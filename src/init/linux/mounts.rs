@@ -113,10 +113,7 @@ where
         mount_phase1_spec(syscalls, spec)?;
         if spec.seed_after_mount {
             syscalls.seed_sd(spec.mount_point).map_err(|error| {
-                BoundaryError::Recovery(format!(
-                    "seed SD on {} failed: {error}",
-                    spec.mount_point
-                ))
+                BoundaryError::Recovery(format!("seed SD on {} failed: {error}", spec.mount_point))
             })?;
         }
     }

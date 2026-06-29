@@ -44,9 +44,7 @@ impl SystemTokenTemplate {
         // logon SID for its session.
         let groups = token
             .groups()
-            .map_err(|error| {
-                BoundaryError::Token(format!("query SYSTEM groups failed: {error}"))
-            })?
+            .map_err(|error| BoundaryError::Token(format!("query SYSTEM groups failed: {error}")))?
             .into_iter()
             .filter(|(_, attrs)| {
                 !GroupAttributes::from_bits_truncate(*attrs).contains(GroupAttributes::LOGON_ID)

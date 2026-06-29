@@ -1,6 +1,6 @@
-# Base metadata shared by every peinit2 package. The runtime package, debuginfo,
-# and debugsource are all carved from one build.main tree, matching the
-# peiosutils/libpeios split-package style.
+# Base metadata shared by every peinit package. The runtime package, libpeinit
+# development files, debuginfo, and debugsource are all carved from one
+# build.main tree, matching the peiosutils/libpeios split-package style.
 
 format = "peipkg"
 

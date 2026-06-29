@@ -7,8 +7,9 @@ license = "MIT"
 publish = false
 
 [lib]
-name = "peinit2"
+name = "peinit"
 path = "src/lib.rs"
+crate-type = ["rlib", "cdylib"]
 
 [dependencies]
 jiff = "0.2.29"

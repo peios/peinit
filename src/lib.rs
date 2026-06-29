@@ -23,6 +23,10 @@ pub mod boot;
 #[doc(hidden)]
 pub mod boundary;
 #[doc(hidden)]
+pub mod capi;
+#[doc(hidden)]
+pub mod cli;
+#[doc(hidden)]
 pub mod control;
 #[doc(hidden)]
 pub mod execution;

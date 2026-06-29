@@ -1,0 +1,10 @@
+prefix=@prefix@
+exec_prefix=${prefix}
+libdir=@libdir@
+includedir=${prefix}/include
+
+Name: peinit
+Description: Peinit public C client/integration ABI
+Version: @version@
+Libs: -L${libdir} -lpeinit
+Cflags: -I${includedir}
