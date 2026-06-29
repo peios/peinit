@@ -19,7 +19,7 @@ mod process_control;
 use child::{ChildExecSpec, child_exec};
 use model::ChildSetupStatus;
 use process_control::{
-    CloneProcessResult, clone_process_into_cgroup, open_dev_null, token_from_handle,
+    CloneProcessResult, clone_process_into_cgroup, open_console, open_dev_null, token_from_handle,
 };
 
 pub(super) fn launch_linux_process(
@@ -68,6 +68,24 @@ pub(super) fn launch_linux_process(
         }
     };
 
+    // Console-attached services (the compiled-in console shell) get a live tty
+    // on 0/1/2 instead of the daemon /dev/null + capture pipes below. Opened in
+    // the parent so the cloned child inherits the fd; the child dups it onto the
+    // standard streams and the parent drops its copy after the clone.
+    let console = if job.attach_console {
+        match open_console() {
+            Ok(console) => Some(console),
+            Err(error) => {
+                return Err(parent_setup_with_cleanup(
+                    error,
+                    close_parent_launch_fds(token, cgroup),
+                ));
+            }
+        }
+    } else {
+        None
+    };
+
     let (exec_error_read, exec_error_write) = match create_read_nonblocking_pipe("exec-error") {
         Ok(pipe) => pipe,
         Err(error) => {
@@ -108,6 +126,7 @@ pub(super) fn launch_linux_process(
                     stdout_write_fd: stdout_write.as_raw_fd(),
                     stderr_read_fd: stderr_read.as_raw_fd(),
                     stderr_write_fd: stderr_write.as_raw_fd(),
+                    console_fd: console.as_ref().map(|console| console.as_raw_fd()),
                     limit_nofile: job.limit_nofile,
                     limit_core: job.limit_core,
                     oom_score_adj: job.oom_score_adj,
@@ -124,6 +143,7 @@ pub(super) fn launch_linux_process(
 
     let cleanup_evidence = close_parent_launch_fds(token, cgroup);
     drop(dev_null);
+    drop(console);
     drop(exec_error_write);
     drop(stdout_write);
     drop(stderr_write);

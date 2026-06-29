@@ -27,3 +27,15 @@ pub(in crate::boundary::linux_launch::process) fn open_dev_null() -> Result<Owne
         .map_err(|error| BoundaryError::Process(format!("open /dev/null failed: {error}")))?;
     Ok(file.into())
 }
+
+/// Open the system console read/write for a console-attached service (the
+/// compiled-in console shell). The child dups this onto stdin/stdout/stderr in
+/// place of the daemon `/dev/null` + log-pipe wiring, giving it a live tty —
+/// the same attach the recovery console performs.
+pub(in crate::boundary::linux_launch::process) fn open_console() -> Result<OwnedFd, BoundaryError> {
+    let file = OpenOptions::new()
+        .desired_access(FileAccess::READ_DATA | FileAccess::WRITE_DATA)
+        .open(None, Path::new("/dev/console"))
+        .map_err(|error| BoundaryError::Process(format!("open /dev/console failed: {error}")))?;
+    Ok(file.into())
+}

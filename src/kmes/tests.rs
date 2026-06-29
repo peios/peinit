@@ -64,6 +64,7 @@ fn encodes_terminal_job_payload_as_msgpack_record() {
         activation_generation: 3,
         cgroup_generation: 7,
         operation_id: Some(operation_id),
+        attach_console: false,
     })
     .expect("job ended event");
 

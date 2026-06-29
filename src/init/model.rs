@@ -26,6 +26,7 @@ impl Default for InitConfig {
 pub struct KernelCommandLine {
     pub safe_mode: bool,
     pub recovery: bool,
+    pub console: bool,
 }
 
 impl KernelCommandLine {
@@ -35,6 +36,11 @@ impl KernelCommandLine {
             match token {
                 "peios.safemode=1" => command_line.safe_mode = true,
                 "peios.recovery=1" => command_line.recovery = true,
+                // Bring-up/debug affordance: inject the compiled-in console
+                // service (a SYSTEM shell attached to /dev/console, respawned on
+                // exit) into the Phase 2 boot set. Off by default so a normal
+                // image never auto-spawns a privileged console shell.
+                "peios.console=1" => command_line.console = true,
                 _ => {}
             }
         }
@@ -57,6 +63,16 @@ pub trait InitPlatform {
         observed_at_ns: u64,
     ) -> Result<(), BoundaryError>;
     fn setup_infrastructure(&mut self) -> Result<Phase1Infrastructure, BoundaryError>;
+    /// Run the image's autorun scripts (`/usr/system/libexec/autorun.d`),
+    /// between base provisioning and Phase-2 service enumeration. peinit is a
+    /// generic runner here — it knows nothing about what the scripts do (the
+    /// registry-seed apply is just one of them). Scripts own their own lifecycle
+    /// (persistent, idempotent, or self-deleting via `rm "$0"`). Fail-open: the
+    /// implementation logs its own console summary and never aborts boot. Default
+    /// is a no-op so non-Linux platforms and test doubles need no implementation.
+    fn run_autorun_scripts(&mut self) -> Result<(), BoundaryError> {
+        Ok(())
+    }
     fn log_phase1_warning(
         &mut self,
         _warning: &Phase1InfrastructureWarning,

@@ -164,6 +164,9 @@ impl DefinitionBuilder {
             service_security: self.service_security,
             timer_persistent: self.timer_persistent,
             timer_jitter_secs: self.timer_jitter_secs,
+            // Console attachment is never registry-expressible: it is reserved
+            // for the compiled-in console service.
+            attach_console: false,
         })
     }
 }

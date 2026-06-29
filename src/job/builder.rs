@@ -68,6 +68,7 @@ impl JobRecord {
             activation_generation,
             cgroup_generation,
             operation_id: Some(operation_id),
+            attach_console: service.attach_console,
         }
     }
 
@@ -107,6 +108,7 @@ impl JobRecord {
             activation_generation: 0,
             cgroup_generation: 0,
             operation_id: None,
+            attach_console: false,
         }
     }
 }

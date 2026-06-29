@@ -19,6 +19,7 @@ mod mounts;
 mod recovery_console;
 mod registryd;
 mod rtc;
+mod autorun;
 
 use files::LinuxInitFiles;
 use infrastructure::setup_linux_phase1_infrastructure;
@@ -93,6 +94,10 @@ impl InitPlatform for LinuxInitPlatform {
 
     fn setup_infrastructure(&mut self) -> Result<Phase1Infrastructure, BoundaryError> {
         setup_linux_phase1_infrastructure()
+    }
+
+    fn run_autorun_scripts(&mut self) -> Result<(), BoundaryError> {
+        autorun::run_autorun_scripts()
     }
 
     fn log_phase1_warning(

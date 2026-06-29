@@ -120,11 +120,22 @@ pub struct ServiceDefinition {
     pub service_security: ServiceSecurityDescriptor,
     pub timer_persistent: bool,
     pub timer_jitter_secs: u64,
+    /// When set, the launcher attaches this service's stdio to `/dev/console`
+    /// (a real tty on fds 0/1/2) instead of the daemon default (`/dev/null`
+    /// stdin + captured stdout/stderr log pipes). Reserved for the compiled-in
+    /// console service; never set from a registry definition.
+    pub attach_console: bool,
 }
 
 impl ServiceDefinition {
     pub const REGISTRYD_NAME: &'static str = "registryd";
     pub const REGISTRYD_IMAGE_PATH: &'static str = "/usr/sbin/registryd";
+    /// The compiled-in console service: a SYSTEM shell on `/dev/console`,
+    /// injected into the Phase 2 boot set only when `peios.console=1` is on the
+    /// kernel command line. Not a registry entry — like registryd, peinit owns
+    /// it directly.
+    pub const CONSOLE_NAME: &'static str = "console";
+    pub const CONSOLE_IMAGE_PATH: &'static str = "/usr/bin/sh";
     /// Hive specs handed to the Phase-1 registryd, in the `HiveName=Path` form
     /// the RSI source (loregd) parses. peinit owns this boot policy — where the
     /// machine registry lives — the way it owns `REGISTRYD_IMAGE_PATH`; loregd
@@ -201,6 +212,7 @@ impl ServiceDefinition {
             service_security: ServiceSecurityDescriptor::Default,
             timer_persistent: Self::DEFAULT_TIMER_PERSISTENT,
             timer_jitter_secs: Self::DEFAULT_TIMER_JITTER_SECS,
+            attach_console: false,
         }
     }
 
@@ -215,9 +227,66 @@ impl ServiceDefinition {
         service
     }
 
+    /// The compiled-in console service: a SYSTEM shell on `/dev/console`.
+    ///
+    /// Unlike registryd it is *not* a notify-readiness daemon — a shell never
+    /// sends `READY=1`, so readiness is `Alive` (active once exec'd). It is
+    /// respawned forever (`RestartPolicy::Always`): exiting the shell yields a
+    /// fresh prompt rather than a dead console. `attach_console` routes its
+    /// stdio to the console tty in the launcher. Environment mirrors the
+    /// recovery console's shell so the prompt behaves the same.
+    pub fn compiled_in_console() -> Self {
+        let mut service = Self::simple_system_boot(Self::CONSOLE_NAME, Self::CONSOLE_IMAGE_PATH);
+        service.readiness = Readiness::Alive;
+        service.restart_policy = RestartPolicy::Always;
+        service.attach_console = true;
+        service.environment = vec![
+            ServiceEnvironmentVariable {
+                name: "PATH".to_string(),
+                value: "/usr/sbin:/usr/bin:/sbin:/bin".to_string(),
+            },
+            ServiceEnvironmentVariable {
+                name: "TERM".to_string(),
+                value: "linux".to_string(),
+            },
+            ServiceEnvironmentVariable {
+                name: "HOME".to_string(),
+                value: "/root".to_string(),
+            },
+        ];
+        service
+    }
+
     pub fn has_boot_trigger(&self) -> bool {
         self.triggers
             .iter()
             .any(|trigger| matches!(trigger, ServiceTrigger::Boot))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn compiled_in_console_attaches_a_respawning_alive_system_shell() {
+        let console = ServiceDefinition::compiled_in_console();
+
+        assert_eq!(console.name, ServiceDefinition::CONSOLE_NAME);
+        assert_eq!(console.image_path, ServiceDefinition::CONSOLE_IMAGE_PATH);
+        assert_eq!(console.identity, "SYSTEM");
+        assert!(console.attach_console);
+        // A shell never sends READY=1, so it must be Alive (active once exec'd)
+        // and respawned forever so exiting the shell yields a fresh prompt.
+        assert_eq!(console.readiness, Readiness::Alive);
+        assert_eq!(console.restart_policy, RestartPolicy::Always);
+        assert!(console.has_boot_trigger());
+    }
+
+    #[test]
+    fn simple_system_boot_does_not_attach_a_console() {
+        let service = ServiceDefinition::simple_system_boot("svc", "/usr/bin/svc");
+
+        assert!(!service.attach_console);
     }
 }
