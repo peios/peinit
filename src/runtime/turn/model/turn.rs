@@ -1,0 +1,155 @@
+use crate::boundary::{
+    BoundaryError, LinuxSignalFdRead, LinuxTimerFdRead, RegistryWatchEvent,
+    TimerLastRunWriteOutcome,
+};
+use crate::control::reload_config::{ReloadConfigError, ReloadConfigOutcome};
+use crate::runtime::{RuntimeEventSource, RuntimeLogPipeTurn};
+use crate::supervisor::{
+    SupervisorChildReapTurn, SupervisorControlConnectionTableTurn,
+    SupervisorFilesystemCheckCompletionDispatch, SupervisorLifecycleDeadlineDispatch,
+    SupervisorLifecycleDeadlineTimerTurn, SupervisorPendingProcessSetupDispatch,
+    SupervisorPid1SignalFdTurn, SupervisorProcessSetupDispatch,
+    SupervisorShutdownDeadlineTimerTurn, SupervisorShutdownDriveDispatch, SupervisorTimerDispatch,
+};
+
+use super::notify::{RuntimeNotifyRead, RuntimeNotifySupervisorTurn};
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RuntimeShutdownEventTurn {
+    Pid1Signal {
+        read: LinuxSignalFdRead,
+        supervisor: SupervisorPid1SignalFdTurn,
+        child_reaps: Vec<SupervisorChildReapTurn>,
+        deadline_timer: Option<SupervisorShutdownDeadlineTimerTurn>,
+    },
+    ControlListener {
+        accept: crate::control::connection::ControlConnectionAcceptTurn,
+        registration: Option<RuntimeEventSource>,
+    },
+    ControlConnection {
+        fd: i32,
+        supervisor: Box<SupervisorControlConnectionTableTurn>,
+        deadline_timer: Option<SupervisorShutdownDeadlineTimerTurn>,
+    },
+    IdleControlConnectionsClosed {
+        fds: Vec<i32>,
+    },
+    StaleControlConnection {
+        fd: i32,
+    },
+    ShutdownDeadlineTimer {
+        read: LinuxTimerFdRead,
+        drive: Option<Box<SupervisorShutdownDriveDispatch>>,
+        deadline_timer: SupervisorShutdownDeadlineTimerTurn,
+    },
+    LifecycleDeadlineTimer {
+        read: LinuxTimerFdRead,
+        drive: Option<Box<SupervisorLifecycleDeadlineDispatch>>,
+        deadline_timer: SupervisorLifecycleDeadlineTimerTurn,
+    },
+    Notify {
+        read: RuntimeNotifyRead,
+        supervisor: Option<RuntimeNotifySupervisorTurn>,
+        deadline_timer: Option<SupervisorShutdownDeadlineTimerTurn>,
+    },
+    ServiceLogPipe {
+        pipe: RuntimeLogPipeTurn,
+    },
+    JfsDevice {
+        turn: RuntimeJfsDeviceTurn,
+    },
+    CalendarTimer {
+        fd: i32,
+        turn: RuntimeCalendarTimerTurn,
+    },
+    FilesystemCheckHelper {
+        result_fd: i32,
+        turn: RuntimeFilesystemCheckHelperTurn,
+    },
+    FilesystemCheckHelperExit {
+        pidfd: i32,
+        turn: RuntimeFilesystemCheckHelperTurn,
+    },
+    RegistryWatch {
+        fd: i32,
+        turn: RuntimeRegistryWatchTurn,
+    },
+    ProcessSetup {
+        fd: i32,
+        turn: RuntimeProcessSetupTurn,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RuntimeCalendarTimerTurn {
+    NoRuntimeTable {
+        fd: i32,
+    },
+    Read {
+        read: LinuxTimerFdRead,
+        supervisor: Option<Box<SupervisorTimerDispatch>>,
+        last_run_write: Option<Result<TimerLastRunWriteOutcome, BoundaryError>>,
+        next_scheduled_ns: Option<u64>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RuntimeJfsDeviceTurn {
+    ParseBoundaryReached {
+        fd: i32,
+        source_disabled_until_abi_exists: bool,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RuntimeFilesystemCheckHelperTurn {
+    WouldBlock {
+        result_fd: i32,
+    },
+    Stale {
+        fd: i32,
+    },
+    Completed {
+        completion: Box<SupervisorFilesystemCheckCompletionDispatch>,
+    },
+    ReadFailedClosed {
+        result_fd: i32,
+        error: BoundaryError,
+        completion: Box<SupervisorFilesystemCheckCompletionDispatch>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RuntimeRegistryWatchTurn {
+    Unavailable {
+        fd: i32,
+        reason: String,
+    },
+    NoEvents {
+        fd: i32,
+    },
+    ReadFailed {
+        fd: i32,
+        error: BoundaryError,
+        source_disabled: bool,
+    },
+    ReloadConfig {
+        events: Vec<RegistryWatchEvent>,
+        overflow: bool,
+        outcome: Box<Result<ReloadConfigOutcome, ReloadConfigError>>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RuntimeProcessSetupTurn {
+    Pending {
+        pending: SupervisorPendingProcessSetupDispatch,
+    },
+    Stale {
+        fd: i32,
+    },
+    Completed {
+        supervisor: Box<SupervisorProcessSetupDispatch>,
+        log_registrations: Vec<RuntimeEventSource>,
+    },
+}

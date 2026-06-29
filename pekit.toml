@@ -1,0 +1,180 @@
+# peinit2 — replacement Peios real-root PID 1 service manager.
+#
+# This recipe mirrors peinit's packaged build strategy, but builds the fully
+# wired Linux PID1 path by enabling all features. The important libpeios detail
+# is deliberate: use pkg-config, not PEIOS_LIB_DIR, so peios-sys does not embed a
+# checkout-local rpath in the packaged binary. Local monorepo builds synthesize a
+# temporary peios.pc from the sibling libpeios/pkm trees when libpeios-devel is
+# not already installed in the build root.
+
+out_dir = "out"
+
+[build]
+command = """
+set -eu
+set -o pipefail 2>/dev/null || true
+
+SRC="$(pwd)"
+REPO_ROOT="$(cd "$SRC/.." && pwd)"
+
+for tool in cargo rustc gcc pkg-config objcopy strip readelf debugedit; do
+  command -v "$tool" >/dev/null || { echo "missing required peinit2 build tool: $tool" >&2; exit 1; }
+done
+
+# Force the packaging-safe peios-sys path even if a developer shell happens to
+# carry the env overrides used for quick local tests.
+unset PEIOS_LIB_DIR PEIOS_INCLUDE PKM_UAPI
+
+if ! pkg-config --exists peios; then
+  LIBPEIOS_ROOT="$REPO_ROOT/libpeios"
+  PKM_UAPI_ROOT="$REPO_ROOT/pkm/uapi"
+
+  [ -f "$LIBPEIOS_ROOT/Cargo.toml" ] || {
+    echo "libpeios package metadata not found at $LIBPEIOS_ROOT" >&2
+    exit 1
+  }
+  [ -d "$LIBPEIOS_ROOT/include/peios" ] || {
+    echo "libpeios headers not found at $LIBPEIOS_ROOT/include" >&2
+    exit 1
+  }
+  [ -d "$PKM_UAPI_ROOT/pkm" ] || {
+    echo "pkm UAPI headers not found at $PKM_UAPI_ROOT" >&2
+    exit 1
+  }
+
+  cargo build --release --locked --manifest-path "$LIBPEIOS_ROOT/Cargo.toml"
+
+  PC_DIR="$PEKIT_OUT/pkgconfig"
+  mkdir -p "$PC_DIR"
+  LIBPEIOS_VERSION="$(sed -n 's/^version = "\\([^"]*\\)".*/\\1/p' "$LIBPEIOS_ROOT/Cargo.toml" | head -1)"
+  {
+    printf 'prefix=%s\\n' "$LIBPEIOS_ROOT"
+    printf 'exec_prefix=${prefix}\\n'
+    printf 'libdir=%s/target/release\\n' "$LIBPEIOS_ROOT"
+    printf 'includedir=%s/include\\n' "$LIBPEIOS_ROOT"
+    printf '\\n'
+    printf 'Name: peios\\n'
+    printf 'Description: Peios userspace C ABI library (libpeios)\\n'
+    printf 'Version: %s\\n' "$LIBPEIOS_VERSION"
+    printf 'Libs: -L${libdir} -lpeios\\n'
+    printf 'Cflags: -I${includedir} -I%s\\n' "$PKM_UAPI_ROOT"
+  } > "$PC_DIR/peios.pc"
+  export PKG_CONFIG_PATH="$PC_DIR${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+fi
+
+# bindgen needs freestanding C headers such as stddef.h. A full clang install
+# has these in its resource dir; libclang-only hosts often need GCC's include
+# dir passed explicitly.
+export BINDGEN_EXTRA_CLANG_ARGS="-isystem $(gcc -print-file-name=include) ${BINDGEN_EXTRA_CLANG_ARGS:-}"
+
+CARGO_PROFILE_RELEASE_DEBUG=2 CARGO_PROFILE_RELEASE_SPLIT_DEBUGINFO=off \
+  cargo build --release --locked --all-features --bin peinit2 --target-dir "$PEKIT_OUT/target"
+
+mkdir -p "$PEKIT_OUT/usr/bin"
+install -m 0755 "$PEKIT_OUT/target/release/peinit2" "$PEKIT_OUT/usr/bin/peinit2"
+
+# Split debug info in the same style as libpeios/peiosutils: DWARF goes to a
+# build-id-indexed .debug file, the shipped PID1 binary is stripped, and only
+# this crate's referenced sources are staged under /usr/src/debug/peinit2.
+bin="$PEKIT_OUT/usr/bin/peinit2"
+debugedit -b "$SRC" -d /usr/src/debug/peinit2 -l "$PEKIT_OUT/.srclist" -n "$bin"
+bid=$(readelf -n "$bin" | sed -n 's/^[[:space:]]*Build ID: //p' | head -1)
+if [ -n "$bid" ]; then
+  p2=$(printf %s "$bid" | cut -c1-2)
+  rest=$(printf %s "$bid" | cut -c3-)
+  mkdir -p "$PEKIT_OUT/usr/lib/debug/.build-id/$p2"
+  objcopy --only-keep-debug "$bin" "$PEKIT_OUT/usr/lib/debug/.build-id/$p2/$rest.debug"
+  chmod 0644 "$PEKIT_OUT/usr/lib/debug/.build-id/$p2/$rest.debug"
+fi
+strip "$bin"
+
+tr '\\0' '\\n' < "$PEKIT_OUT/.srclist" | sort -u | while IFS= read -r rel; do
+  [ -n "$rel" ] || continue
+  case "$rel" in */) continue;; esac
+  [ -f "$SRC/$rel" ] || continue
+  mkdir -p "$PEKIT_OUT/usr/src/debug/peinit2/$(dirname "$rel")"
+  cp "$SRC/$rel" "$PEKIT_OUT/usr/src/debug/peinit2/$rel"
+done
+rm -f "$PEKIT_OUT/.srclist"
+"""
+
+[build.dependencies.peipkg]
+cargo = "*"
+rust = "*"
+gcc = "*"
+clang = "*"
+pkgconf-pkg-config = "*"
+libpeios-devel = "*"
+kernel-headers = "*"
+binutils = "*"
+debugedit = "*"
+
+[build.dependencies.apt]
+cargo = "*"
+rustc = "*"
+gcc = "*"
+pkg-config = "*"
+"libclang-dev" = "*"
+binutils = "*"
+debugedit = "*"
+
+[test]
+command = """
+set -eu
+set -o pipefail 2>/dev/null || true
+
+SRC="$(pwd)"
+REPO_ROOT="$(cd "$SRC/.." && pwd)"
+
+for tool in cargo rustc gcc pkg-config; do
+  command -v "$tool" >/dev/null || { echo "missing required peinit2 test tool: $tool" >&2; exit 1; }
+done
+
+unset PEIOS_LIB_DIR PEIOS_INCLUDE PKM_UAPI
+
+if ! pkg-config --exists peios; then
+  LIBPEIOS_ROOT="$REPO_ROOT/libpeios"
+  PKM_UAPI_ROOT="$REPO_ROOT/pkm/uapi"
+
+  [ -f "$LIBPEIOS_ROOT/Cargo.toml" ] || {
+    echo "libpeios package metadata not found at $LIBPEIOS_ROOT" >&2
+    exit 1
+  }
+  [ -d "$LIBPEIOS_ROOT/include/peios" ] || {
+    echo "libpeios headers not found at $LIBPEIOS_ROOT/include" >&2
+    exit 1
+  }
+  [ -d "$PKM_UAPI_ROOT/pkm" ] || {
+    echo "pkm UAPI headers not found at $PKM_UAPI_ROOT" >&2
+    exit 1
+  }
+
+  cargo build --release --locked --manifest-path "$LIBPEIOS_ROOT/Cargo.toml"
+
+  PEKIT_TEST_OUT="${PEKIT_OUT:-target/pekit-test}"
+  PC_DIR="$PEKIT_TEST_OUT/pkgconfig"
+  mkdir -p "$PC_DIR"
+  LIBPEIOS_VERSION="$(sed -n 's/^version = "\\([^"]*\\)".*/\\1/p' "$LIBPEIOS_ROOT/Cargo.toml" | head -1)"
+  {
+    printf 'prefix=%s\\n' "$LIBPEIOS_ROOT"
+    printf 'exec_prefix=${prefix}\\n'
+    printf 'libdir=%s/target/release\\n' "$LIBPEIOS_ROOT"
+    printf 'includedir=%s/include\\n' "$LIBPEIOS_ROOT"
+    printf '\\n'
+    printf 'Name: peios\\n'
+    printf 'Description: Peios userspace C ABI library (libpeios)\\n'
+    printf 'Version: %s\\n' "$LIBPEIOS_VERSION"
+    printf 'Libs: -L${libdir} -lpeios\\n'
+    printf 'Cflags: -I${includedir} -I%s\\n' "$PKM_UAPI_ROOT"
+  } > "$PC_DIR/peios.pc"
+  export PKG_CONFIG_PATH="$PC_DIR${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+  export LD_LIBRARY_PATH="$LIBPEIOS_ROOT/target/release${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+fi
+
+export BINDGEN_EXTRA_CLANG_ARGS="-isystem $(gcc -print-file-name=include) ${BINDGEN_EXTRA_CLANG_ARGS:-}"
+
+cargo test --locked --all-features
+"""
+
+[clean]
+command = "cargo clean"

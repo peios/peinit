@@ -1,0 +1,12 @@
+# peinit2-debuginfo — separated debug symbols for the peinit2 PID 1 binary.
+# build.main splits DWARF into /usr/lib/debug/.build-id/ so gdb/perf/debuginfod
+# can find the symbols by build-id.
+
+[package]
+description = "Replacement Peios PID 1 service manager - debugging symbols"
+
+[dependencies]
+peinit2 = "{{version}}"
+
+[files]
+":usr/lib/debug/**" = "usr/lib/debug/"

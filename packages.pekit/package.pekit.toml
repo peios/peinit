@@ -1,0 +1,10 @@
+# Base metadata shared by every peinit2 package. The runtime package, debuginfo,
+# and debugsource are all carved from one build.main tree, matching the
+# peiosutils/libpeios split-package style.
+
+format = "peipkg"
+
+[package]
+version      = "{{version}}-1"
+architecture = "x86_64"
+license      = "MIT"

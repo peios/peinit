@@ -1,0 +1,41 @@
+use crate::supervisor::dispatch::{
+    SupervisorBootSuccessDispatch, SupervisorFilesystemCheckTimeoutDispatch,
+    SupervisorHealthCheckIntervalDispatch, SupervisorHealthCheckTimeoutDispatch,
+    SupervisorPostStartHookTimeoutDispatch, SupervisorPreStartHookTimeoutDispatch,
+    SupervisorReadinessTimeoutDispatch, SupervisorReloadCommandTimeoutDispatch,
+    SupervisorReloadDetectionDispatch, SupervisorRestartBackoffDispatch,
+    SupervisorStopEscalationDispatch, SupervisorWatchdogTimeoutDispatch,
+};
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SupervisorLifecycleDeadlineDispatch {
+    pub pre_start_check_timeouts: Vec<SupervisorFilesystemCheckTimeoutDispatch>,
+    pub pre_start_hook_timeouts: Vec<SupervisorPreStartHookTimeoutDispatch>,
+    pub post_start_hook_timeouts: Vec<SupervisorPostStartHookTimeoutDispatch>,
+    pub readiness_timeouts: Vec<SupervisorReadinessTimeoutDispatch>,
+    pub stop_timeouts: Vec<SupervisorStopEscalationDispatch>,
+    pub reload_detections: Vec<SupervisorReloadDetectionDispatch>,
+    pub reload_command_timeouts: Vec<SupervisorReloadCommandTimeoutDispatch>,
+    pub restart_backoffs: Vec<SupervisorRestartBackoffDispatch>,
+    pub health_check_intervals: Vec<SupervisorHealthCheckIntervalDispatch>,
+    pub health_check_timeouts: Vec<SupervisorHealthCheckTimeoutDispatch>,
+    pub watchdog_timeouts: Vec<SupervisorWatchdogTimeoutDispatch>,
+    pub boot_successes: Vec<SupervisorBootSuccessDispatch>,
+}
+
+impl SupervisorLifecycleDeadlineDispatch {
+    pub fn is_empty(&self) -> bool {
+        self.pre_start_check_timeouts.is_empty()
+            && self.pre_start_hook_timeouts.is_empty()
+            && self.post_start_hook_timeouts.is_empty()
+            && self.readiness_timeouts.is_empty()
+            && self.stop_timeouts.is_empty()
+            && self.reload_detections.is_empty()
+            && self.reload_command_timeouts.is_empty()
+            && self.restart_backoffs.is_empty()
+            && self.health_check_intervals.is_empty()
+            && self.health_check_timeouts.is_empty()
+            && self.watchdog_timeouts.is_empty()
+            && self.boot_successes.is_empty()
+    }
+}

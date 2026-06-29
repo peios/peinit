@@ -1,0 +1,335 @@
+use crate::boundary::ProcessSignal;
+use crate::control::lifecycle::LifecycleCommandOutcome;
+use crate::operation::OperationSource;
+use crate::service::RestartPolicy;
+use crate::service::runtime::{ServiceState, TransitionCause};
+use crate::supervisor::{Supervisor, SupervisorSettings};
+
+use super::{
+    APP_CRASH_NS, APP_LAUNCH_NS, BOOT_NS, LIFECYCLE_COMMAND_NS, ScriptedClock, StaticRegistry,
+    TestProcessController, TestProcessLauncher, TestTokenProvider, alive_service, process,
+    settings,
+};
+
+const CONTROL_NS: u64 = 1_700_000_000;
+const STOPPED_NS: u64 = 1_700_010_000;
+const RECOVERY_NS: u64 = 1_800_000_000;
+const RECOVERY_LAUNCH_NS: u64 = 1_800_010_000;
+
+#[test]
+fn conflict_start_stops_active_reverse_declared_conflict_before_winner_launches() {
+    let mut app = alive_service("app");
+    app.triggers.clear();
+    let mut incumbent = alive_service("incumbent");
+    incumbent.conflicts.push("app".to_string());
+    let mut supervisor = boot_and_launch(vec![app, incumbent], [BOOT_NS, APP_LAUNCH_NS]);
+
+    let mut clock = ScriptedClock::new([LIFECYCLE_COMMAND_NS]);
+    let start = supervisor
+        .start_service("app", None, &mut clock)
+        .expect("start app");
+    let LifecycleCommandOutcome::OnDemandStart(dispatch) = &start.outcome else {
+        panic!("expected on-demand start");
+    };
+    assert!(start.start_dispatches.is_empty());
+    assert!(supervisor.pending_launch_jobs().is_empty());
+    assert_eq!(
+        supervisor.pending_control_operations()[0].service,
+        "incumbent",
+    );
+    assert_eq!(
+        supervisor
+            .operation_status(supervisor.pending_control_operations()[0].operation_id)
+            .expect("conflict stop operation")
+            .source,
+        OperationSource::ConflictResolution,
+    );
+    assert_eq!(
+        dispatch.requested_operation.returned_operation_id,
+        supervisor
+            .service_status("app")
+            .expect("app status")
+            .current_operation
+            .expect("app operation")
+            .id,
+    );
+
+    let mut controller = TestProcessController::default();
+    let mut clock = ScriptedClock::new([CONTROL_NS]);
+    supervisor
+        .execute_next_pending_control_operation(&mut controller, &mut clock)
+        .expect("execute conflict stop")
+        .expect("conflict stop dispatch");
+    assert_eq!(controller.signals[0].signal, ProcessSignal::Sigterm);
+    assert_eq!(
+        supervisor
+            .service_status("incumbent")
+            .expect("incumbent")
+            .cause,
+        Some(TransitionCause::ConflictEviction),
+    );
+
+    let incumbent_job = current_job(&supervisor, "incumbent");
+    let terminal = supervisor
+        .complete_job(incumbent_job, STOPPED_NS, 0)
+        .expect("incumbent stopped");
+    assert_eq!(
+        terminal
+            .start_dispatches
+            .iter()
+            .map(|dispatch| dispatch.ready.service.as_str())
+            .collect::<Vec<_>>(),
+        vec!["app"],
+    );
+    assert_eq!(
+        supervisor
+            .service_status("incumbent")
+            .expect("incumbent")
+            .state,
+        ServiceState::Failed,
+    );
+    assert_eq!(supervisor.pending_launch_jobs().len(), 1);
+}
+
+#[test]
+fn binds_to_stop_propagates_and_recovery_restarts_failed_dependent() {
+    let mut app = alive_service("app");
+    app.binds_to.push("db".to_string());
+    let db = alive_service("db");
+    let mut supervisor =
+        boot_and_launch(vec![app, db], [BOOT_NS, APP_LAUNCH_NS, APP_LAUNCH_NS + 1]);
+
+    let mut clock = ScriptedClock::new([LIFECYCLE_COMMAND_NS]);
+    supervisor
+        .stop_service("db", None, &mut clock)
+        .expect("stop db");
+    let mut controller = TestProcessController::default();
+    let mut clock = ScriptedClock::new([CONTROL_NS, CONTROL_NS + 1]);
+    supervisor
+        .execute_next_pending_control_operation(&mut controller, &mut clock)
+        .expect("execute db stop")
+        .expect("db stop dispatch");
+    assert_eq!(supervisor.pending_control_operations()[0].service, "app",);
+
+    supervisor
+        .execute_next_pending_control_operation(&mut controller, &mut clock)
+        .expect("execute app binds stop")
+        .expect("app stop dispatch");
+    assert_eq!(
+        supervisor.service_status("app").expect("app").cause,
+        Some(TransitionCause::BindsToPropagation),
+    );
+
+    let app_job = current_job(&supervisor, "app");
+    supervisor
+        .complete_job(app_job, STOPPED_NS, 0)
+        .expect("app stopped by binds");
+    assert_eq!(
+        supervisor.service_status("app").expect("app").state,
+        ServiceState::Failed,
+    );
+    let db_job = current_job(&supervisor, "db");
+    supervisor
+        .complete_job(db_job, STOPPED_NS + 1, 0)
+        .expect("db stopped");
+
+    let mut clock = ScriptedClock::new([RECOVERY_NS, RECOVERY_LAUNCH_NS]);
+    let db_start = supervisor
+        .start_service("db", None, &mut clock)
+        .expect("restart db");
+    assert_eq!(
+        db_start
+            .start_dispatches
+            .iter()
+            .map(|dispatch| dispatch.ready.service.as_str())
+            .collect::<Vec<_>>(),
+        vec!["db"],
+    );
+
+    let mut tokens = TestTokenProvider::default();
+    let mut launcher = TestProcessLauncher::new(vec![process(9100, 91), process(9101, 92)]);
+    let db_launch = supervisor
+        .launch_next_pending_job(&mut tokens, &mut launcher, &mut clock)
+        .expect("launch db recovery")
+        .expect("db launch");
+    assert_eq!(
+        db_launch
+            .start_dispatches
+            .iter()
+            .map(|dispatch| dispatch.ready.service.as_str())
+            .collect::<Vec<_>>(),
+        vec!["app"],
+    );
+    let app_operation = supervisor
+        .service_status("app")
+        .expect("app status")
+        .current_operation
+        .expect("app recovery operation")
+        .id;
+    assert_eq!(
+        supervisor
+            .operation_status(app_operation)
+            .expect("app recovery operation")
+            .source,
+        OperationSource::BindsToRecovery,
+    );
+}
+
+#[test]
+fn on_failure_starts_fallback_when_service_enters_failed() {
+    let mut app = alive_service("app");
+    app.on_failure = Some("fallback".to_string());
+    app.restart_policy = RestartPolicy::Never;
+    let mut fallback = alive_service("fallback");
+    fallback.triggers.clear();
+    let mut supervisor = boot_and_launch(vec![app, fallback], [BOOT_NS, APP_LAUNCH_NS]);
+    let app_job = current_job(&supervisor, "app");
+
+    let terminal = supervisor
+        .complete_job(app_job, APP_CRASH_NS, 1)
+        .expect("app failed");
+
+    assert_eq!(
+        terminal
+            .start_dispatches
+            .iter()
+            .map(|dispatch| dispatch.ready.service.as_str())
+            .collect::<Vec<_>>(),
+        vec!["fallback"],
+    );
+    let fallback_operation = supervisor
+        .service_status("fallback")
+        .expect("fallback")
+        .current_operation
+        .expect("fallback operation")
+        .id;
+    assert_eq!(
+        supervisor
+            .operation_status(fallback_operation)
+            .expect("fallback operation")
+            .source,
+        OperationSource::OnFailure,
+    );
+    assert_eq!(supervisor.pending_launch_jobs().len(), 1);
+}
+
+#[test]
+fn on_failure_self_reference_is_suppressed_at_runtime() {
+    let mut app = alive_service("app");
+    app.on_failure = Some("app".to_string());
+    app.restart_policy = RestartPolicy::Never;
+    let mut supervisor = boot_and_launch(vec![app], [BOOT_NS, APP_LAUNCH_NS]);
+    let app_job = current_job(&supervisor, "app");
+
+    let terminal = supervisor
+        .complete_job(app_job, APP_CRASH_NS, 1)
+        .expect("app failed");
+
+    assert!(terminal.start_dispatches.is_empty());
+    assert!(supervisor.pending_launch_jobs().is_empty());
+}
+
+#[test]
+fn on_failure_loop_guard_survives_active_fallback_crashes() {
+    let mut a = alive_service("a");
+    a.on_failure = Some("b".to_string());
+    a.restart_policy = RestartPolicy::Never;
+    let mut b = alive_service("b");
+    b.triggers.clear();
+    b.on_failure = Some("a".to_string());
+    b.restart_policy = RestartPolicy::Never;
+    let mut supervisor = boot_and_launch(vec![a, b], [BOOT_NS, APP_LAUNCH_NS]);
+
+    let a_job = current_job(&supervisor, "a");
+    let a_failure = supervisor
+        .complete_job(a_job, APP_CRASH_NS, 1)
+        .expect("a failed");
+    assert_eq!(
+        a_failure
+            .start_dispatches
+            .iter()
+            .map(|dispatch| dispatch.ready.service.as_str())
+            .collect::<Vec<_>>(),
+        vec!["b"],
+    );
+    launch_one_pending(&mut supervisor, APP_CRASH_NS + 1, 9200, 120);
+
+    let b_job = current_job(&supervisor, "b");
+    let b_failure = supervisor
+        .complete_job(b_job, APP_CRASH_NS + 2, 1)
+        .expect("b failed");
+    assert_eq!(
+        b_failure
+            .start_dispatches
+            .iter()
+            .map(|dispatch| dispatch.ready.service.as_str())
+            .collect::<Vec<_>>(),
+        vec!["a"],
+    );
+    launch_one_pending(&mut supervisor, APP_CRASH_NS + 3, 9201, 121);
+
+    let a_job = current_job(&supervisor, "a");
+    let suppressed = supervisor
+        .complete_job(a_job, APP_CRASH_NS + 4, 1)
+        .expect("a failed again");
+    assert!(suppressed.start_dispatches.is_empty());
+    assert!(supervisor.pending_launch_jobs().is_empty());
+
+    let maintenance = supervisor
+        .process_due_operation_maintenance(APP_CRASH_NS + 5)
+        .expect("drain relationship audit events");
+    assert_eq!(maintenance.relationship_audit_events.len(), 1);
+    let audit = &maintenance.relationship_audit_events[0];
+    assert_eq!(audit.failed_service, "a");
+    assert_eq!(audit.attempted_handler, "b");
+    assert_eq!(audit.chain, ["b", "a", "b"]);
+    assert_eq!(
+        audit.reason,
+        crate::supervisor::SupervisorOnFailureLoopSuppressionReason::Cycle
+    );
+}
+
+fn boot_and_launch<const N: usize>(
+    services: Vec<crate::service::ServiceDefinition>,
+    times: [u64; N],
+) -> Supervisor {
+    let process_count = services.len();
+    let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
+    let mut registry = StaticRegistry::services(services);
+    let mut clock = ScriptedClock::new(times);
+    supervisor
+        .run_phase2_boot(&mut registry, &mut clock)
+        .expect("boot supervisor");
+    let mut tokens = TestTokenProvider::default();
+    let mut launcher = TestProcessLauncher::new(
+        (0..process_count)
+            .map(|index| process(9000 + index as u32, 80 + index as i32))
+            .collect(),
+    );
+    while !supervisor.pending_launch_jobs().is_empty() {
+        supervisor
+            .launch_next_pending_job(&mut tokens, &mut launcher, &mut clock)
+            .expect("launch service")
+            .expect("launch dispatch");
+    }
+    supervisor
+}
+
+fn launch_one_pending(supervisor: &mut Supervisor, launched_at_ns: u64, pid: u32, pidfd: i32) {
+    let mut clock = ScriptedClock::new([launched_at_ns]);
+    let mut tokens = TestTokenProvider::default();
+    let mut launcher = TestProcessLauncher::new(vec![process(pid, pidfd)]);
+    supervisor
+        .launch_next_pending_job(&mut tokens, &mut launcher, &mut clock)
+        .expect("launch pending service")
+        .expect("launch dispatch");
+}
+
+fn current_job(supervisor: &Supervisor, service: &str) -> crate::ids::JobId {
+    supervisor
+        .service_status(service)
+        .expect("service status")
+        .current_job
+        .expect("current job")
+        .id
+}

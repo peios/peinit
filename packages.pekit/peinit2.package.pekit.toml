@@ -1,0 +1,26 @@
+# peinit2 — replacement Peios real-root PID 1 service manager.
+#
+# Shared metadata (format/version/architecture/license) is inherited from the
+# base package.pekit.toml. Runtime library dependencies such as libpeios/glibc
+# are derived from the binary's DT_NEEDED entries; registryd is explicit because
+# peinit2's compiled-in Phase 1 service definition requires a registryd provider
+# at /usr/sbin/registryd.
+
+[package]
+description = "Replacement Peios real-root PID 1 service manager"
+
+[provides]
+init = "1"
+
+[claims.provides.init.bin]
+target = "/usr/bin/peinit2"
+path   = "/init"
+
+[dependencies]
+registryd = "*"
+
+[claims.dependencies.registryd.binary]
+path = "/usr/sbin/registryd"
+
+[files]
+":usr/bin/peinit2" = "usr/bin/peinit2"

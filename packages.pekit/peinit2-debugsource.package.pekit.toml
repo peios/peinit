@@ -1,0 +1,11 @@
+# peinit2-debugsource — Rust sources referenced by peinit2's debug info, staged
+# under /usr/src/debug/peinit2. Pairs with peinit2-debuginfo.
+
+[package]
+description = "Replacement Peios PID 1 service manager - debug sources"
+
+[dependencies]
+peinit2-debuginfo = "{{version}}"
+
+[files]
+":usr/src/debug/**" = "usr/src/debug/"

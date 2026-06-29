@@ -1,0 +1,184 @@
+use crate::boot::BootMode;
+use crate::boundary::{Clock, RegistryClient};
+use crate::supervisor::{Supervisor, SupervisorBootDispatch, SupervisorSettings};
+
+use super::{
+    InitConfig, InitPlatform, InitRecoveryReason, InitRunError, InitRunResult, InitRuntime,
+};
+
+mod recovery;
+#[cfg(test)]
+mod tests;
+
+use recovery::{RecoveryEnvironment, enter_recovery, log_console};
+
+pub fn run_init<P, R, C, T>(
+    config: InitConfig,
+    platform: &mut P,
+    registry: &mut R,
+    clock: &mut C,
+    runtime: &mut T,
+) -> Result<InitRunResult, InitRunError>
+where
+    P: InitPlatform + ?Sized,
+    R: RegistryClient,
+    C: Clock + ?Sized,
+    T: InitRuntime + ?Sized,
+{
+    platform.assert_pid1().map_err(InitRunError::Fatal)?;
+    log_console(platform, "peinit: phase1 starting\n");
+
+    if let Err(error) = platform.verify_root_writable() {
+        return enter_recovery(
+            platform,
+            InitRecoveryReason::RootWritable(error),
+            RecoveryEnvironment::Skip,
+        );
+    }
+
+    log_console(platform, "peinit: phase1 mounting virtual filesystems\n");
+    if let Err(error) = platform.mount_virtual_filesystems() {
+        return enter_recovery(
+            platform,
+            InitRecoveryReason::VirtualFilesystems(error),
+            RecoveryEnvironment::Skip,
+        );
+    }
+    log_console(platform, "peinit: phase1 virtual filesystems mounted\n");
+
+    let command_line = match platform.read_kernel_command_line() {
+        Ok(command_line) => command_line,
+        Err(error) => {
+            return enter_recovery(
+                platform,
+                InitRecoveryReason::KernelCommandLine(error),
+                RecoveryEnvironment::Ensure,
+            );
+        }
+    };
+    let counter = if command_line.recovery {
+        None
+    } else {
+        match platform.read_boot_attempt_counter() {
+            Ok(counter) => Some(counter),
+            Err(error) => {
+                return enter_recovery(
+                    platform,
+                    InitRecoveryReason::BootAttemptCounter(error),
+                    RecoveryEnvironment::Ensure,
+                );
+            }
+        }
+    };
+    let counter = if platform.increment_boot_attempt_counter().is_ok() {
+        counter
+    } else {
+        Some(0)
+    };
+
+    if command_line.recovery {
+        return enter_recovery(
+            platform,
+            InitRecoveryReason::ForcedByKernelCommandLine,
+            RecoveryEnvironment::Ensure,
+        );
+    }
+    if let Some(counter) = counter
+        && counter >= config.boot_attempt_threshold
+    {
+        return enter_recovery(
+            platform,
+            InitRecoveryReason::BootAttemptThresholdReached {
+                counter,
+                threshold: config.boot_attempt_threshold,
+            },
+            RecoveryEnvironment::Ensure,
+        );
+    }
+
+    let mut settings = SupervisorSettings::new(config.phase2);
+    if command_line.safe_mode {
+        settings.phase2.mode = BootMode::Safe;
+    }
+    let mut supervisor = Supervisor::new(settings);
+
+    if let Err(error) = platform.set_clock_from_rtc() {
+        return enter_recovery(
+            platform,
+            InitRecoveryReason::RtcClock(error),
+            RecoveryEnvironment::Skip,
+        );
+    }
+    let registryd_started_at_ns = match clock.monotonic_ns() {
+        Ok(now) => now,
+        Err(error) => {
+            return enter_recovery(
+                platform,
+                InitRecoveryReason::Registryd(error),
+                RecoveryEnvironment::Skip,
+            );
+        }
+    };
+    log_console(platform, "peinit: phase1 starting registryd\n");
+    if let Err(error) = platform.start_registryd(&mut supervisor, registry, registryd_started_at_ns)
+    {
+        return enter_recovery(
+            platform,
+            InitRecoveryReason::Registryd(error),
+            RecoveryEnvironment::Skip,
+        );
+    }
+    log_console(platform, "peinit: phase1 registryd started\n");
+    let infrastructure = match platform.setup_infrastructure() {
+        Ok(infrastructure) => infrastructure,
+        Err(error) => {
+            return enter_recovery(
+                platform,
+                InitRecoveryReason::Infrastructure(error),
+                RecoveryEnvironment::Skip,
+            );
+        }
+    };
+    for warning in infrastructure.warnings() {
+        let _ = platform.log_phase1_warning(warning);
+    }
+
+    log_console(platform, "peinit: phase2 boot starting\n");
+    let boot_dispatch = match supervisor.run_phase2_boot(registry, clock) {
+        Ok(dispatch) => dispatch,
+        Err(error) => {
+            return enter_recovery(
+                platform,
+                InitRecoveryReason::Phase2(error),
+                RecoveryEnvironment::Ensure,
+            );
+        }
+    };
+    log_phase2_boot_progress(platform, &boot_dispatch);
+    log_console(platform, "peinit: phase2 boot complete\n");
+
+    match runtime.enter_runtime(supervisor, infrastructure) {
+        Ok(()) => Ok(InitRunResult::RuntimeReturned),
+        Err(error) => enter_recovery(
+            platform,
+            InitRecoveryReason::Runtime(error),
+            RecoveryEnvironment::Ensure,
+        ),
+    }
+}
+
+fn log_phase2_boot_progress<P>(platform: &mut P, dispatch: &SupervisorBootDispatch)
+where
+    P: InitPlatform + ?Sized,
+{
+    for blocked in &dispatch.plan.blocked {
+        log_console(
+            platform,
+            &format!(
+                "peinit: service {} failed: {:?}\n",
+                blocked.service,
+                blocked.reason.transition_cause()
+            ),
+        );
+    }
+}

@@ -1,0 +1,5 @@
+# Rust / cargo build output
+/target
+
+# pekit build + package output (out_dir)
+/out
