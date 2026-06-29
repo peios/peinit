@@ -10,6 +10,7 @@ use super::{
     Phase1Infrastructure, run_init,
 };
 
+mod autorun;
 mod files;
 mod infrastructure;
 mod loopback;
@@ -19,7 +20,6 @@ mod mounts;
 mod recovery_console;
 mod registryd;
 mod rtc;
-mod autorun;
 
 use files::LinuxInitFiles;
 use infrastructure::setup_linux_phase1_infrastructure;

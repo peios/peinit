@@ -16,6 +16,8 @@ set -o pipefail 2>/dev/null || true
 
 SRC="$(pwd)"
 REPO_ROOT="$(cd "$SRC/.." && pwd)"
+TRIPLET=x86_64-linux-peios
+LIBDIR="usr/lib/$TRIPLET"
 
 for tool in cargo rustc gcc pkg-config objcopy strip readelf debugedit; do
   command -v "$tool" >/dev/null || { echo "missing required peinit2 build tool: $tool" >&2; exit 1; }
@@ -68,44 +70,73 @@ fi
 export BINDGEN_EXTRA_CLANG_ARGS="-isystem $(gcc -print-file-name=include) ${BINDGEN_EXTRA_CLANG_ARGS:-}"
 
 CARGO_PROFILE_RELEASE_DEBUG=2 CARGO_PROFILE_RELEASE_SPLIT_DEBUGINFO=off \
-  cargo build --release --locked --all-features --bin peinit2 --target-dir "$PEKIT_OUT/target"
+  cargo build --release --locked --all-features --bin peinit2 --bin svctl --lib --target-dir "$PEKIT_OUT/target"
 
-mkdir -p "$PEKIT_OUT/usr/bin"
+mkdir -p "$PEKIT_OUT/usr/bin" "$PEKIT_OUT/usr/sbin" "$PEKIT_OUT/$LIBDIR" "$PEKIT_OUT/usr/include/peinit" "$PEKIT_OUT/$LIBDIR/pkgconfig"
 install -m 0755 "$PEKIT_OUT/target/release/peinit2" "$PEKIT_OUT/usr/bin/peinit2"
+install -m 0755 "$PEKIT_OUT/target/release/svctl" "$PEKIT_OUT/usr/bin/svctl"
+ln -s ../bin/svctl "$PEKIT_OUT/usr/sbin/reboot"
+ln -s ../bin/svctl "$PEKIT_OUT/usr/sbin/poweroff"
+ln -s ../bin/svctl "$PEKIT_OUT/usr/sbin/halt"
+ln -s ../bin/svctl "$PEKIT_OUT/usr/sbin/shutdown"
+install -m 0755 "$PEKIT_OUT/target/release/libpeinit.so" "$PEKIT_OUT/$LIBDIR/libpeinit.so.0"
+ln -s libpeinit.so.0 "$PEKIT_OUT/$LIBDIR/libpeinit.so"
+cp include/peinit.h "$PEKIT_OUT/usr/include/"
+cp include/peinit/*.h "$PEKIT_OUT/usr/include/peinit/"
+
+PCVER="$(sed -n 's/^version = "\\([^"]*\\)".*/\\1/p' Cargo.toml | head -1)"
+sed -e "s|@prefix@|/usr|g" \
+    -e "s|@libdir@|/$LIBDIR|g" \
+    -e "s|@version@|$PCVER|g" \
+    peinit.pc.in > "$PEKIT_OUT/$LIBDIR/pkgconfig/peinit.pc"
 
 # Split debug info in the same style as libpeios/peiosutils: DWARF goes to a
-# build-id-indexed .debug file, the shipped PID1 binary is stripped, and only
-# this crate's referenced sources are staged under /usr/src/debug/peinit2.
+# build-id-indexed .debug file, shipped ELF objects are stripped, and only this
+# crate's referenced sources are staged under /usr/src/debug/peinit.
 bin="$PEKIT_OUT/usr/bin/peinit2"
-debugedit -b "$SRC" -d /usr/src/debug/peinit2 -l "$PEKIT_OUT/.srclist" -n "$bin"
-bid=$(readelf -n "$bin" | sed -n 's/^[[:space:]]*Build ID: //p' | head -1)
-if [ -n "$bid" ]; then
-  p2=$(printf %s "$bid" | cut -c1-2)
-  rest=$(printf %s "$bid" | cut -c3-)
-  mkdir -p "$PEKIT_OUT/usr/lib/debug/.build-id/$p2"
-  objcopy --only-keep-debug "$bin" "$PEKIT_OUT/usr/lib/debug/.build-id/$p2/$rest.debug"
-  chmod 0644 "$PEKIT_OUT/usr/lib/debug/.build-id/$p2/$rest.debug"
-fi
-strip "$bin"
+svctl="$PEKIT_OUT/usr/bin/svctl"
+so="$PEKIT_OUT/$LIBDIR/libpeinit.so.0"
+: > "$PEKIT_OUT/.srclist.all"
+split_debug() {
+  elf="$1"
+  list="$PEKIT_OUT/.srclist.$(basename "$elf")"
+  debugedit -b "$SRC" -d /usr/src/debug/peinit -l "$list" -n "$elf"
+  cat "$list" >> "$PEKIT_OUT/.srclist.all"
+  bid=$(readelf -n "$elf" | sed -n 's/^[[:space:]]*Build ID: //p' | head -1)
+  if [ -n "$bid" ]; then
+    p2=$(printf %s "$bid" | cut -c1-2)
+    rest=$(printf %s "$bid" | cut -c3-)
+    mkdir -p "$PEKIT_OUT/usr/lib/debug/.build-id/$p2"
+    objcopy --only-keep-debug "$elf" "$PEKIT_OUT/usr/lib/debug/.build-id/$p2/$rest.debug"
+    chmod 0644 "$PEKIT_OUT/usr/lib/debug/.build-id/$p2/$rest.debug"
+  fi
+  strip "$elf"
+  rm -f "$list"
+}
+split_debug "$bin"
+split_debug "$svctl"
+split_debug "$so"
 
-tr '\\0' '\\n' < "$PEKIT_OUT/.srclist" | sort -u | while IFS= read -r rel; do
+tr '\\0' '\\n' < "$PEKIT_OUT/.srclist.all" | sort -u | while IFS= read -r rel; do
   [ -n "$rel" ] || continue
   case "$rel" in */) continue;; esac
   [ -f "$SRC/$rel" ] || continue
-  mkdir -p "$PEKIT_OUT/usr/src/debug/peinit2/$(dirname "$rel")"
-  cp "$SRC/$rel" "$PEKIT_OUT/usr/src/debug/peinit2/$rel"
+  mkdir -p "$PEKIT_OUT/usr/src/debug/peinit/$(dirname "$rel")"
+  cp "$SRC/$rel" "$PEKIT_OUT/usr/src/debug/peinit/$rel"
 done
-rm -f "$PEKIT_OUT/.srclist"
+rm -f "$PEKIT_OUT/.srclist.all"
 """
 
 [build.dependencies.peipkg]
 cargo = "*"
 rust = "*"
 gcc = "*"
+"gcc-c++" = "*"
 clang = "*"
 pkgconf-pkg-config = "*"
 libpeios-devel = "*"
 kernel-headers = "*"
+cbindgen = "0.29.2"
 binutils = "*"
 debugedit = "*"
 
@@ -113,8 +144,10 @@ debugedit = "*"
 cargo = "*"
 rustc = "*"
 gcc = "*"
+"g++" = "*"
 pkg-config = "*"
 "libclang-dev" = "*"
+cbindgen = "*"
 binutils = "*"
 debugedit = "*"
 
@@ -126,7 +159,7 @@ set -o pipefail 2>/dev/null || true
 SRC="$(pwd)"
 REPO_ROOT="$(cd "$SRC/.." && pwd)"
 
-for tool in cargo rustc gcc pkg-config; do
+for tool in cargo rustc gcc g++ pkg-config cbindgen; do
   command -v "$tool" >/dev/null || { echo "missing required peinit2 test tool: $tool" >&2; exit 1; }
 done
 
@@ -174,6 +207,7 @@ fi
 export BINDGEN_EXTRA_CLANG_ARGS="-isystem $(gcc -print-file-name=include) ${BINDGEN_EXTRA_CLANG_ARGS:-}"
 
 cargo test --locked --all-features
+./tools/verify-abi.sh
 """
 
 [clean]

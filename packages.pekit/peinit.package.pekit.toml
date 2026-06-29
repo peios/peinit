@@ -1,0 +1,35 @@
+# peinit — Peios real-root PID 1 service manager.
+#
+# Shared metadata (format/version/architecture/license) is inherited from the
+# base package.pekit.toml. Runtime library dependencies such as libpeios/glibc
+# are derived from the binary's DT_NEEDED entries; registryd is explicit because
+# peinit's compiled-in Phase 1 service definition requires a registryd provider
+# at /usr/sbin/registryd. The libpeinit runtime shared object ships here with
+# PID 1. svctl is the matching command-line client for Peinit's current control
+# socket surface. Headers and the unversioned linker symlink are in
+# peinit-devel.
+
+[package]
+description = "Peios real-root PID 1 service manager"
+
+[provides]
+init = "1"
+
+[claims.provides.init.bin]
+target = "/usr/bin/peinit2"
+path   = "/init"
+
+[dependencies]
+registryd = "*"
+
+[claims.dependencies.registryd.binary]
+path = "/usr/sbin/registryd"
+
+[files]
+":usr/bin/peinit2" = "usr/bin/peinit2"
+":usr/bin/svctl" = "usr/bin/svctl"
+":usr/sbin/reboot" = "usr/sbin/reboot"
+":usr/sbin/poweroff" = "usr/sbin/poweroff"
+":usr/sbin/halt" = "usr/sbin/halt"
+":usr/sbin/shutdown" = "usr/sbin/shutdown"
+":usr/lib/x86_64-linux-peios/libpeinit.so.0" = "usr/lib/x86_64-linux-peios/libpeinit.so.0"

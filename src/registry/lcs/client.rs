@@ -33,8 +33,7 @@ impl RegistryClient for LcsRegistryClient {
     }
 
     fn provision_base_registry(&mut self) -> Result<(), BoundaryError> {
-        provision_lcs_base_registry()
-            .map_err(|error| BoundaryError::Registry(format!("{error:?}")))
+        provision_lcs_base_registry().map_err(|error| BoundaryError::Registry(format!("{error:?}")))
     }
 
     fn read_global_environment(

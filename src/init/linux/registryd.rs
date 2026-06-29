@@ -162,9 +162,11 @@ fn complete_phase1_pending_setup(
     let mut clock = LinuxMonotonicClock::new();
     let deadline_ns = observed_at_ns.saturating_add(REGISTRYD_SETUP_TIMEOUT_NS);
     loop {
-        let status = launcher.read_process_setup_status(setup_status_fd).map_err(|error| {
-            BoundaryError::Recovery(format!("read registryd setup status failed: {error:?}"))
-        })?;
+        let status = launcher
+            .read_process_setup_status(setup_status_fd)
+            .map_err(|error| {
+                BoundaryError::Recovery(format!("read registryd setup status failed: {error:?}"))
+            })?;
         if matches!(status, ProcessSetupStatus::Pending) {
             let now_ns = clock.monotonic_ns()?;
             if now_ns >= deadline_ns {

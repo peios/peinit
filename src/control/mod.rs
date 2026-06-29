@@ -1,3 +1,4 @@
+pub mod client;
 pub mod connection;
 pub mod lifecycle;
 pub mod query;

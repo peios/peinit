@@ -185,13 +185,31 @@ fn seeds_fresh_managed_roots_after_mounting_them() {
 
     // The fresh SD-less managed roots (tmpfs + cgroup2) are seeded; the
     // UNMANAGED virtual filesystems (proc/sysfs) and devpts are not.
-    assert!(syscalls.calls.contains(&MountCall::Seed("/run".to_string())));
-    assert!(syscalls.calls.contains(&MountCall::Seed("/dev/shm".to_string())));
-    assert!(syscalls
-        .calls
-        .contains(&MountCall::Seed("/sys/fs/cgroup".to_string())));
-    assert!(!syscalls.calls.contains(&MountCall::Seed("/proc".to_string())));
-    assert!(!syscalls.calls.contains(&MountCall::Seed("/dev/pts".to_string())));
+    assert!(
+        syscalls
+            .calls
+            .contains(&MountCall::Seed("/run".to_string()))
+    );
+    assert!(
+        syscalls
+            .calls
+            .contains(&MountCall::Seed("/dev/shm".to_string()))
+    );
+    assert!(
+        syscalls
+            .calls
+            .contains(&MountCall::Seed("/sys/fs/cgroup".to_string()))
+    );
+    assert!(
+        !syscalls
+            .calls
+            .contains(&MountCall::Seed("/proc".to_string()))
+    );
+    assert!(
+        !syscalls
+            .calls
+            .contains(&MountCall::Seed("/dev/pts".to_string()))
+    );
 }
 
 #[test]

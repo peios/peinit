@@ -26,8 +26,15 @@ pub(super) fn provision_lcs_base_registry() -> Result<(), LcsRegistryReadError> 
         move |source: peios::Error| LcsRegistryReadError::Provision { stage, source }
     };
 
-    Key::create(None, SYSTEM_ROOT_KEY, access, CreateFlags::empty(), None, None)
-        .map_err(provision_err("create System"))?;
+    Key::create(
+        None,
+        SYSTEM_ROOT_KEY,
+        access,
+        CreateFlags::empty(),
+        None,
+        None,
+    )
+    .map_err(provision_err("create System"))?;
     let (services, _disp) = Key::create(
         None,
         SERVICES_ROOT_KEY,
@@ -37,8 +44,15 @@ pub(super) fn provision_lcs_base_registry() -> Result<(), LcsRegistryReadError> 
         None,
     )
     .map_err(provision_err("create Services"))?;
-    Key::create(None, INIT_ROOT_KEY, access, CreateFlags::empty(), None, None)
-        .map_err(provision_err("create Init"))?;
+    Key::create(
+        None,
+        INIT_ROOT_KEY,
+        access,
+        CreateFlags::empty(),
+        None,
+        None,
+    )
+    .map_err(provision_err("create Init"))?;
 
     match services.query_value(b"SchemaVersion", None) {
         Ok(_) => {}
@@ -52,10 +66,12 @@ pub(super) fn provision_lcs_base_registry() -> Result<(), LcsRegistryReadError> 
                 .call()
                 .map_err(provision_err("set SchemaVersion"))?;
         }
-        Err(error) => return Err(LcsRegistryReadError::Provision {
-            stage: "query SchemaVersion",
-            source: error,
-        }),
+        Err(error) => {
+            return Err(LcsRegistryReadError::Provision {
+                stage: "query SchemaVersion",
+                source: error,
+            });
+        }
     }
     Ok(())
 }
