@@ -1,0 +1,151 @@
+use crate::supervisor::{
+    SupervisorPid1SignalFdTurn, SupervisorShutdownCgroupKillDispatch, SupervisorShutdownDispatch,
+    SupervisorShutdownDriveDispatch, SupervisorShutdownFinalizationDispatch,
+    SupervisorShutdownKillDispatch, SupervisorShutdownSignalAction,
+    SupervisorShutdownSignalDispatch, SupervisorShutdownStopDispatch,
+    SupervisorShutdownTerminalDispatch, SupervisorShutdownTimeoutDispatch,
+};
+
+use crate::runtime::console::{collect_shutdown_finalization_state_console_message, push_message};
+
+pub(super) fn collect_pid1_signal_turn_console_messages(
+    turn: &SupervisorPid1SignalFdTurn,
+    out: &mut Vec<String>,
+) {
+    if let SupervisorPid1SignalFdTurn::Shutdown(dispatch) = turn {
+        collect_shutdown_signal_dispatch_console_messages(dispatch, out);
+    }
+}
+
+pub(super) fn collect_shutdown_dispatch_console_messages(
+    dispatch: &SupervisorShutdownDispatch,
+    out: &mut Vec<String>,
+) {
+    push_message(
+        out,
+        format!("peinit: shutdown {:?} started\n", dispatch.runtime.kind),
+    );
+    for killed in &dispatch.killed_starting {
+        collect_shutdown_kill_console_message(killed, out);
+    }
+    for stop in &dispatch.first_wave {
+        collect_shutdown_stop_console_message(stop, out);
+    }
+    collect_shutdown_finalization_state_console_message(&dispatch.runtime.finalization, out);
+}
+
+pub(super) fn collect_shutdown_drive_dispatch_console_messages(
+    dispatch: &SupervisorShutdownDriveDispatch,
+    out: &mut Vec<String>,
+) {
+    if let Some(timeout) = &dispatch.timeout {
+        collect_shutdown_timeout_console_messages(timeout, out);
+    }
+    if let Some(finalization) = &dispatch.finalization {
+        collect_shutdown_finalization_dispatch_console_messages(finalization, out);
+    }
+}
+
+pub(super) fn collect_shutdown_terminal_dispatch_console_messages(
+    dispatch: &SupervisorShutdownTerminalDispatch,
+    out: &mut Vec<String>,
+) {
+    if let Some(service) = dispatch.job_event.service.as_deref() {
+        push_message(out, format!("peinit: shutdown service {service} exited\n"));
+    }
+    for stop in &dispatch.next_wave {
+        collect_shutdown_stop_console_message(stop, out);
+    }
+    collect_shutdown_finalization_state_console_message(&dispatch.finalization, out);
+}
+
+fn collect_shutdown_signal_dispatch_console_messages(
+    dispatch: &SupervisorShutdownSignalDispatch,
+    out: &mut Vec<String>,
+) {
+    match &dispatch.action {
+        SupervisorShutdownSignalAction::Graceful(shutdown) => {
+            collect_shutdown_dispatch_console_messages(shutdown, out);
+        }
+        SupervisorShutdownSignalAction::Forced(immediate) => {
+            push_message(out, "peinit: shutdown forced reboot requested\n");
+            for killed in &immediate.killed_services {
+                collect_shutdown_cgroup_kill_console_message(killed, out);
+            }
+            collect_shutdown_finalization_dispatch_console_messages(&immediate.finalization, out);
+        }
+        SupervisorShutdownSignalAction::AlreadyInProgress { kind } => {
+            push_message(
+                out,
+                format!("peinit: shutdown {kind:?} already in progress\n"),
+            );
+        }
+    }
+}
+
+fn collect_shutdown_timeout_console_messages(
+    dispatch: &SupervisorShutdownTimeoutDispatch,
+    out: &mut Vec<String>,
+) {
+    if dispatch.global_timeout {
+        push_message(out, "peinit: shutdown global timeout expired\n");
+    }
+    for killed in &dispatch.cgroup_kills {
+        collect_shutdown_cgroup_kill_console_message(killed, out);
+    }
+    for abandoned in &dispatch.abandoned {
+        push_message(
+            out,
+            format!("peinit: shutdown abandoned {}\n", abandoned.service),
+        );
+    }
+    for stop in &dispatch.next_wave {
+        collect_shutdown_stop_console_message(stop, out);
+    }
+    collect_shutdown_finalization_state_console_message(&dispatch.finalization, out);
+}
+
+fn collect_shutdown_finalization_dispatch_console_messages(
+    dispatch: &SupervisorShutdownFinalizationDispatch,
+    out: &mut Vec<String>,
+) {
+    push_message(out, "peinit: shutdown finalizing\n");
+    collect_shutdown_finalization_state_console_message(&dispatch.finalization, out);
+}
+
+fn collect_shutdown_kill_console_message(
+    dispatch: &SupervisorShutdownKillDispatch,
+    out: &mut Vec<String>,
+) {
+    push_message(
+        out,
+        format!("peinit: shutdown killing {}\n", dispatch.service),
+    );
+}
+
+fn collect_shutdown_cgroup_kill_console_message(
+    dispatch: &SupervisorShutdownCgroupKillDispatch,
+    out: &mut Vec<String>,
+) {
+    push_message(
+        out,
+        format!("peinit: shutdown killing {}\n", dispatch.service),
+    );
+}
+
+fn collect_shutdown_stop_console_message(
+    dispatch: &SupervisorShutdownStopDispatch,
+    out: &mut Vec<String>,
+) {
+    if dispatch.already_stopping {
+        push_message(
+            out,
+            format!("peinit: shutdown waiting for {}\n", dispatch.service),
+        );
+    } else {
+        push_message(
+            out,
+            format!("peinit: shutdown stopping {}\n", dispatch.service),
+        );
+    }
+}

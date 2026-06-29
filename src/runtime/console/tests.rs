@@ -1,0 +1,332 @@
+use crate::boundary::{ChildExitStatus, ChildReap, LaunchedProcess, LinuxSignalFdRead};
+use crate::execution::job_started::ServiceMainJobStartedDispatch;
+use crate::execution::job_terminal::ServiceMainJobTerminalDispatch;
+use crate::execution::launch::LaunchCreatedJobDispatch;
+use crate::ids::{JobId, JobIdAllocator};
+use crate::job::{JobEvent, JobEventDetail, JobState, JobType};
+use crate::runtime::{RuntimeLogPipeTurn, RuntimeShutdownEventTurn, RuntimeWorkPumpTurn};
+use crate::security::TokenSummary;
+use crate::service::ServiceTableTransition;
+use crate::service::runtime::{ServiceState, ServiceTransitionEvent, TransitionCause};
+use crate::shutdown::{
+    CleanupActionResult, ShutdownFinalizationReport, ShutdownFinalizationState, ShutdownKind,
+    ShutdownPlan, ShutdownRuntime,
+};
+use crate::supervisor::{
+    SupervisorChildReapDispatch, SupervisorChildReapTurn, SupervisorLaunchDispatch,
+    SupervisorPid1SignalFdTurn, SupervisorShutdownDispatch, SupervisorShutdownFinalizationDispatch,
+    SupervisorShutdownSignalAction, SupervisorShutdownSignalDispatch,
+    SupervisorShutdownStopDispatch, SupervisorTerminalDispatch,
+};
+
+use super::collect_runtime_loop_console_messages;
+
+#[test]
+fn service_launch_emits_console_progress() {
+    let work = RuntimeWorkPumpTurn {
+        service_launches: vec![SupervisorLaunchDispatch {
+            launch: LaunchCreatedJobDispatch {
+                job_id: job_id(1),
+                process: LaunchedProcess {
+                    pid: 700,
+                    pidfd: 70,
+                    stdout_fd: None,
+                    stderr_fd: None,
+                    setup_status_fd: None,
+                    cleanup_evidence: Vec::new(),
+                },
+                job_event: created_job("app", job_id(1)),
+            },
+            started: ServiceMainJobStartedDispatch {
+                job_event: running_job("app", job_id(1)),
+                operation_events: Vec::new(),
+                service_transitions: Vec::new(),
+                graph_events: Vec::new(),
+                post_start_hook: None,
+            },
+            start_dispatches: Vec::new(),
+        }],
+        ..RuntimeWorkPumpTurn::default()
+    };
+
+    let messages = collect_messages(&work, &[], &RuntimeWorkPumpTurn::default());
+
+    assert_eq!(messages, vec!["peinit: service app started\n"]);
+}
+
+#[test]
+fn service_log_pipe_turn_does_not_echo_output_to_console() {
+    let turn = RuntimeShutdownEventTurn::ServiceLogPipe {
+        pipe: RuntimeLogPipeTurn::Read {
+            fd: 9,
+            records: Vec::new(),
+            closed: false,
+            would_block: false,
+            buffered_records: 0,
+        },
+    };
+
+    let messages = collect_messages(
+        &RuntimeWorkPumpTurn::default(),
+        &[turn],
+        &RuntimeWorkPumpTurn::default(),
+    );
+
+    assert!(messages.is_empty());
+}
+
+#[test]
+fn critical_service_failure_emits_failure_and_critical_messages() {
+    let service = "database";
+    let job_id = job_id(2);
+    let turn = RuntimeShutdownEventTurn::Pid1Signal {
+        read: LinuxSignalFdRead::Other {
+            signal: libc::SIGCHLD,
+        },
+        supervisor: SupervisorPid1SignalFdTurn::Other {
+            signal: libc::SIGCHLD,
+        },
+        child_reaps: vec![SupervisorChildReapTurn::Tracked {
+            child: ChildReap {
+                pid: 800,
+                status: ChildExitStatus::Exited { code: 1 },
+            },
+            job_id,
+            dispatch: SupervisorChildReapDispatch::Runtime(Box::new(SupervisorTerminalDispatch {
+                terminal: ServiceMainJobTerminalDispatch {
+                    job_event: failed_job(service, job_id),
+                    operation_events: Vec::new(),
+                    service_transitions: vec![transition(
+                        service,
+                        ServiceState::Active,
+                        ServiceState::Failed,
+                        TransitionCause::ProcessCrash,
+                    )],
+                    graph_events: Vec::new(),
+                    post_start_hook: None,
+                },
+                cleanup_job_events: Vec::new(),
+                start_dispatches: Vec::new(),
+                restart_start_dispatches: Vec::new(),
+                critical_reboot: Some(finalization_dispatch()),
+            })),
+        }],
+        deadline_timer: None,
+    };
+
+    let messages = collect_messages(
+        &RuntimeWorkPumpTurn::default(),
+        &[turn],
+        &RuntimeWorkPumpTurn::default(),
+    );
+
+    assert_eq!(
+        messages,
+        vec![
+            "peinit: service database failed: ProcessCrash\n",
+            "peinit: critical service database failed: service main exited\n",
+        ],
+    );
+}
+
+#[test]
+fn shutdown_signal_emits_shutdown_progress() {
+    let turn = RuntimeShutdownEventTurn::Pid1Signal {
+        read: LinuxSignalFdRead::Shutdown(crate::shutdown::ShutdownSignal::Sigterm),
+        supervisor: SupervisorPid1SignalFdTurn::Shutdown(Box::new(
+            SupervisorShutdownSignalDispatch {
+                signal: crate::shutdown::ShutdownSignal::Sigterm,
+                action: SupervisorShutdownSignalAction::Graceful(SupervisorShutdownDispatch {
+                    runtime: shutdown_runtime(ShutdownKind::Poweroff),
+                    completed_transitions: Vec::new(),
+                    killed_starting: Vec::new(),
+                    first_wave: vec![SupervisorShutdownStopDispatch {
+                        service: "app".to_string(),
+                        already_stopping: false,
+                        target: None,
+                        signal: None,
+                        service_transition: None,
+                        deadline: None,
+                    }],
+                    startup_operation_events: Vec::new(),
+                    startup_job_events: Vec::new(),
+                }),
+            },
+        )),
+        child_reaps: Vec::new(),
+        deadline_timer: None,
+    };
+
+    let messages = collect_messages(
+        &RuntimeWorkPumpTurn::default(),
+        &[turn],
+        &RuntimeWorkPumpTurn::default(),
+    );
+
+    assert_eq!(
+        messages,
+        vec![
+            "peinit: shutdown Poweroff started\n",
+            "peinit: shutdown stopping app\n",
+        ],
+    );
+}
+
+fn collect_messages(
+    pre_work: &RuntimeWorkPumpTurn,
+    turns: &[RuntimeShutdownEventTurn],
+    post_work: &RuntimeWorkPumpTurn,
+) -> Vec<String> {
+    let mut messages = Vec::new();
+    collect_runtime_loop_console_messages(pre_work, turns, post_work, &[], &mut messages);
+    messages
+}
+
+fn created_job(service: &str, id: JobId) -> JobEvent {
+    job_event(
+        service,
+        id,
+        JobState::Created,
+        None,
+        None,
+        None,
+        JobEventDetail::Created {
+            image_path: format!("/sbin/{service}"),
+            identity: "SYSTEM".to_string(),
+            operation_id: None,
+        },
+    )
+}
+
+fn running_job(service: &str, id: JobId) -> JobEvent {
+    job_event(
+        service,
+        id,
+        JobState::Running,
+        Some(700),
+        Some(70),
+        None,
+        JobEventDetail::Started {
+            started_at_ns: 20,
+            pid: 700,
+            cgroup_id: service.to_string(),
+        },
+    )
+}
+
+fn failed_job(service: &str, id: JobId) -> JobEvent {
+    job_event(
+        service,
+        id,
+        JobState::Failed,
+        Some(800),
+        Some(80),
+        Some(30),
+        JobEventDetail::Ended {
+            ended_at_ns: 30,
+            duration_ns: 10,
+            exit_code: Some(1),
+            exit_signal: None,
+            failure_cause: Some("exit 1".to_string()),
+        },
+    )
+}
+
+fn job_event(
+    service: &str,
+    id: JobId,
+    state: JobState,
+    pid: Option<u32>,
+    pidfd: Option<i32>,
+    ended_at_ns: Option<u64>,
+    detail: JobEventDetail,
+) -> JobEvent {
+    JobEvent {
+        job_id: id,
+        service: Some(service.to_string()),
+        job_type: JobType::ServiceMain,
+        hook_index: None,
+        state,
+        pid,
+        pidfd,
+        resolved_identity: "SYSTEM".to_string(),
+        operation_id: None,
+        token_summary: TokenSummary::requested_identity("SYSTEM"),
+        image_path: format!("/sbin/{service}"),
+        arguments: Vec::new(),
+        created_at_ns: 10,
+        started_at_ns: pid.map(|_| 20),
+        ended_at_ns,
+        exit_code: if state == JobState::Failed {
+            Some(1)
+        } else {
+            None
+        },
+        exit_signal: None,
+        failure_cause: if state == JobState::Failed {
+            Some("exit 1".to_string())
+        } else {
+            None
+        },
+        cgroup_id: service.to_string(),
+        activation_generation: 1,
+        cgroup_generation: 1,
+        detail,
+    }
+}
+
+fn transition(
+    service: &str,
+    from: ServiceState,
+    to: ServiceState,
+    cause: TransitionCause,
+) -> ServiceTableTransition {
+    ServiceTableTransition {
+        event: ServiceTransitionEvent {
+            service: service.to_string(),
+            from,
+            to,
+            cause,
+            generation: 1,
+        },
+        discarded_definition_removed: false,
+    }
+}
+
+fn shutdown_runtime(kind: ShutdownKind) -> ShutdownRuntime {
+    ShutdownRuntime {
+        kind,
+        initiated_at_ns: 1,
+        global_deadline_ns: 90,
+        plan: ShutdownPlan {
+            completed_to_clear: Vec::new(),
+            starting_to_kill: Vec::new(),
+            stop_waves: Vec::new(),
+            ignored: Vec::new(),
+        },
+        current_wave: 0,
+        stop_deadlines: Vec::new(),
+        post_kill_deadlines: Vec::new(),
+        finalization: ShutdownFinalizationState::WaitingForServices,
+    }
+}
+
+fn finalization_dispatch() -> SupervisorShutdownFinalizationDispatch {
+    SupervisorShutdownFinalizationDispatch {
+        report: ShutdownFinalizationReport {
+            snapshot_mounts: CleanupActionResult::Ok,
+            mount_results: Vec::new(),
+            root_remount: CleanupActionResult::Ok,
+            sync_result: CleanupActionResult::Ok,
+            reboot_result: CleanupActionResult::Ok,
+        },
+        finalization: ShutdownFinalizationState::Completed,
+    }
+}
+
+fn job_id(sequence: u64) -> JobId {
+    let mut allocator = JobIdAllocator::new();
+    allocator
+        .allocate_batch(sequence as usize + 1, 1_717_171_717_123_456_789)
+        .expect("job id")[sequence as usize]
+}
