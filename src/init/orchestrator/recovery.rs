@@ -73,6 +73,25 @@ impl RegistryClient for NoRecoveryRegistry {
     fn read_service_definitions(
         &mut self,
     ) -> Result<Vec<crate::service::ServiceDefinition>, crate::boundary::BoundaryError> {
+        // Recovery never boots configured services; it only needs registryd up.
         Ok(Vec::new())
+    }
+
+    fn provision_base_registry(&mut self) -> Result<(), crate::boundary::BoundaryError> {
+        // Still create the base structure (Machine\System\{Services,Init} +
+        // SchemaVersion) so the recovery environment matches a normal boot — a
+        // fresh system's recovery shell should see, and be able to build on, the
+        // same registry layout. Idempotent, so a provisioned system is a no-op.
+        // Gated like the rest of the LCS path: LcsRegistryClient only exists with
+        // the peios-registry feature (the real Linux build); without it there is
+        // no registry to provision.
+        #[cfg(feature = "peios-registry")]
+        {
+            crate::registry::LcsRegistryClient.provision_base_registry()
+        }
+        #[cfg(not(feature = "peios-registry"))]
+        {
+            Ok(())
+        }
     }
 }
