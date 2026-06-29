@@ -10,7 +10,7 @@ use super::model::ChildSetupEvidence;
 
 use self::resources::{change_working_directory, set_oom_score_adj, set_rlimits};
 use self::signals::reset_signal_environment;
-use self::stdio::set_standard_streams;
+use self::stdio::{set_console_streams, set_standard_streams};
 use self::sys::{clear_cloexec, close_fd_checked, dup2_checked, errno};
 
 mod resources;
@@ -30,6 +30,9 @@ pub(super) struct ChildExecSpec {
     pub stdout_write_fd: i32,
     pub stderr_read_fd: i32,
     pub stderr_write_fd: i32,
+    /// When `Some`, attach this fd (an open `/dev/console`) to stdin/stdout/
+    /// stderr instead of the daemon `/dev/null` + capture pipes above.
+    pub console_fd: Option<i32>,
     pub limit_nofile: Option<u64>,
     pub limit_core: Option<u64>,
     pub oom_score_adj: i32,
@@ -48,6 +51,7 @@ pub(super) fn child_exec(token: &Token, command: &LaunchCommand, spec: ChildExec
         stdout_write_fd,
         stderr_read_fd,
         stderr_write_fd,
+        console_fd,
         limit_nofile,
         limit_core,
         oom_score_adj,
@@ -62,13 +66,24 @@ pub(super) fn child_exec(token: &Token, command: &LaunchCommand, spec: ChildExec
         );
     }
 
-    if let Err(errno) = set_standard_streams(
-        dev_null_fd,
-        stdout_read_fd,
-        stdout_write_fd,
-        stderr_read_fd,
-        stderr_write_fd,
-    ) {
+    let stdio_result = match console_fd {
+        Some(console_fd) => set_console_streams(
+            console_fd,
+            dev_null_fd,
+            stdout_read_fd,
+            stdout_write_fd,
+            stderr_read_fd,
+            stderr_write_fd,
+        ),
+        None => set_standard_streams(
+            dev_null_fd,
+            stdout_read_fd,
+            stdout_write_fd,
+            stderr_read_fd,
+            stderr_write_fd,
+        ),
+    };
+    if let Err(errno) = stdio_result {
         fail_child_setup(exec_error_write_fd, ProcessPreExecStep::SetStdio, errno);
     }
 

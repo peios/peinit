@@ -68,6 +68,10 @@ pub struct JobRecord {
     pub activation_generation: u64,
     pub cgroup_generation: u64,
     pub operation_id: Option<OperationId>,
+    /// Launch this job's process with its stdio attached to `/dev/console`
+    /// instead of the daemon default. Carried from the service definition's
+    /// `attach_console`; the compiled-in console service is the only setter.
+    pub attach_console: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

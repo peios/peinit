@@ -541,6 +541,7 @@ fn job_event(job_type: JobType) -> JobEvent {
         activation_generation: 1,
         cgroup_generation: 1,
         operation_id: None,
+        attach_console: false,
     })
 }
 

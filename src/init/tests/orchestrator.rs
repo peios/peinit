@@ -37,6 +37,7 @@ fn recovery_flag_enters_recovery_after_root_probe_and_counter_increment() {
     let mut platform = Platform::new().command_line(KernelCommandLine {
         recovery: true,
         safe_mode: false,
+        console: false,
     });
     let mut registry = Registry::with_services([]);
     let mut clock = ClockAt(1);
@@ -68,6 +69,7 @@ fn recovery_flag_does_not_require_readable_boot_attempt_counter() {
         .command_line(KernelCommandLine {
             recovery: true,
             safe_mode: false,
+            console: false,
         })
         .boot_attempt_counter_error("malformed counter");
     let mut registry = Registry::with_services([]);
@@ -262,6 +264,7 @@ fn safemode_flag_sets_supervisor_boot_mode() {
     let mut platform = Platform::new().command_line(KernelCommandLine {
         safe_mode: true,
         recovery: false,
+        console: false,
     });
     let mut registry = Registry::with_services([critical_service("core"), service("app")]);
     let mut clock = ClockAt(10);

@@ -65,6 +65,70 @@ fn run_phase2_boot_reads_snapshot_plans_and_dispatches_operations_atomically() {
 }
 
 #[test]
+fn spawn_console_injects_the_compiled_in_console_service() {
+    let mut registry = StaticRegistry::services(vec![service("app", "/sbin/app")]);
+    let mut clock = FixedClock::at(OBSERVED_AT_NS);
+    let mut operation_ids = OperationIdAllocator::new();
+    let mut job_ids = JobIdAllocator::new();
+    let mut operations = OperationStore::new();
+
+    let mut settings = settings();
+    settings.spawn_console = true;
+
+    let run = run_phase2_boot(
+        settings,
+        &mut registry,
+        &mut clock,
+        &mut operation_ids,
+        &mut job_ids,
+        &mut operations,
+    )
+    .expect("phase2 boot");
+
+    // The console service is not a registry entry — it is appended to the boot
+    // set, so it appears alongside the registry-defined app.
+    assert!(
+        run.service_table
+            .service_names()
+            .contains(&crate::service::ServiceDefinition::CONSOLE_NAME),
+    );
+    let console = run
+        .service_table
+        .definition(crate::service::ServiceDefinition::CONSOLE_NAME)
+        .expect("console definition");
+    assert!(console.attach_console);
+    assert_eq!(
+        console.image_path,
+        crate::service::ServiceDefinition::CONSOLE_IMAGE_PATH,
+    );
+}
+
+#[test]
+fn console_is_absent_without_spawn_console() {
+    let mut registry = StaticRegistry::services(vec![service("app", "/sbin/app")]);
+    let mut clock = FixedClock::at(OBSERVED_AT_NS);
+    let mut operation_ids = OperationIdAllocator::new();
+    let mut job_ids = JobIdAllocator::new();
+    let mut operations = OperationStore::new();
+
+    let run = run_phase2_boot(
+        settings(),
+        &mut registry,
+        &mut clock,
+        &mut operation_ids,
+        &mut job_ids,
+        &mut operations,
+    )
+    .expect("phase2 boot");
+
+    assert!(
+        !run.service_table
+            .service_names()
+            .contains(&crate::service::ServiceDefinition::CONSOLE_NAME),
+    );
+}
+
+#[test]
 fn registry_boot_settings_override_phase2_defaults() {
     let mut registry = StaticRegistry::services(vec![service("app", "/sbin/app")])
         .with_max_parallel_starts(Ok(Some(4)))

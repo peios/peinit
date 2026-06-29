@@ -17,6 +17,11 @@ pub struct Phase2BootSettings {
     pub mode: BootMode,
     pub max_parallel_starts: u32,
     pub boot_success_grace_secs: u32,
+    /// Inject the compiled-in console service into the boot set (from
+    /// `peios.console=1`). A per-boot command-line policy like `mode`, not a
+    /// registry-configured value, so `read_effective_boot_settings` leaves it
+    /// untouched.
+    pub spawn_console: bool,
 }
 
 impl Default for Phase2BootSettings {
@@ -25,6 +30,7 @@ impl Default for Phase2BootSettings {
             mode: BootMode::Full,
             max_parallel_starts: DEFAULT_MAX_PARALLEL_STARTS,
             boot_success_grace_secs: DEFAULT_BOOT_SUCCESS_GRACE_SECS,
+            spawn_console: false,
         }
     }
 }

@@ -100,6 +100,7 @@ where
     if command_line.safe_mode {
         settings.phase2.mode = BootMode::Safe;
     }
+    settings.phase2.spawn_console = command_line.console;
     let mut supervisor = Supervisor::new(settings);
 
     if let Err(error) = platform.set_clock_from_rtc() {
@@ -129,6 +130,13 @@ where
         );
     }
     log_console(platform, "peinit: phase1 registryd started\n");
+    // Phase 1.5: run the image's autorun scripts now that the registry is
+    // serving, before Phase 2 enumerates Machine\System\Services — so a script
+    // that seeds services (the seed-apply autorun) has them present when the boot
+    // plan is built. peinit is a generic runner; the scripts own their effect and
+    // lifecycle. Fail-open: the platform logs its own summary and never aborts
+    // boot, so a missing dir or a failed script is a warning, not recovery.
+    let _ = platform.run_autorun_scripts();
     let infrastructure = match platform.setup_infrastructure() {
         Ok(infrastructure) => infrastructure,
         Err(error) => {
