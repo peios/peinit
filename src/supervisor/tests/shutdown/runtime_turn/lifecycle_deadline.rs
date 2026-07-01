@@ -47,6 +47,7 @@ fn runtime_loop_arms_lifecycle_timer_before_waiting() {
     let mut connections = ControlConnectionTable::new(4);
     let mut shutdown_timer = FakeDeadlineTimer::would_block();
     let mut lifecycle_timer = FakeDeadlineTimer::would_block();
+    let mut power_button = super::support::FakePowerButtonSource::would_block();
     let mut log_pipes = crate::runtime::RuntimeServiceLogPipes::default();
     let mut filesystem_check_reader =
         crate::supervisor::tests::TestFilesystemCheckReader::default();
@@ -72,6 +73,7 @@ fn runtime_loop_arms_lifecycle_timer_before_waiting() {
             control_connections: &mut connections,
             deadline_timer: &mut shutdown_timer,
             lifecycle_timer: &mut lifecycle_timer,
+            power_button_source: &mut power_button,
             filesystem_check_reader: &mut filesystem_check_reader,
             log_pipes: &mut log_pipes,
         },

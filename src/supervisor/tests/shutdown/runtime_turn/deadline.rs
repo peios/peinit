@@ -26,6 +26,7 @@ fn runtime_shutdown_deadline_timer_event_drives_due_shutdown_work_and_rearms() {
     let mut connections = crate::control::connection::ControlConnectionTable::new(4);
     let mut deadline_timer = FakeDeadlineTimer::expired_once();
     let mut lifecycle_timer = FakeDeadlineTimer::would_block();
+    let mut power_button = super::support::FakePowerButtonSource::would_block();
     let mut log_pipes = crate::runtime::RuntimeServiceLogPipes::default();
     let mut filesystem_check_reader =
         crate::supervisor::tests::TestFilesystemCheckReader::default();
@@ -51,6 +52,7 @@ fn runtime_shutdown_deadline_timer_event_drives_due_shutdown_work_and_rearms() {
             control_connections: &mut connections,
             deadline_timer: &mut deadline_timer,
             lifecycle_timer: &mut lifecycle_timer,
+            power_button_source: &mut power_button,
             filesystem_check_reader: &mut filesystem_check_reader,
             log_pipes: &mut log_pipes,
         },
@@ -104,6 +106,7 @@ fn runtime_deadline_timer_event_can_finalize_without_rebooting_host() {
     let mut connections = crate::control::connection::ControlConnectionTable::new(4);
     let mut deadline_timer = FakeDeadlineTimer::expired_once();
     let mut lifecycle_timer = FakeDeadlineTimer::would_block();
+    let mut power_button = super::support::FakePowerButtonSource::would_block();
     let mut log_pipes = crate::runtime::RuntimeServiceLogPipes::default();
     let mut filesystem_check_reader =
         crate::supervisor::tests::TestFilesystemCheckReader::default();
@@ -126,6 +129,7 @@ fn runtime_deadline_timer_event_can_finalize_without_rebooting_host() {
             control_connections: &mut connections,
             deadline_timer: &mut deadline_timer,
             lifecycle_timer: &mut lifecycle_timer,
+            power_button_source: &mut power_button,
             filesystem_check_reader: &mut filesystem_check_reader,
             log_pipes: &mut log_pipes,
         },

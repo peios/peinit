@@ -1,5 +1,6 @@
 mod config;
 mod fields;
+mod provisioning;
 mod service;
 mod value;
 
@@ -18,6 +19,9 @@ pub use config::{
     build_max_log_buffer_per_service_from_registry_values,
     build_max_log_line_length_from_registry_values, build_max_parallel_starts_from_registry_values,
     build_shutdown_timeout_from_registry_values, services_schema_warnings,
+};
+pub use provisioning::{
+    build_provisioned_path_from_registry_values, build_provisioned_path_registry_snapshot,
 };
 pub use service::{
     apply_inherited_service_security, build_service_definition_from_registry_values,

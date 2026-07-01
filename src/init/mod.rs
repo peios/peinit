@@ -11,7 +11,7 @@ mod tests;
 pub use linux::{LinuxInitError, run_linux_peinit};
 pub use model::{
     DEFAULT_BOOT_ATTEMPT_THRESHOLD, InitConfig, InitFatalError, InitPlatform, InitRecoveryReason,
-    InitRunError, InitRunResult, InitRuntime, KernelCommandLine, Phase1Infrastructure,
-    Phase1InfrastructureWarning, Phase1JfsDevice,
+    InitRunError, InitRunResult, InitRuntime, KernelCommandLine, MachineIdStatus,
+    Phase1Infrastructure, Phase1InfrastructureWarning, Phase1JfsDevice,
 };
 pub use orchestrator::run_init;

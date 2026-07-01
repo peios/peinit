@@ -4,7 +4,9 @@ use crate::boundary::{
 };
 use crate::control::service_security::ServiceAccessChecker;
 use crate::control::system::SystemAccessChecker;
-use crate::supervisor::{Supervisor, SupervisorChildReapDispatch, SupervisorPid1SignalFdTurn};
+use crate::supervisor::{
+    Supervisor, SupervisorChildReapDispatch, SupervisorChildReapTurn, SupervisorPid1SignalFdTurn,
+};
 
 use super::deadline::sync_deadline_timer;
 use super::model::{
@@ -35,8 +37,7 @@ where
     let supervisor_turn = supervisor
         .handle_pid1_signal_fd_read(read, context.clock, context.controller, context.finalizer)
         .map_err(RuntimeShutdownEventTurnError::Supervisor)?;
-    let child_reaps = if matches!(read, LinuxSignalFdRead::Other { signal } if signal == libc::SIGCHLD)
-    {
+    let reaps = if matches!(read, LinuxSignalFdRead::Other { signal } if signal == libc::SIGCHLD) {
         process_sigchld_reaps(
             supervisor,
             child_reaper,
@@ -45,10 +46,20 @@ where
             context.finalizer,
         )?
     } else {
-        Vec::new()
+        SigchldReaps::empty()
+    };
+    let shutdown_advanced = child_reaps_advanced_shutdown(&reaps.child_reaps);
+    let drive = if shutdown_advanced {
+        let now_ns = reaps.ended_at_ns.expect("shutdown reaps have a timestamp");
+        supervisor
+            .drive_shutdown(context.controller, context.finalizer, now_ns)
+            .map_err(RuntimeShutdownEventTurnError::Supervisor)?
+            .map(Box::new)
+    } else {
+        None
     };
     let deadline_timer_turn = if matches!(supervisor_turn, SupervisorPid1SignalFdTurn::Shutdown(_))
-        || child_reaps_advanced_shutdown(&child_reaps)
+        || shutdown_advanced
     {
         Some(sync_deadline_timer(supervisor, deadline_timer)?)
     } else {
@@ -57,9 +68,24 @@ where
     Ok(RuntimeShutdownEventTurn::Pid1Signal {
         read,
         supervisor: supervisor_turn,
-        child_reaps,
+        child_reaps: reaps.child_reaps,
+        drive,
         deadline_timer: deadline_timer_turn,
     })
+}
+
+struct SigchldReaps {
+    child_reaps: Vec<SupervisorChildReapTurn>,
+    ended_at_ns: Option<u64>,
+}
+
+impl SigchldReaps {
+    fn empty() -> Self {
+        Self {
+            child_reaps: Vec::new(),
+            ended_at_ns: None,
+        }
+    }
 }
 
 fn process_sigchld_reaps<H, C, P, F>(
@@ -68,7 +94,7 @@ fn process_sigchld_reaps<H, C, P, F>(
     clock: &mut C,
     controller: &mut P,
     finalizer: &mut F,
-) -> Result<Vec<crate::supervisor::SupervisorChildReapTurn>, RuntimeShutdownEventTurnError>
+) -> Result<SigchldReaps, RuntimeShutdownEventTurnError>
 where
     H: ChildReaper + ?Sized,
     C: Clock + ?Sized,
@@ -79,27 +105,29 @@ where
         .reap_children()
         .map_err(RuntimeShutdownEventTurnError::ChildReap)?;
     if children.is_empty() {
-        return Ok(Vec::new());
+        return Ok(SigchldReaps::empty());
     }
     let ended_at_ns = clock.monotonic_ns().map_err(|error| {
         RuntimeShutdownEventTurnError::Supervisor(crate::supervisor::SupervisorError::Clock(error))
     })?;
-    children
+    let child_reaps = children
         .into_iter()
         .map(|child: ChildReap| {
             supervisor.apply_reaped_child(child, ended_at_ns, controller, finalizer)
         })
         .collect::<Result<Vec<_>, _>>()
-        .map_err(RuntimeShutdownEventTurnError::Supervisor)
+        .map_err(RuntimeShutdownEventTurnError::Supervisor)?;
+    Ok(SigchldReaps {
+        child_reaps,
+        ended_at_ns: Some(ended_at_ns),
+    })
 }
 
-fn child_reaps_advanced_shutdown(
-    child_reaps: &[crate::supervisor::SupervisorChildReapTurn],
-) -> bool {
+fn child_reaps_advanced_shutdown(child_reaps: &[SupervisorChildReapTurn]) -> bool {
     child_reaps.iter().any(|turn| {
         matches!(
             turn,
-            crate::supervisor::SupervisorChildReapTurn::Tracked {
+            SupervisorChildReapTurn::Tracked {
                 dispatch: SupervisorChildReapDispatch::Shutdown(_),
                 ..
             }

@@ -25,6 +25,8 @@ where
     if environment == RecoveryEnvironment::Ensure {
         let _ = platform.verify_root_writable();
         let _ = platform.mount_virtual_filesystems();
+        let _ = platform.restore_random_seed();
+        let _ = platform.ensure_machine_id();
         let _ = platform.set_clock_from_rtc();
         let mut supervisor = Supervisor::new(SupervisorSettings::default());
         let mut registry = NoRecoveryRegistry;

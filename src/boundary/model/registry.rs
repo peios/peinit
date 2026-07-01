@@ -1,5 +1,6 @@
 use crate::control::socket::ControlSocketLimits;
 use crate::control::system::ControlSecurityDescriptor;
+use crate::provisioning::ProvisionedPathRegistrySnapshot;
 use crate::registry::SUPPORTED_SERVICES_SCHEMA_VERSION;
 use crate::service::{ServiceDefinition, ServiceEnvironmentVariable};
 use crate::timer::state::TimerLastRunStorage;
@@ -72,6 +73,10 @@ pub trait RegistryClient {
         &mut self,
     ) -> Result<Vec<ServiceEnvironmentVariable>, BoundaryError> {
         Ok(Vec::new())
+    }
+
+    fn read_provisioned_paths(&mut self) -> Result<ProvisionedPathRegistrySnapshot, BoundaryError> {
+        Ok(ProvisionedPathRegistrySnapshot::empty())
     }
 
     fn read_eventd_log_socket_path(&mut self) -> Result<Option<String>, BoundaryError> {

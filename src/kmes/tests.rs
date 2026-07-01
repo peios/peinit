@@ -466,6 +466,7 @@ fn token(identity: &str) -> TokenSummary {
 
 fn empty_finalization_report() -> ShutdownFinalizationReport {
     ShutdownFinalizationReport {
+        random_seed: CleanupActionResult::Ok,
         snapshot_mounts: CleanupActionResult::Ok,
         mount_results: Vec::new(),
         root_remount: CleanupActionResult::Ok,

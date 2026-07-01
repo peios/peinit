@@ -51,12 +51,14 @@ impl Supervisor {
         F: ShutdownFinalizer + ?Sized,
     {
         let kind = self.shutdown_runtime()?.kind;
+        let random_seed = cleanup_result(finalizer.save_random_seed());
         let (snapshot_mounts, mount_points) = snapshot_mounts(finalizer);
         let mount_results = cleanup_mounts(finalizer, mount_points);
         let root_remount = cleanup_result(finalizer.remount_readonly("/"));
         let sync_result = cleanup_result(finalizer.sync_filesystems());
         let reboot_result = cleanup_result(finalizer.reboot(kind));
         let report = ShutdownFinalizationReport {
+            random_seed,
             snapshot_mounts,
             mount_results,
             root_remount,
@@ -84,6 +86,7 @@ impl Supervisor {
         let sync_result = cleanup_result(finalizer.sync_filesystems());
         let reboot_result = cleanup_result(finalizer.reboot(kind));
         let report = ShutdownFinalizationReport {
+            random_seed: CleanupActionResult::Ok,
             snapshot_mounts: CleanupActionResult::Ok,
             mount_results: Vec::new(),
             root_remount: CleanupActionResult::Ok,

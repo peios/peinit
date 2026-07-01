@@ -1,3 +1,4 @@
+use crate::provisioning::ServiceRuntimeDirectory;
 use crate::service::{
     ErrorControl, NotifyAccess, Readiness, RestartPolicy, ServiceCheck, ServiceDefinition,
     ServiceEnvironmentVariable, ServiceSecurityDescriptor, ServiceTrigger, ServiceType,
@@ -41,6 +42,7 @@ pub(super) struct DefinitionBuilder {
     pub(super) fd_store_max: u32,
     pub(super) environment: Vec<ServiceEnvironmentVariable>,
     pub(super) working_directory: String,
+    pub(super) runtime_directories: Vec<ServiceRuntimeDirectory>,
     pub(super) limit_nofile: Option<u64>,
     pub(super) limit_core: Option<u64>,
     pub(super) conditions: Vec<ServiceCheck>,
@@ -93,6 +95,7 @@ impl DefinitionBuilder {
             fd_store_max: ServiceDefinition::DEFAULT_FD_STORE_MAX,
             environment: Vec::new(),
             working_directory: ServiceDefinition::DEFAULT_WORKING_DIRECTORY.to_string(),
+            runtime_directories: Vec::new(),
             limit_nofile: None,
             limit_core: None,
             conditions: Vec::new(),
@@ -150,6 +153,7 @@ impl DefinitionBuilder {
             fd_store_max: self.fd_store_max,
             environment: self.environment,
             working_directory: self.working_directory,
+            runtime_directories: self.runtime_directories,
             limit_nofile: self.limit_nofile,
             limit_core: self.limit_core,
             conditions: self.conditions,

@@ -11,6 +11,7 @@ pub enum ShutdownKind {
 pub enum ShutdownSignal {
     Sigint,
     Sigterm,
+    Sigpwr,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -119,6 +120,7 @@ pub enum ShutdownFinalizationState {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShutdownFinalizationReport {
+    pub random_seed: CleanupActionResult,
     pub snapshot_mounts: CleanupActionResult,
     pub mount_results: Vec<MountCleanupResult>,
     pub root_remount: CleanupActionResult,

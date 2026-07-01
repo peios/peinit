@@ -3,6 +3,7 @@ use std::os::fd::{AsRawFd, OwnedFd};
 use crate::boot::phase2::Phase2BootSettings;
 use crate::boundary::{BoundaryError, RegistryClient};
 use crate::control::socket::LinuxControlSocket;
+use crate::provisioning::{ProvisionedPath, ProvisionedPathApplyReport};
 use crate::supervisor::{Supervisor, SupervisorError};
 
 pub const DEFAULT_BOOT_ATTEMPT_THRESHOLD: u32 = 3;
@@ -55,6 +56,12 @@ pub trait InitPlatform {
     fn verify_root_writable(&mut self) -> Result<(), BoundaryError>;
     fn increment_boot_attempt_counter(&mut self) -> Result<(), BoundaryError>;
     fn mount_virtual_filesystems(&mut self) -> Result<(), BoundaryError>;
+    fn restore_random_seed(&mut self) -> Result<bool, BoundaryError> {
+        Ok(false)
+    }
+    fn ensure_machine_id(&mut self) -> Result<MachineIdStatus, BoundaryError> {
+        Ok(MachineIdStatus::Existing)
+    }
     fn set_clock_from_rtc(&mut self) -> Result<(), BoundaryError>;
     fn start_registryd(
         &mut self,
@@ -72,6 +79,12 @@ pub trait InitPlatform {
     /// is a no-op so non-Linux platforms and test doubles need no implementation.
     fn run_autorun_scripts(&mut self) -> Result<(), BoundaryError> {
         Ok(())
+    }
+    fn provision_boot_paths(
+        &mut self,
+        _paths: &[ProvisionedPath],
+    ) -> Result<ProvisionedPathApplyReport, BoundaryError> {
+        Ok(ProvisionedPathApplyReport::default())
     }
     fn log_phase1_warning(
         &mut self,
@@ -208,11 +221,20 @@ pub enum InitRecoveryReason {
     BootAttemptThresholdReached { counter: u32, threshold: u32 },
     RootWritable(BoundaryError),
     VirtualFilesystems(BoundaryError),
+    MachineId(BoundaryError),
     RtcClock(BoundaryError),
     Registryd(BoundaryError),
+    Provisioning(BoundaryError),
     Infrastructure(BoundaryError),
     Phase2(SupervisorError),
     Runtime(BoundaryError),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MachineIdStatus {
+    Existing,
+    Generated,
+    ReplacedInvalid,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

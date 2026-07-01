@@ -11,6 +11,7 @@ const KIND_FILESYSTEM_CHECK_HELPER: u32 = 10;
 const KIND_FILESYSTEM_CHECK_HELPER_EXIT: u32 = 11;
 const KIND_REGISTRY_WATCH: u32 = 12;
 const KIND_PROCESS_SETUP: u32 = 13;
+const KIND_POWER_BUTTON: u32 = 14;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RuntimeEventSource {
@@ -27,6 +28,7 @@ pub enum RuntimeEventSource {
     FilesystemCheckHelperExit { pidfd: i32 },
     RegistryWatch { fd: i32 },
     ProcessSetup { fd: i32 },
+    PowerButton { fd: i32 },
 }
 
 impl RuntimeEventSource {
@@ -49,6 +51,7 @@ impl RuntimeEventSource {
             }
             Self::RegistryWatch { fd } => encode_token(KIND_REGISTRY_WATCH, fd as u32),
             Self::ProcessSetup { fd } => encode_token(KIND_PROCESS_SETUP, fd as u32),
+            Self::PowerButton { fd } => encode_token(KIND_POWER_BUTTON, fd as u32),
         }
     }
 
@@ -84,6 +87,10 @@ impl RuntimeEventSource {
         source_from_fd(fd, |fd| Self::ProcessSetup { fd })
     }
 
+    pub fn power_button(fd: i32) -> Result<Self, RuntimeEventSourceDecodeError> {
+        source_from_fd(fd, |fd| Self::PowerButton { fd })
+    }
+
     pub fn from_token(token: u64) -> Result<Self, RuntimeEventSourceDecodeError> {
         let kind = (token >> 32) as u32;
         let value = (token & u64::from(u32::MAX)) as u32;
@@ -107,6 +114,7 @@ impl RuntimeEventSource {
             }
             KIND_REGISTRY_WATCH => source_from_token_fd(value, |fd| Self::RegistryWatch { fd }),
             KIND_PROCESS_SETUP => source_from_token_fd(value, |fd| Self::ProcessSetup { fd }),
+            KIND_POWER_BUTTON => source_from_token_fd(value, |fd| Self::PowerButton { fd }),
             _ => Err(RuntimeEventSourceDecodeError::UnknownToken { token }),
         }
     }
@@ -163,6 +171,7 @@ mod tests {
             RuntimeEventSource::FilesystemCheckHelperExit { pidfd: 47 },
             RuntimeEventSource::RegistryWatch { fd: 48 },
             RuntimeEventSource::ProcessSetup { fd: 49 },
+            RuntimeEventSource::PowerButton { fd: 50 },
         ];
 
         for source in sources {

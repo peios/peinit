@@ -1,3 +1,5 @@
+use crate::provisioning::ServiceRuntimeDirectory;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ServiceType {
     Simple,
@@ -106,6 +108,7 @@ pub struct ServiceDefinition {
     pub fd_store_max: u32,
     pub environment: Vec<ServiceEnvironmentVariable>,
     pub working_directory: String,
+    pub runtime_directories: Vec<ServiceRuntimeDirectory>,
     pub limit_nofile: Option<u64>,
     pub limit_core: Option<u64>,
     pub conditions: Vec<ServiceCheck>,
@@ -198,6 +201,7 @@ impl ServiceDefinition {
             fd_store_max: Self::DEFAULT_FD_STORE_MAX,
             environment: Vec::new(),
             working_directory: Self::DEFAULT_WORKING_DIRECTORY.to_string(),
+            runtime_directories: Vec::new(),
             limit_nofile: None,
             limit_core: None,
             conditions: Vec::new(),

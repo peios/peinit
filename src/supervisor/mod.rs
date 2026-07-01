@@ -17,6 +17,7 @@ mod notify;
 mod operation_maintenance;
 mod phase1_registryd;
 mod post_start_hooks;
+mod power_button;
 mod pre_start_checks;
 mod process_setup;
 mod ready;
@@ -81,7 +82,8 @@ pub use dispatch::{
     SupervisorOnFailureLoopSuppressionReason, SupervisorPendingProcessSetupDispatch,
     SupervisorPostStartHookLaunchDispatch, SupervisorPostStartHookLaunchFailureDispatch,
     SupervisorPostStartHookLaunchResult, SupervisorPostStartHookTerminalDispatch,
-    SupervisorPostStartHookTimeoutDispatch, SupervisorPreStartHookTerminalDispatch,
+    SupervisorPostStartHookTimeoutDispatch, SupervisorPowerButtonAction,
+    SupervisorPowerButtonDispatch, SupervisorPreStartHookTerminalDispatch,
     SupervisorPreStartHookTimeoutDispatch, SupervisorProcessSetupDispatch,
     SupervisorReadinessTimeoutDispatch, SupervisorReloadCommandTerminalDispatch,
     SupervisorReloadCommandTimeoutDispatch, SupervisorReloadDetectionDispatch,

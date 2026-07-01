@@ -14,6 +14,7 @@ fn epoll_events_decode_to_runtime_sources() {
         LinuxEpollEvent::read(RuntimeEventSource::JfsDevice { fd: 44 }.token()),
         LinuxEpollEvent::read(RuntimeEventSource::FilesystemCheckHelper { result_fd: 45 }.token()),
         LinuxEpollEvent::read(RuntimeEventSource::FilesystemCheckHelperExit { pidfd: 46 }.token()),
+        LinuxEpollEvent::read(RuntimeEventSource::PowerButton { fd: 47 }.token()),
     ];
 
     assert_eq!(
@@ -27,6 +28,7 @@ fn epoll_events_decode_to_runtime_sources() {
             RuntimeEventSource::JfsDevice { fd: 44 },
             RuntimeEventSource::FilesystemCheckHelper { result_fd: 45 },
             RuntimeEventSource::FilesystemCheckHelperExit { pidfd: 46 },
+            RuntimeEventSource::PowerButton { fd: 47 },
         ],
     );
 }

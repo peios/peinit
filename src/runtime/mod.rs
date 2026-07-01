@@ -44,10 +44,10 @@ pub use turn::{
     RuntimeCalendarTimerTurn, RuntimeEventRegistrar, RuntimeEventRegistrationError,
     RuntimeFilesystemCheckHelperTurn, RuntimeJfsDeviceTurn, RuntimeLifecycleDeadlineTimer,
     RuntimeNotifyDatagram, RuntimeNotifyRead, RuntimeNotifyRejection, RuntimeNotifySource,
-    RuntimeNotifySupervisorTurn, RuntimePid1SignalSource, RuntimeProcessSetupTurn,
-    RuntimeRegistryWatchTurn, RuntimeShutdownDeadlineTimer, RuntimeShutdownEventContext,
-    RuntimeShutdownEventSources, RuntimeShutdownEventTurn, RuntimeShutdownEventTurnError,
-    process_runtime_shutdown_event,
+    RuntimeNotifySupervisorTurn, RuntimePid1SignalSource, RuntimePowerButtonSource,
+    RuntimePowerButtonTurn, RuntimeProcessSetupTurn, RuntimeRegistryWatchTurn,
+    RuntimeShutdownDeadlineTimer, RuntimeShutdownEventContext, RuntimeShutdownEventSources,
+    RuntimeShutdownEventTurn, RuntimeShutdownEventTurnError, process_runtime_shutdown_event,
 };
 pub use work_pump::{
     RuntimeWorkPumpConfig, RuntimeWorkPumpContext, RuntimeWorkPumpError, RuntimeWorkPumpTurn,

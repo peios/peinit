@@ -15,13 +15,13 @@ use super::job::{
 };
 use super::system::{
     collect_child_reap_turn, collect_control_connection_table_turn,
-    collect_lifecycle_deadline_dispatch, collect_pid1_signal_turn, collect_shutdown_drive_dispatch,
-    collect_timer_dispatch,
+    collect_lifecycle_deadline_dispatch, collect_pid1_signal_turn, collect_power_button_dispatch,
+    collect_shutdown_drive_dispatch, collect_timer_dispatch,
 };
 use crate::runtime::{
     RuntimeCalendarTimerTurn, RuntimeFilesystemCheckHelperTurn, RuntimeNotifyRead,
-    RuntimeNotifyRejection, RuntimeNotifySupervisorTurn, RuntimeProcessSetupTurn,
-    RuntimeShutdownEventTurn, RuntimeWorkPumpTurn,
+    RuntimeNotifyRejection, RuntimeNotifySupervisorTurn, RuntimePowerButtonTurn,
+    RuntimeProcessSetupTurn, RuntimeShutdownEventTurn, RuntimeWorkPumpTurn,
 };
 
 pub(crate) fn collect_runtime_loop_kmes_events(
@@ -54,11 +54,15 @@ pub(crate) fn collect_runtime_shutdown_turn_kmes_events(
         RuntimeShutdownEventTurn::Pid1Signal {
             supervisor,
             child_reaps,
+            drive,
             ..
         } => {
             collect_pid1_signal_turn(supervisor, out)?;
             for reap in child_reaps {
                 collect_child_reap_turn(reap, out)?;
+            }
+            if let Some(drive) = drive {
+                collect_shutdown_drive_dispatch(drive, out)?;
             }
         }
         RuntimeShutdownEventTurn::ControlConnection { supervisor, .. } => {
@@ -91,6 +95,9 @@ pub(crate) fn collect_runtime_shutdown_turn_kmes_events(
         RuntimeShutdownEventTurn::ProcessSetup { turn, .. } => {
             collect_process_setup_turn(turn, out)?;
         }
+        RuntimeShutdownEventTurn::PowerButton { turn, .. } => {
+            collect_power_button_turn(turn, out)?;
+        }
         RuntimeShutdownEventTurn::ControlListener { .. }
         | RuntimeShutdownEventTurn::IdleControlConnectionsClosed { .. }
         | RuntimeShutdownEventTurn::StaleControlConnection { .. }
@@ -99,6 +106,16 @@ pub(crate) fn collect_runtime_shutdown_turn_kmes_events(
         | RuntimeShutdownEventTurn::RegistryWatch { .. } => {}
     }
     Ok(())
+}
+
+fn collect_power_button_turn(
+    turn: &RuntimePowerButtonTurn,
+    out: &mut Vec<KmesEvent>,
+) -> Result<(), BoundaryError> {
+    let RuntimePowerButtonTurn::Shutdown { supervisor, .. } = turn else {
+        return Ok(());
+    };
+    collect_power_button_dispatch(supervisor, out)
 }
 
 fn collect_process_setup_turn(

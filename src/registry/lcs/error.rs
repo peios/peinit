@@ -26,6 +26,16 @@ pub enum LcsRegistryReadError {
     OpenInit(peios::Error),
     ReadInit(peios::Error),
     DecodeInit(ServiceRegistryDecodeError),
+    OpenProvisionedPaths(peios::Error),
+    EnumerateProvisionedPath(peios::Error),
+    OpenProvisionedPath {
+        entry: String,
+        source: peios::Error,
+    },
+    ReadProvisionedPath {
+        entry: String,
+        source: peios::Error,
+    },
     OpenGlobalEnvironment(peios::Error),
     ReadGlobalEnvironment(peios::Error),
     DecodeGlobalEnvironment(ServiceRegistryDecodeError),

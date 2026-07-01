@@ -53,6 +53,7 @@ pub(in crate::supervisor::tests::shutdown::runtime_turn) fn process_expired_life
     let mut connections = ControlConnectionTable::new(4);
     let mut shutdown_timer = FakeDeadlineTimer::would_block();
     let mut lifecycle_timer = FakeDeadlineTimer::expired_once();
+    let mut power_button = super::super::support::FakePowerButtonSource::would_block();
     let mut log_pipes = crate::runtime::RuntimeServiceLogPipes::default();
     let mut filesystem_check_reader =
         crate::supervisor::tests::TestFilesystemCheckReader::default();
@@ -77,6 +78,7 @@ pub(in crate::supervisor::tests::shutdown::runtime_turn) fn process_expired_life
             control_connections: &mut connections,
             deadline_timer: &mut shutdown_timer,
             lifecycle_timer: &mut lifecycle_timer,
+            power_button_source: &mut power_button,
             filesystem_check_reader: &mut filesystem_check_reader,
             log_pipes: &mut log_pipes,
         },

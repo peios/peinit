@@ -5,6 +5,7 @@ mod eventd;
 mod global_env;
 mod init;
 mod name;
+mod provisioning;
 mod schema;
 mod service;
 mod timer;

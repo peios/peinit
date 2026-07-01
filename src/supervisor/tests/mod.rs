@@ -179,7 +179,10 @@ impl TokenProvider for TestTokenProvider {
 #[derive(Debug)]
 struct TestProcessLauncher {
     results: VecDeque<Result<LaunchedProcess, BoundaryError>>,
+    runtime_directory_results: VecDeque<Result<(), BoundaryError>>,
     observed_jobs: Vec<String>,
+    observed_runtime_directory_services: Vec<String>,
+    observed_runtime_directories: Vec<Vec<String>>,
     observed_notify_sockets: Vec<Option<String>>,
     observed_paths: Vec<Option<String>>,
     observed_app_modes: Vec<Option<String>>,
@@ -290,7 +293,10 @@ impl TestProcessLauncher {
     fn new(processes: Vec<LaunchedProcess>) -> Self {
         Self {
             results: processes.into_iter().map(Ok).collect(),
+            runtime_directory_results: VecDeque::new(),
             observed_jobs: Vec::new(),
+            observed_runtime_directory_services: Vec::new(),
+            observed_runtime_directories: Vec::new(),
             observed_notify_sockets: Vec::new(),
             observed_paths: Vec::new(),
             observed_app_modes: Vec::new(),
@@ -305,7 +311,10 @@ impl TestProcessLauncher {
     fn results(results: Vec<Result<LaunchedProcess, BoundaryError>>) -> Self {
         Self {
             results: results.into(),
+            runtime_directory_results: VecDeque::new(),
             observed_jobs: Vec::new(),
+            observed_runtime_directory_services: Vec::new(),
+            observed_runtime_directories: Vec::new(),
             observed_notify_sockets: Vec::new(),
             observed_paths: Vec::new(),
             observed_app_modes: Vec::new(),
@@ -316,9 +325,30 @@ impl TestProcessLauncher {
             observed_setup_timeouts: Vec::new(),
         }
     }
+
+    fn runtime_directory_results(mut self, results: Vec<Result<(), BoundaryError>>) -> Self {
+        self.runtime_directory_results = results.into();
+        self
+    }
 }
 
 impl ProcessLauncher for TestProcessLauncher {
+    fn provision_service_runtime_directories(
+        &mut self,
+        service: &ServiceDefinition,
+    ) -> Result<(), BoundaryError> {
+        self.observed_runtime_directory_services
+            .push(service.name.clone());
+        self.observed_runtime_directories.push(
+            service
+                .runtime_directories
+                .iter()
+                .map(|directory| directory.name.clone())
+                .collect(),
+        );
+        self.runtime_directory_results.pop_front().unwrap_or(Ok(()))
+    }
+
     fn launch_service(
         &mut self,
         spec: ProcessLaunchSpec<'_>,

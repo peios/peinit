@@ -4,7 +4,11 @@ use crate::boot::BootMode;
 use crate::boundary::{BoundaryError, Clock, KmesEvent, RegistryClient};
 use crate::init::{
     InitFatalError, InitPlatform, InitRecoveryReason, InitRuntime, KernelCommandLine,
-    Phase1Infrastructure, Phase1InfrastructureWarning, Phase1JfsDevice,
+    MachineIdStatus, Phase1Infrastructure, Phase1InfrastructureWarning, Phase1JfsDevice,
+};
+use crate::provisioning::{
+    ProvisionedPath, ProvisionedPathApplyReport, ProvisionedPathRegistrySnapshot,
+    ProvisionedPathRegistryWarning,
 };
 use crate::service::runtime::ServiceState;
 use crate::service::{Readiness, ServiceDefinition};
@@ -18,9 +22,13 @@ pub(super) struct Platform {
     increment_result: Result<(), BoundaryError>,
     root_result: Result<(), BoundaryError>,
     mount_result: Result<(), BoundaryError>,
+    random_seed_result: Result<bool, BoundaryError>,
+    machine_id_result: Result<MachineIdStatus, BoundaryError>,
     rtc_result: Result<(), BoundaryError>,
     registryd_result: Result<(), BoundaryError>,
     infrastructure_result: Result<Phase1Infrastructure, BoundaryError>,
+    provision_report: Result<ProvisionedPathApplyReport, BoundaryError>,
+    pub(super) provisioned_paths_seen: Vec<ProvisionedPath>,
     pub(super) root_verified: bool,
     pub(super) increment_calls: usize,
     pub(super) warning_logs: Vec<Phase1InfrastructureWarning>,
@@ -38,9 +46,13 @@ impl Platform {
             increment_result: Ok(()),
             root_result: Ok(()),
             mount_result: Ok(()),
+            random_seed_result: Ok(false),
+            machine_id_result: Ok(MachineIdStatus::Existing),
             rtc_result: Ok(()),
             registryd_result: Ok(()),
             infrastructure_result: Ok(Phase1Infrastructure::new()),
+            provision_report: Ok(ProvisionedPathApplyReport::default()),
+            provisioned_paths_seen: Vec::new(),
             root_verified: false,
             increment_calls: 0,
             warning_logs: Vec::new(),
@@ -80,6 +92,26 @@ impl Platform {
         self
     }
 
+    pub(super) fn random_seed_error(mut self, message: &str) -> Self {
+        self.random_seed_result = Err(BoundaryError::Recovery(message.to_string()));
+        self
+    }
+
+    pub(super) fn random_seed_restored(mut self) -> Self {
+        self.random_seed_result = Ok(true);
+        self
+    }
+
+    pub(super) fn machine_id_error(mut self, message: &str) -> Self {
+        self.machine_id_result = Err(BoundaryError::Recovery(message.to_string()));
+        self
+    }
+
+    pub(super) fn machine_id_status(mut self, status: MachineIdStatus) -> Self {
+        self.machine_id_result = Ok(status);
+        self
+    }
+
     pub(super) fn with_jfs_infrastructure(mut self) -> Self {
         self.infrastructure_result = Ok(Phase1Infrastructure::with_jfs_device(
             Phase1JfsDevice::new(pipe_read_fd(), "/dev/jfs"),
@@ -89,6 +121,11 @@ impl Platform {
 
     pub(super) fn infrastructure(mut self, infrastructure: Phase1Infrastructure) -> Self {
         self.infrastructure_result = Ok(infrastructure);
+        self
+    }
+
+    pub(super) fn provision_report(mut self, report: ProvisionedPathApplyReport) -> Self {
+        self.provision_report = Ok(report);
         self
     }
 }
@@ -120,6 +157,14 @@ impl InitPlatform for Platform {
         self.mount_result.clone()
     }
 
+    fn restore_random_seed(&mut self) -> Result<bool, BoundaryError> {
+        self.random_seed_result.clone()
+    }
+
+    fn ensure_machine_id(&mut self) -> Result<MachineIdStatus, BoundaryError> {
+        self.machine_id_result.clone()
+    }
+
     fn set_clock_from_rtc(&mut self) -> Result<(), BoundaryError> {
         self.rtc_result.clone()
     }
@@ -138,6 +183,14 @@ impl InitPlatform for Platform {
             &mut self.infrastructure_result,
             Ok(Phase1Infrastructure::new()),
         )
+    }
+
+    fn provision_boot_paths(
+        &mut self,
+        paths: &[ProvisionedPath],
+    ) -> Result<ProvisionedPathApplyReport, BoundaryError> {
+        self.provisioned_paths_seen = paths.to_vec();
+        self.provision_report.clone()
     }
 
     fn log_phase1_warning(
@@ -167,19 +220,43 @@ impl InitPlatform for Platform {
 #[derive(Debug, Clone)]
 pub(super) struct Registry {
     services: Vec<ServiceDefinition>,
+    provisioned_paths: Result<ProvisionedPathRegistrySnapshot, BoundaryError>,
 }
 
 impl Registry {
     pub(super) fn with_services<const N: usize>(services: [ServiceDefinition; N]) -> Self {
         Self {
             services: services.into_iter().collect(),
+            provisioned_paths: Ok(ProvisionedPathRegistrySnapshot::empty()),
         }
+    }
+
+    pub(super) fn with_provisioned_paths(
+        mut self,
+        snapshot: ProvisionedPathRegistrySnapshot,
+    ) -> Self {
+        self.provisioned_paths = Ok(snapshot);
+        self
+    }
+
+    pub(super) fn provisioned_path_registry_warning(mut self, entry: &str, message: &str) -> Self {
+        let mut snapshot = ProvisionedPathRegistrySnapshot::empty();
+        snapshot.warnings.push(ProvisionedPathRegistryWarning {
+            entry: entry.to_string(),
+            message: message.to_string(),
+        });
+        self.provisioned_paths = Ok(snapshot);
+        self
     }
 }
 
 impl RegistryClient for Registry {
     fn read_service_definitions(&mut self) -> Result<Vec<ServiceDefinition>, BoundaryError> {
         Ok(self.services.clone())
+    }
+
+    fn read_provisioned_paths(&mut self) -> Result<ProvisionedPathRegistrySnapshot, BoundaryError> {
+        self.provisioned_paths.clone()
     }
 }
 

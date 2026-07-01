@@ -9,8 +9,12 @@ mod linux_epoll;
 mod linux_io;
 #[cfg(feature = "peios-boundary")]
 mod linux_kmes;
+mod linux_machine_id;
+mod linux_power;
 #[cfg(feature = "peios-boundary")]
 mod linux_pre_start_check;
+mod linux_provisioning;
+mod linux_random_seed;
 mod linux_signal;
 mod linux_timer;
 mod model;
@@ -45,10 +49,23 @@ pub(crate) use linux_io::{read_fd_to_string, write_all_fd};
 pub use linux_kmes::LinuxKmesEventSink;
 #[cfg(feature = "peios-boundary")]
 pub use linux_launch::{LinuxProcessLauncher, LinuxSystemTokenProvider};
+pub use linux_machine_id::{
+    DEFAULT_MACHINE_ID_PATH, LinuxMachineIdError, LinuxMachineIdStatus, ensure_linux_machine_id,
+};
+#[cfg(feature = "peios-boundary")]
+pub use linux_power::LinuxPowerButtonDevices;
+pub use linux_power::{LinuxPowerButtonRead, LinuxPowerButtonReadError};
 #[cfg(feature = "peios-boundary")]
 pub use linux_pre_start_check::LinuxFilesystemCheckHelper;
 #[cfg(feature = "peios-boundary")]
 pub use linux_process::LinuxProcessController;
+pub use linux_provisioning::{
+    provision_linux_boot_paths, provision_linux_service_runtime_directories,
+};
+pub use linux_random_seed::{
+    DEFAULT_RANDOM_SEED_PATH, LinuxRandomSeedError, LinuxRandomSeedRestoreStatus,
+    restore_linux_random_seed, save_linux_random_seed,
+};
 pub use linux_signal::{
     LinuxPid1SignalFd, LinuxSignalFdRead, LinuxSignalFdReadError, LinuxSignalMask,
     Pid1SignalFdRegisteredSetup, Pid1SignalFdRegisteredSetupError, Pid1SignalFdSetup,

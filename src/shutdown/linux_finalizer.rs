@@ -12,7 +12,7 @@ use peios::file::{FileAccess, OpenOptions};
 
 #[cfg(feature = "peios-boundary")]
 use crate::boundary::read_fd_to_string;
-use crate::boundary::{BoundaryError, ShutdownFinalizer};
+use crate::boundary::{BoundaryError, ShutdownFinalizer, save_linux_random_seed};
 
 use super::ShutdownKind;
 use super::mountinfo::{mountinfo_contains_mount_point, parse_mountinfo_mount_points};
@@ -72,6 +72,11 @@ fn read_text_file(path: &Path) -> io::Result<String> {
 }
 
 impl ShutdownFinalizer for LinuxShutdownFinalizer {
+    fn save_random_seed(&mut self) -> Result<(), BoundaryError> {
+        save_linux_random_seed()
+            .map_err(|error| BoundaryError::Shutdown(format!("save random seed failed: {error:?}")))
+    }
+
     fn snapshot_mounts(&mut self) -> Result<Vec<String>, BoundaryError> {
         parse_mountinfo_mount_points(&self.read_mountinfo()?)
     }

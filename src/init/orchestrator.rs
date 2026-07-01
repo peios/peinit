@@ -1,9 +1,10 @@
 use crate::boot::BootMode;
-use crate::boundary::{Clock, RegistryClient};
+use crate::boundary::{BoundaryError, Clock, RegistryClient};
 use crate::supervisor::{Supervisor, SupervisorBootDispatch, SupervisorSettings};
 
 use super::{
     InitConfig, InitPlatform, InitRecoveryReason, InitRunError, InitRunResult, InitRuntime,
+    MachineIdStatus,
 };
 
 mod recovery;
@@ -45,6 +46,32 @@ where
         );
     }
     log_console(platform, "peinit: phase1 virtual filesystems mounted\n");
+
+    match platform.restore_random_seed() {
+        Ok(true) => log_console(platform, "peinit: phase1 restored random seed\n"),
+        Ok(false) => {}
+        Err(error) => log_console(
+            platform,
+            &format!("peinit warning: random seed restore failed: {error:?}\n"),
+        ),
+    }
+
+    match platform.ensure_machine_id() {
+        Ok(MachineIdStatus::Existing) => {}
+        Ok(MachineIdStatus::Generated) => {
+            log_console(platform, "peinit: phase1 generated machine-id\n")
+        }
+        Ok(MachineIdStatus::ReplacedInvalid) => {
+            log_console(platform, "peinit warning: invalid machine-id replaced\n")
+        }
+        Err(error) => {
+            return enter_recovery(
+                platform,
+                InitRecoveryReason::MachineId(error),
+                RecoveryEnvironment::Ensure,
+            );
+        }
+    }
 
     let command_line = match platform.read_kernel_command_line() {
         Ok(command_line) => command_line,
@@ -137,6 +164,63 @@ where
     // lifecycle. Fail-open: the platform logs its own summary and never aborts
     // boot, so a missing dir or a failed script is a warning, not recovery.
     let _ = platform.run_autorun_scripts();
+    let provisioning = match registry.read_provisioned_paths() {
+        Ok(snapshot) => snapshot,
+        Err(error) => {
+            return enter_recovery(
+                platform,
+                InitRecoveryReason::Provisioning(error),
+                RecoveryEnvironment::Ensure,
+            );
+        }
+    };
+    for warning in &provisioning.warnings {
+        log_console(
+            platform,
+            &format!(
+                "peinit warning: provisioned path {} ignored: {}\n",
+                warning.entry, warning.message
+            ),
+        );
+    }
+    let provisioning_report = match platform.provision_boot_paths(&provisioning.entries) {
+        Ok(report) => report,
+        Err(error) => {
+            return enter_recovery(
+                platform,
+                InitRecoveryReason::Provisioning(error),
+                RecoveryEnvironment::Ensure,
+            );
+        }
+    };
+    for warning in &provisioning_report.warnings {
+        log_console(
+            platform,
+            &format!(
+                "peinit warning: provisioned path {} at {} failed: {}\n",
+                warning.entry, warning.path, warning.message
+            ),
+        );
+    }
+    if provisioning_report.has_required_failures() {
+        for failure in &provisioning_report.required_failures {
+            log_console(
+                platform,
+                &format!(
+                    "peinit: required provisioned path {} at {} failed: {}\n",
+                    failure.entry, failure.path, failure.message
+                ),
+            );
+        }
+        return enter_recovery(
+            platform,
+            InitRecoveryReason::Provisioning(BoundaryError::Recovery(format!(
+                "{} required provisioned path(s) failed",
+                provisioning_report.required_failures.len()
+            ))),
+            RecoveryEnvironment::Ensure,
+        );
+    }
     let infrastructure = match platform.setup_infrastructure() {
         Ok(infrastructure) => infrastructure,
         Err(error) => {

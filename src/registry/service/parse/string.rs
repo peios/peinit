@@ -1,3 +1,4 @@
+use crate::provisioning::ServiceRuntimeDirectory;
 use crate::registry::fields::Field;
 use crate::registry::value::{
     RawRegistryValue, ServiceRegistryDecodeError, decode_multi_sz_field, decode_sz_field,
@@ -58,5 +59,56 @@ pub(in crate::registry::service) fn parse_absolute_path_field(
             field: field.name(),
             value: parsed,
         })
+    }
+}
+
+pub(in crate::registry::service) fn parse_runtime_directories(
+    value: &RawRegistryValue,
+    field: Field,
+) -> Result<Vec<ServiceRuntimeDirectory>, ServiceRegistryDecodeError> {
+    decode_multi_sz_field(value, field.name())?
+        .into_iter()
+        .map(|entry| {
+            if is_valid_runtime_directory_name(&entry) {
+                Ok(ServiceRuntimeDirectory { name: entry })
+            } else {
+                Err(ServiceRegistryDecodeError::InvalidRuntimeDirectory {
+                    field: field.name(),
+                    value: entry,
+                })
+            }
+        })
+        .collect()
+}
+
+fn is_valid_runtime_directory_name(value: &str) -> bool {
+    !value.is_empty()
+        && value != "."
+        && value != ".."
+        && !value
+            .bytes()
+            .any(|byte| matches!(byte, b'/' | b'\\' | 0..=31 | 127))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_valid_runtime_directory_name;
+
+    #[test]
+    fn runtime_directory_names_are_single_relative_components() {
+        for valid in ["app", "app.sock.d", "app-cache_1"] {
+            assert!(is_valid_runtime_directory_name(valid), "{valid}");
+        }
+        for invalid in [
+            "",
+            ".",
+            "..",
+            "/app",
+            "app/cache",
+            "app\\cache",
+            "bad\nname",
+        ] {
+            assert!(!is_valid_runtime_directory_name(invalid), "{invalid:?}");
+        }
     }
 }

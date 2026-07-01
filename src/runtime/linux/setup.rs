@@ -79,6 +79,7 @@ impl LinuxShutdownRuntime {
                 RuntimeEventSource::LifecycleDeadlineTimer,
             )
             .map_err(LinuxRuntimeSetupError::Register)?;
+        let power_buttons = setup_power_button_devices(&mut epoll);
         #[cfg(feature = "peios-registry")]
         let registry_watches = setup_registry_watches(&mut epoll)?;
 
@@ -98,6 +99,7 @@ impl LinuxShutdownRuntime {
             console_sink: LinuxConsoleSink::new(),
             log_pipes: RuntimeServiceLogPipes::default(),
             jfs_device: None,
+            power_buttons,
             clock: LinuxMonotonicClock::new(),
             controller: LinuxProcessController::new(),
             boot_attempt_counter: LinuxBootAttemptCounter::new(),
@@ -114,6 +116,18 @@ impl LinuxShutdownRuntime {
             config,
         })
     }
+}
+
+fn setup_power_button_devices(
+    registrar: &mut impl RuntimeEventRegistrar,
+) -> crate::boundary::LinuxPowerButtonDevices {
+    let mut devices = crate::boundary::LinuxPowerButtonDevices::open_default();
+    devices.retain_fds(|fd| {
+        registrar
+            .register_source(fd, RuntimeEventSource::PowerButton { fd })
+            .is_ok()
+    });
+    devices
 }
 
 #[cfg(feature = "peios-registry")]

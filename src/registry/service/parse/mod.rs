@@ -14,4 +14,5 @@ pub(super) use reference::{
 };
 pub(super) use string::{
     parse_absolute_path_field, parse_identity_field, parse_non_empty_list, parse_optional_string,
+    parse_runtime_directories,
 };

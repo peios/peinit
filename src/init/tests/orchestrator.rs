@@ -2,7 +2,11 @@ use crate::boot::BootMode;
 use crate::boundary::BoundaryError;
 use crate::init::{
     InitConfig, InitFatalError, InitRecoveryReason, InitRunError, InitRunResult, KernelCommandLine,
-    Phase1Infrastructure, Phase1InfrastructureWarning, run_init,
+    MachineIdStatus, Phase1Infrastructure, Phase1InfrastructureWarning, run_init,
+};
+use crate::provisioning::{
+    ProvisionedPath, ProvisionedPathApplyFailure, ProvisionedPathApplyReport, ProvisionedPathKind,
+    ProvisionedPathRegistrySnapshot, ProvisionedPathSecurity,
 };
 use crate::service::runtime::ServiceState;
 
@@ -131,6 +135,152 @@ fn kernel_command_line_is_read_after_virtual_filesystem_mounts() {
 }
 
 #[test]
+fn random_seed_restore_failure_is_warning_not_recovery() {
+    let mut platform = Platform::new().random_seed_error("credit failed");
+    let mut registry = Registry::with_services([service("app")]);
+    let mut clock = ClockAt(10);
+    let mut runtime = Runtime::default();
+
+    let result = run_init(
+        InitConfig::default(),
+        &mut platform,
+        &mut registry,
+        &mut clock,
+        &mut runtime,
+    )
+    .expect("runtime");
+
+    assert_eq!(result, InitRunResult::RuntimeReturned);
+    assert!(runtime.entered);
+    assert!(platform.recovery_reasons.is_empty());
+    assert!(
+        platform.console_messages.iter().any(|message| {
+            message == "peinit warning: random seed restore failed: Recovery(\"credit failed\")\n"
+        }),
+        "{:?}",
+        platform.console_messages,
+    );
+}
+
+#[test]
+fn restored_random_seed_is_logged_before_registryd_start() {
+    let mut platform = Platform::new().random_seed_restored();
+    let mut registry = Registry::with_services([service("app")]);
+    let mut clock = ClockAt(10);
+    let mut runtime = Runtime::default();
+
+    run_init(
+        InitConfig::default(),
+        &mut platform,
+        &mut registry,
+        &mut clock,
+        &mut runtime,
+    )
+    .expect("runtime");
+
+    let restored_index = platform
+        .console_messages
+        .iter()
+        .position(|message| message == "peinit: phase1 restored random seed\n")
+        .expect("restored message");
+    let registryd_index = platform
+        .console_messages
+        .iter()
+        .position(|message| message == "peinit: phase1 starting registryd\n")
+        .expect("registryd message");
+    assert!(restored_index < registryd_index);
+}
+
+#[test]
+fn generated_machine_id_is_logged_before_registryd_start() {
+    let mut platform = Platform::new().machine_id_status(MachineIdStatus::Generated);
+    let mut registry = Registry::with_services([service("app")]);
+    let mut clock = ClockAt(10);
+    let mut runtime = Runtime::default();
+
+    run_init(
+        InitConfig::default(),
+        &mut platform,
+        &mut registry,
+        &mut clock,
+        &mut runtime,
+    )
+    .expect("runtime");
+
+    let generated_index = platform
+        .console_messages
+        .iter()
+        .position(|message| message == "peinit: phase1 generated machine-id\n")
+        .expect("machine-id message");
+    let registryd_index = platform
+        .console_messages
+        .iter()
+        .position(|message| message == "peinit: phase1 starting registryd\n")
+        .expect("registryd message");
+    assert!(generated_index < registryd_index);
+}
+
+#[test]
+fn invalid_machine_id_replacement_is_logged_before_registryd_start() {
+    let mut platform = Platform::new().machine_id_status(MachineIdStatus::ReplacedInvalid);
+    let mut registry = Registry::with_services([service("app")]);
+    let mut clock = ClockAt(10);
+    let mut runtime = Runtime::default();
+
+    run_init(
+        InitConfig::default(),
+        &mut platform,
+        &mut registry,
+        &mut clock,
+        &mut runtime,
+    )
+    .expect("runtime");
+
+    let warning_index = platform
+        .console_messages
+        .iter()
+        .position(|message| message == "peinit warning: invalid machine-id replaced\n")
+        .expect("machine-id warning");
+    let registryd_index = platform
+        .console_messages
+        .iter()
+        .position(|message| message == "peinit: phase1 starting registryd\n")
+        .expect("registryd message");
+    assert!(warning_index < registryd_index);
+}
+
+#[test]
+fn machine_id_failure_enters_recovery_before_registryd_start() {
+    let mut platform = Platform::new().machine_id_error("write failed");
+    let mut registry = Registry::with_services([service("app")]);
+    let mut clock = ClockAt(10);
+    let mut runtime = Runtime::default();
+
+    let result = run_init(
+        InitConfig::default(),
+        &mut platform,
+        &mut registry,
+        &mut clock,
+        &mut runtime,
+    )
+    .expect("recovery");
+
+    assert!(matches!(
+        result,
+        InitRunResult::RecoveryReturned {
+            reason: InitRecoveryReason::MachineId(_),
+        },
+    ));
+    assert!(!runtime.entered);
+    assert!(
+        !platform
+            .console_messages
+            .iter()
+            .any(|message| message == "peinit: phase1 starting registryd\n"),
+    );
+}
+
+#[test]
 fn boot_attempt_threshold_enters_recovery() {
     let mut platform = Platform::new().boot_attempt_counter(3);
     let mut registry = Registry::with_services([]);
@@ -218,6 +368,146 @@ fn successful_boot_enters_runtime_with_phase2_booted_supervisor() {
 }
 
 #[test]
+fn provisioned_paths_are_applied_after_registryd_before_phase2() {
+    let entry = provisioned_directory("eventd-run", "/run/eventd", false);
+    let mut snapshot = ProvisionedPathRegistrySnapshot::empty();
+    snapshot.entries.push(entry.clone());
+    let mut platform = Platform::new();
+    let mut registry = Registry::with_services([service("app")]).with_provisioned_paths(snapshot);
+    let mut clock = ClockAt(10);
+    let mut runtime = Runtime::default();
+
+    let result = run_init(
+        InitConfig::default(),
+        &mut platform,
+        &mut registry,
+        &mut clock,
+        &mut runtime,
+    )
+    .expect("runtime");
+
+    assert_eq!(result, InitRunResult::RuntimeReturned);
+    assert_eq!(platform.provisioned_paths_seen, vec![entry]);
+    let provision_index = platform
+        .console_messages
+        .iter()
+        .position(|message| message == "peinit: phase2 boot starting\n")
+        .expect("phase2 message");
+    let registryd_index = platform
+        .console_messages
+        .iter()
+        .position(|message| message == "peinit: phase1 registryd started\n")
+        .expect("registryd message");
+    assert!(registryd_index < provision_index);
+}
+
+#[test]
+fn malformed_provisioned_path_entries_are_warnings_not_recovery() {
+    let mut platform = Platform::new();
+    let mut registry = Registry::with_services([service("app")])
+        .provisioned_path_registry_warning("broken", "missing Path");
+    let mut clock = ClockAt(10);
+    let mut runtime = Runtime::default();
+
+    let result = run_init(
+        InitConfig::default(),
+        &mut platform,
+        &mut registry,
+        &mut clock,
+        &mut runtime,
+    )
+    .expect("runtime");
+
+    assert_eq!(result, InitRunResult::RuntimeReturned);
+    assert!(runtime.entered);
+    assert!(
+        platform.console_messages.iter().any(|message| {
+            message == "peinit warning: provisioned path broken ignored: missing Path\n"
+        }),
+        "{:?}",
+        platform.console_messages,
+    );
+}
+
+#[test]
+fn optional_provisioned_path_failures_are_warnings_not_recovery() {
+    let entry = provisioned_directory("cache", "/run/cache", false);
+    let mut snapshot = ProvisionedPathRegistrySnapshot::empty();
+    snapshot.entries.push(entry);
+    let mut report = ProvisionedPathApplyReport::default();
+    report.warnings.push(ProvisionedPathApplyFailure {
+        entry: "cache".to_string(),
+        path: "/run/cache".to_string(),
+        message: "permission denied".to_string(),
+    });
+    let mut platform = Platform::new().provision_report(report);
+    let mut registry = Registry::with_services([service("app")]).with_provisioned_paths(snapshot);
+    let mut clock = ClockAt(10);
+    let mut runtime = Runtime::default();
+
+    let result = run_init(
+        InitConfig::default(),
+        &mut platform,
+        &mut registry,
+        &mut clock,
+        &mut runtime,
+    )
+    .expect("runtime");
+
+    assert_eq!(result, InitRunResult::RuntimeReturned);
+    assert!(runtime.entered);
+    assert!(platform.recovery_reasons.is_empty());
+    assert!(
+        platform.console_messages.iter().any(|message| {
+            message
+                == "peinit warning: provisioned path cache at /run/cache failed: permission denied\n"
+        }),
+        "{:?}",
+        platform.console_messages,
+    );
+}
+
+#[test]
+fn required_provisioned_path_failures_enter_recovery_before_phase2() {
+    let entry = provisioned_directory("eventd", "/run/eventd", true);
+    let mut snapshot = ProvisionedPathRegistrySnapshot::empty();
+    snapshot.entries.push(entry);
+    let mut report = ProvisionedPathApplyReport::default();
+    report.required_failures.push(ProvisionedPathApplyFailure {
+        entry: "eventd".to_string(),
+        path: "/run/eventd".to_string(),
+        message: "security rejected".to_string(),
+    });
+    let mut platform = Platform::new().provision_report(report);
+    let mut registry = Registry::with_services([service("app")]).with_provisioned_paths(snapshot);
+    let mut clock = ClockAt(10);
+    let mut runtime = Runtime::default();
+
+    let result = run_init(
+        InitConfig::default(),
+        &mut platform,
+        &mut registry,
+        &mut clock,
+        &mut runtime,
+    )
+    .expect("recovery");
+
+    assert!(matches!(
+        result,
+        InitRunResult::RecoveryReturned {
+            reason: InitRecoveryReason::Provisioning(_),
+        },
+    ));
+    assert!(!runtime.entered);
+    assert!(
+        !platform
+            .console_messages
+            .iter()
+            .any(|message| message == "peinit: phase2 boot starting\n")
+    );
+}
+
+#[test]
 fn phase1_infrastructure_warnings_are_logged_and_do_not_block_runtime() {
     let mut infrastructure = Phase1Infrastructure::new();
     infrastructure.push_warning(Phase1InfrastructureWarning::JfsDeviceOpen {
@@ -257,6 +547,16 @@ fn phase1_infrastructure_warnings_are_logged_and_do_not_block_runtime() {
             },
         ],
     );
+}
+
+fn provisioned_directory(name: &str, path: &str, required: bool) -> ProvisionedPath {
+    ProvisionedPath {
+        name: name.to_string(),
+        kind: ProvisionedPathKind::Directory,
+        path: path.to_string(),
+        security: ProvisionedPathSecurity::Default,
+        required,
+    }
 }
 
 #[test]

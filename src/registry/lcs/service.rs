@@ -21,7 +21,7 @@ pub(super) fn read_lcs_service_definitions() -> Result<Vec<ServiceDefinition>, L
     .map_err(LcsRegistryReadError::OpenRoot)?;
     let inherited_security = read_lcs_inherited_service_security(&root)?;
 
-    let mut names = root
+    let names = root
         .subkeys(None)
         .map(|entry| {
             entry
@@ -29,7 +29,7 @@ pub(super) fn read_lcs_service_definitions() -> Result<Vec<ServiceDefinition>, L
                 .and_then(|subkey| decode_name(subkey.name).map_err(LcsRegistryReadError::Name))
         })
         .collect::<Result<Vec<_>, _>>()?;
-    names.sort();
+    let names = unique_sorted_service_names(names);
 
     let mut definitions = Vec::new();
     for name in names {
@@ -38,6 +38,12 @@ pub(super) fn read_lcs_service_definitions() -> Result<Vec<ServiceDefinition>, L
     apply_inherited_service_security(&mut definitions, inherited_security);
 
     Ok(definitions)
+}
+
+fn unique_sorted_service_names(mut names: Vec<String>) -> Vec<String> {
+    names.sort();
+    names.dedup();
+    names
 }
 
 fn read_lcs_inherited_service_security(
@@ -85,4 +91,26 @@ fn read_lcs_service_definition(name: &str) -> Result<ServiceDefinition, LcsRegis
             source,
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::unique_sorted_service_names;
+
+    #[test]
+    fn service_name_collection_deduplicates_repeated_lcs_subkey_entries() {
+        assert_eq!(
+            unique_sorted_service_names(vec![
+                "mkuki-watch".to_string(),
+                "registryd".to_string(),
+                "mkuki-watch".to_string(),
+                "mkirf-watch".to_string(),
+            ]),
+            vec![
+                "mkirf-watch".to_string(),
+                "mkuki-watch".to_string(),
+                "registryd".to_string(),
+            ],
+        );
+    }
 }

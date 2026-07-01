@@ -3,6 +3,10 @@ use crate::shutdown::ShutdownKind;
 use super::error::BoundaryError;
 
 pub trait ShutdownFinalizer {
+    fn save_random_seed(&mut self) -> Result<(), BoundaryError> {
+        Ok(())
+    }
+
     fn snapshot_mounts(&mut self) -> Result<Vec<String>, BoundaryError>;
 
     fn unmount(&mut self, mount_point: &str) -> Result<(), BoundaryError>;

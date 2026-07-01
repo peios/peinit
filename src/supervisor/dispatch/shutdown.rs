@@ -99,6 +99,17 @@ pub enum SupervisorShutdownSignalAction {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SupervisorPowerButtonDispatch {
+    pub action: SupervisorPowerButtonAction,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SupervisorPowerButtonAction {
+    Graceful(Box<SupervisorShutdownDispatch>),
+    AlreadyInProgress { kind: ShutdownKind },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SupervisorShutdownDriveDispatch {
     pub timeout: Option<SupervisorShutdownTimeoutDispatch>,
     pub finalization: Option<SupervisorShutdownFinalizationDispatch>,

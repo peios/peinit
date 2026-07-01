@@ -153,6 +153,36 @@ fn path_fields_must_be_absolute() {
 }
 
 #[test]
+fn runtime_directories_must_be_single_relative_components() {
+    for value in [
+        "",
+        ".",
+        "..",
+        "/app",
+        "app/cache",
+        "app\\cache",
+        "bad\nname",
+    ] {
+        let err = build_service_definition_from_registry_values(
+            "app",
+            &[
+                sz("ImagePath", "/usr/bin/app"),
+                multi_sz("RuntimeDirectories", &[value]),
+            ],
+        )
+        .expect_err("invalid runtime directory");
+
+        assert_eq!(
+            err,
+            ServiceRegistryDecodeError::InvalidRuntimeDirectory {
+                field: "RuntimeDirectories",
+                value: value.to_string(),
+            }
+        );
+    }
+}
+
+#[test]
 fn executable_command_fields_are_validated() {
     let err = build_service_definition_from_registry_values(
         "app",

@@ -111,6 +111,7 @@ fn critical_service_failure_emits_failure_and_critical_messages() {
                 critical_reboot: Some(finalization_dispatch()),
             })),
         }],
+        drive: None,
         deadline_timer: None,
     };
 
@@ -154,6 +155,7 @@ fn shutdown_signal_emits_shutdown_progress() {
             },
         )),
         child_reaps: Vec::new(),
+        drive: None,
         deadline_timer: None,
     };
 
@@ -314,6 +316,7 @@ fn shutdown_runtime(kind: ShutdownKind) -> ShutdownRuntime {
 fn finalization_dispatch() -> SupervisorShutdownFinalizationDispatch {
     SupervisorShutdownFinalizationDispatch {
         report: ShutdownFinalizationReport {
+            random_seed: CleanupActionResult::Ok,
             snapshot_mounts: CleanupActionResult::Ok,
             mount_results: Vec::new(),
             root_remount: CleanupActionResult::Ok,

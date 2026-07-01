@@ -1,5 +1,6 @@
 use crate::supervisor::{
-    SupervisorPid1SignalFdTurn, SupervisorShutdownCgroupKillDispatch, SupervisorShutdownDispatch,
+    SupervisorPid1SignalFdTurn, SupervisorPowerButtonAction, SupervisorPowerButtonDispatch,
+    SupervisorShutdownCgroupKillDispatch, SupervisorShutdownDispatch,
     SupervisorShutdownDriveDispatch, SupervisorShutdownFinalizationDispatch,
     SupervisorShutdownKillDispatch, SupervisorShutdownSignalAction,
     SupervisorShutdownSignalDispatch, SupervisorShutdownStopDispatch,
@@ -32,6 +33,23 @@ pub(super) fn collect_shutdown_dispatch_console_messages(
         collect_shutdown_stop_console_message(stop, out);
     }
     collect_shutdown_finalization_state_console_message(&dispatch.runtime.finalization, out);
+}
+
+pub(super) fn collect_power_button_dispatch_console_messages(
+    dispatch: &SupervisorPowerButtonDispatch,
+    out: &mut Vec<String>,
+) {
+    match &dispatch.action {
+        SupervisorPowerButtonAction::Graceful(shutdown) => {
+            collect_shutdown_dispatch_console_messages(shutdown, out);
+        }
+        SupervisorPowerButtonAction::AlreadyInProgress { kind } => {
+            push_message(
+                out,
+                format!("peinit: shutdown {kind:?} already in progress\n"),
+            );
+        }
+    }
 }
 
 pub(super) fn collect_shutdown_drive_dispatch_console_messages(
@@ -110,6 +128,12 @@ fn collect_shutdown_finalization_dispatch_console_messages(
     out: &mut Vec<String>,
 ) {
     push_message(out, "peinit: shutdown finalizing\n");
+    if let crate::shutdown::CleanupActionResult::Failed(message) = &dispatch.report.random_seed {
+        push_message(
+            out,
+            format!("peinit warning: shutdown random seed save failed: {message}\n"),
+        );
+    }
     collect_shutdown_finalization_state_console_message(&dispatch.finalization, out);
 }
 

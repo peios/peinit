@@ -1,4 +1,9 @@
-use crate::boundary::{BoundaryError, KmesEventSink, LinuxKmesEventSink, LinuxMonotonicClock};
+use crate::boundary::{
+    BoundaryError, KmesEventSink, LinuxKmesEventSink, LinuxMachineIdStatus, LinuxMonotonicClock,
+    LinuxRandomSeedRestoreStatus, ensure_linux_machine_id, provision_linux_boot_paths,
+    restore_linux_random_seed,
+};
+use crate::provisioning::{ProvisionedPath, ProvisionedPathApplyReport};
 use crate::registry::LcsRegistryClient;
 use crate::runtime::{
     LinuxRuntimeConfig, LinuxRuntimeSetupError, LinuxShutdownRuntime, Phase1JfsRegistration,
@@ -7,7 +12,7 @@ use crate::supervisor::Supervisor;
 
 use super::{
     InitConfig, InitFatalError, InitPlatform, InitRecoveryReason, InitRuntime, KernelCommandLine,
-    Phase1Infrastructure, run_init,
+    MachineIdStatus, Phase1Infrastructure, run_init,
 };
 
 mod autorun;
@@ -78,6 +83,26 @@ impl InitPlatform for LinuxInitPlatform {
         mount_phase1_virtual_filesystems(self.files.mountinfo_path(), &mut syscalls)
     }
 
+    fn restore_random_seed(&mut self) -> Result<bool, BoundaryError> {
+        match restore_linux_random_seed().map_err(random_seed_restore_error)? {
+            LinuxRandomSeedRestoreStatus::Missing => Ok(false),
+            LinuxRandomSeedRestoreStatus::Credited => Ok(true),
+            LinuxRandomSeedRestoreStatus::MixedWithoutCredit { credit_error } => {
+                Err(BoundaryError::Recovery(format!(
+                    "random seed mixed without entropy credit: {credit_error}"
+                )))
+            }
+        }
+    }
+
+    fn ensure_machine_id(&mut self) -> Result<MachineIdStatus, BoundaryError> {
+        match ensure_linux_machine_id().map_err(machine_id_error)? {
+            LinuxMachineIdStatus::Existing => Ok(MachineIdStatus::Existing),
+            LinuxMachineIdStatus::Generated => Ok(MachineIdStatus::Generated),
+            LinuxMachineIdStatus::ReplacedInvalid => Ok(MachineIdStatus::ReplacedInvalid),
+        }
+    }
+
     fn set_clock_from_rtc(&mut self) -> Result<(), BoundaryError> {
         let mut syscalls = LinuxRtcClockSyscalls;
         set_clock_from_hardware_rtc(&mut syscalls)
@@ -98,6 +123,13 @@ impl InitPlatform for LinuxInitPlatform {
 
     fn run_autorun_scripts(&mut self) -> Result<(), BoundaryError> {
         autorun::run_autorun_scripts()
+    }
+
+    fn provision_boot_paths(
+        &mut self,
+        paths: &[ProvisionedPath],
+    ) -> Result<ProvisionedPathApplyReport, BoundaryError> {
+        Ok(provision_linux_boot_paths(paths))
     }
 
     fn log_phase1_warning(
@@ -185,6 +217,14 @@ pub fn run_linux_peinit() -> Result<super::InitRunResult, LinuxInitError> {
 
 fn runtime_setup_error(error: LinuxRuntimeSetupError) -> BoundaryError {
     BoundaryError::Recovery(format!("runtime setup failed: {error:?}"))
+}
+
+fn random_seed_restore_error(error: crate::boundary::LinuxRandomSeedError) -> BoundaryError {
+    BoundaryError::Recovery(format!("{error:?}"))
+}
+
+fn machine_id_error(error: crate::boundary::LinuxMachineIdError) -> BoundaryError {
+    BoundaryError::Recovery(format!("{error:?}"))
 }
 
 fn log_phase1_registration_warning(

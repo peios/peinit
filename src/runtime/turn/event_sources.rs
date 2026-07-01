@@ -6,7 +6,7 @@ use crate::control::connection::{
 };
 use crate::runtime::{
     RuntimeLifecycleDeadlineTimer, RuntimeNotifySource, RuntimePid1SignalSource,
-    RuntimeServiceLogPipes, RuntimeShutdownDeadlineTimer,
+    RuntimePowerButtonSource, RuntimeServiceLogPipes, RuntimeShutdownDeadlineTimer,
 };
 
 pub struct RuntimeShutdownEventSources<'a, I, L, S, H, N, D, T>
@@ -26,6 +26,7 @@ where
     pub control_connections: &'a mut ControlConnectionTable<ControlConnectionRecord<I>>,
     pub deadline_timer: &'a mut D,
     pub lifecycle_timer: &'a mut T,
+    pub power_button_source: &'a mut dyn RuntimePowerButtonSource,
     pub filesystem_check_reader: &'a mut dyn FilesystemCheckHelperReader,
     pub log_pipes: &'a mut RuntimeServiceLogPipes,
 }

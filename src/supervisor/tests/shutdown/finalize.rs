@@ -28,6 +28,7 @@ fn finalize_shutdown_unmounts_deepest_first_remounts_failures_syncs_and_reboots(
 
     let dispatch = dispatch.expect("finalize shutdown");
     assert_eq!(dispatch.finalization, ShutdownFinalizationState::Completed);
+    assert_eq!(dispatch.report.random_seed, CleanupActionResult::Ok);
     assert_eq!(dispatch.report.snapshot_mounts, CleanupActionResult::Ok);
     assert_eq!(
         dispatch
@@ -59,6 +60,7 @@ fn finalize_shutdown_unmounts_deepest_first_remounts_failures_syncs_and_reboots(
     assert_eq!(
         finalizer.calls,
         vec![
+            FinalizerCall::SaveRandomSeed,
             FinalizerCall::SnapshotMounts,
             FinalizerCall::Unmount("/sys/fs/cgroup".to_string()),
             FinalizerCall::Unmount("/dev/pts".to_string()),
@@ -120,6 +122,33 @@ fn failed_final_action_enters_retry_state_and_retries_only_sync_and_reboot_when_
     );
 }
 
+#[test]
+fn random_seed_save_failure_is_reported_but_does_not_block_final_action() {
+    let mut supervisor = ready_supervisor(ShutdownKind::Poweroff);
+    let mut finalizer = TestShutdownFinalizer::new(["/", "/run"]).fail_random_seed_save();
+
+    let dispatch = supervisor
+        .finalize_shutdown(&mut finalizer, SHUTDOWN_NS + 100)
+        .expect("finalize shutdown");
+
+    assert_eq!(dispatch.finalization, ShutdownFinalizationState::Completed);
+    assert_eq!(
+        dispatch.report.random_seed,
+        CleanupActionResult::Failed("Shutdown(\"random seed save failed\")".to_string()),
+    );
+    assert_eq!(
+        &finalizer.calls,
+        &[
+            FinalizerCall::SaveRandomSeed,
+            FinalizerCall::SnapshotMounts,
+            FinalizerCall::Unmount("/run".to_string()),
+            FinalizerCall::RemountReadonly("/".to_string()),
+            FinalizerCall::Sync,
+            FinalizerCall::Reboot(ShutdownKind::Poweroff),
+        ],
+    );
+}
+
 fn ready_supervisor(kind: ShutdownKind) -> crate::supervisor::Supervisor {
     let mut supervisor = shutdown_fixture();
     let mut controller = TestProcessController::default();
@@ -129,6 +158,7 @@ fn ready_supervisor(kind: ShutdownKind) -> crate::supervisor::Supervisor {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum FinalizerCall {
+    SaveRandomSeed,
     SnapshotMounts,
     Unmount(String),
     RemountReadonly(String),
@@ -140,6 +170,7 @@ enum FinalizerCall {
 struct TestShutdownFinalizer {
     mounts: Vec<String>,
     failed_unmounts: BTreeSet<String>,
+    fail_random_seed_save: bool,
     reboot_results: VecDeque<Result<(), &'static str>>,
     calls: Vec<FinalizerCall>,
 }
@@ -149,6 +180,7 @@ impl TestShutdownFinalizer {
         Self {
             mounts: mounts.into_iter().map(ToString::to_string).collect(),
             failed_unmounts: BTreeSet::new(),
+            fail_random_seed_save: false,
             reboot_results: VecDeque::from([Ok(())]),
             calls: Vec::new(),
         }
@@ -156,6 +188,11 @@ impl TestShutdownFinalizer {
 
     fn fail_unmount(mut self, mount_point: &str) -> Self {
         self.failed_unmounts.insert(mount_point.to_string());
+        self
+    }
+
+    fn fail_random_seed_save(mut self) -> Self {
+        self.fail_random_seed_save = true;
         self
     }
 
@@ -169,6 +206,17 @@ impl TestShutdownFinalizer {
 }
 
 impl ShutdownFinalizer for TestShutdownFinalizer {
+    fn save_random_seed(&mut self) -> Result<(), BoundaryError> {
+        self.calls.push(FinalizerCall::SaveRandomSeed);
+        if self.fail_random_seed_save {
+            Err(BoundaryError::Shutdown(
+                "random seed save failed".to_string(),
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
     fn snapshot_mounts(&mut self) -> Result<Vec<String>, BoundaryError> {
         self.calls.push(FinalizerCall::SnapshotMounts);
         Ok(self.mounts.clone())

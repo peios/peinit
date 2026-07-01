@@ -21,6 +21,7 @@ fn runtime_jfs_event_reaches_parse_boundary_and_disables_source_until_abi_exists
     let mut connections = crate::control::connection::ControlConnectionTable::new(4);
     let mut deadline_timer = FakeDeadlineTimer::would_block();
     let mut lifecycle_timer = FakeDeadlineTimer::would_block();
+    let mut power_button = super::support::FakePowerButtonSource::would_block();
     let mut log_pipes = crate::runtime::RuntimeServiceLogPipes::default();
     let mut filesystem_check_reader =
         crate::supervisor::tests::TestFilesystemCheckReader::default();
@@ -42,6 +43,7 @@ fn runtime_jfs_event_reaches_parse_boundary_and_disables_source_until_abi_exists
             control_connections: &mut connections,
             deadline_timer: &mut deadline_timer,
             lifecycle_timer: &mut lifecycle_timer,
+            power_button_source: &mut power_button,
             filesystem_check_reader: &mut filesystem_check_reader,
             log_pipes: &mut log_pipes,
         },

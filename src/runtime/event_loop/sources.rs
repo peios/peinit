@@ -168,7 +168,7 @@ fn prioritize_runtime_sources(sources: Vec<RuntimeEventSource>) -> Vec<RuntimeEv
 
 fn runtime_source_priority(source: RuntimeEventSource) -> u8 {
     match source {
-        RuntimeEventSource::Pid1Signal => 0,
+        RuntimeEventSource::Pid1Signal | RuntimeEventSource::PowerButton { .. } => 0,
         RuntimeEventSource::ShutdownDeadlineTimer => 1,
         _ => 2,
     }
@@ -195,6 +195,7 @@ mod tests {
             RuntimeEventSource::ShutdownDeadlineTimer,
             RuntimeEventSource::ServiceLogPipe { fd: 12 },
             RuntimeEventSource::Pid1Signal,
+            RuntimeEventSource::PowerButton { fd: 13 },
             RuntimeEventSource::NotifySocket,
         ];
 
@@ -202,6 +203,7 @@ mod tests {
             prioritize_runtime_sources(sources),
             vec![
                 RuntimeEventSource::Pid1Signal,
+                RuntimeEventSource::PowerButton { fd: 13 },
                 RuntimeEventSource::ShutdownDeadlineTimer,
                 RuntimeEventSource::ServiceLogPipe { fd: 10 },
                 RuntimeEventSource::ControlConnection { fd: 11 },
