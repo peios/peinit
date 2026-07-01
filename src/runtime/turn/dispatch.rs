@@ -19,6 +19,7 @@ use super::event_sources::NoRuntimeRegistryClient;
 use super::jfs::process_jfs_device_event;
 use super::lifecycle_deadline::process_lifecycle_deadline_timer_event;
 use super::notify::process_notify_event;
+use super::power_button::process_power_button_event;
 use super::pre_start_check::{
     process_filesystem_check_helper_event, process_filesystem_check_helper_exit_event,
 };
@@ -181,5 +182,12 @@ where
                 &mut *sources.log_pipes,
             )
         }
+        RuntimeEventSource::PowerButton { fd } => process_power_button_event(
+            supervisor,
+            fd,
+            &mut *sources.power_button_source,
+            &mut *sources.deadline_timer,
+            context,
+        ),
     }
 }

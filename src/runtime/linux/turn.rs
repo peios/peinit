@@ -56,6 +56,7 @@ impl LinuxShutdownRuntime {
                 control_connections: &mut self.control_connections,
                 deadline_timer: &mut self.deadline_timer,
                 lifecycle_timer: &mut self.lifecycle_timer,
+                power_button_source: &mut self.power_buttons,
                 filesystem_check_reader: &mut self.filesystem_check_reader,
                 log_pipes: &mut self.log_pipes,
             };
@@ -114,6 +115,7 @@ impl LinuxShutdownRuntime {
                 control_connections: &mut self.control_connections,
                 deadline_timer: &mut self.deadline_timer,
                 lifecycle_timer: &mut self.lifecycle_timer,
+                power_button_source: &mut self.power_buttons,
                 filesystem_check_reader: &mut self.filesystem_check_reader,
                 log_pipes: &mut self.log_pipes,
             },

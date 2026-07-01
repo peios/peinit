@@ -40,7 +40,8 @@ pub use relationship::{
     SupervisorOnFailureLoopSuppressedDispatch, SupervisorOnFailureLoopSuppressionReason,
 };
 pub use shutdown::{
-    SupervisorImmediateShutdownDispatch, SupervisorShutdownAbandonedDispatch,
+    SupervisorImmediateShutdownDispatch, SupervisorPowerButtonAction,
+    SupervisorPowerButtonDispatch, SupervisorShutdownAbandonedDispatch,
     SupervisorShutdownCgroupKillDispatch, SupervisorShutdownDispatch,
     SupervisorShutdownDriveDispatch, SupervisorShutdownFinalizationDispatch,
     SupervisorShutdownKillDispatch, SupervisorShutdownSignalAction,

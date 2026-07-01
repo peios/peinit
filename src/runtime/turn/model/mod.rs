@@ -13,9 +13,11 @@ pub use notify::{
 };
 pub use registration::{RuntimeEventRegistrar, RuntimeEventRegistrationError};
 pub use source::{
-    RuntimeLifecycleDeadlineTimer, RuntimePid1SignalSource, RuntimeShutdownDeadlineTimer,
+    RuntimeLifecycleDeadlineTimer, RuntimePid1SignalSource, RuntimePowerButtonSource,
+    RuntimeShutdownDeadlineTimer,
 };
 pub use turn::{
     RuntimeCalendarTimerTurn, RuntimeFilesystemCheckHelperTurn, RuntimeJfsDeviceTurn,
-    RuntimeProcessSetupTurn, RuntimeRegistryWatchTurn, RuntimeShutdownEventTurn,
+    RuntimePowerButtonTurn, RuntimeProcessSetupTurn, RuntimeRegistryWatchTurn,
+    RuntimeShutdownEventTurn,
 };

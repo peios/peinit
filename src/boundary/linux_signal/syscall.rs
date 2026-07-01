@@ -43,6 +43,7 @@ where
     Ok(match info.ssi_signo as i32 {
         libc::SIGINT => LinuxSignalFdRead::Shutdown(ShutdownSignal::Sigint),
         libc::SIGTERM => LinuxSignalFdRead::Shutdown(ShutdownSignal::Sigterm),
+        libc::SIGPWR => LinuxSignalFdRead::Shutdown(ShutdownSignal::Sigpwr),
         signal => LinuxSignalFdRead::Other { signal },
     })
 }

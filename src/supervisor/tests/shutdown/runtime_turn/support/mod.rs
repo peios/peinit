@@ -4,6 +4,7 @@ mod control;
 mod deadline;
 mod finalizer;
 mod notify;
+mod power;
 mod registrar;
 mod signal;
 
@@ -13,6 +14,7 @@ pub(super) use control::{FakeAcceptedConnection, FakeControlListener, control_pe
 pub(super) use deadline::{DeadlineTimerCall, FakeDeadlineTimer};
 pub(super) use finalizer::{RuntimeFinalizer, RuntimeFinalizerCall};
 pub(super) use notify::FakeNotifySource;
+pub(super) use power::FakePowerButtonSource;
 pub(super) use registrar::{FakeRegistrar, RegistrarCall};
 pub(super) use signal::FakeSignalSource;
 

@@ -15,6 +15,8 @@ use super::super::work::SupervisorWork;
 use super::failure::apply_service_launch_failure;
 use super::fd_inheritance::inherited_fds_for_job;
 use super::record_pending_process_setup;
+use crate::execution::launch::LaunchCreatedJobError;
+use crate::service::ServiceDefinition;
 
 impl Supervisor {
     pub fn launch_next_pending_job<T, P, C>(
@@ -57,16 +59,23 @@ impl Supervisor {
         work.pending_launches.pop_front();
 
         let global_environment = work.global_environment.clone();
-        let launch = inherited_fds_for_job(&work, job_id).and_then(|inherited_fds| {
-            launch_created_service_main_job_with_environment(
-                &mut work.jobs,
-                token_provider,
-                process_launcher,
-                request,
-                &global_environment,
-                inherited_fds,
-            )
-        });
+        let launch = service_definition_for_runtime_provisioning(&work, job_id)
+            .and_then(|service| {
+                process_launcher
+                    .provision_service_runtime_directories(&service)
+                    .map_err(LaunchCreatedJobError::Boundary)
+            })
+            .and_then(|()| inherited_fds_for_job(&work, job_id))
+            .and_then(|inherited_fds| {
+                launch_created_service_main_job_with_environment(
+                    &mut work.jobs,
+                    token_provider,
+                    process_launcher,
+                    request,
+                    &global_environment,
+                    inherited_fds,
+                )
+            });
         let launch = match launch {
             Ok(LaunchCreatedJobResult::Started(launch)) => *launch,
             Ok(LaunchCreatedJobResult::PendingSetup(setup)) => {
@@ -103,6 +112,27 @@ impl Supervisor {
 
         Ok(Some(dispatch.into()))
     }
+}
+
+fn service_definition_for_runtime_provisioning(
+    work: &SupervisorWork,
+    job_id: crate::ids::JobId,
+) -> Result<ServiceDefinition, LaunchCreatedJobError> {
+    let job = work
+        .jobs
+        .get(job_id)
+        .cloned()
+        .ok_or(LaunchCreatedJobError::JobStore(
+            crate::job::JobStoreError::UnknownJob { id: job_id },
+        ))?;
+    let service = job
+        .service
+        .ok_or(LaunchCreatedJobError::ServiceMainJobMissingService { job_id })?;
+    work.services.definition(&service).cloned().ok_or_else(|| {
+        LaunchCreatedJobError::Boundary(crate::boundary::BoundaryError::Process(format!(
+            "service definition for {service} is unavailable during runtime directory provisioning"
+        )))
+    })
 }
 
 pub(in crate::supervisor) fn apply_started_service_launch(

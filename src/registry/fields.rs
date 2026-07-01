@@ -58,6 +58,7 @@ service_fields! {
     ("FdStoreMax", FdStoreMax),
     ("Environment", Environment),
     ("WorkingDirectory", WorkingDirectory),
+    ("RuntimeDirectories", RuntimeDirectories),
     ("LimitNOFILE", LimitNoFile),
     ("LimitCORE", LimitCore),
     ("Conditions", Conditions),

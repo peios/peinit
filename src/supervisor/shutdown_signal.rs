@@ -41,13 +41,15 @@ impl Supervisor {
         F: ShutdownFinalizer,
     {
         let action = match signal {
-            ShutdownSignal::Sigterm => self.handle_sigterm(controller, observed_at_ns)?,
+            ShutdownSignal::Sigterm | ShutdownSignal::Sigpwr => {
+                self.handle_poweroff_signal(controller, observed_at_ns)?
+            }
             ShutdownSignal::Sigint => self.handle_sigint(controller, finalizer, observed_at_ns)?,
         };
         Ok(SupervisorShutdownSignalDispatch { signal, action })
     }
 
-    fn handle_sigterm<P>(
+    fn handle_poweroff_signal<P>(
         &mut self,
         controller: &mut P,
         observed_at_ns: u64,

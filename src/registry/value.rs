@@ -21,6 +21,13 @@ pub enum ServiceRegistryDecodeError {
     InvalidServiceName {
         service: String,
     },
+    InvalidProvisionedPathName {
+        name: String,
+    },
+    MissingProvisionedPathField {
+        entry: String,
+        field: &'static str,
+    },
     MissingImagePath,
     DuplicateField {
         field: &'static str,
@@ -65,6 +72,14 @@ pub enum ServiceRegistryDecodeError {
     },
     InvalidAbsolutePath {
         field: &'static str,
+        value: String,
+    },
+    InvalidRuntimeDirectory {
+        field: &'static str,
+        value: String,
+    },
+    InvalidProvisionedPathKind {
+        entry: String,
         value: String,
     },
     InvalidExecutableCommand {

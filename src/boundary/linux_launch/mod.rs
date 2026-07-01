@@ -15,6 +15,7 @@ use super::{
 };
 use crate::job::JobRecord;
 use crate::security::is_system_identity;
+use crate::service::ServiceDefinition;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct LinuxSystemTokenProvider {
@@ -81,6 +82,18 @@ impl LinuxProcessLauncher {
 }
 
 impl ProcessLauncher for LinuxProcessLauncher {
+    fn provision_service_runtime_directories(
+        &mut self,
+        service: &ServiceDefinition,
+    ) -> Result<(), BoundaryError> {
+        crate::boundary::provision_linux_service_runtime_directories(service).map_err(|error| {
+            BoundaryError::Process(format!(
+                "provision runtime directories for {} failed: {error}",
+                service.name
+            ))
+        })
+    }
+
     fn launch_service(
         &mut self,
         spec: ProcessLaunchSpec<'_>,

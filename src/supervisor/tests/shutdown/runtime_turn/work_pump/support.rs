@@ -129,6 +129,7 @@ pub(super) fn run_loop(supervisor: &mut Supervisor, script: LoopScript) -> LoopR
     let mut connections = ControlConnectionTable::new(4);
     let mut shutdown_timer = FakeDeadlineTimer::would_block();
     let mut lifecycle_timer = script.lifecycle_timer;
+    let mut power_button = super::super::support::FakePowerButtonSource::would_block();
     let mut log_pipes = crate::runtime::RuntimeServiceLogPipes::default();
     let mut filesystem_check_reader =
         crate::supervisor::tests::TestFilesystemCheckReader::new(script.filesystem_reports);
@@ -155,6 +156,7 @@ pub(super) fn run_loop(supervisor: &mut Supervisor, script: LoopScript) -> LoopR
             control_connections: &mut connections,
             deadline_timer: &mut shutdown_timer,
             lifecycle_timer: &mut lifecycle_timer,
+            power_button_source: &mut power_button,
             filesystem_check_reader: &mut filesystem_check_reader,
             log_pipes: &mut log_pipes,
         },

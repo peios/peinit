@@ -1,6 +1,7 @@
 use crate::boundary::{BoundaryError, KmesEvent};
 use crate::supervisor::{
-    SupervisorShutdownDispatch, SupervisorShutdownDriveDispatch, SupervisorShutdownSignalAction,
+    SupervisorPowerButtonAction, SupervisorPowerButtonDispatch, SupervisorShutdownDispatch,
+    SupervisorShutdownDriveDispatch, SupervisorShutdownSignalAction,
     SupervisorShutdownSignalDispatch, SupervisorShutdownTerminalDispatch,
     SupervisorSystemShutdownDispatch,
 };
@@ -15,6 +16,19 @@ pub(in crate::runtime::kmes) fn collect_pid1_signal_turn(
         return Ok(());
     };
     collect_shutdown_signal_dispatch(dispatch, out)
+}
+
+pub(in crate::runtime::kmes) fn collect_power_button_dispatch(
+    dispatch: &SupervisorPowerButtonDispatch,
+    out: &mut Vec<KmesEvent>,
+) -> Result<(), BoundaryError> {
+    match &dispatch.action {
+        SupervisorPowerButtonAction::Graceful(shutdown) => {
+            collect_shutdown_dispatch(shutdown, out)?;
+        }
+        SupervisorPowerButtonAction::AlreadyInProgress { .. } => {}
+    }
+    Ok(())
 }
 
 pub(in crate::runtime::kmes) fn collect_shutdown_drive_dispatch(

@@ -29,6 +29,28 @@ fn sigterm_begins_graceful_poweroff_shutdown() {
 }
 
 #[test]
+fn sigpwr_begins_graceful_poweroff_shutdown() {
+    let mut supervisor = shutdown_fixture();
+    let mut controller = TestProcessController::default();
+    let mut finalizer = SignalFinalizer::default();
+
+    let dispatch = supervisor
+        .handle_shutdown_signal(
+            ShutdownSignal::Sigpwr,
+            &mut controller,
+            &mut finalizer,
+            SHUTDOWN_NS,
+        )
+        .expect("handle sigpwr");
+
+    let SupervisorShutdownSignalAction::Graceful(graceful) = dispatch.action else {
+        panic!("expected graceful shutdown");
+    };
+    assert_eq!(graceful.runtime.kind, ShutdownKind::Poweroff);
+    assert!(finalizer.calls.is_empty());
+}
+
+#[test]
 fn third_sigint_in_window_forces_immediate_reboot() {
     let mut supervisor = shutdown_fixture();
     let mut controller = TestProcessController::default();

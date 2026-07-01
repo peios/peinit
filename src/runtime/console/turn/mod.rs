@@ -3,8 +3,8 @@ mod job;
 mod shutdown;
 
 use crate::runtime::{
-    RuntimeCalendarTimerTurn, RuntimeNotifySupervisorTurn, RuntimeProcessSetupTurn,
-    RuntimeShutdownEventTurn,
+    RuntimeCalendarTimerTurn, RuntimeNotifySupervisorTurn, RuntimePowerButtonTurn,
+    RuntimeProcessSetupTurn, RuntimeShutdownEventTurn,
 };
 
 pub(super) fn collect_runtime_shutdown_turn_console_messages(
@@ -15,11 +15,15 @@ pub(super) fn collect_runtime_shutdown_turn_console_messages(
         RuntimeShutdownEventTurn::Pid1Signal {
             supervisor,
             child_reaps,
+            drive,
             ..
         } => {
             shutdown::collect_pid1_signal_turn_console_messages(supervisor, out);
             for reap in child_reaps {
                 job::collect_child_reap_turn_console_messages(reap, out);
+            }
+            if let Some(drive) = drive {
+                shutdown::collect_shutdown_drive_dispatch_console_messages(drive, out);
             }
         }
         RuntimeShutdownEventTurn::ControlConnection { supervisor, .. } => {
@@ -49,6 +53,9 @@ pub(super) fn collect_runtime_shutdown_turn_console_messages(
         RuntimeShutdownEventTurn::ProcessSetup { turn, .. } => {
             collect_process_setup_turn_console_messages(turn, out);
         }
+        RuntimeShutdownEventTurn::PowerButton { turn, .. } => {
+            collect_power_button_turn_console_messages(turn, out);
+        }
         RuntimeShutdownEventTurn::ControlListener { .. }
         | RuntimeShutdownEventTurn::IdleControlConnectionsClosed { .. }
         | RuntimeShutdownEventTurn::StaleControlConnection { .. }
@@ -56,6 +63,15 @@ pub(super) fn collect_runtime_shutdown_turn_console_messages(
         | RuntimeShutdownEventTurn::ServiceLogPipe { .. }
         | RuntimeShutdownEventTurn::JfsDevice { .. }
         | RuntimeShutdownEventTurn::RegistryWatch { .. } => {}
+    }
+}
+
+fn collect_power_button_turn_console_messages(
+    turn: &RuntimePowerButtonTurn,
+    out: &mut Vec<String>,
+) {
+    if let RuntimePowerButtonTurn::Shutdown { supervisor, .. } = turn {
+        shutdown::collect_power_button_dispatch_console_messages(supervisor, out);
     }
 }
 

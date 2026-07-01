@@ -2,6 +2,7 @@ use std::os::fd::OwnedFd;
 
 use crate::boundary::BoundaryError;
 use crate::job::JobRecord;
+use crate::service::ServiceDefinition;
 
 use super::launch_failure::{ProcessCleanupEvidence, ProcessPreExecError};
 use super::token::TokenHandle;
@@ -48,6 +49,13 @@ pub struct ProcessInheritedFd {
 }
 
 pub trait ProcessLauncher {
+    fn provision_service_runtime_directories(
+        &mut self,
+        _service: &ServiceDefinition,
+    ) -> Result<(), BoundaryError> {
+        Ok(())
+    }
+
     fn launch_service(
         &mut self,
         spec: ProcessLaunchSpec<'_>,

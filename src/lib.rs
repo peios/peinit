@@ -48,6 +48,8 @@ pub mod notify;
 #[doc(hidden)]
 pub mod operation;
 #[doc(hidden)]
+pub mod provisioning;
+#[doc(hidden)]
 pub mod registry;
 #[doc(hidden)]
 pub mod runtime;

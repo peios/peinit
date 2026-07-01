@@ -107,6 +107,7 @@ fn read_pid1_signalfd_maps_shutdown_signals() {
         reads: VecDeque::from([
             Ok(Some(signalfd_info(libc::SIGINT))),
             Ok(Some(signalfd_info(libc::SIGTERM))),
+            Ok(Some(signalfd_info(libc::SIGPWR))),
         ]),
         ..FakeSignalSyscalls::default()
     };
@@ -118,6 +119,10 @@ fn read_pid1_signalfd_maps_shutdown_signals() {
     assert_eq!(
         read_pid1_signalfd(&mut syscalls, 17).expect("sigterm"),
         LinuxSignalFdRead::Shutdown(ShutdownSignal::Sigterm),
+    );
+    assert_eq!(
+        read_pid1_signalfd(&mut syscalls, 17).expect("sigpwr"),
+        LinuxSignalFdRead::Shutdown(ShutdownSignal::Sigpwr),
     );
 }
 

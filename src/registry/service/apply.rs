@@ -12,8 +12,8 @@ use super::builder::DefinitionBuilder;
 use super::parse::{
     parse_absolute_path_field, parse_environment_variables, parse_executable_command_field,
     parse_executable_command_list, parse_identity_field, parse_non_empty_list,
-    parse_optional_string, parse_service_checks, parse_service_reference_field,
-    parse_service_reference_list, validate_exec_reload,
+    parse_optional_string, parse_runtime_directories, parse_service_checks,
+    parse_service_reference_field, parse_service_reference_list, validate_exec_reload,
 };
 
 pub(super) fn apply_service_field(
@@ -135,6 +135,10 @@ pub(super) fn apply_service_field(
         }
         Field::WorkingDirectory => {
             builder.working_directory = parse_absolute_path_field(value, Field::WorkingDirectory)?;
+        }
+        Field::RuntimeDirectories => {
+            builder.runtime_directories =
+                parse_runtime_directories(value, Field::RuntimeDirectories)?;
         }
         Field::LimitNoFile => {
             builder.limit_nofile = Some(u64::from(decode_dword_field(value, "LimitNOFILE")?));

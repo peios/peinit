@@ -1,3 +1,4 @@
+use crate::provisioning::ServiceRuntimeDirectory;
 use crate::registry::{
     apply_inherited_service_security, build_service_definition_from_registry_values,
 };
@@ -45,6 +46,7 @@ fn builds_service_definition_from_registry_values() {
             dword("FdStoreMax", 8),
             multi_sz("Environment", &["APP_MODE=prod", "EMPTY="]),
             sz("WorkingDirectory", "/srv/app"),
+            multi_sz("RuntimeDirectories", &["app", "app-cache"]),
             dword("LimitNOFILE", 4096),
             dword("LimitCORE", 0),
             multi_sz(
@@ -129,6 +131,17 @@ fn builds_service_definition_from_registry_values() {
         ]
     );
     assert_eq!(definition.working_directory, "/srv/app");
+    assert_eq!(
+        definition.runtime_directories,
+        vec![
+            ServiceRuntimeDirectory {
+                name: "app".to_string(),
+            },
+            ServiceRuntimeDirectory {
+                name: "app-cache".to_string(),
+            },
+        ]
+    );
     assert_eq!(definition.limit_nofile, Some(4096));
     assert_eq!(definition.limit_core, Some(0));
     assert_eq!(
@@ -210,6 +223,7 @@ fn defaults_absent_optional_fields() {
     assert_eq!(definition.fd_store_max, 0);
     assert!(definition.environment.is_empty());
     assert_eq!(definition.working_directory, "/");
+    assert!(definition.runtime_directories.is_empty());
     assert_eq!(definition.limit_nofile, None);
     assert_eq!(definition.limit_core, None);
     assert!(definition.conditions.is_empty());

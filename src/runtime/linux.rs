@@ -13,7 +13,8 @@ use std::path::Path;
 use crate::boundary::{
     LinuxBootAttemptCounter, LinuxChildReaper, LinuxConsoleSink, LinuxEpoll,
     LinuxFilesystemCheckHelper, LinuxKmesEventSink, LinuxMonotonicClock, LinuxPid1SignalFd,
-    LinuxProcessController, LinuxProcessLauncher, LinuxSystemTokenProvider, LinuxTimerFd,
+    LinuxPowerButtonDevices, LinuxProcessController, LinuxProcessLauncher,
+    LinuxSystemTokenProvider, LinuxTimerFd,
 };
 use crate::control::connection::{ControlConnectionRecord, ControlConnectionTable};
 use crate::control::socket::{LinuxControlConnection, LinuxControlSocket};
@@ -41,6 +42,7 @@ pub struct LinuxShutdownRuntime {
     console_sink: LinuxConsoleSink,
     log_pipes: RuntimeServiceLogPipes,
     jfs_device: Option<RuntimeJfsDevice>,
+    power_buttons: LinuxPowerButtonDevices,
     clock: LinuxMonotonicClock,
     controller: LinuxProcessController,
     boot_attempt_counter: LinuxBootAttemptCounter,

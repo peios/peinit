@@ -4,6 +4,7 @@ use crate::boundary::{
 };
 use crate::control::socket::ControlSocketLimits;
 use crate::control::system::ControlSecurityDescriptor;
+use crate::provisioning::ProvisionedPathRegistrySnapshot;
 use crate::service::{ServiceDefinition, ServiceEnvironmentVariable};
 use crate::timer::state::TimerLastRunStorage;
 
@@ -16,6 +17,7 @@ use super::init::{
     read_lcs_control_security, read_lcs_control_socket_limits, read_lcs_max_log_buffer_per_service,
     read_lcs_max_log_line_length,
 };
+use super::provisioning::read_lcs_provisioned_paths;
 use super::schema::{provision_lcs_base_registry, read_lcs_services_schema_version};
 use super::service::read_lcs_service_definitions;
 use super::timer;
@@ -40,6 +42,10 @@ impl RegistryClient for LcsRegistryClient {
         &mut self,
     ) -> Result<Vec<ServiceEnvironmentVariable>, BoundaryError> {
         read_lcs_global_environment().map_err(|error| BoundaryError::Registry(format!("{error:?}")))
+    }
+
+    fn read_provisioned_paths(&mut self) -> Result<ProvisionedPathRegistrySnapshot, BoundaryError> {
+        read_lcs_provisioned_paths().map_err(|error| BoundaryError::Registry(format!("{error:?}")))
     }
 
     fn read_max_parallel_starts(&mut self) -> Result<Option<u32>, BoundaryError> {

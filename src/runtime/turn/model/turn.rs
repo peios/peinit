@@ -1,6 +1,6 @@
 use crate::boundary::{
-    BoundaryError, LinuxSignalFdRead, LinuxTimerFdRead, RegistryWatchEvent,
-    TimerLastRunWriteOutcome,
+    BoundaryError, LinuxPowerButtonRead, LinuxPowerButtonReadError, LinuxSignalFdRead,
+    LinuxTimerFdRead, RegistryWatchEvent, TimerLastRunWriteOutcome,
 };
 use crate::control::reload_config::{ReloadConfigError, ReloadConfigOutcome};
 use crate::runtime::{RuntimeEventSource, RuntimeLogPipeTurn};
@@ -8,7 +8,7 @@ use crate::supervisor::{
     SupervisorChildReapTurn, SupervisorControlConnectionTableTurn,
     SupervisorFilesystemCheckCompletionDispatch, SupervisorLifecycleDeadlineDispatch,
     SupervisorLifecycleDeadlineTimerTurn, SupervisorPendingProcessSetupDispatch,
-    SupervisorPid1SignalFdTurn, SupervisorProcessSetupDispatch,
+    SupervisorPid1SignalFdTurn, SupervisorPowerButtonDispatch, SupervisorProcessSetupDispatch,
     SupervisorShutdownDeadlineTimerTurn, SupervisorShutdownDriveDispatch, SupervisorTimerDispatch,
 };
 
@@ -20,6 +20,7 @@ pub enum RuntimeShutdownEventTurn {
         read: LinuxSignalFdRead,
         supervisor: SupervisorPid1SignalFdTurn,
         child_reaps: Vec<SupervisorChildReapTurn>,
+        drive: Option<Box<SupervisorShutdownDriveDispatch>>,
         deadline_timer: Option<SupervisorShutdownDeadlineTimerTurn>,
     },
     ControlListener {
@@ -78,6 +79,10 @@ pub enum RuntimeShutdownEventTurn {
         fd: i32,
         turn: RuntimeProcessSetupTurn,
     },
+    PowerButton {
+        fd: i32,
+        turn: RuntimePowerButtonTurn,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -98,6 +103,23 @@ pub enum RuntimeJfsDeviceTurn {
     ParseBoundaryReached {
         fd: i32,
         source_disabled_until_abi_exists: bool,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RuntimePowerButtonTurn {
+    Ignored {
+        read: LinuxPowerButtonRead,
+    },
+    ReadFailed {
+        fd: i32,
+        error: LinuxPowerButtonReadError,
+        source_disabled: bool,
+    },
+    Shutdown {
+        read: LinuxPowerButtonRead,
+        supervisor: Box<SupervisorPowerButtonDispatch>,
+        deadline_timer: Option<SupervisorShutdownDeadlineTimerTurn>,
     },
 }
 
