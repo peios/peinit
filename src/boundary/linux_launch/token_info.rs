@@ -1,7 +1,28 @@
+use peios::security::Privileges;
 use peios::token::{PrivilegeAdjustment, Token};
 
 use crate::boundary::BoundaryError;
-use crate::security::{TokenSummary, privilege_names_from_mask, privilege_request_mask};
+use crate::security::TokenSummary;
+
+/// Resolve `RequiredPrivileges` names to the mask they describe.
+///
+/// The name↔bit table lives in libpeios, beside the `Privileges` constants it
+/// names, and every bit in it comes from the ABI headers. peinit used to carry
+/// its own copy with the bit numbers written out by hand, and four of them were
+/// wrong — `SeCreateTokenPrivilege` was recorded as bit 0 where the ABI assigns
+/// bit 2, with the same off-by-two for the three after it. Because the caller
+/// *removes* every present bit outside this mask, a service naming one of those
+/// four had it stripped rather than kept: fail-safe, and silent.
+fn required_mask(names: &[String]) -> Result<u64, &str> {
+    let mut mask = Privileges::empty();
+    for name in names {
+        let Some(privilege) = Privileges::parse_name(name) else {
+            return Err(name);
+        };
+        mask |= privilege;
+    }
+    Ok(mask.bits())
+}
 
 pub(super) fn apply_required_privileges(
     token: &Token,
@@ -10,8 +31,8 @@ pub(super) fn apply_required_privileges(
     if required_privileges.is_empty() {
         return Ok(());
     }
-    let required_mask = privilege_request_mask(required_privileges).map_err(|error| {
-        BoundaryError::Token(format!("unknown RequiredPrivileges entry '{}'", error.name))
+    let required_mask = required_mask(required_privileges).map_err(|name| {
+        BoundaryError::Token(format!("unknown RequiredPrivileges entry '{name}'"))
     })?;
     let present = token
         .privileges()
@@ -49,11 +70,22 @@ pub(super) fn summarize_token(
         identity,
         user_sid,
         group_sids,
-        privilege_names_from_mask(privileges.present.bits()),
-        privilege_names_from_mask(privileges.enabled.bits()),
+        names(privileges.present),
+        names(privileges.enabled),
     ))
 }
 
+/// A summary is for a human to read, so an unnameable bit is omitted rather
+/// than rendered as a number — `canonical_names` skips what it cannot name.
+fn names(privileges: Privileges) -> Vec<String> {
+    privileges.canonical_names().map(String::from).collect()
+}
+
+/// Every present bit the caller did not ask for.
+///
+/// Deliberately iterates all 64 bits rather than only the named ones: a token
+/// may carry a privilege this build has no name for, and `RequiredPrivileges`
+/// means *only these*, so an unnameable bit must still be removed.
 fn privileges_to_remove(present_mask: u64, required_mask: u64) -> Vec<PrivilegeAdjustment> {
     (0..u64::BITS)
         .filter(|bit| {
@@ -66,7 +98,8 @@ fn privileges_to_remove(present_mask: u64, required_mask: u64) -> Vec<PrivilegeA
 
 #[cfg(test)]
 mod tests {
-    use super::privileges_to_remove;
+    use super::{privileges_to_remove, required_mask};
+    use peios::security::Privileges;
 
     #[test]
     fn required_privileges_remove_only_present_unrequested_bits() {
@@ -87,5 +120,50 @@ mod tests {
 
         assert_eq!(removals.len(), 1);
         assert_eq!(removals[0].luid, 61);
+    }
+
+    /// The regression the shared table exists to prevent. peinit's own copy had
+    /// these as bits 0..3; the ABI assigns 2..5.
+    #[test]
+    fn the_low_privileges_resolve_to_the_bits_the_abi_assigns() {
+        let names = [
+            ("SeCreateTokenPrivilege", 2),
+            ("SeAssignPrimaryTokenPrivilege", 3),
+            ("SeLockMemoryPrivilege", 4),
+            ("SeIncreaseQuotaPrivilege", 5),
+        ];
+        for (name, bit) in names {
+            assert_eq!(
+                required_mask(&[name.to_string()]),
+                Ok(1u64 << bit),
+                "{name} must resolve to bit {bit}"
+            );
+        }
+    }
+
+    #[test]
+    fn several_names_combine_into_one_mask() {
+        let asked = [
+            "SeTcbPrivilege".to_string(),
+            "SeBackupPrivilege".to_string(),
+        ];
+        assert_eq!(
+            required_mask(&asked),
+            Ok((Privileges::TCB | Privileges::BACKUP).bits())
+        );
+    }
+
+    #[test]
+    fn an_unknown_name_is_reported_rather_than_ignored() {
+        let asked = [
+            "SeTcbPrivilege".to_string(),
+            "SeNonsensePrivilege".to_string(),
+        ];
+        assert_eq!(required_mask(&asked), Err("SeNonsensePrivilege"));
+    }
+
+    #[test]
+    fn no_names_is_an_empty_mask() {
+        assert_eq!(required_mask(&[]), Ok(0));
     }
 }
