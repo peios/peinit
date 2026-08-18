@@ -21,7 +21,7 @@ struct SystemTokenTemplate {
     groups: Vec<(Sid, u32)>,
     privileges: PrivilegeSet,
     integrity: IntegrityLevel,
-    session: SessionId,
+    auth_id: SessionId,
 }
 
 impl SystemTokenTemplate {
@@ -56,15 +56,21 @@ impl SystemTokenTemplate {
         let integrity = token.integrity().map_err(|error| {
             BoundaryError::Token(format!("query SYSTEM integrity failed: {error}"))
         })?;
-        let session = token.session_id().map_err(|error| {
-            BoundaryError::Token(format!("query SYSTEM session failed: {error}"))
+        let statistics = token.statistics().map_err(|error| {
+            BoundaryError::Token(format!("query SYSTEM token statistics failed: {error}"))
         })?;
+        if statistics.token_type != TokenType::Primary {
+            return Err(BoundaryError::Token(format!(
+                "peinit real token is {:?}, expected Primary",
+                statistics.token_type
+            )));
+        }
         Ok(Self {
             user,
             groups,
             privileges,
             integrity,
-            session,
+            auth_id: statistics.auth_id,
         })
     }
 }
@@ -73,6 +79,15 @@ fn create_system_token_from_template(
     service: &str,
     template: &SystemTokenTemplate,
 ) -> Result<Token, BoundaryError> {
+    build_system_token(service, template)?
+        .create()
+        .map_err(|error| BoundaryError::Token(format!("create SYSTEM token failed: {error}")))
+}
+
+fn build_system_token(
+    service: &str,
+    template: &SystemTokenTemplate,
+) -> Result<TokenBuilder, BoundaryError> {
     let service = Sid::from_str(&service_sid(service))
         .map_err(|error| BoundaryError::Token(format!("derive service SID failed: {error}")))?;
     let group_attrs = GroupAttributes::MANDATORY
@@ -87,7 +102,9 @@ fn create_system_token_from_template(
         .token_type(TokenType::Primary, ImpersonationLevel::Anonymous)
         .integrity(template.integrity)
         .privileges(template.privileges.present, template.privileges.enabled)
-        .session(template.session)
+        // The create-spec field is the LogonSession LUID/auth_id. It is not
+        // the independent u32 interactivity scope.
+        .session(template.auth_id)
         .owner_index(0)
         .primary_group_index(0)
         .projected_ids(0, 0)
@@ -96,7 +113,47 @@ fn create_system_token_from_template(
         builder.add_group(sid, *attrs);
     }
     builder.add_group(&service, group_attrs.bits());
-    builder
-        .create()
-        .map_err(|error| BoundaryError::Token(format!("create SYSTEM token failed: {error}")))
+    Ok(builder)
+}
+
+#[cfg(test)]
+mod tests {
+    use peios::security::{IntegrityLevel, Privileges, Sid, WellKnown};
+    use peios::token::{PrivilegeSet, SessionId};
+
+    use super::{SystemTokenTemplate, build_system_token};
+
+    #[test]
+    fn system_token_spec_uses_auth_id_not_interactivity_scope() {
+        let template = SystemTokenTemplate {
+            user: Sid::well_known(WellKnown::System),
+            groups: Vec::new(),
+            privileges: PrivilegeSet {
+                present: Privileges::empty(),
+                enabled: Privileges::empty(),
+                enabled_by_default: Privileges::empty(),
+                used: Privileges::empty(),
+            },
+            integrity: IntegrityLevel::SYSTEM,
+            auth_id: SessionId(999),
+        };
+
+        let spec = build_system_token("registryd", &template)
+            .expect("build SYSTEM token")
+            .to_bytes()
+            .expect("serialize SYSTEM token");
+
+        assert_eq!(
+            u64::from_le_bytes(spec[56..64].try_into().expect("auth_id field")),
+            999
+        );
+        assert_eq!(
+            u32::from_le_bytes(
+                spec[184..188]
+                    .try_into()
+                    .expect("interactivity-scope field")
+            ),
+            0
+        );
+    }
 }
