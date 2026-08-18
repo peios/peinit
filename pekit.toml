@@ -75,10 +75,15 @@ CARGO_PROFILE_RELEASE_DEBUG=2 CARGO_PROFILE_RELEASE_SPLIT_DEBUGINFO=off \
 mkdir -p "$PEKIT_OUT/usr/bin" "$PEKIT_OUT/usr/sbin" "$PEKIT_OUT/$LIBDIR" "$PEKIT_OUT/usr/include/peinit" "$PEKIT_OUT/$LIBDIR/pkgconfig"
 install -m 0755 "$PEKIT_OUT/target/release/peinit2" "$PEKIT_OUT/usr/bin/peinit2"
 install -m 0755 "$PEKIT_OUT/target/release/svctl" "$PEKIT_OUT/usr/bin/svctl"
-ln -s ../bin/svctl "$PEKIT_OUT/usr/sbin/reboot"
-ln -s ../bin/svctl "$PEKIT_OUT/usr/sbin/poweroff"
-ln -s ../bin/svctl "$PEKIT_OUT/usr/sbin/halt"
-ln -s ../bin/svctl "$PEKIT_OUT/usr/sbin/shutdown"
+# The shutdown verbs, as argv[0] aliases of svctl. In /usr/bin rather than
+# /usr/sbin: shutting a machine down is gated by the control socket's security
+# descriptor, not by which directory the binary sits in, so filing them under
+# sbin implied an access rule that does not exist. A relative link with no
+# ../ now that they are siblings of the target.
+ln -s svctl "$PEKIT_OUT/usr/bin/reboot"
+ln -s svctl "$PEKIT_OUT/usr/bin/poweroff"
+ln -s svctl "$PEKIT_OUT/usr/bin/halt"
+ln -s svctl "$PEKIT_OUT/usr/bin/shutdown"
 install -m 0755 "$PEKIT_OUT/target/release/libpeinit.so" "$PEKIT_OUT/$LIBDIR/libpeinit.so.0"
 ln -s libpeinit.so.0 "$PEKIT_OUT/$LIBDIR/libpeinit.so"
 cp include/peinit.h "$PEKIT_OUT/usr/include/"
