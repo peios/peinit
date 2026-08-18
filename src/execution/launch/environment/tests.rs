@@ -183,3 +183,8 @@ fn test_fd() -> OwnedFd {
     let (left, _right) = UnixStream::pair().expect("socket pair");
     left.into()
 }
+
+#[test]
+fn default_path_uses_stratafs_runtime_views() {
+    assert_eq!(DEFAULT_PATH, "/sbin:/bin");
+}

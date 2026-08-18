@@ -357,8 +357,10 @@ fn runtime_loop_buffers_service_logs_until_eventd_socket_is_configured() {
 #[test]
 fn runtime_loop_buffers_service_logs_until_eventd_is_active() {
     let app = alive_service("app");
-    let mut supervisor =
-        boot_supervisor_with_eventd_log_socket_path(vec![app], "/run/peios/eventd-log.sock");
+    let mut supervisor = boot_supervisor_with_eventd_log_socket_path(
+        vec![app],
+        "/run/services/eventd/eventd-log.sock",
+    );
     let (stdout_read, mut stdout_write) = pipe_pair();
     let stdout_fd = stdout_read.into_raw_fd();
     stdout_write

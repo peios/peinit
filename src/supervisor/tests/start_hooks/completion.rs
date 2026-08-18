@@ -9,8 +9,8 @@ use super::*;
 fn successful_pre_hooks_run_sequentially_then_queue_main_job() {
     let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
     let mut app = app_with_pre_hooks(vec![
-        "/usr/bin/pre-one".to_string(),
-        "/usr/bin/pre-two --flag".to_string(),
+        "/bin/pre-one".to_string(),
+        "/bin/pre-two --flag".to_string(),
     ]);
     app.identity = "LocalService".to_string();
     app.hook_identity = Some("SYSTEM".to_string());

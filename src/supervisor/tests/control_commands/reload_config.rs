@@ -175,7 +175,7 @@ fn reload_config_updates_global_environment_snapshot() {
 fn reload_config_updates_eventd_log_socket_path() {
     let mut supervisor = booted_supervisor(vec![inactive_alive_service("app")]);
     let mut registry = StaticRegistry::services(vec![inactive_alive_service("app")])
-        .with_eventd_log_socket_path("/run/peinit/eventd.sock");
+        .with_eventd_log_socket_path("/run/services/peinit/eventd.sock");
     let mut access = TestAccessChecker::allow_all();
     let mut controller = TestProcessController::default();
     let mut clock = ScriptedClock::new([]);
@@ -197,7 +197,7 @@ fn reload_config_updates_eventd_log_socket_path() {
 
     assert_eq!(
         supervisor.eventd_log_socket_path(),
-        Some("/run/peinit/eventd.sock"),
+        Some("/run/services/peinit/eventd.sock"),
     );
 }
 

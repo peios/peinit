@@ -11,7 +11,7 @@ use super::support::{
 #[test]
 fn runtime_pump_launches_main_after_pre_start_hook_sigchld() {
     let mut app = alive_service("app");
-    app.exec_start_pre = vec!["/usr/bin/pre".to_string()];
+    app.exec_start_pre = vec!["/bin/pre".to_string()];
     app.start_timeout_secs = 45;
     let mut supervisor = boot_supervisor(vec![app]);
 

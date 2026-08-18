@@ -127,7 +127,7 @@ fn demand_only_conflicts_are_not_boot_validation_findings() {
 #[test]
 fn invalid_health_check_restart_windows_are_validation_findings() {
     let mut app = service("app");
-    app.health_check = Some("/usr/bin/check".to_string());
+    app.health_check = Some("/bin/check".to_string());
     app.health_check_retries = 3;
     app.health_check_interval_secs = 10;
     app.restart_window_secs = 30;

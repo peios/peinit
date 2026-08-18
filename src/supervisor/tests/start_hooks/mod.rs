@@ -18,7 +18,7 @@ const MAIN_LAUNCH_NS: u64 = BOOT_NS + 50_000;
 fn boot_app_with_single_pre_hook() -> (Supervisor, crate::ids::JobId, crate::ids::OperationId) {
     let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
     let mut registry =
-        StaticRegistry::services(vec![app_with_pre_hooks(vec!["/usr/bin/pre".to_string()])]);
+        StaticRegistry::services(vec![app_with_pre_hooks(vec!["/bin/pre".to_string()])]);
     let mut clock = ScriptedClock::new([BOOT_NS]);
     let boot = supervisor
         .run_phase2_boot(&mut registry, &mut clock)

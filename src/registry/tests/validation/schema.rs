@@ -8,7 +8,7 @@ fn malformed_success_exit_codes_are_rejected() {
     let err = build_service_definition_from_registry_values(
         "broken",
         &[
-            sz("ImagePath", "/usr/bin/app"),
+            sz("ImagePath", "/bin/app"),
             multi_sz("SuccessExitCodes", &["256"]),
         ],
     )
@@ -27,7 +27,7 @@ fn malformed_environment_variables_are_rejected() {
     let err = build_service_definition_from_registry_values(
         "broken",
         &[
-            sz("ImagePath", "/usr/bin/app"),
+            sz("ImagePath", "/bin/app"),
             multi_sz("Environment", &["MISSING_EQUALS"]),
         ],
     )
@@ -51,11 +51,9 @@ fn missing_image_path_is_rejected() {
 
 #[test]
 fn invalid_service_names_are_rejected() {
-    let err = build_service_definition_from_registry_values(
-        "bad/name",
-        &[sz("ImagePath", "/usr/bin/app")],
-    )
-    .expect_err("invalid service name");
+    let err =
+        build_service_definition_from_registry_values("bad/name", &[sz("ImagePath", "/bin/app")])
+            .expect_err("invalid service name");
 
     assert_eq!(
         err,
@@ -69,7 +67,7 @@ fn invalid_service_names_are_rejected() {
 fn duplicate_known_fields_are_rejected_case_insensitively() {
     let err = build_service_definition_from_registry_values(
         "app",
-        &[sz("ImagePath", "/usr/bin/app"), sz("imagepath", "/bin/app")],
+        &[sz("ImagePath", "/bin/app"), sz("imagepath", "/bin/app")],
     )
     .expect_err("duplicate image path");
 
@@ -84,7 +82,7 @@ fn service_reference_fields_reject_invalid_names() {
     let err = build_service_definition_from_registry_values(
         "app",
         &[
-            sz("ImagePath", "/usr/bin/app"),
+            sz("ImagePath", "/bin/app"),
             multi_sz("Requires", &["valid", "bad:name"]),
         ],
     )
@@ -105,7 +103,7 @@ fn malformed_known_triggers_are_rejected() {
         let err = build_service_definition_from_registry_values(
             "app",
             &[
-                sz("ImagePath", "/usr/bin/app"),
+                sz("ImagePath", "/bin/app"),
                 multi_sz("Triggers", &[trigger]),
             ],
         )
@@ -137,7 +135,7 @@ fn path_fields_must_be_absolute() {
     let err = build_service_definition_from_registry_values(
         "app",
         &[
-            sz("ImagePath", "/usr/bin/app"),
+            sz("ImagePath", "/bin/app"),
             sz("WorkingDirectory", "srv/app"),
         ],
     )
@@ -166,7 +164,7 @@ fn runtime_directories_must_be_single_relative_components() {
         let err = build_service_definition_from_registry_values(
             "app",
             &[
-                sz("ImagePath", "/usr/bin/app"),
+                sz("ImagePath", "/bin/app"),
                 multi_sz("RuntimeDirectories", &[value]),
             ],
         )
@@ -187,7 +185,7 @@ fn executable_command_fields_are_validated() {
     let err = build_service_definition_from_registry_values(
         "app",
         &[
-            sz("ImagePath", "/usr/bin/app"),
+            sz("ImagePath", "/bin/app"),
             multi_sz("ExecStartPre", &["relative-hook"]),
         ],
     )
@@ -207,8 +205,8 @@ fn executable_command_fields_are_validated() {
     let err = build_service_definition_from_registry_values(
         "app",
         &[
-            sz("ImagePath", "/usr/bin/app"),
-            sz("HealthCheck", "/usr/bin/check \"unterminated"),
+            sz("ImagePath", "/bin/app"),
+            sz("HealthCheck", "/bin/check \"unterminated"),
         ],
     )
     .expect_err("unterminated health check");
@@ -217,7 +215,7 @@ fn executable_command_fields_are_validated() {
         err,
         ServiceRegistryDecodeError::InvalidExecutableCommand {
             field: "HealthCheck",
-            value: "/usr/bin/check \"unterminated".to_string(),
+            value: "/bin/check \"unterminated".to_string(),
             source: ExecutableCommandParseError::UnclosedDoubleQuote,
         }
     );
@@ -228,7 +226,7 @@ fn exec_reload_signal_must_be_canonical_and_allowed() {
     let err = build_service_definition_from_registry_values(
         "app",
         &[
-            sz("ImagePath", "/usr/bin/app"),
+            sz("ImagePath", "/bin/app"),
             sz("ExecReload", "signal:sighup"),
         ],
     )
@@ -244,7 +242,7 @@ fn exec_reload_signal_must_be_canonical_and_allowed() {
     let err = build_service_definition_from_registry_values(
         "app",
         &[
-            sz("ImagePath", "/usr/bin/app"),
+            sz("ImagePath", "/bin/app"),
             sz("ExecReload", "signal:SIGKILL"),
         ],
     )
@@ -263,7 +261,7 @@ fn conditions_and_asserts_validate_check_syntax_and_registry_cache_scope() {
     let err = build_service_definition_from_registry_values(
         "app",
         &[
-            sz("ImagePath", "/usr/bin/app"),
+            sz("ImagePath", "/bin/app"),
             multi_sz("Conditions", &["unknown:/thing"]),
         ],
     )
@@ -280,7 +278,7 @@ fn conditions_and_asserts_validate_check_syntax_and_registry_cache_scope() {
     let err = build_service_definition_from_registry_values(
         "app",
         &[
-            sz("ImagePath", "/usr/bin/app"),
+            sz("ImagePath", "/bin/app"),
             multi_sz("Asserts", &["registry:Machine\\Software\\Other"]),
         ],
     )
@@ -300,7 +298,7 @@ fn required_privileges_reject_empty_entries() {
     let err = build_service_definition_from_registry_values(
         "app",
         &[
-            sz("ImagePath", "/usr/bin/app"),
+            sz("ImagePath", "/bin/app"),
             multi_sz("RequiredPrivileges", &[""]),
         ],
     )

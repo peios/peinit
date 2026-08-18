@@ -11,7 +11,7 @@ use super::support::{
 #[test]
 fn runtime_pump_executes_reload_operation_and_launches_reload_job() {
     let mut app = alive_service("app");
-    app.exec_reload = Some(r#"/usr/bin/reload --name="hello world" """#.to_string());
+    app.exec_reload = Some(r#"/bin/reload --name="hello world" """#.to_string());
     app.start_timeout_secs = 45;
     let mut supervisor = active_app_supervisor(app, process(8000, 50));
     let operation_id = queue_reload(&mut supervisor);

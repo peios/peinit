@@ -1,7 +1,7 @@
 use std::io;
 use std::path::PathBuf;
 
-pub const CONTROL_SOCKET_PATH: &str = "/run/peinit/control.sock";
+pub const CONTROL_SOCKET_PATH: &str = "/run/services/peinit/control.sock";
 pub const CONTROL_SOCKET_LISTEN_BACKLOG: i32 = 32;
 pub const DEFAULT_MAX_CONTROL_CONNECTIONS: usize = 32;
 pub const DEFAULT_MAX_REQUEST_SIZE_BYTES: usize = 65_536;

@@ -11,7 +11,7 @@ use super::{
 
 #[test]
 fn control_socket_constants_match_psd_007() {
-    assert_eq!(CONTROL_SOCKET_PATH, "/run/peinit/control.sock");
+    assert_eq!(CONTROL_SOCKET_PATH, "/run/services/peinit/control.sock");
     assert_eq!(DEFAULT_MAX_CONTROL_CONNECTIONS, 32);
     assert_eq!(DEFAULT_MAX_REQUEST_SIZE_BYTES, 65_536);
     assert_eq!(DEFAULT_CONNECTION_TIMEOUT_SECS, 30);

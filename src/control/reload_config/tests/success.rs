@@ -76,13 +76,13 @@ fn reloads_schema_guard_control_security_and_limits() {
 fn reloads_eventd_log_socket_path() {
     let mut services = service_table(&["app"]);
     let mut registry = StaticRegistry::services(vec![service("app", "/sbin/app")])
-        .eventd_log_socket_path("/run/peinit/eventd.sock");
+        .eventd_log_socket_path("/run/services/peinit/eventd.sock");
 
     let outcome = reload_config(&mut registry, &mut services).expect("reload config");
 
     assert_eq!(
         outcome.eventd_log_socket_path.as_deref(),
-        Some("/run/peinit/eventd.sock"),
+        Some("/run/services/peinit/eventd.sock"),
     );
 }
 

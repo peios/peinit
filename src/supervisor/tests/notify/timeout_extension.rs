@@ -183,7 +183,7 @@ fn malformed_extend_timeout_is_ignored_outside_transition() {
 
 fn active_command_reload_supervisor() -> crate::supervisor::Supervisor {
     let mut app = alive_service("app");
-    app.exec_reload = Some("/usr/bin/reload".to_string());
+    app.exec_reload = Some("/bin/reload".to_string());
     let mut supervisor =
         crate::supervisor::Supervisor::new(crate::supervisor::SupervisorSettings::new(settings()));
     let mut registry = StaticRegistry::services(vec![app]);

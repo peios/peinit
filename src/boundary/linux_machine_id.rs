@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 #[cfg(feature = "peios-boundary")]
 use peios::file::{CreateOptions, Disposition, FileAccess, OpenOptions, SecInfo};
 
-pub const DEFAULT_MACHINE_ID_PATH: &str = "/etc/machine-id";
+pub const DEFAULT_MACHINE_ID_PATH: &str = "/lcl/etc/machine-id";
 
 const MACHINE_ID_RANDOM_BYTES: usize = 16;
 const MACHINE_ID_TEXT_BYTES: usize = 33;
@@ -356,7 +356,7 @@ mod tests {
         };
 
         let status =
-            ensure_linux_machine_id_with_syscalls(Path::new("/etc/machine-id"), &mut syscalls)
+            ensure_linux_machine_id_with_syscalls(Path::new("/lcl/etc/machine-id"), &mut syscalls)
                 .expect("ensure");
 
         assert_eq!(status, LinuxMachineIdStatus::Existing);
@@ -368,14 +368,14 @@ mod tests {
         let mut syscalls = FakeMachineIdSyscalls::with_random([[0xab; 16]]);
 
         let status =
-            ensure_linux_machine_id_with_syscalls(Path::new("/etc/machine-id"), &mut syscalls)
+            ensure_linux_machine_id_with_syscalls(Path::new("/lcl/etc/machine-id"), &mut syscalls)
                 .expect("ensure");
 
         assert_eq!(status, LinuxMachineIdStatus::Generated);
         assert_eq!(
             syscalls.writes,
             vec![(
-                "/etc/machine-id".to_string(),
+                "/lcl/etc/machine-id".to_string(),
                 b"abababababababababababababababab\n".to_vec(),
             )],
         );
@@ -387,7 +387,7 @@ mod tests {
         syscalls.existing = Some(Vec::new());
 
         let status =
-            ensure_linux_machine_id_with_syscalls(Path::new("/etc/machine-id"), &mut syscalls)
+            ensure_linux_machine_id_with_syscalls(Path::new("/lcl/etc/machine-id"), &mut syscalls)
                 .expect("ensure");
 
         assert_eq!(status, LinuxMachineIdStatus::Generated);
@@ -403,7 +403,7 @@ mod tests {
         syscalls.existing = Some(b"not-a-machine-id\n".to_vec());
 
         let status =
-            ensure_linux_machine_id_with_syscalls(Path::new("/etc/machine-id"), &mut syscalls)
+            ensure_linux_machine_id_with_syscalls(Path::new("/lcl/etc/machine-id"), &mut syscalls)
                 .expect("ensure");
 
         assert_eq!(status, LinuxMachineIdStatus::ReplacedInvalid);
@@ -417,7 +417,7 @@ mod tests {
     fn all_zero_random_bytes_are_rejected_and_retried() {
         let mut syscalls = FakeMachineIdSyscalls::with_random([[0; 16], [0x11; 16]]);
 
-        ensure_linux_machine_id_with_syscalls(Path::new("/etc/machine-id"), &mut syscalls)
+        ensure_linux_machine_id_with_syscalls(Path::new("/lcl/etc/machine-id"), &mut syscalls)
             .expect("ensure");
 
         assert_eq!(

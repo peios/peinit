@@ -11,7 +11,7 @@ use super::*;
 fn start_with_exec_start_pre_creates_first_hook_job_in_hooks_cgroup() {
     let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
     let mut registry = StaticRegistry::services(vec![app_with_pre_hooks(vec![
-        r#"/usr/bin/pre --name="hello world""#.to_string(),
+        r#"/bin/pre --name="hello world""#.to_string(),
     ])]);
     let mut clock = ScriptedClock::new([BOOT_NS]);
 
@@ -36,7 +36,7 @@ fn start_with_exec_start_pre_creates_first_hook_job_in_hooks_cgroup() {
 
     let hook = supervisor.jobs().get(dispatch.job_id).expect("hook job");
     assert_eq!(hook.job_type, JobType::PreExecHook);
-    assert_eq!(hook.image_path, "/usr/bin/pre");
+    assert_eq!(hook.image_path, "/bin/pre");
     assert_eq!(hook.arguments, vec!["--name=hello world"]);
     assert_eq!(hook.cgroup_id, "/sys/fs/cgroup/peinit/app/hooks");
     assert!(supervisor.jobs().get(main_job_id).is_none());
@@ -55,7 +55,7 @@ fn start_with_exec_start_pre_creates_first_hook_job_in_hooks_cgroup() {
 
 #[test]
 fn exec_start_pre_uses_hook_identity_when_configured() {
-    let mut app = app_with_pre_hooks(vec!["/usr/bin/pre".to_string()]);
+    let mut app = app_with_pre_hooks(vec!["/bin/pre".to_string()]);
     app.identity = "LocalService".to_string();
     app.hook_identity = Some("SYSTEM".to_string());
     let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));

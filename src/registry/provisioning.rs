@@ -192,7 +192,7 @@ mod tests {
             "eventd",
             &[
                 sz("Kind", "directory"),
-                sz("Path", "/run/eventd"),
+                sz("Path", "/run/services/eventd"),
                 binary("Security", &[1, 2, 3]),
                 dword("Required", 1),
             ],
@@ -204,7 +204,7 @@ mod tests {
             ProvisionedPath {
                 name: "eventd".to_string(),
                 kind: ProvisionedPathKind::Directory,
-                path: "/run/eventd".to_string(),
+                path: "/run/services/eventd".to_string(),
                 security: ProvisionedPathSecurity::RegistryBinary(vec![1, 2, 3]),
                 required: true,
             }
