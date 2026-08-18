@@ -2,6 +2,7 @@ use crate::service::ServiceSecurityDescriptor;
 use crate::service::runtime::{ServiceState, TransitionCause};
 
 use super::{service, table, transition};
+use crate::service::{ServiceDefinition, ServiceTable};
 
 #[test]
 fn reload_snapshot_adds_updates_and_discards_inactive_removed_services() {
@@ -209,4 +210,96 @@ fn reappearing_definition_restores_removed_entry() {
         "/sbin/app-v2",
     );
     assert_eq!(entry.runtime.state, ServiceState::Active);
+}
+
+/// PEI-203. registryd is compiled in — the registry cannot define the daemon
+/// that serves the registry — so it is absent from every registry snapshot. A
+/// reload must read that absence as "no information", not as a removal.
+///
+/// The consequence of getting this wrong is quiet and delayed, which is why it
+/// is pinned: `definition_removed` refuses restart AND refuses
+/// Start/Restart/Reload from the control socket, so a later registryd crash
+/// becomes unrecoverable — while nothing at all fails at the moment of the
+/// reload.
+#[test]
+fn a_reload_does_not_unmanage_a_compiled_in_service() {
+    let mut table =
+        ServiceTable::from_boot_snapshot(vec![ServiceDefinition::compiled_in_registryd()])
+            .expect("table");
+    for (to, cause) in [
+        (ServiceState::Starting, TransitionCause::ExplicitStart),
+        (ServiceState::Active, TransitionCause::ExplicitStart),
+    ] {
+        table
+            .transition_service("registryd", transition(to, cause))
+            .expect("transition");
+    }
+
+    // What a registry watch event produces: the registry's services, which
+    // never include registryd.
+    let summary = table
+        .apply_definition_snapshot(vec![service("app", "/sbin/app")])
+        .expect("reload");
+
+    assert!(
+        summary.marked_removed.is_empty(),
+        "compiled-in registryd must not be marked removed: {:?}",
+        summary.marked_removed,
+    );
+    assert!(summary.discarded.is_empty());
+    assert!(
+        !table
+            .get("registryd")
+            .expect("registryd")
+            .definition_removed
+    );
+    assert_eq!(
+        table.runtime("registryd").expect("registryd").state,
+        ServiceState::Active,
+        "and it must still be the running service it was",
+    );
+}
+
+/// The rule is provenance, not a name. A registry service that happens to be
+/// called `registryd` carries no compiled-in flag and stays removable like any
+/// other — otherwise the registry could mint itself an un-removable service.
+#[test]
+fn a_registry_service_named_like_a_compiled_in_one_is_still_removable() {
+    let mut table = table(&["registryd"]);
+    for (to, cause) in [
+        (ServiceState::Starting, TransitionCause::ExplicitStart),
+        (ServiceState::Active, TransitionCause::ExplicitStart),
+    ] {
+        table
+            .transition_service("registryd", transition(to, cause))
+            .expect("transition");
+    }
+
+    let summary = table
+        .apply_definition_snapshot(vec![service("app", "/sbin/app")])
+        .expect("reload");
+
+    assert_eq!(summary.marked_removed, vec!["registryd"]);
+    assert!(
+        table
+            .get("registryd")
+            .expect("registryd")
+            .definition_removed
+    );
+}
+
+/// An inactive compiled-in service must not be discarded outright either — the
+/// other branch of the same removal pass.
+#[test]
+fn an_inactive_compiled_in_service_is_not_discarded() {
+    let mut table =
+        ServiceTable::from_boot_snapshot(vec![ServiceDefinition::compiled_in_registryd()])
+            .expect("table");
+
+    let summary = table
+        .apply_definition_snapshot(vec![service("app", "/sbin/app")])
+        .expect("reload");
+
+    assert!(summary.discarded.is_empty());
+    assert!(table.get("registryd").is_some());
 }
