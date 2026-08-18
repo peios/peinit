@@ -42,10 +42,19 @@ pub fn provision_linux_service_runtime_directories(
 ) -> Result<(), io::Error> {
     for directory in &service.runtime_directories {
         let path = PathBuf::from("/run").join(&directory.name);
-        let sd = service_runtime_directory_security(service)?;
+        // Name the step and the path. A bare errno here reaches the operator as
+        // "provision runtime directories for <svc> failed: Invalid argument"
+        // with three candidate syscalls behind it, which costs a boot to narrow.
+        let sd = service_runtime_directory_security(service)
+            .map_err(|error| step_error("build security descriptor for", &path, error))?;
         ensure_directory(&path, &sd)?;
     }
     Ok(())
+}
+
+/// Wrap a step failure with what was being attempted and to what.
+fn step_error(step: &str, path: &Path, error: io::Error) -> io::Error {
+    io::Error::new(error.kind(), format!("{step} {}: {error}", path.display()))
 }
 
 fn apply_provisioned_path(entry: &ProvisionedPath) -> io::Result<()> {
@@ -116,13 +125,15 @@ fn security_from_registry_bytes(_bytes: &[u8]) -> io::Result<ResolvedSecurity> {
 
 fn ensure_directory(path: &Path, sd: &ResolvedSecurity) -> io::Result<()> {
     ensure_parent_exists(path)?;
-    let directory = create_or_open_directory(path, sd)?;
+    let directory =
+        create_or_open_directory(path, sd).map_err(|e| step_error("create directory", path, e))?;
     apply_fd_security(&directory, sd)
+        .map_err(|e| step_error("apply security descriptor to directory", path, e))
 }
 
 fn ensure_file(path: &Path, sd: &ResolvedSecurity) -> io::Result<()> {
     ensure_parent_exists(path)?;
-    let file = create_or_open_file(path, sd)?;
+    let file = create_or_open_file(path, sd).map_err(|e| step_error("create file", path, e))?;
     if !fd_is_regular_file(file.as_raw_fd())? {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -130,6 +141,7 @@ fn ensure_file(path: &Path, sd: &ResolvedSecurity) -> io::Result<()> {
         ));
     }
     apply_fd_security(&file, sd)
+        .map_err(|e| step_error("apply security descriptor to file", path, e))
 }
 
 fn ensure_parent_exists(path: &Path) -> io::Result<()> {
@@ -142,7 +154,13 @@ fn ensure_parent_exists(path: &Path) -> io::Result<()> {
     if parent.as_os_str().is_empty() {
         return Ok(());
     }
-    if parent.symlink_metadata()?.is_dir() {
+    // Wrapped, not propagated bare: the common failure here is a missing parent
+    // (peinit deliberately does not create ancestors), and a raw ENOENT gives an
+    // operator no clue which path was missing or that a parent was the issue.
+    let metadata = parent
+        .symlink_metadata()
+        .map_err(|error| step_error("stat parent of", path, error))?;
+    if metadata.is_dir() {
         Ok(())
     } else {
         Err(io::Error::new(
@@ -256,6 +274,27 @@ mod tests {
         assert!(report.applied.is_empty());
         assert_eq!(report.warnings.len(), 1);
         assert!(report.required_failures.is_empty());
+    }
+
+    /// A provisioning failure must name the step and the path. Both the runtime
+    /// directory and the boot path routes reach the operator as one line on the
+    /// console, and "Invalid argument" with three candidate syscalls behind it
+    /// costs a boot to narrow.
+    #[test]
+    fn provisioning_failure_names_the_step_and_the_path() {
+        let report = provision_linux_boot_paths(&[ProvisionedPath {
+            name: "missing-parent".to_string(),
+            kind: ProvisionedPathKind::Directory,
+            path: "/tmp/peinit-test-missing-parent/child".to_string(),
+            security: ProvisionedPathSecurity::Default,
+            required: false,
+        }]);
+
+        let message = &report.warnings[0].message;
+        assert!(
+            message.contains("/tmp/peinit-test-missing-parent"),
+            "message should name the path: {message}",
+        );
     }
 
     #[test]
