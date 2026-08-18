@@ -18,6 +18,9 @@ struct StaticRegistry {
     shutdown_timeout_secs: Option<Result<Option<u32>, BoundaryError>>,
     max_log_line_length: Option<Result<Option<u32>, BoundaryError>>,
     max_log_buffer_per_service: Option<Result<Option<u32>, BoundaryError>>,
+    post_kill_timeout_secs: Option<Result<Option<u32>, BoundaryError>>,
+    log_read_bytes_per_event: Option<Result<Option<u32>, BoundaryError>>,
+    pre_eventd_buffer_bytes: Option<Result<Option<u32>, BoundaryError>>,
     reads: usize,
 }
 
@@ -30,6 +33,9 @@ impl StaticRegistry {
             shutdown_timeout_secs: None,
             max_log_line_length: None,
             max_log_buffer_per_service: None,
+            post_kill_timeout_secs: None,
+            log_read_bytes_per_event: None,
+            pre_eventd_buffer_bytes: None,
             reads: 0,
         }
     }
@@ -42,6 +48,9 @@ impl StaticRegistry {
             shutdown_timeout_secs: None,
             max_log_line_length: None,
             max_log_buffer_per_service: None,
+            post_kill_timeout_secs: None,
+            log_read_bytes_per_event: None,
+            pre_eventd_buffer_bytes: None,
             reads: 0,
         }
     }
@@ -58,6 +67,21 @@ impl StaticRegistry {
 
     fn with_shutdown_timeout_secs(mut self, value: Result<Option<u32>, BoundaryError>) -> Self {
         self.shutdown_timeout_secs = Some(value);
+        self
+    }
+
+    fn with_post_kill_timeout_secs(mut self, value: Result<Option<u32>, BoundaryError>) -> Self {
+        self.post_kill_timeout_secs = Some(value);
+        self
+    }
+
+    fn with_log_read_bytes_per_event(mut self, value: Result<Option<u32>, BoundaryError>) -> Self {
+        self.log_read_bytes_per_event = Some(value);
+        self
+    }
+
+    fn with_pre_eventd_buffer_bytes(mut self, value: Result<Option<u32>, BoundaryError>) -> Self {
+        self.pre_eventd_buffer_bytes = Some(value);
         self
     }
 
@@ -91,6 +115,18 @@ impl RegistryClient for StaticRegistry {
 
     fn read_shutdown_timeout_secs(&mut self) -> Result<Option<u32>, BoundaryError> {
         self.shutdown_timeout_secs.clone().unwrap_or(Ok(None))
+    }
+
+    fn read_post_kill_timeout_secs(&mut self) -> Result<Option<u32>, BoundaryError> {
+        self.post_kill_timeout_secs.clone().unwrap_or(Ok(None))
+    }
+
+    fn read_log_read_bytes_per_event(&mut self) -> Result<Option<u32>, BoundaryError> {
+        self.log_read_bytes_per_event.clone().unwrap_or(Ok(None))
+    }
+
+    fn read_pre_eventd_buffer_bytes(&mut self) -> Result<Option<u32>, BoundaryError> {
+        self.pre_eventd_buffer_bytes.clone().unwrap_or(Ok(None))
     }
 
     fn read_max_log_line_length(&mut self) -> Result<Option<u32>, BoundaryError> {

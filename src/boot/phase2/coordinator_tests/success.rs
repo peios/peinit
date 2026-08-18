@@ -64,47 +64,13 @@ fn run_phase2_boot_reads_snapshot_plans_and_dispatches_operations_atomically() {
     );
 }
 
+/// The boot set is exactly what the registry defines. console, authd, lpsd and
+/// login were once appended here from compiled-in definitions when
+/// `peios.console=1` / `peios.login=1` were on the command line; they are
+/// ordinary registry services now, so nothing is added to what the registry
+/// returned.
 #[test]
-fn spawn_console_injects_the_compiled_in_console_service() {
-    let mut registry = StaticRegistry::services(vec![service("app", "/sbin/app")]);
-    let mut clock = FixedClock::at(OBSERVED_AT_NS);
-    let mut operation_ids = OperationIdAllocator::new();
-    let mut job_ids = JobIdAllocator::new();
-    let mut operations = OperationStore::new();
-
-    let mut settings = settings();
-    settings.spawn_console = true;
-
-    let run = run_phase2_boot(
-        settings,
-        &mut registry,
-        &mut clock,
-        &mut operation_ids,
-        &mut job_ids,
-        &mut operations,
-    )
-    .expect("phase2 boot");
-
-    // The console service is not a registry entry — it is appended to the boot
-    // set, so it appears alongside the registry-defined app.
-    assert!(
-        run.service_table
-            .service_names()
-            .contains(&crate::service::ServiceDefinition::CONSOLE_NAME),
-    );
-    let console = run
-        .service_table
-        .definition(crate::service::ServiceDefinition::CONSOLE_NAME)
-        .expect("console definition");
-    assert!(console.attach_console);
-    assert_eq!(
-        console.image_path,
-        crate::service::ServiceDefinition::CONSOLE_IMAGE_PATH,
-    );
-}
-
-#[test]
-fn console_is_absent_without_spawn_console() {
+fn the_boot_set_is_exactly_the_registry_service_table() {
     let mut registry = StaticRegistry::services(vec![service("app", "/sbin/app")]);
     let mut clock = FixedClock::at(OBSERVED_AT_NS);
     let mut operation_ids = OperationIdAllocator::new();
@@ -121,11 +87,13 @@ fn console_is_absent_without_spawn_console() {
     )
     .expect("phase2 boot");
 
-    assert!(
-        !run.service_table
-            .service_names()
-            .contains(&crate::service::ServiceDefinition::CONSOLE_NAME),
-    );
+    assert_eq!(run.service_table.service_names(), vec!["app"]);
+    for injected in ["console", "authd", "lpsd", "login"] {
+        assert!(
+            !run.service_table.service_names().contains(&injected),
+            "{injected} must come from the registry, not from peinit",
+        );
+    }
 }
 
 #[test]
@@ -135,7 +103,10 @@ fn registry_boot_settings_override_phase2_defaults() {
         .with_boot_success_grace_secs(Ok(Some(12)))
         .with_max_log_line_length(Ok(Some(12_000)))
         .with_max_log_buffer_per_service(Ok(Some(128_000)))
-        .with_shutdown_timeout_secs(Ok(Some(17)));
+        .with_shutdown_timeout_secs(Ok(Some(17)))
+        .with_post_kill_timeout_secs(Ok(Some(9)))
+        .with_log_read_bytes_per_event(Ok(Some(4_096)))
+        .with_pre_eventd_buffer_bytes(Ok(Some(2_097_152)));
     let mut clock = FixedClock::at(OBSERVED_AT_NS);
     let mut operation_ids = OperationIdAllocator::new();
     let mut job_ids = JobIdAllocator::new();
@@ -157,4 +128,44 @@ fn registry_boot_settings_override_phase2_defaults() {
     assert_eq!(run.log_config.max_line_bytes, 12_000);
     assert_eq!(run.log_config.max_buffer_per_service_bytes, 128_000);
     assert_eq!(run.shutdown_settings.global_timeout_secs, 17);
+    assert_eq!(run.shutdown_settings.post_kill_timeout_secs, 9);
+    assert_eq!(run.log_config.read_bytes_per_event, 4_096);
+    assert_eq!(run.log_config.pre_eventd_buffer_bytes, 2_097_152);
+}
+
+/// Each of these is a field whose struct siblings were already registry-backed
+/// while it was not, so the gap was an omission rather than a decision. Absent
+/// values must still fall through to the compiled-in defaults.
+#[test]
+fn newly_configurable_settings_fall_back_to_their_defaults() {
+    let mut registry = StaticRegistry::services(vec![service("app", "/sbin/app")]);
+    let mut clock = FixedClock::at(OBSERVED_AT_NS);
+    let mut operation_ids = OperationIdAllocator::new();
+    let mut job_ids = JobIdAllocator::new();
+    let mut operations = OperationStore::new();
+
+    let run = run_phase2_boot(
+        settings(),
+        &mut registry,
+        &mut clock,
+        &mut operation_ids,
+        &mut job_ids,
+        &mut operations,
+    )
+    .expect("phase2 boot");
+
+    let shutdown_defaults = crate::shutdown::ShutdownSettings::default();
+    let log_defaults = crate::logging::RuntimeLogConfig::default();
+    assert_eq!(
+        run.shutdown_settings.post_kill_timeout_secs,
+        shutdown_defaults.post_kill_timeout_secs,
+    );
+    assert_eq!(
+        run.log_config.read_bytes_per_event,
+        log_defaults.read_bytes_per_event,
+    );
+    assert_eq!(
+        run.log_config.pre_eventd_buffer_bytes,
+        log_defaults.pre_eventd_buffer_bytes,
+    );
 }

@@ -181,7 +181,46 @@ fn collect_messages(
 ) -> Vec<String> {
     let mut messages = Vec::new();
     collect_runtime_loop_console_messages(pre_work, turns, post_work, &[], &mut messages);
-    messages
+    messages.into_iter().map(|message| message.text).collect()
+}
+
+/// A launch failure must say WHY on the console. The cause is already on the
+/// job event — a token that could not be materialised, a runtime directory that
+/// could not be secured — and printing only the service name leaves an operator
+/// unable to tell those apart.
+#[test]
+fn launch_failure_console_message_carries_the_cause() {
+    let mut out = Vec::new();
+    let mut event = created_job("lpsd", job_id(1));
+    event.failure_cause = Some("provision runtime directories for lpsd failed".to_string());
+
+    super::push_service_launch_failed(&mut out, &event);
+
+    assert_eq!(
+        out,
+        vec![super::ConsoleMessage::error(
+            "peinit: service lpsd failed to launch: provision runtime directories for lpsd failed\n"
+        )],
+    );
+}
+
+/// A cause is not guaranteed to be present, and its absence must not swallow
+/// the report of the failure itself.
+#[test]
+fn launch_failure_console_message_without_a_cause_still_reports_the_failure() {
+    let mut out = Vec::new();
+    let mut event = created_job("lpsd", job_id(1));
+    event.failure_cause = None;
+
+    super::push_service_launch_failed(&mut out, &event);
+
+    // Error, not Status: a launch failure has to survive `peios.quiet=2`.
+    assert_eq!(
+        out,
+        vec![super::ConsoleMessage::error(
+            "peinit: service lpsd failed to launch\n"
+        )],
+    );
 }
 
 fn created_job(service: &str, id: JobId) -> JobEvent {

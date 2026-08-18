@@ -52,19 +52,29 @@ pub fn build_launch_environment_with_inherited_fds(
         .collect()
 }
 
+/// registryd alone launches without the global `EnvVars` layer.
+///
+/// Not an availability rule — by Phase 2 the key has been read and is sitting
+/// in supervisor state, so every other service can have it. This is a trust
+/// rule, and it is circular precedence that motivates it: registryd *serves*
+/// `Machine\\System\\Init\\EnvVars`, and write access to that key is
+/// equivalent to compromising every service peinit starts (`LD_PRELOAD` and
+/// friends go in unfiltered — the key's security descriptor is the whole
+/// control boundary). Letting the key inject into the daemon that serves it
+/// would make that boundary self-referential: whoever could write it could
+/// subvert the process enforcing who may write it.
+///
+/// At the Phase 1 launch this is a no-op — `global_environment` is still empty
+/// until `run_phase2_boot` fills it. The case it exists for is a registryd
+/// *restart* after Phase 2, when the layer is populated and would otherwise
+/// apply.
+///
+/// The SYSTEM check is part of the rule, not a shortcut: a non-SYSTEM job that
+/// happened to be named `registryd` is not the platform's registry daemon and
+/// gets the ordinary layering.
 fn uses_compiled_in_environment_only(job: &JobRecord) -> bool {
     job.resolved_identity == SYSTEM_IDENTITY
-        && job
-            .service
-            .as_deref()
-            .is_some_and(is_early_platform_service)
-}
-
-fn is_early_platform_service(service: &str) -> bool {
-    matches!(
-        service,
-        ServiceDefinition::REGISTRYD_NAME | "eudev" | "lpsd" | "authd" | "eventd"
-    )
+        && job.service.as_deref() == Some(ServiceDefinition::REGISTRYD_NAME)
 }
 
 #[cfg(test)]

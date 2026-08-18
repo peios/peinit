@@ -2,6 +2,10 @@ use crate::boundary::{BootAttemptCounter, ProcessController, ShutdownFinalizer};
 
 use super::critical_reboot::annotate_critical_reboot_if_due;
 use super::{SupervisorLifecycleDeadlineDispatch, SupervisorLifecycleDeadlineKind};
+use crate::control::lifecycle::LifecycleCommand;
+use crate::supervisor::dispatch::{
+    SupervisorBootSettleDispatch, SupervisorBootSettleFailure, SupervisorBootSettleStart,
+};
 use crate::supervisor::state::{Supervisor, SupervisorError};
 
 impl Supervisor {
@@ -169,6 +173,42 @@ impl Supervisor {
                     return Ok(false);
                 };
                 dispatch.boot_successes.push(boot_success);
+            }
+            SupervisorLifecycleDeadlineKind::BootSettle => {
+                let Some(due) = self.boot_settle.take_due(&self.services, now_ns) else {
+                    return Ok(false);
+                };
+                // Started one at a time and independently: these services have
+                // no relationship to each other beyond both having waited, so
+                // one refusing to start (disabled since boot, dependency since
+                // failed) must not stop the others. A failure to start is
+                // reported and dropped rather than propagated — this path is a
+                // convenience for output legibility, and taking the boot down
+                // over it would be a far worse outcome than a scrambled prompt.
+                let mut started = Vec::new();
+                let mut failed = Vec::new();
+                for service in due.services {
+                    match self.run_lifecycle_command_at(
+                        LifecycleCommand::Start,
+                        service.clone(),
+                        None,
+                        now_ns,
+                    ) {
+                        Ok(lifecycle) => started.push(SupervisorBootSettleStart {
+                            service,
+                            lifecycle: Box::new(lifecycle),
+                        }),
+                        Err(error) => failed.push(SupervisorBootSettleFailure {
+                            service,
+                            error: format!("{error:?}"),
+                        }),
+                    }
+                }
+                dispatch.boot_settles.push(SupervisorBootSettleDispatch {
+                    started,
+                    failed,
+                    timed_out: due.timed_out,
+                });
             }
         }
         Ok(true)

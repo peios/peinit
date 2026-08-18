@@ -32,9 +32,32 @@ impl Supervisor {
                 },
             ));
         }
+        let created_at_ns = clock.monotonic_ns().map_err(SupervisorError::Clock)?;
+        self.run_lifecycle_command_at(command, service, caller, created_at_ns)
+    }
+
+    /// `run_lifecycle_command` for a caller that already knows the time.
+    ///
+    /// The deadline paths run inside a timer turn that was handed `now_ns`;
+    /// re-reading the clock there would let two events in the same turn
+    /// disagree about when they happened, and would mean threading a clock into
+    /// code whose whole input is already a timestamp.
+    pub(crate) fn run_lifecycle_command_at(
+        &mut self,
+        command: LifecycleCommand,
+        service: impl Into<String>,
+        caller: Option<TokenSummary>,
+        created_at_ns: u64,
+    ) -> Result<SupervisorLifecycleDispatch, SupervisorError> {
+        if let Some(shutdown) = &self.shutdown {
+            return Err(SupervisorError::Shutdown(
+                crate::shutdown::ShutdownError::AlreadyInProgress {
+                    kind: shutdown.kind,
+                },
+            ));
+        }
         let service = service.into();
         reject_abandoned_reset_without_controller(&self.services, command, &service)?;
-        let created_at_ns = clock.monotonic_ns().map_err(SupervisorError::Clock)?;
         let mut work = SupervisorWork::from_supervisor(self);
         let request_id = allocate_request_id(&mut work, created_at_ns)?;
         let outcome = admit_supervisor_lifecycle_command(

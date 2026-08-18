@@ -97,6 +97,8 @@ impl LinuxShutdownRuntime {
             calendar_timers: super::calendar_timer::LinuxCalendarTimerTable::new(),
             kmes_sink: crate::boundary::LinuxKmesEventSink::new(),
             console_sink: LinuxConsoleSink::new(),
+            quiet: config.quiet,
+            quiet_policy: crate::runtime::console::QuietPolicy::new(config.quiet, false),
             log_pipes: RuntimeServiceLogPipes::default(),
             jfs_device: None,
             power_buttons,

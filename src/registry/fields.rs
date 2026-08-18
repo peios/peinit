@@ -72,6 +72,7 @@ service_fields! {
     ("ErrorControl", ErrorControl),
     ("ServiceSecurity", ServiceSecurity),
     ("TimerPersistent", TimerPersistent),
+    ("TTYPath", TtyPath),
     ("TimerJitter", TimerJitter),
 }
 
@@ -106,13 +107,27 @@ pub(super) fn parse_error_control(value: u32) -> Result<ErrorControl, ServiceReg
     }
 }
 
+/// Boot sub-triggers, as a closed set.
+///
+/// `boot` takes no argument, so `boot:<anything>` was rejected outright — the
+/// same arity rule that rejects a bare `timer`. Opening the namespace keeps
+/// that rule rather than dropping it: a listed sub-type is accepted and
+/// everything else is still an error, so `boot:setled` is caught instead of
+/// being silently tolerated as an unknown trigger kind.
+const BOOT_SUB_TRIGGERS: &[(&str, ServiceTrigger)] = &[("settled", ServiceTrigger::BootSettled)];
+
 pub(super) fn classify_trigger(
     value: String,
 ) -> Result<ServiceTrigger, ServiceRegistryDecodeError> {
     if value == "boot" {
         Ok(ServiceTrigger::Boot)
-    } else if value.starts_with("boot:")
-        || value == "timer"
+    } else if let Some(sub) = value.strip_prefix("boot:") {
+        BOOT_SUB_TRIGGERS
+            .iter()
+            .find(|(name, _)| *name == sub)
+            .map(|(_, trigger)| trigger.clone())
+            .ok_or(ServiceRegistryDecodeError::InvalidTrigger { value })
+    } else if value == "timer"
         || value == "timer:"
         || value.is_empty()
         || value.starts_with(':')

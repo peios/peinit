@@ -226,7 +226,7 @@ fn successful_eventd_flush_drains_buffer_in_order() {
     pipes.pre_eventd.push(service_record("two"));
     let mut sink = FakeEventdSink::default();
 
-    let flush = pipes.flush_to_eventd("/run/peios/eventd-log.sock", &mut sink);
+    let flush = pipes.flush_to_eventd("/run/services/eventd/eventd-log.sock", &mut sink);
 
     assert_eq!(flush.sent_records, 2);
     assert_eq!(flush.buffered_records, 0);
@@ -249,7 +249,7 @@ fn failed_eventd_flush_keeps_unsent_records_buffered() {
     pipes.pre_eventd.push(service_record("three"));
     let mut sink = FakeEventdSink::fail_on_call(2);
 
-    let flush = pipes.flush_to_eventd("/run/peios/eventd-log.sock", &mut sink);
+    let flush = pipes.flush_to_eventd("/run/services/eventd/eventd-log.sock", &mut sink);
 
     assert_eq!(flush.attempted_records, 2);
     assert_eq!(flush.sent_records, 1);
@@ -273,7 +273,7 @@ fn eventd_forwarding_waits_for_supervised_active_state() {
 
     let flush = pipes.sync_eventd_forwarding_with_sink(
         false,
-        Some("/run/peios/eventd-log.sock"),
+        Some("/run/services/eventd/eventd-log.sock"),
         &mut sink,
     );
 
@@ -292,8 +292,11 @@ fn eventd_forwarding_replays_buffer_oldest_first_when_active() {
     pipes.pre_eventd.push(service_record("two"));
     let mut sink = FakeEventdSink::default();
 
-    let flush =
-        pipes.sync_eventd_forwarding_with_sink(true, Some("/run/peios/eventd-log.sock"), &mut sink);
+    let flush = pipes.sync_eventd_forwarding_with_sink(
+        true,
+        Some("/run/services/eventd/eventd-log.sock"),
+        &mut sink,
+    );
 
     assert!(flush.eventd_active);
     assert!(flush.socket_path_configured);
@@ -317,8 +320,11 @@ fn eventd_forwarding_keeps_buffered_records_when_active_send_fails() {
     pipes.pre_eventd.push(service_record("two"));
     let mut sink = FakeEventdSink::fail_on_call(1);
 
-    let flush =
-        pipes.sync_eventd_forwarding_with_sink(true, Some("/run/peios/eventd-log.sock"), &mut sink);
+    let flush = pipes.sync_eventd_forwarding_with_sink(
+        true,
+        Some("/run/services/eventd/eventd-log.sock"),
+        &mut sink,
+    );
 
     assert!(flush.eventd_active);
     assert_eq!(flush.attempted_records, 1);
@@ -341,14 +347,17 @@ fn eventd_forwarding_buffers_again_while_eventd_is_inactive() {
     let mut pipes = RuntimeServiceLogPipes::default();
     let mut sink = FakeEventdSink::default();
 
-    let active =
-        pipes.sync_eventd_forwarding_with_sink(true, Some("/run/peios/eventd-log.sock"), &mut sink);
+    let active = pipes.sync_eventd_forwarding_with_sink(
+        true,
+        Some("/run/services/eventd/eventd-log.sock"),
+        &mut sink,
+    );
     assert!(active.error.is_none());
     assert!(pipes.eventd_forwarding_enabled());
 
     let inactive = pipes.sync_eventd_forwarding_with_sink(
         false,
-        Some("/run/peios/eventd-log.sock"),
+        Some("/run/services/eventd/eventd-log.sock"),
         &mut sink,
     );
 
@@ -378,7 +387,11 @@ fn active_eventd_receives_new_pipe_records_without_pre_eventd_buffering() {
         )
         .expect("register pipe");
     let mut sink = FakeEventdSink::default();
-    pipes.sync_eventd_forwarding_with_sink(true, Some("/run/peios/eventd.sock"), &mut sink);
+    pipes.sync_eventd_forwarding_with_sink(
+        true,
+        Some("/run/services/eventd/eventd.sock"),
+        &mut sink,
+    );
 
     let turn = pipes.process_pipe_event_with_sink(fd, &mut ClockAt(20), &mut registrar, &mut sink);
 
@@ -415,7 +428,11 @@ fn live_eventd_send_failure_buffers_unsent_records_and_disables_forwarding() {
         )
         .expect("register pipe");
     let mut setup_sink = FakeEventdSink::default();
-    pipes.sync_eventd_forwarding_with_sink(true, Some("/run/peios/eventd.sock"), &mut setup_sink);
+    pipes.sync_eventd_forwarding_with_sink(
+        true,
+        Some("/run/services/eventd/eventd.sock"),
+        &mut setup_sink,
+    );
     let mut sink = FakeEventdSink::fail_on_call(2);
 
     pipes.process_pipe_event_with_sink(fd, &mut ClockAt(20), &mut registrar, &mut sink);
@@ -541,7 +558,7 @@ fn job_event(job_type: JobType) -> JobEvent {
         activation_generation: 1,
         cgroup_generation: 1,
         operation_id: None,
-        attach_console: false,
+        console_path: None,
     })
 }
 

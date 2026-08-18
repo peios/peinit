@@ -14,6 +14,11 @@ use super::{
 };
 
 #[test]
+fn default_path_uses_stratafs_runtime_views() {
+    assert_eq!(DEFAULT_PATH, "/sbin:/bin");
+}
+
+#[test]
 fn launch_environment_layers_base_service_and_protocol_variables() {
     let mut job = test_job();
     let global_environment = vec![
@@ -84,8 +89,8 @@ fn launch_environment_defaults_path_when_service_does_not_override_it() {
 }
 
 #[test]
-fn launch_environment_skips_global_env_for_early_platform_services() {
-    let job = test_job_for_service("authd");
+fn launch_environment_skips_global_env_for_registryd() {
+    let job = test_job_for_service(ServiceDefinition::REGISTRYD_NAME);
     let global_environment = vec![
         ServiceEnvironmentVariable {
             name: PATH.to_string(),
@@ -115,6 +120,77 @@ fn launch_environment_skips_global_env_for_early_platform_services() {
         environment
             .iter()
             .all(|variable| variable.name != "GLOBAL_ONLY")
+    );
+}
+
+#[test]
+fn launch_environment_applies_global_env_to_other_platform_daemons() {
+    // authd, lpsd, eventd and eudev used to be exempted alongside registryd on
+    // the stated grounds that the registry "is not yet readable when they
+    // start". It is: they are Phase 2 services, launched after
+    // `run_phase2_boot` has read the key into supervisor state. Only registryd
+    // — which serves the key — is exempt, so these get the ordinary layering.
+    for service in ["authd", "lpsd", "eventd", "eudev"] {
+        let job = test_job_for_service(service);
+        let global_environment = vec![ServiceEnvironmentVariable {
+            name: "GLOBAL_ONLY".to_string(),
+            value: "yes".to_string(),
+        }];
+
+        let environment = build_launch_environment_with_inherited_fds(
+            &job,
+            "/run/test/notify.sock",
+            &global_environment,
+            &[],
+        );
+
+        assert!(
+            environment
+                .iter()
+                .any(|variable| variable.name == "GLOBAL_ONLY"),
+            "{service} should receive the global EnvVars layer",
+        );
+    }
+}
+
+#[test]
+fn launch_environment_applies_global_env_to_non_system_registryd() {
+    // The SYSTEM check is load-bearing: the exemption is for the platform's
+    // registry daemon, not for anything wearing its name.
+    let service = ServiceDefinition::simple_system_boot(
+        ServiceDefinition::REGISTRYD_NAME,
+        ServiceDefinition::REGISTRYD_IMAGE_PATH,
+    );
+    let job = JobRecord::new_service_main(
+        JobIdAllocator::new().allocate_batch(1, 1).expect("job id")[0],
+        ServiceMainJobSpec {
+            service: &service,
+            resolved_identity: "LocalService".to_string(),
+            token_summary: TokenSummary::requested_identity("LocalService"),
+            activation_generation: 1,
+            cgroup_generation: 0,
+            operation_id: OperationIdAllocator::new()
+                .allocate_batch(1, 1)
+                .expect("operation id")[0],
+            created_at_ns: 1,
+        },
+    );
+    let global_environment = vec![ServiceEnvironmentVariable {
+        name: "GLOBAL_ONLY".to_string(),
+        value: "yes".to_string(),
+    }];
+
+    let environment = build_launch_environment_with_inherited_fds(
+        &job,
+        "/run/test/notify.sock",
+        &global_environment,
+        &[],
+    );
+
+    assert!(
+        environment
+            .iter()
+            .any(|variable| variable.name == "GLOBAL_ONLY")
     );
 }
 
@@ -182,9 +258,4 @@ fn inherited_fd(name: &str) -> ProcessInheritedFd {
 fn test_fd() -> OwnedFd {
     let (left, _right) = UnixStream::pair().expect("socket pair");
     left.into()
-}
-
-#[test]
-fn default_path_uses_stratafs_runtime_views() {
-    assert_eq!(DEFAULT_PATH, "/sbin:/bin");
 }

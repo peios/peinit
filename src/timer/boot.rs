@@ -216,7 +216,7 @@ fn timer_schedules(service: &ServiceDefinition) -> Vec<&str> {
         .iter()
         .filter_map(|trigger| match trigger {
             ServiceTrigger::Timer { schedule } => Some(schedule.as_str()),
-            ServiceTrigger::Boot | ServiceTrigger::Other(_) => None,
+            ServiceTrigger::Boot | ServiceTrigger::BootSettled | ServiceTrigger::Other(_) => None,
         })
         .collect()
 }

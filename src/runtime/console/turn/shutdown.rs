@@ -1,3 +1,4 @@
+use crate::runtime::console::ConsoleMessage;
 use crate::supervisor::{
     SupervisorPid1SignalFdTurn, SupervisorPowerButtonAction, SupervisorPowerButtonDispatch,
     SupervisorShutdownCgroupKillDispatch, SupervisorShutdownDispatch,
@@ -11,7 +12,7 @@ use crate::runtime::console::{collect_shutdown_finalization_state_console_messag
 
 pub(super) fn collect_pid1_signal_turn_console_messages(
     turn: &SupervisorPid1SignalFdTurn,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     if let SupervisorPid1SignalFdTurn::Shutdown(dispatch) = turn {
         collect_shutdown_signal_dispatch_console_messages(dispatch, out);
@@ -20,7 +21,7 @@ pub(super) fn collect_pid1_signal_turn_console_messages(
 
 pub(super) fn collect_shutdown_dispatch_console_messages(
     dispatch: &SupervisorShutdownDispatch,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     push_message(
         out,
@@ -37,7 +38,7 @@ pub(super) fn collect_shutdown_dispatch_console_messages(
 
 pub(super) fn collect_power_button_dispatch_console_messages(
     dispatch: &SupervisorPowerButtonDispatch,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     match &dispatch.action {
         SupervisorPowerButtonAction::Graceful(shutdown) => {
@@ -54,7 +55,7 @@ pub(super) fn collect_power_button_dispatch_console_messages(
 
 pub(super) fn collect_shutdown_drive_dispatch_console_messages(
     dispatch: &SupervisorShutdownDriveDispatch,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     if let Some(timeout) = &dispatch.timeout {
         collect_shutdown_timeout_console_messages(timeout, out);
@@ -66,7 +67,7 @@ pub(super) fn collect_shutdown_drive_dispatch_console_messages(
 
 pub(super) fn collect_shutdown_terminal_dispatch_console_messages(
     dispatch: &SupervisorShutdownTerminalDispatch,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     if let Some(service) = dispatch.job_event.service.as_deref() {
         push_message(out, format!("peinit: shutdown service {service} exited\n"));
@@ -79,7 +80,7 @@ pub(super) fn collect_shutdown_terminal_dispatch_console_messages(
 
 fn collect_shutdown_signal_dispatch_console_messages(
     dispatch: &SupervisorShutdownSignalDispatch,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     match &dispatch.action {
         SupervisorShutdownSignalAction::Graceful(shutdown) => {
@@ -103,7 +104,7 @@ fn collect_shutdown_signal_dispatch_console_messages(
 
 fn collect_shutdown_timeout_console_messages(
     dispatch: &SupervisorShutdownTimeoutDispatch,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     if dispatch.global_timeout {
         push_message(out, "peinit: shutdown global timeout expired\n");
@@ -125,7 +126,7 @@ fn collect_shutdown_timeout_console_messages(
 
 fn collect_shutdown_finalization_dispatch_console_messages(
     dispatch: &SupervisorShutdownFinalizationDispatch,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     push_message(out, "peinit: shutdown finalizing\n");
     if let crate::shutdown::CleanupActionResult::Failed(message) = &dispatch.report.random_seed {
@@ -139,7 +140,7 @@ fn collect_shutdown_finalization_dispatch_console_messages(
 
 fn collect_shutdown_kill_console_message(
     dispatch: &SupervisorShutdownKillDispatch,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     push_message(
         out,
@@ -149,7 +150,7 @@ fn collect_shutdown_kill_console_message(
 
 fn collect_shutdown_cgroup_kill_console_message(
     dispatch: &SupervisorShutdownCgroupKillDispatch,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     push_message(
         out,
@@ -159,7 +160,7 @@ fn collect_shutdown_cgroup_kill_console_message(
 
 fn collect_shutdown_stop_console_message(
     dispatch: &SupervisorShutdownStopDispatch,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     if dispatch.already_stopping {
         push_message(

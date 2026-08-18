@@ -57,6 +57,21 @@ impl Supervisor {
             &retained_satisfied,
             phase2_settings.boot_success_grace_secs,
         );
+        // Everything the plan will act on this boot, started or blocked. A
+        // blocked service is already terminal, so it settles immediately — it
+        // is listed so that adding one never silently shortens the wait.
+        let awaiting = plan
+            .starts
+            .iter()
+            .map(|start| start.service.clone())
+            .chain(plan.blocked.iter().map(|blocked| blocked.service.clone()))
+            .collect::<Vec<_>>();
+        work.boot_settle.configure_phase2(
+            &work.services,
+            awaiting,
+            plan.observed_at_ns,
+            phase2_settings.settle_timeout_secs,
+        );
         work.global_environment = global_environment;
         work.eventd_log_socket_path = eventd_log_socket_path;
         work.control_security = control_security;

@@ -1,3 +1,4 @@
+use crate::runtime::console::ConsoleMessage;
 use crate::supervisor::{
     SupervisorChildReapDispatch, SupervisorChildReapTurn, SupervisorHealthCheckTerminalDispatch,
     SupervisorLifecycleDeadlineDispatch, SupervisorPostStartHookTerminalDispatch,
@@ -15,7 +16,7 @@ use crate::runtime::console::{
 
 pub(super) fn collect_child_reap_turn_console_messages(
     turn: &SupervisorChildReapTurn,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     let SupervisorChildReapTurn::Tracked { dispatch, .. } = turn else {
         return;
@@ -42,7 +43,7 @@ pub(super) fn collect_child_reap_turn_console_messages(
 
 pub(super) fn collect_lifecycle_deadline_dispatch_console_messages(
     dispatch: &SupervisorLifecycleDeadlineDispatch,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     for timeout in &dispatch.pre_start_check_timeouts {
         collect_service_transitions_console_messages(
@@ -71,18 +72,45 @@ pub(super) fn collect_lifecycle_deadline_dispatch_console_messages(
     for timeout in &dispatch.watchdog_timeouts {
         collect_watchdog_timeout_console_messages(timeout, out);
     }
+    for settle in &dispatch.boot_settles {
+        // Say when the wait was cut short, because it changes what the operator
+        // is looking at: a prompt started on a timeout may still be written
+        // over by whatever is still moving.
+        if settle.timed_out && !settle.started.is_empty() {
+            crate::runtime::console::push_message(
+                out,
+                "peinit: boot did not settle in time; starting deferred service(s) anyway\n"
+                    .to_string(),
+            );
+        }
+        for start in &settle.started {
+            crate::runtime::console::collect_start_dispatches_console_messages(
+                &start.lifecycle.start_dispatches,
+                out,
+            );
+        }
+        for failure in &settle.failed {
+            crate::runtime::console::push_error(
+                out,
+                format!(
+                    "peinit: deferred service {} could not be started: {}\n",
+                    failure.service, failure.error
+                ),
+            );
+        }
+    }
 }
 
 pub(super) fn collect_post_start_hook_terminal_console_messages(
     dispatch: &crate::execution::start::PostStartHookTerminalDispatch,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     collect_service_transitions_console_messages(&dispatch.service_transitions, out);
 }
 
 pub(super) fn collect_health_check_terminal_console_messages(
     dispatch: &SupervisorHealthCheckTerminalDispatch,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     collect_service_transitions_console_messages(&dispatch.service_transitions, out);
     if dispatch.critical_reboot.is_some()
@@ -94,7 +122,7 @@ pub(super) fn collect_health_check_terminal_console_messages(
 
 fn collect_readiness_timeout_dispatch_console_messages(
     dispatch: &SupervisorReadinessTimeoutDispatch,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     collect_service_transitions_console_messages(&dispatch.timeout.service_transitions, out);
     collect_start_dispatches_console_messages(&dispatch.start_dispatches, out);
@@ -102,14 +130,14 @@ fn collect_readiness_timeout_dispatch_console_messages(
 
 fn collect_reload_command_timeout_dispatch_console_messages(
     dispatch: &SupervisorReloadCommandTimeoutDispatch,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     collect_service_transition_console_message(&dispatch.timeout.service_transition, out);
 }
 
 fn collect_terminal_dispatch_console_messages(
     dispatch: &SupervisorTerminalDispatch,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     collect_service_transitions_console_messages(&dispatch.terminal.service_transitions, out);
     collect_start_dispatches_console_messages(&dispatch.start_dispatches, out);
@@ -123,7 +151,7 @@ fn collect_terminal_dispatch_console_messages(
 
 fn collect_pre_start_hook_terminal_console_messages(
     dispatch: &SupervisorPreStartHookTerminalDispatch,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     collect_service_transitions_console_messages(&dispatch.terminal.service_transitions, out);
     collect_start_dispatches_console_messages(&dispatch.start_dispatches, out);
@@ -131,7 +159,7 @@ fn collect_pre_start_hook_terminal_console_messages(
 
 fn collect_post_start_hook_terminal_dispatch_console_messages(
     dispatch: &SupervisorPostStartHookTerminalDispatch,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     collect_post_start_hook_terminal_console_messages(&dispatch.terminal, out);
     collect_start_dispatches_console_messages(&dispatch.start_dispatches, out);
@@ -139,7 +167,7 @@ fn collect_post_start_hook_terminal_dispatch_console_messages(
 
 fn collect_watchdog_timeout_console_messages(
     dispatch: &SupervisorWatchdogTimeoutDispatch,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     collect_service_transitions_console_messages(&dispatch.service_transitions, out);
     if dispatch.critical_reboot.is_some() {

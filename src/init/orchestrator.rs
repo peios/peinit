@@ -4,14 +4,14 @@ use crate::supervisor::{Supervisor, SupervisorBootDispatch, SupervisorSettings};
 
 use super::{
     InitConfig, InitPlatform, InitRecoveryReason, InitRunError, InitRunResult, InitRuntime,
-    MachineIdStatus,
+    MachineIdStatus, QuietLevel,
 };
 
 mod recovery;
 #[cfg(test)]
 mod tests;
 
-use recovery::{RecoveryEnvironment, enter_recovery, log_console};
+use recovery::{RecoveryEnvironment, enter_recovery, log_console, log_console_error};
 
 pub fn run_init<P, R, C, T>(
     config: InitConfig,
@@ -27,7 +27,11 @@ where
     T: InitRuntime + ?Sized,
 {
     platform.assert_pid1().map_err(InitRunError::Fatal)?;
-    log_console(platform, "peinit: phase1 starting\n");
+    // Before the command line is read, so `peios.quiet` cannot apply yet:
+    // peinit cannot honour a preference it has not seen. These few lines are
+    // also the only evidence peinit started at all, which makes them the right
+    // ones to be unconditional.
+    log_console(platform, QuietLevel::Verbose, "peinit: phase1 starting\n");
 
     if let Err(error) = platform.verify_root_writable() {
         return enter_recovery(
@@ -37,7 +41,11 @@ where
         );
     }
 
-    log_console(platform, "peinit: phase1 mounting virtual filesystems\n");
+    log_console(
+        platform,
+        QuietLevel::Verbose,
+        "peinit: phase1 mounting virtual filesystems\n",
+    );
     if let Err(error) = platform.mount_virtual_filesystems() {
         return enter_recovery(
             platform,
@@ -45,12 +53,20 @@ where
             RecoveryEnvironment::Skip,
         );
     }
-    log_console(platform, "peinit: phase1 virtual filesystems mounted\n");
+    log_console(
+        platform,
+        QuietLevel::Verbose,
+        "peinit: phase1 virtual filesystems mounted\n",
+    );
 
     match platform.restore_random_seed() {
-        Ok(true) => log_console(platform, "peinit: phase1 restored random seed\n"),
+        Ok(true) => log_console(
+            platform,
+            QuietLevel::Verbose,
+            "peinit: phase1 restored random seed\n",
+        ),
         Ok(false) => {}
-        Err(error) => log_console(
+        Err(error) => log_console_error(
             platform,
             &format!("peinit warning: random seed restore failed: {error:?}\n"),
         ),
@@ -58,11 +74,13 @@ where
 
     match platform.ensure_machine_id() {
         Ok(MachineIdStatus::Existing) => {}
-        Ok(MachineIdStatus::Generated) => {
-            log_console(platform, "peinit: phase1 generated machine-id\n")
-        }
+        Ok(MachineIdStatus::Generated) => log_console(
+            platform,
+            QuietLevel::Verbose,
+            "peinit: phase1 generated machine-id\n",
+        ),
         Ok(MachineIdStatus::ReplacedInvalid) => {
-            log_console(platform, "peinit warning: invalid machine-id replaced\n")
+            log_console_error(platform, "peinit warning: invalid machine-id replaced\n")
         }
         Err(error) => {
             return enter_recovery(
@@ -83,6 +101,7 @@ where
             );
         }
     };
+    let quiet = command_line.quiet;
     let counter = if command_line.recovery {
         None
     } else {
@@ -110,15 +129,19 @@ where
             RecoveryEnvironment::Ensure,
         );
     }
-    if let Some(counter) = counter
-        && counter >= config.boot_attempt_threshold
+    let threshold = command_line
+        .boot_attempt_threshold
+        .unwrap_or(config.boot_attempt_threshold);
+    // `peios.bootattempts=0` disables the check outright — the escape hatch for
+    // a system whose recovery trigger is itself the problem, e.g. a root that
+    // reports failure but boots fine.
+    if threshold > 0
+        && let Some(counter) = counter
+        && counter >= threshold
     {
         return enter_recovery(
             platform,
-            InitRecoveryReason::BootAttemptThresholdReached {
-                counter,
-                threshold: config.boot_attempt_threshold,
-            },
+            InitRecoveryReason::BootAttemptThresholdReached { counter, threshold },
             RecoveryEnvironment::Ensure,
         );
     }
@@ -127,7 +150,15 @@ where
     if command_line.safe_mode {
         settings.phase2.mode = BootMode::Safe;
     }
-    settings.phase2.spawn_console = command_line.console;
+    // Phase-1 command-line overrides. The socket has to be settled before
+    // registryd is launched below, because binding it is the first thing that
+    // launch does.
+    if let Some(path) = &command_line.notify_socket_path {
+        settings.notify_socket_path = path.clone();
+    }
+    // Carried on the supervisor because the runtime is entered with a
+    // supervisor and nothing else — the same reason the notify socket is.
+    settings.quiet = quiet;
     let mut supervisor = Supervisor::new(settings);
 
     if let Err(error) = platform.set_clock_from_rtc() {
@@ -147,7 +178,7 @@ where
             );
         }
     };
-    log_console(platform, "peinit: phase1 starting registryd\n");
+    log_console(platform, quiet, "peinit: phase1 starting registryd\n");
     if let Err(error) = platform.start_registryd(&mut supervisor, registry, registryd_started_at_ns)
     {
         return enter_recovery(
@@ -156,7 +187,7 @@ where
             RecoveryEnvironment::Skip,
         );
     }
-    log_console(platform, "peinit: phase1 registryd started\n");
+    log_console(platform, quiet, "peinit: phase1 registryd started\n");
     // Phase 1.5: run the image's autorun scripts now that the registry is
     // serving, before Phase 2 enumerates Machine\System\Services — so a script
     // that seeds services (the seed-apply autorun) has them present when the boot
@@ -175,7 +206,7 @@ where
         }
     };
     for warning in &provisioning.warnings {
-        log_console(
+        log_console_error(
             platform,
             &format!(
                 "peinit warning: provisioned path {} ignored: {}\n",
@@ -194,7 +225,7 @@ where
         }
     };
     for warning in &provisioning_report.warnings {
-        log_console(
+        log_console_error(
             platform,
             &format!(
                 "peinit warning: provisioned path {} at {} failed: {}\n",
@@ -204,7 +235,7 @@ where
     }
     if provisioning_report.has_required_failures() {
         for failure in &provisioning_report.required_failures {
-            log_console(
+            log_console_error(
                 platform,
                 &format!(
                     "peinit: required provisioned path {} at {} failed: {}\n",
@@ -235,7 +266,7 @@ where
         let _ = platform.log_phase1_warning(warning);
     }
 
-    log_console(platform, "peinit: phase2 boot starting\n");
+    log_console(platform, quiet, "peinit: phase2 boot starting\n");
     let boot_dispatch = match supervisor.run_phase2_boot(registry, clock) {
         Ok(dispatch) => dispatch,
         Err(error) => {
@@ -247,7 +278,7 @@ where
         }
     };
     log_phase2_boot_progress(platform, &boot_dispatch);
-    log_console(platform, "peinit: phase2 boot complete\n");
+    log_console(platform, quiet, "peinit: phase2 boot complete\n");
 
     match runtime.enter_runtime(supervisor, infrastructure) {
         Ok(()) => Ok(InitRunResult::RuntimeReturned),
@@ -264,7 +295,7 @@ where
     P: InitPlatform + ?Sized,
 {
     for blocked in &dispatch.plan.blocked {
-        log_console(
+        log_console_error(
             platform,
             &format!(
                 "peinit: service {} failed: {:?}\n",

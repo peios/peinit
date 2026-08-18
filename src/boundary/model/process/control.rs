@@ -45,6 +45,13 @@ pub trait ProcessController {
 
     fn kill_cgroup(&mut self, cgroup_id: &str) -> Result<(), BoundaryError>;
 
+    /// Whether the cgroup still holds processes.
+    ///
+    /// A cgroup that does not exist MUST report `false`, not an error: every
+    /// caller is asking "may I stop waiting for this to drain?", and a tree
+    /// that is gone holds nothing. An error means the cgroup exists and could
+    /// not be inspected — "nothing to check" and "cannot check" are different
+    /// answers, and only the second is a fault.
     fn cgroup_populated(&mut self, cgroup_id: &str) -> Result<bool, BoundaryError>;
 
     fn remove_cgroup(&mut self, cgroup_id: &str) -> Result<CgroupRemoveOutcome, BoundaryError>;

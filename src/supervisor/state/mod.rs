@@ -23,6 +23,7 @@ use crate::operation::store::OperationStore;
 use crate::service::{ServiceEnvironmentVariable, ServiceTable};
 use crate::shutdown::{ShutdownRuntime, ShutdownSignalTracker};
 
+use super::boot_settle::BootSettleTracker;
 use super::boot_success::BootSuccessTracker;
 use super::cgroup_cleanup::CgroupCleanupStore;
 use super::control_boundary::PendingControlOperation;
@@ -59,6 +60,7 @@ pub struct Supervisor {
     pub(super) pending_process_setups: BTreeMap<i32, PendingLaunchSetup>,
     pub(super) pending_control_operations: VecDeque<PendingControlOperation>,
     pub(super) retained_service_launches: Vec<LaunchCreatedJobDispatch>,
+    pub(super) boot_settle: BootSettleTracker,
     pub(super) boot_success: BootSuccessTracker,
     pub(super) shutdown: Option<ShutdownRuntime>,
     pub(super) shutdown_signals: ShutdownSignalTracker,
@@ -94,6 +96,7 @@ impl Supervisor {
             pending_process_setups: BTreeMap::new(),
             pending_control_operations: VecDeque::new(),
             retained_service_launches: Vec::new(),
+            boot_settle: BootSettleTracker::default(),
             boot_success: BootSuccessTracker::default(),
             shutdown: None,
             shutdown_signals: ShutdownSignalTracker::default(),

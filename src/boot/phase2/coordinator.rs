@@ -2,7 +2,7 @@ use crate::boundary::{Clock, RegistryClient};
 use crate::ids::{JobIdAllocator, OperationIdAllocator};
 use crate::operation::store::OperationStore;
 use crate::registry::services_schema_warnings;
-use crate::service::{ServiceDefinition, ServiceTable};
+use crate::service::ServiceTable;
 
 use super::planner::prepare_phase2_boot_plan_with_retained;
 
@@ -66,17 +66,10 @@ where
     }
     let shutdown_settings = read_effective_shutdown_settings(registry)?;
 
-    let mut services = registry
+    let services = registry
         .read_service_definitions()
         .map_err(Phase2RecoveryReason::RegistryRead)
         .map_err(Phase2BootRunError::RecoveryRequired)?;
-    // peios.console=1: add the compiled-in console shell to the boot set. It is
-    // not a registry entry (peinit owns it directly, like registryd), so it is
-    // appended here after the registry read and then planned, launched, and
-    // respawned by the normal Phase 2 / runtime machinery.
-    if settings.spawn_console {
-        services.push(ServiceDefinition::compiled_in_console());
-    }
     let services_schema_version = registry
         .read_services_schema_version()
         .map_err(Phase2RecoveryReason::RegistryRead)

@@ -1,10 +1,11 @@
 use crate::supervisor::dispatch::{
-    SupervisorBootSuccessDispatch, SupervisorFilesystemCheckTimeoutDispatch,
-    SupervisorHealthCheckIntervalDispatch, SupervisorHealthCheckTimeoutDispatch,
-    SupervisorPostStartHookTimeoutDispatch, SupervisorPreStartHookTimeoutDispatch,
-    SupervisorReadinessTimeoutDispatch, SupervisorReloadCommandTimeoutDispatch,
-    SupervisorReloadDetectionDispatch, SupervisorRestartBackoffDispatch,
-    SupervisorStopEscalationDispatch, SupervisorWatchdogTimeoutDispatch,
+    SupervisorBootSettleDispatch, SupervisorBootSuccessDispatch,
+    SupervisorFilesystemCheckTimeoutDispatch, SupervisorHealthCheckIntervalDispatch,
+    SupervisorHealthCheckTimeoutDispatch, SupervisorPostStartHookTimeoutDispatch,
+    SupervisorPreStartHookTimeoutDispatch, SupervisorReadinessTimeoutDispatch,
+    SupervisorReloadCommandTimeoutDispatch, SupervisorReloadDetectionDispatch,
+    SupervisorRestartBackoffDispatch, SupervisorStopEscalationDispatch,
+    SupervisorWatchdogTimeoutDispatch,
 };
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -21,6 +22,7 @@ pub struct SupervisorLifecycleDeadlineDispatch {
     pub health_check_timeouts: Vec<SupervisorHealthCheckTimeoutDispatch>,
     pub watchdog_timeouts: Vec<SupervisorWatchdogTimeoutDispatch>,
     pub boot_successes: Vec<SupervisorBootSuccessDispatch>,
+    pub boot_settles: Vec<SupervisorBootSettleDispatch>,
 }
 
 impl SupervisorLifecycleDeadlineDispatch {
@@ -37,5 +39,6 @@ impl SupervisorLifecycleDeadlineDispatch {
             && self.health_check_timeouts.is_empty()
             && self.watchdog_timeouts.is_empty()
             && self.boot_successes.is_empty()
+            && self.boot_settles.is_empty()
     }
 }

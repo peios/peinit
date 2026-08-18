@@ -18,6 +18,9 @@ use crate::supervisor::Supervisor;
 pub(super) struct Platform {
     pid1: Result<(), InitFatalError>,
     command_line: Result<KernelCommandLine, BoundaryError>,
+    /// The notify socket the supervisor was carrying when registryd was
+    /// launched — the observable effect of `peios.notifysocket=`.
+    pub(super) registryd_notify_socket_path: Option<String>,
     boot_attempt_counter: Result<u32, BoundaryError>,
     increment_result: Result<(), BoundaryError>,
     root_result: Result<(), BoundaryError>,
@@ -42,6 +45,7 @@ impl Platform {
         Self {
             pid1: Ok(()),
             command_line: Ok(KernelCommandLine::default()),
+            registryd_notify_socket_path: None,
             boot_attempt_counter: Ok(0),
             increment_result: Ok(()),
             root_result: Ok(()),
@@ -171,10 +175,11 @@ impl InitPlatform for Platform {
 
     fn start_registryd(
         &mut self,
-        _supervisor: &mut Supervisor,
+        supervisor: &mut Supervisor,
         _registry: &mut dyn RegistryClient,
         _observed_at_ns: u64,
     ) -> Result<(), BoundaryError> {
+        self.registryd_notify_socket_path = Some(supervisor.settings().notify_socket_path.clone());
         self.registryd_result.clone()
     }
 
