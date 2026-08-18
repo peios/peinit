@@ -24,7 +24,13 @@ pub unsafe extern "C" fn peinit_client_connect_default(
     out: *mut *mut peinit_client_t,
     error_out: *mut *mut peinit_error_t,
 ) -> c_int {
-    unsafe { peinit_client_connect_path(c"/run/peinit/control.sock".as_ptr(), out, error_out) }
+    unsafe {
+        peinit_client_connect_path(
+            c"/run/services/peinit/control.sock".as_ptr(),
+            out,
+            error_out,
+        )
+    }
 }
 
 #[unsafe(no_mangle)]
@@ -372,12 +378,12 @@ pub unsafe extern "C" fn peinit_response_error_message(
 
 #[unsafe(no_mangle)]
 pub extern "C" fn peinit_default_control_socket_path() -> *const c_char {
-    c"/run/peinit/control.sock".as_ptr()
+    c"/run/services/peinit/control.sock".as_ptr()
 }
 
 #[allow(dead_code)]
 fn _assert_default_path_matches_runtime() {
-    assert_eq!(CONTROL_SOCKET_PATH, "/run/peinit/control.sock");
+    assert_eq!(CONTROL_SOCKET_PATH, "/run/services/peinit/control.sock");
 }
 
 impl From<ControlClientError> for ErrorDetail {

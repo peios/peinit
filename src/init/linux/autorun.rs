@@ -2,8 +2,8 @@
 //!
 //! This is peinit's *generic* first-boot/every-boot hook. peinit knows nothing
 //! about what the scripts do — it just runs them. The directory is populated by
-//! peiso (the image composer); packages cannot write there (`/usr/system` is
-//! package-forbidden), so a package can't slip a boot script in.
+//! peiso (the image composer); packages cannot write there (`/lcl/policy` is
+//! off peipkg's allowlist), so a package can't slip a boot script in.
 //!
 //! Scripts own their own lifecycle. peinit runs them on EVERY boot and never
 //! deletes them, so:
@@ -25,13 +25,13 @@ use crate::boundary::BoundaryError;
 
 use super::recovery_console::write_console;
 
-/// Composer-curated boot scripts. Under `/usr/system` so packages can't write
+/// Composer-curated boot scripts. Under `/lcl/policy` so packages can't write
 /// here; peiso places them (e.g. the seed-apply script alongside the seed queue).
-const AUTORUN_DIR: &str = "/usr/system/libexec/autorun.d";
+const AUTORUN_DIR: &str = "/lcl/policy/autorun.d";
 
 /// PATH handed to autorun scripts so they can call system tools (`reg`, `feat`,
 /// …) by name — PID 1 itself carries none.
-const AUTORUN_PATH: &str = "/usr/sbin:/usr/bin:/sbin:/bin";
+const AUTORUN_PATH: &str = "/sbin:/bin";
 
 pub(super) fn run_autorun_scripts() -> Result<(), BoundaryError> {
     let mut scripts = match list_scripts() {
@@ -93,4 +93,14 @@ fn list_scripts() -> std::io::Result<Vec<PathBuf>> {
         }
     }
     Ok(scripts)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::AUTORUN_PATH;
+
+    #[test]
+    fn autorun_path_uses_stratafs_runtime_views() {
+        assert_eq!(AUTORUN_PATH, "/sbin:/bin");
+    }
 }

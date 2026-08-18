@@ -17,7 +17,7 @@ use super::super::support::{
 fn failed_reload_wait_response_includes_failed_mode() {
     let mut app = ServiceDefinition::simple_system_boot("app", "/sbin/app");
     app.readiness = Readiness::Alive;
-    app.exec_reload = Some("/usr/bin/reload".to_string());
+    app.exec_reload = Some("/bin/reload".to_string());
     let mut supervisor = booted_supervisor(vec![app]);
     let mut tokens = TestTokenProvider::default();
     let mut launcher = TestProcessLauncher::new(vec![process(9000, 90), process(9001, 91)]);

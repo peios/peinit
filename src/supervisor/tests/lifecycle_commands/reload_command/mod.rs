@@ -19,7 +19,7 @@ const RELOAD_COMMAND_EXIT_NS: u64 = LIFECYCLE_COMMAND_NS + 3;
 
 fn active_app_supervisor_with_reload_command() -> Supervisor {
     let mut app = alive_service("app");
-    app.exec_reload = Some(r#"/usr/bin/reload --name="hello world" """#.to_string());
+    app.exec_reload = Some(r#"/bin/reload --name="hello world" """#.to_string());
     app.start_timeout_secs = 45;
     let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
     let mut registry = StaticRegistry::services(vec![app]);

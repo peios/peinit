@@ -26,7 +26,7 @@ extern "C" {
 #define PEINIT_SHUTDOWN_HALT 2
 
 /*
- * peinit_default_control_socket_path - return "/run/peinit/control.sock".
+ * peinit_default_control_socket_path - return "/run/services/peinit/control.sock".
  *
  * The returned pointer is static storage owned by libpeinit.
  */

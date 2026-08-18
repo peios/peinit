@@ -115,7 +115,7 @@ pub(super) fn active_watchdog_app_supervisor() -> Supervisor {
 
 pub(super) fn active_app_supervisor_with_reload_command() -> Supervisor {
     let mut app = alive_service("app");
-    app.exec_reload = Some(r#"/usr/bin/reload --name="hello world" """#.to_string());
+    app.exec_reload = Some(r#"/bin/reload --name="hello world" """#.to_string());
     app.start_timeout_secs = 45;
     app_supervisor(app)
 }
@@ -138,7 +138,7 @@ fn app_supervisor(app: ServiceDefinition) -> Supervisor {
 
 pub(super) fn pre_start_hook_supervisor() -> (Supervisor, crate::ids::JobId) {
     let mut app = alive_service("app");
-    app.exec_start_pre = vec!["/usr/bin/pre".to_string()];
+    app.exec_start_pre = vec!["/bin/pre".to_string()];
     app.start_timeout_secs = 45;
     let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
     let mut registry = StaticRegistry::services(vec![app]);

@@ -16,7 +16,7 @@ pub(super) const HEALTH_TIMEOUT_SECS: u64 = 5;
 
 pub(super) fn active_health_supervisor(retries: u32) -> (Supervisor, u64) {
     let mut app = alive_service("app");
-    app.health_check = Some("/usr/bin/app-health --quick".to_string());
+    app.health_check = Some("/bin/app-health --quick".to_string());
     app.health_check_interval_secs = HEALTH_INTERVAL_SECS;
     app.health_check_timeout_secs = HEALTH_TIMEOUT_SECS;
     app.health_check_retries = retries;
@@ -48,7 +48,7 @@ pub(super) fn active_health_supervisor(retries: u32) -> (Supervisor, u64) {
 
 pub(super) fn critical_active_health_supervisor() -> (Supervisor, u64) {
     let mut app = alive_service("app");
-    app.health_check = Some("/usr/bin/app-health --quick".to_string());
+    app.health_check = Some("/bin/app-health --quick".to_string());
     app.health_check_interval_secs = HEALTH_INTERVAL_SECS;
     app.health_check_timeout_secs = HEALTH_TIMEOUT_SECS;
     app.health_check_retries = 1;

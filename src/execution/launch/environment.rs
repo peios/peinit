@@ -9,7 +9,7 @@ pub const PATH: &str = "PATH";
 pub const NOTIFY_SOCKET: &str = "NOTIFY_SOCKET";
 pub const LISTEN_FDS: &str = "LISTEN_FDS";
 pub const LISTEN_FDNAMES: &str = "LISTEN_FDNAMES";
-pub const DEFAULT_PATH: &str = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
+pub const DEFAULT_PATH: &str = "/sbin:/bin";
 
 pub fn build_launch_environment(
     job: &JobRecord,

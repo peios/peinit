@@ -31,7 +31,7 @@ fn external_exec_reload_creates_reload_hook_job_in_hooks_cgroup() {
     let job = supervisor.jobs().get(job_id).expect("reload hook job");
     assert_eq!(job.service.as_deref(), Some("app"));
     assert_eq!(job.job_type, JobType::ReloadHook);
-    assert_eq!(job.image_path, "/usr/bin/reload");
+    assert_eq!(job.image_path, "/bin/reload");
     assert_eq!(job.arguments, vec!["--name=hello world", ""]);
     assert_eq!(job.cgroup_id, "/sys/fs/cgroup/peinit/app/hooks");
     assert_eq!(job.operation_id, Some(operation_id));

@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 #[cfg(feature = "peios-boundary")]
 use peios::file::{Disposition, FileAccess, OpenOptions, SecInfo};
 
-pub const DEFAULT_RANDOM_SEED_PATH: &str = "/var/lib/peinit/random-seed";
+pub const DEFAULT_RANDOM_SEED_PATH: &str = "/var/state/peinit/random-seed";
 
 const DEFAULT_RANDOM_DEVICE_PATH: &str = "/dev/urandom";
 const RANDOM_SEED_BYTES: usize = 512;

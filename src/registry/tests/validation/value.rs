@@ -34,7 +34,7 @@ fn malformed_strings_are_rejected() {
         &[RawRegistryValue {
             name: "ImagePath".to_string(),
             value_type: RegistryValueType::Sz,
-            data: b"/usr/bin/app".to_vec(),
+            data: b"/bin/app".to_vec(),
         }],
     )
     .expect_err("malformed string");
@@ -53,7 +53,7 @@ fn malformed_multi_strings_are_rejected() {
     let err = build_service_definition_from_registry_values(
         "broken",
         &[
-            sz("ImagePath", "/usr/bin/app"),
+            sz("ImagePath", "/bin/app"),
             RawRegistryValue {
                 name: "Triggers".to_string(),
                 value_type: RegistryValueType::MultiSz,

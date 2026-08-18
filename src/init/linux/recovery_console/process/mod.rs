@@ -22,9 +22,9 @@ pub(super) fn spawn_linux_recovery_shell(path: &str) -> Result<u32, BoundaryErro
     let shell_path = CString::new(path).map_err(|error| {
         BoundaryError::Recovery(format!("recovery shell path {path} is invalid: {error}"))
     })?;
-    let env_path = static_env("PATH=/usr/sbin:/usr/bin:/sbin:/bin")?;
+    let env_path = static_env("PATH=/sbin:/bin")?;
     let env_term = static_env("TERM=linux")?;
-    let env_home = static_env("HOME=/root")?;
+    let env_home = static_env("HOME=/")?;
     let argv = [shell_path.as_ptr(), std::ptr::null()];
     let envp = [
         env_path.as_ptr(),

@@ -386,7 +386,7 @@ fn non_retained_oneshot_exec_start_post_timeout_clears_after_dependent_release()
 
 fn boot_app_with_worker_and_post_hook() -> (Supervisor, crate::ids::OperationId) {
     let mut app = alive_service("app");
-    app.exec_start_post = vec!["/usr/bin/post --flag".to_string()];
+    app.exec_start_post = vec!["/bin/post --flag".to_string()];
     app.start_timeout_secs = 45;
     let mut worker = alive_service("worker");
     worker.requires.push("app".to_string());
@@ -410,7 +410,7 @@ fn boot_app_with_worker_and_post_hook() -> (Supervisor, crate::ids::OperationId)
 
 fn boot_oneshot_with_worker_and_post_hook() -> (Supervisor, crate::ids::OperationId) {
     let mut task = oneshot_service("task");
-    task.exec_start_post = vec!["/usr/bin/post --flag".to_string()];
+    task.exec_start_post = vec!["/bin/post --flag".to_string()];
     let mut worker = alive_service("worker");
     worker.requires.push("task".to_string());
 
@@ -433,8 +433,8 @@ fn boot_oneshot_with_worker_and_post_hook() -> (Supervisor, crate::ids::Operatio
 
 fn boot_app_with_post_hook_and_timers() -> Supervisor {
     let mut app = alive_service("app");
-    app.exec_start_post = vec!["/usr/bin/post --flag".to_string()];
-    app.health_check = Some("/usr/bin/app-health".to_string());
+    app.exec_start_post = vec!["/bin/post --flag".to_string()];
+    app.health_check = Some("/bin/app-health".to_string());
     app.health_check_interval_secs = POST_HOOK_HEALTH_INTERVAL_SECS;
     app.watchdog_timeout_secs = POST_HOOK_WATCHDOG_SECS;
 
