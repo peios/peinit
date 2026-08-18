@@ -171,6 +171,10 @@ impl DefinitionBuilder {
             timer_persistent: self.timer_persistent,
             timer_jitter_secs: self.timer_jitter_secs,
             console_path: self.console_path,
+            // Never set from the registry, by definition: this marks a service
+            // peinit defines itself. A registry entry claiming it would make
+            // itself un-removable.
+            compiled_in: false,
         })
     }
 }

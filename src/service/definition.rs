@@ -155,6 +155,20 @@ pub struct ServiceDefinition {
     /// closed — so output goes to the terminal and nowhere else.
     pub console_path: Option<String>,
 
+    /// peinit defines this service itself; the registry does not and cannot.
+    ///
+    /// True only for registryd, which bootstraps the registry and therefore can
+    /// never be an entry in it. The flag exists so a *reload* can tell "the
+    /// registry no longer defines this" from "the registry never did": a
+    /// snapshot omitting a compiled-in service says nothing about it, and
+    /// treating that omission as a removal silently unmanages the one Critical
+    /// service peinit cannot afford to lose.
+    ///
+    /// Provenance rather than a name check, so the rule lives beside the data
+    /// and holds if the compiled-in set ever grows again. A registry service
+    /// that happened to be called `registryd` would carry `false` and stay
+    /// removable like any other.
+    pub compiled_in: bool,
 }
 
 impl ServiceDefinition {
@@ -238,6 +252,7 @@ impl ServiceDefinition {
             timer_persistent: Self::DEFAULT_TIMER_PERSISTENT,
             timer_jitter_secs: Self::DEFAULT_TIMER_JITTER_SECS,
             console_path: None,
+            compiled_in: false,
         }
     }
 
@@ -249,6 +264,10 @@ impl ServiceDefinition {
             .map(|arg| arg.to_string())
             .collect();
         service.error_control = ErrorControl::Critical;
+        // The registry cannot define the daemon that serves the registry, so a
+        // reload must never read its absence from a registry snapshot as a
+        // removal.
+        service.compiled_in = true;
         service
     }
 

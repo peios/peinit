@@ -58,6 +58,22 @@ impl ServiceTable {
             let Some(entry) = self.entries.get_mut(&name) else {
                 continue;
             };
+            // A compiled-in service is absent from every registry snapshot,
+            // because the registry cannot define it — registryd bootstraps the
+            // registry. Its absence therefore carries no information, and
+            // reading it as a removal marks the one Critical service peinit
+            // cannot afford to lose: `definition_removed` refuses restart AND
+            // refuses Start/Restart/Reload from the control socket, so a later
+            // registryd crash becomes unrecoverable, silently, because nothing
+            // fails at the moment of the reload.
+            //
+            // The boot path has always guarded this by carrying the compiled-in
+            // definition into the snapshot (`merge_phase2_service_table`). This
+            // is the same rule stated where it belongs — on the data — so every
+            // caller of a snapshot gets it rather than each remembering.
+            if entry.definition.compiled_in {
+                continue;
+            }
             if retains_definition_after_removal(entry.runtime.state) {
                 if entry.definition_removed {
                     continue;
@@ -118,6 +134,10 @@ fn runtime_effective_definition(
     effective.asserts = current.asserts.clone();
     effective.triggers = current.triggers.clone();
     effective.disabled = current.disabled;
+    // Provenance is peinit's, not the registry's. Kept from `current` so a
+    // registry entry that shadows a compiled-in name cannot strip the flag and
+    // make the service removable on the reload after next.
+    effective.compiled_in = current.compiled_in;
 
     effective
 }
