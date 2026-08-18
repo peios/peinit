@@ -11,17 +11,17 @@ use crate::shutdown::ShutdownSettings;
 
 pub const DEFAULT_MAX_PARALLEL_STARTS: u32 = 10;
 pub const DEFAULT_BOOT_SUCCESS_GRACE_SECS: u32 = 30;
+pub use crate::supervisor::DEFAULT_SETTLE_TIMEOUT_SECS;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Phase2BootSettings {
     pub mode: BootMode,
     pub max_parallel_starts: u32,
     pub boot_success_grace_secs: u32,
-    /// Inject the compiled-in console service into the boot set (from
-    /// `peios.console=1`). A per-boot command-line policy like `mode`, not a
-    /// registry-configured value, so `read_effective_boot_settings` leaves it
-    /// untouched.
-    pub spawn_console: bool,
+    /// Seconds to wait for the boot set to settle before starting
+    /// `boot:settled` services anyway. Bounds the wait so a hung service
+    /// delays a console prompt rather than denying it.
+    pub settle_timeout_secs: u32,
 }
 
 impl Default for Phase2BootSettings {
@@ -30,7 +30,7 @@ impl Default for Phase2BootSettings {
             mode: BootMode::Full,
             max_parallel_starts: DEFAULT_MAX_PARALLEL_STARTS,
             boot_success_grace_secs: DEFAULT_BOOT_SUCCESS_GRACE_SECS,
-            spawn_console: false,
+            settle_timeout_secs: DEFAULT_SETTLE_TIMEOUT_SECS,
         }
     }
 }

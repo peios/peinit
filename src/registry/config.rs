@@ -15,8 +15,12 @@ const LOG_SOCKET_PATH_FIELD: &str = "LogSocketPath";
 const MAX_PARALLEL_STARTS_FIELD: &str = "MaxParallelStarts";
 const BOOT_SUCCESS_GRACE_FIELD: &str = "BootSuccessGrace";
 const SHUTDOWN_TIMEOUT_FIELD: &str = "ShutdownTimeout";
+const POST_KILL_TIMEOUT_FIELD: &str = "PostKillTimeout";
+const SETTLE_TIMEOUT_FIELD: &str = "SettleTimeout";
 const MAX_LOG_LINE_LENGTH_FIELD: &str = "MaxLogLineLength";
 const MAX_LOG_BUFFER_PER_SERVICE_FIELD: &str = "MaxLogBufferPerService";
+const LOG_READ_BYTES_PER_EVENT_FIELD: &str = "LogReadBytesPerEvent";
+const PRE_EVENTD_BUFFER_FIELD: &str = "PreEventdBuffer";
 const CONTROL_SECURITY_FIELD: &str = "ControlSecurity";
 const MAX_CONTROL_CONNECTIONS_FIELD: &str = "MaxControlConnections";
 const MAX_REQUEST_SIZE_FIELD: &str = "MaxRequestSize";
@@ -98,6 +102,45 @@ pub fn build_shutdown_timeout_from_registry_values(
     values: &[RawRegistryValue],
 ) -> Result<Option<u32>, ServiceRegistryDecodeError> {
     build_optional_boot_dword_from_registry_values(values, SHUTDOWN_TIMEOUT_FIELD)
+}
+
+/// `Machine\\System\\Boot\\PostKillTimeout` — how long peinit waits for a
+/// service cgroup to drain after SIGKILL before treating it as stuck. Sits
+/// beside `ShutdownTimeout`, which bounds the shutdown as a whole; this bounds
+/// one service's last stage of it.
+pub fn build_post_kill_timeout_from_registry_values(
+    values: &[RawRegistryValue],
+) -> Result<Option<u32>, ServiceRegistryDecodeError> {
+    build_optional_boot_dword_from_registry_values(values, POST_KILL_TIMEOUT_FIELD)
+}
+
+/// `Machine\\System\\Boot\\SettleTimeout` — how long peinit waits for the boot
+/// set to stop moving before starting `boot:settled` services anyway. Bounds
+/// the wait so a service stuck in Starting delays a console prompt rather than
+/// denying it.
+pub fn build_settle_timeout_from_registry_values(
+    values: &[RawRegistryValue],
+) -> Result<Option<u32>, ServiceRegistryDecodeError> {
+    build_optional_boot_dword_from_registry_values(values, SETTLE_TIMEOUT_FIELD)
+}
+
+/// `Machine\\System\\Init\\LogReadBytesPerEvent` — how much peinit drains from
+/// a service's stdout/stderr pipe per readable event. Larger favours throughput
+/// on chatty services, smaller favours fairness between them.
+pub fn build_log_read_bytes_per_event_from_registry_values(
+    values: &[RawRegistryValue],
+) -> Result<Option<u32>, ServiceRegistryDecodeError> {
+    build_optional_boot_dword_from_registry_values(values, LOG_READ_BYTES_PER_EVENT_FIELD)
+}
+
+/// `Machine\\System\\Init\\PreEventdBuffer` — total bytes of service output
+/// peinit holds in memory before eventd is up to receive it. Raise it on a
+/// system whose early services are noisy, lower it where boot-time memory is
+/// tight; overflow drops the oldest output, it never blocks a service.
+pub fn build_pre_eventd_buffer_from_registry_values(
+    values: &[RawRegistryValue],
+) -> Result<Option<u32>, ServiceRegistryDecodeError> {
+    build_optional_boot_dword_from_registry_values(values, PRE_EVENTD_BUFFER_FIELD)
 }
 
 pub fn build_max_log_line_length_from_registry_values(

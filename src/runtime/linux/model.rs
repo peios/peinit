@@ -22,6 +22,8 @@ pub struct LinuxRuntimeConfig {
     pub control_limits: RuntimeControlLimits,
     pub control_security: ControlSecurityDescriptor,
     pub work_pump: RuntimeWorkPumpConfig,
+    /// `peios.quiet` — how much peinit may write to the console.
+    pub quiet: crate::init::QuietLevel,
 }
 
 impl Default for LinuxRuntimeConfig {
@@ -34,6 +36,7 @@ impl Default for LinuxRuntimeConfig {
             control_limits: RuntimeControlLimits::default(),
             control_security: ControlSecurityDescriptor::Default,
             work_pump: RuntimeWorkPumpConfig::default(),
+            quiet: crate::init::QuietLevel::default(),
         }
     }
 }

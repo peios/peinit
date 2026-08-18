@@ -68,10 +68,14 @@ pub struct JobRecord {
     pub activation_generation: u64,
     pub cgroup_generation: u64,
     pub operation_id: Option<OperationId>,
-    /// Launch this job's process with its stdio attached to `/dev/console`
-    /// instead of the daemon default. Carried from the service definition's
-    /// `attach_console`; the compiled-in console service is the only setter.
-    pub attach_console: bool,
+    /// Launch this job's process with its stdio attached to this terminal
+    /// instead of the daemon default, as its controlling terminal. Carried from
+    /// the service definition's `TTYPath`.
+    ///
+    /// Only a service's *main* job ever carries one: hooks and health checks
+    /// are machine-read, so their output belongs in the log pipes even when the
+    /// service they belong to owns a terminal.
+    pub console_path: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

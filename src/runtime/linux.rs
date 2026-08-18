@@ -40,6 +40,12 @@ pub struct LinuxShutdownRuntime {
     calendar_timers: calendar_timer::LinuxCalendarTimerTable,
     kmes_sink: LinuxKmesEventSink,
     console_sink: LinuxConsoleSink,
+    /// `peios.quiet`, from the kernel command line.
+    quiet: crate::init::QuietLevel,
+    /// Re-evaluated once per turn rather than per message: terminal ownership
+    /// can only change when a service does, and a turn is the granularity at
+    /// which that happens.
+    quiet_policy: crate::runtime::console::QuietPolicy,
     log_pipes: RuntimeServiceLogPipes,
     jfs_device: Option<RuntimeJfsDevice>,
     power_buttons: LinuxPowerButtonDevices,

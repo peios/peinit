@@ -16,9 +16,12 @@ pub use config::{
     build_control_socket_limits_from_registry_values,
     build_eventd_log_socket_path_from_registry_values,
     build_global_environment_from_registry_values,
+    build_log_read_bytes_per_event_from_registry_values,
     build_max_log_buffer_per_service_from_registry_values,
     build_max_log_line_length_from_registry_values, build_max_parallel_starts_from_registry_values,
-    build_shutdown_timeout_from_registry_values, services_schema_warnings,
+    build_post_kill_timeout_from_registry_values, build_pre_eventd_buffer_from_registry_values,
+    build_settle_timeout_from_registry_values, build_shutdown_timeout_from_registry_values,
+    services_schema_warnings,
 };
 pub use provisioning::{
     build_provisioned_path_from_registry_values, build_provisioned_path_registry_snapshot,

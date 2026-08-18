@@ -28,14 +28,19 @@ pub(in crate::boundary::linux_launch::process) fn open_dev_null() -> Result<Owne
     Ok(file.into())
 }
 
-/// Open the system console read/write for a console-attached service (the
-/// compiled-in console shell). The child dups this onto stdin/stdout/stderr in
-/// place of the daemon `/dev/null` + log-pipe wiring, giving it a live tty —
-/// the same attach the recovery console performs.
-pub(in crate::boundary::linux_launch::process) fn open_console() -> Result<OwnedFd, BoundaryError> {
+/// Open a service's terminal read/write, from its `TTYPath`. The child dups
+/// this onto stdin/stdout/stderr in place of the daemon `/dev/null` + log-pipe
+/// wiring and adopts it as its controlling terminal.
+///
+/// Opened in the parent so the fd is already present in the cloned child: the
+/// child path is restricted to raw syscalls on prebuilt pointers, and opening
+/// through the peios file API there would mean allocating after clone.
+pub(in crate::boundary::linux_launch::process) fn open_console(
+    path: &str,
+) -> Result<OwnedFd, BoundaryError> {
     let file = OpenOptions::new()
         .desired_access(FileAccess::READ_DATA | FileAccess::WRITE_DATA)
-        .open(None, Path::new("/dev/console"))
-        .map_err(|error| BoundaryError::Process(format!("open /dev/console failed: {error}")))?;
+        .open(None, Path::new(path))
+        .map_err(|error| BoundaryError::Process(format!("open {path} failed: {error}")))?;
     Ok(file.into())
 }

@@ -9,11 +9,13 @@ use super::super::fd::close_fd;
 use super::model::ChildSetupEvidence;
 
 use self::resources::{change_working_directory, set_oom_score_adj, set_rlimits};
+use self::session::{acquire_controlling_terminal, become_session_leader};
 use self::signals::reset_signal_environment;
 use self::stdio::{set_console_streams, set_standard_streams};
 use self::sys::{clear_cloexec, close_fd_checked, dup2_checked, errno};
 
 mod resources;
+mod session;
 mod signals;
 mod stdio;
 mod sys;
@@ -66,6 +68,20 @@ pub(super) fn child_exec(token: &Token, command: &LaunchCommand, spec: ChildExec
         );
     }
 
+    // A terminal-attached service owns its terminal: new session first, so the
+    // TIOCSCTTY below has a session leader to attach to. Ordered before the
+    // dup because setsid() drops any controlling terminal the child inherited,
+    // which would otherwise undo the attach.
+    if console_fd.is_some()
+        && let Err(errno) = become_session_leader()
+    {
+        fail_child_setup(
+            exec_error_write_fd,
+            ProcessPreExecStep::CreateSession,
+            errno,
+        );
+    }
+
     let stdio_result = match console_fd {
         Some(console_fd) => set_console_streams(
             console_fd,
@@ -85,6 +101,20 @@ pub(super) fn child_exec(token: &Token, command: &LaunchCommand, spec: ChildExec
     };
     if let Err(errno) = stdio_result {
         fail_child_setup(exec_error_write_fd, ProcessPreExecStep::SetStdio, errno);
+    }
+
+    // Now that the terminal is on fd 0, claim it. Deliberately fatal rather
+    // than a warning: a shell without a controlling terminal starts and looks
+    // fine but has no job control, which is a far more confusing failure to
+    // meet later than a refused start naming this step.
+    if console_fd.is_some()
+        && let Err(errno) = acquire_controlling_terminal()
+    {
+        fail_child_setup(
+            exec_error_write_fd,
+            ProcessPreExecStep::AcquireControllingTerminal,
+            errno,
+        );
     }
 
     if let Err(errno) = reset_signal_environment() {

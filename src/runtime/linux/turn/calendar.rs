@@ -1,5 +1,4 @@
 #[cfg(feature = "peios-registry")]
-use crate::boundary::ConsoleSink;
 #[cfg(feature = "peios-registry")]
 use crate::runtime::collect_runtime_loop_console_messages;
 use crate::runtime::{RuntimeCalendarTimerTurn, RuntimeEventSource, RuntimeShutdownLoopError};
@@ -55,9 +54,7 @@ impl LinuxShutdownRuntime {
             calendar_turns,
             &mut console_messages,
         );
-        for message in console_messages {
-            let _ = self.console_sink.write_console(&message);
-        }
+        self.write_console_messages(console_messages);
         Ok(())
     }
 

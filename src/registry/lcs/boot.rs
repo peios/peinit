@@ -1,6 +1,7 @@
 use crate::registry::{
     BOOT_ROOT_KEY, RawRegistryValue, build_boot_success_grace_from_registry_values,
-    build_max_parallel_starts_from_registry_values, build_shutdown_timeout_from_registry_values,
+    build_max_parallel_starts_from_registry_values, build_post_kill_timeout_from_registry_values,
+    build_settle_timeout_from_registry_values, build_shutdown_timeout_from_registry_values,
 };
 
 use super::error::LcsRegistryReadError;
@@ -20,6 +21,16 @@ pub(super) fn read_lcs_boot_success_grace_secs() -> Result<Option<u32>, LcsRegis
 pub(super) fn read_lcs_shutdown_timeout_secs() -> Result<Option<u32>, LcsRegistryReadError> {
     let values = read_lcs_boot_values()?;
     build_shutdown_timeout_from_registry_values(&values).map_err(LcsRegistryReadError::DecodeBoot)
+}
+
+pub(super) fn read_lcs_post_kill_timeout_secs() -> Result<Option<u32>, LcsRegistryReadError> {
+    let values = read_lcs_boot_values()?;
+    build_post_kill_timeout_from_registry_values(&values).map_err(LcsRegistryReadError::DecodeBoot)
+}
+
+pub(super) fn read_lcs_settle_timeout_secs() -> Result<Option<u32>, LcsRegistryReadError> {
+    let values = read_lcs_boot_values()?;
+    build_settle_timeout_from_registry_values(&values).map_err(LcsRegistryReadError::DecodeBoot)
 }
 
 fn read_lcs_boot_values() -> Result<Vec<RawRegistryValue>, LcsRegistryReadError> {

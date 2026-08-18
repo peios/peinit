@@ -2,6 +2,7 @@ mod control;
 mod job;
 mod shutdown;
 
+use crate::runtime::console::ConsoleMessage;
 use crate::runtime::{
     RuntimeCalendarTimerTurn, RuntimeNotifySupervisorTurn, RuntimePowerButtonTurn,
     RuntimeProcessSetupTurn, RuntimeShutdownEventTurn,
@@ -9,7 +10,7 @@ use crate::runtime::{
 
 pub(super) fn collect_runtime_shutdown_turn_console_messages(
     turn: &RuntimeShutdownEventTurn,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     match turn {
         RuntimeShutdownEventTurn::Pid1Signal {
@@ -68,7 +69,7 @@ pub(super) fn collect_runtime_shutdown_turn_console_messages(
 
 fn collect_power_button_turn_console_messages(
     turn: &RuntimePowerButtonTurn,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     if let RuntimePowerButtonTurn::Shutdown { supervisor, .. } = turn {
         shutdown::collect_power_button_dispatch_console_messages(supervisor, out);
@@ -77,7 +78,7 @@ fn collect_power_button_turn_console_messages(
 
 fn collect_process_setup_turn_console_messages(
     turn: &RuntimeProcessSetupTurn,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     let RuntimeProcessSetupTurn::Completed { supervisor, .. } = turn else {
         return;
@@ -121,21 +122,21 @@ fn collect_process_setup_turn_console_messages(
 
 pub(super) fn collect_runtime_calendar_timer_console_messages(
     turn: &RuntimeCalendarTimerTurn,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     control::collect_runtime_calendar_timer_console_messages(turn, out);
 }
 
 pub(super) fn collect_post_start_hook_terminal_console_messages(
     dispatch: &crate::execution::start::PostStartHookTerminalDispatch,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     job::collect_post_start_hook_terminal_console_messages(dispatch, out);
 }
 
 pub(super) fn collect_health_check_terminal_console_messages(
     dispatch: &crate::supervisor::SupervisorHealthCheckTerminalDispatch,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     job::collect_health_check_terminal_console_messages(dispatch, out);
 }

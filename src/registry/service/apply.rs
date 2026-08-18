@@ -136,6 +136,23 @@ pub(super) fn apply_service_field(
         Field::WorkingDirectory => {
             builder.working_directory = parse_absolute_path_field(value, Field::WorkingDirectory)?;
         }
+        Field::TtyPath => {
+            // Emptiness is checked before absoluteness, not after: an empty
+            // value means "no terminal" — so a seeded or inherited TTYPath can
+            // be turned off without deleting the value — and the absolute-path
+            // check would otherwise reject it as malformed.
+            let path = decode_sz_field(value, Field::TtyPath.name())?;
+            builder.console_path = if path.is_empty() {
+                None
+            } else if path.starts_with('/') {
+                Some(path)
+            } else {
+                return Err(ServiceRegistryDecodeError::InvalidAbsolutePath {
+                    field: Field::TtyPath.name(),
+                    value: path,
+                });
+            };
+        }
         Field::RuntimeDirectories => {
             builder.runtime_directories =
                 parse_runtime_directories(value, Field::RuntimeDirectories)?;

@@ -61,6 +61,22 @@ pub trait RegistryClient {
         Ok(None)
     }
 
+    fn read_post_kill_timeout_secs(&mut self) -> Result<Option<u32>, BoundaryError> {
+        Ok(None)
+    }
+
+    fn read_settle_timeout_secs(&mut self) -> Result<Option<u32>, BoundaryError> {
+        Ok(None)
+    }
+
+    fn read_log_read_bytes_per_event(&mut self) -> Result<Option<u32>, BoundaryError> {
+        Ok(None)
+    }
+
+    fn read_pre_eventd_buffer_bytes(&mut self) -> Result<Option<u32>, BoundaryError> {
+        Ok(None)
+    }
+
     fn read_max_log_line_length(&mut self) -> Result<Option<u32>, BoundaryError> {
         Ok(None)
     }

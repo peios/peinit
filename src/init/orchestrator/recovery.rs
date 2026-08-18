@@ -1,7 +1,7 @@
 use crate::boundary::RegistryClient;
 use crate::supervisor::{Supervisor, SupervisorSettings};
 
-use super::{InitPlatform, InitRecoveryReason, InitRunError, InitRunResult};
+use super::{InitPlatform, InitRecoveryReason, InitRunError, InitRunResult, QuietLevel};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum RecoveryEnvironment {
@@ -17,7 +17,10 @@ pub(super) fn enter_recovery<P>(
 where
     P: InitPlatform + ?Sized,
 {
-    log_console(
+    // Never suppressed, at any quiet level and whoever owns the terminal: the
+    // system is about to stop being the system, and the recovery shell is
+    // taking that terminal next in any case.
+    log_console_error(
         platform,
         &format!("peinit: entering recovery: {reason:?}\n"),
     );
@@ -41,7 +44,24 @@ where
     Ok(InitRunResult::RecoveryReturned { reason })
 }
 
-pub(super) fn log_console<P>(platform: &mut P, message: &str)
+/// Phase 1 progress, subject to `peios.quiet`.
+///
+/// Only the blackout half of the policy can apply here: Phase 1 runs before any
+/// service exists, so there is no terminal for anything else to own. The
+/// ownership rule starts mattering when the runtime does.
+pub(super) fn log_console<P>(platform: &mut P, quiet: QuietLevel, message: &str)
+where
+    P: InitPlatform + ?Sized,
+{
+    if quiet.suppresses_status() {
+        return;
+    }
+    let _ = platform.write_console_message(message);
+}
+
+/// Phase 1 output that survives a blackout: something went wrong, and silence
+/// was a preference rather than an instruction to hide faults.
+pub(super) fn log_console_error<P>(platform: &mut P, message: &str)
 where
     P: InitPlatform + ?Sized,
 {

@@ -57,6 +57,7 @@ pub enum SupervisorLifecycleDeadlineKind {
         cgroup_id: String,
     },
     BootSuccess,
+    BootSettle,
 }
 
 impl SupervisorLifecycleDeadlineKind {
@@ -75,6 +76,7 @@ impl SupervisorLifecycleDeadlineKind {
             Self::HealthCheckInterval { .. } => 10,
             Self::CgroupCleanup { .. } => 11,
             Self::BootSuccess => 12,
+            Self::BootSettle => 13,
         }
     }
 
@@ -92,7 +94,7 @@ impl SupervisorLifecycleDeadlineKind {
             | Self::HealthCheckTimeout { service, .. }
             | Self::WatchdogTimeout { service, .. }
             | Self::CgroupCleanup { service, .. } => service,
-            Self::BootSuccess => "",
+            Self::BootSuccess | Self::BootSettle => "",
         }
     }
 
@@ -105,7 +107,7 @@ impl SupervisorLifecycleDeadlineKind {
             | Self::StopTimeout { operation_id, .. }
             | Self::ReloadDetection { operation_id, .. }
             | Self::ReloadCommandTimeout { operation_id, .. } => Some(*operation_id),
-            Self::RestartBackoff { .. } | Self::BootSuccess => None,
+            Self::RestartBackoff { .. } | Self::BootSuccess | Self::BootSettle => None,
             Self::HealthCheckInterval { .. }
             | Self::HealthCheckTimeout { .. }
             | Self::WatchdogTimeout { .. }
@@ -127,7 +129,8 @@ impl SupervisorLifecycleDeadlineKind {
             | Self::HealthCheckInterval { .. }
             | Self::WatchdogTimeout { .. }
             | Self::CgroupCleanup { .. }
-            | Self::BootSuccess => None,
+            | Self::BootSuccess
+            | Self::BootSettle => None,
         }
     }
 }

@@ -25,6 +25,20 @@ where
     {
         config.max_buffer_per_service_bytes = max_buffer_bytes as usize;
     }
+    if let Some(read_bytes) = registry
+        .read_log_read_bytes_per_event()
+        .map_err(Phase2RecoveryReason::RegistryRead)
+        .map_err(Phase2BootRunError::RecoveryRequired)?
+    {
+        config.read_bytes_per_event = read_bytes as usize;
+    }
+    if let Some(buffer_bytes) = registry
+        .read_pre_eventd_buffer_bytes()
+        .map_err(Phase2RecoveryReason::RegistryRead)
+        .map_err(Phase2BootRunError::RecoveryRequired)?
+    {
+        config.pre_eventd_buffer_bytes = buffer_bytes as usize;
+    }
     Ok(config)
 }
 
@@ -49,6 +63,13 @@ where
     {
         settings.boot_success_grace_secs = boot_success_grace_secs;
     }
+    if let Some(settle_timeout_secs) = registry
+        .read_settle_timeout_secs()
+        .map_err(Phase2RecoveryReason::RegistryRead)
+        .map_err(Phase2BootRunError::RecoveryRequired)?
+    {
+        settings.settle_timeout_secs = settle_timeout_secs;
+    }
     Ok(settings)
 }
 
@@ -65,6 +86,13 @@ where
         .map_err(Phase2BootRunError::RecoveryRequired)?
     {
         settings.global_timeout_secs = u64::from(timeout_secs);
+    }
+    if let Some(timeout_secs) = registry
+        .read_post_kill_timeout_secs()
+        .map_err(Phase2RecoveryReason::RegistryRead)
+        .map_err(Phase2BootRunError::RecoveryRequired)?
+    {
+        settings.post_kill_timeout_secs = u64::from(timeout_secs);
     }
     Ok(settings)
 }

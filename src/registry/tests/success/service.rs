@@ -14,7 +14,7 @@ fn builds_service_definition_from_registry_values() {
     let definition = build_service_definition_from_registry_values(
         "app",
         &[
-            sz("ImagePath", "/usr/bin/app"),
+            sz("ImagePath", "/bin/app"),
             multi_sz("Arguments", &["--foreground"]),
             dword("Type", 1),
             multi_sz("Triggers", &["boot", "timer:daily", "event:custom"]),
@@ -31,15 +31,15 @@ fn builds_service_definition_from_registry_values() {
             dword("NotifyAccess", 0),
             dword("RemainAfterExit", 1),
             multi_sz("SuccessExitCodes", &["0", "2", "2"]),
-            multi_sz("ExecStartPre", &["/usr/bin/pre-one", "/usr/bin/pre-two"]),
-            multi_sz("ExecStartPost", &["/usr/bin/post --flag"]),
+            multi_sz("ExecStartPre", &["/bin/pre-one", "/bin/pre-two"]),
+            multi_sz("ExecStartPost", &["/bin/post --flag"]),
             sz("HookIdentity", "SYSTEM"),
             sz("ExecReload", "signal:SIGUSR1"),
             dword("PreStartCheckTimeout", 7),
             dword("StartTimeout", 45),
             dword("StopTimeout", 12),
             dword("WatchdogTimeout", 60),
-            sz("HealthCheck", "/usr/bin/health --once"),
+            sz("HealthCheck", "/bin/health --once"),
             dword("HealthCheckInterval", 10),
             dword("HealthCheckTimeout", 2),
             dword("HealthCheckRetries", 3),
@@ -53,7 +53,7 @@ fn builds_service_definition_from_registry_values() {
                 "Conditions",
                 &["path:/srv/app", "registry:Machine\\System\\Services\\app"],
             ),
-            multi_sz("Asserts", &["file:/usr/bin/app", "directory:/srv"]),
+            multi_sz("Asserts", &["file:/bin/app", "directory:/srv"]),
             sz("DisplayName", "Application"),
             sz("Description", "Example application service"),
             dword("RestartPolicy", 2),
@@ -69,7 +69,7 @@ fn builds_service_definition_from_registry_values() {
     .expect("definition");
 
     assert_eq!(definition.name, "app");
-    assert_eq!(definition.image_path, "/usr/bin/app");
+    assert_eq!(definition.image_path, "/bin/app");
     assert_eq!(definition.arguments, vec!["--foreground"]);
     assert_eq!(definition.service_type, ServiceType::Oneshot);
     assert_eq!(
@@ -100,9 +100,9 @@ fn builds_service_definition_from_registry_values() {
     assert_eq!(definition.success_exit_codes, vec![0, 2]);
     assert_eq!(
         definition.exec_start_pre,
-        vec!["/usr/bin/pre-one", "/usr/bin/pre-two"]
+        vec!["/bin/pre-one", "/bin/pre-two"]
     );
-    assert_eq!(definition.exec_start_post, vec!["/usr/bin/post --flag"]);
+    assert_eq!(definition.exec_start_post, vec!["/bin/post --flag"]);
     assert_eq!(definition.hook_identity, Some("SYSTEM".to_string()));
     assert_eq!(definition.exec_reload, Some("signal:SIGUSR1".to_string()));
     assert_eq!(definition.pre_start_check_timeout_secs, 7);
@@ -111,7 +111,7 @@ fn builds_service_definition_from_registry_values() {
     assert_eq!(definition.watchdog_timeout_secs, 60);
     assert_eq!(
         definition.health_check,
-        Some("/usr/bin/health --once".to_string())
+        Some("/bin/health --once".to_string())
     );
     assert_eq!(definition.health_check_interval_secs, 10);
     assert_eq!(definition.health_check_timeout_secs, 2);
@@ -131,6 +131,8 @@ fn builds_service_definition_from_registry_values() {
         ]
     );
     assert_eq!(definition.working_directory, "/srv/app");
+    // Not in the value set above: a service without TTYPath gets daemon stdio.
+    assert_eq!(definition.console_path, None);
     assert_eq!(
         definition.runtime_directories,
         vec![
@@ -162,7 +164,7 @@ fn builds_service_definition_from_registry_values() {
         vec![
             ServiceCheck {
                 kind: ServiceCheckKind::File,
-                argument: "/usr/bin/app".to_string(),
+                argument: "/bin/app".to_string(),
             },
             ServiceCheck {
                 kind: ServiceCheckKind::Directory,
@@ -192,7 +194,7 @@ fn builds_service_definition_from_registry_values() {
 fn defaults_absent_optional_fields() {
     let definition = build_service_definition_from_registry_values(
         "minimal",
-        &[sz("ImagePath", "/usr/bin/minimal")],
+        &[sz("ImagePath", "/bin/minimal")],
     )
     .expect("definition");
 
@@ -244,19 +246,19 @@ fn applies_inherited_service_security_to_services_without_explicit_value() {
     let mut explicit = build_service_definition_from_registry_values(
         "explicit",
         &[
-            sz("ImagePath", "/usr/bin/explicit"),
+            sz("ImagePath", "/bin/explicit"),
             binary("ServiceSecurity", &[1, 2, 3]),
         ],
     )
     .expect("explicit definition");
     let inherited = build_service_definition_from_registry_values(
         "inherited",
-        &[sz("ImagePath", "/usr/bin/inherited")],
+        &[sz("ImagePath", "/bin/inherited")],
     )
     .expect("inherited definition");
     let fallback = build_service_definition_from_registry_values(
         "fallback",
-        &[sz("ImagePath", "/usr/bin/fallback")],
+        &[sz("ImagePath", "/bin/fallback")],
     )
     .expect("fallback definition");
 
@@ -283,7 +285,7 @@ fn empty_identity_defaults_to_local_service() {
     let definition = build_service_definition_from_registry_values(
         "svc",
         &[
-            sz("ImagePath", "/usr/bin/svc"),
+            sz("ImagePath", "/bin/svc"),
             sz("Identity", ""),
             sz("HookIdentity", ""),
             sz("DisplayName", ""),
@@ -303,7 +305,7 @@ fn well_known_identities_are_case_insensitive_and_canonicalized() {
     let definition = build_service_definition_from_registry_values(
         "svc",
         &[
-            sz("ImagePath", "/usr/bin/svc"),
+            sz("ImagePath", "/bin/svc"),
             sz("Identity", "system"),
             sz("HookIdentity", "networkservice"),
         ],
@@ -319,7 +321,7 @@ fn non_well_known_identity_names_are_preserved_for_authd() {
     let definition = build_service_definition_from_registry_values(
         "svc",
         &[
-            sz("ImagePath", "/usr/bin/svc"),
+            sz("ImagePath", "/bin/svc"),
             sz("Identity", "Domain\\BuildUser"),
             sz("HookIdentity", "local\\HookUser"),
         ],
@@ -337,7 +339,7 @@ fn non_well_known_identity_names_are_preserved_for_authd() {
 fn critical_error_control_implies_safe_mode() {
     let definition = build_service_definition_from_registry_values(
         "svc",
-        &[sz("ImagePath", "/usr/bin/svc"), dword("ErrorControl", 1)],
+        &[sz("ImagePath", "/bin/svc"), dword("ErrorControl", 1)],
     )
     .expect("definition");
 
@@ -349,7 +351,7 @@ fn unknown_optional_fields_are_ignored() {
     let definition = build_service_definition_from_registry_values(
         "svc",
         &[
-            sz("ImagePath", "/usr/bin/svc"),
+            sz("ImagePath", "/bin/svc"),
             RawRegistryValue {
                 name: "FutureField".to_string(),
                 value_type: RegistryValueType::Binary,
@@ -360,5 +362,89 @@ fn unknown_optional_fields_are_ignored() {
     .expect("definition");
 
     assert_eq!(definition.name, "svc");
-    assert_eq!(definition.image_path, "/usr/bin/svc");
+    assert_eq!(definition.image_path, "/bin/svc");
+}
+
+/// TTYPath is what makes a console or login service expressible as registry
+/// data. It replaced a compiled-in `attach_console` flag that only peinit's own
+/// definitions could set, and it carries a path rather than a boolean so a
+/// service can take `tty1` while the kernel console is a serial line.
+#[test]
+fn tty_path_attaches_a_named_terminal() {
+    let definition = build_service_definition_from_registry_values(
+        "console",
+        &[sz("ImagePath", "/bin/sh"), sz("TTYPath", "/dev/tty1")],
+    )
+    .expect("definition");
+
+    assert_eq!(definition.console_path.as_deref(), Some("/dev/tty1"));
+}
+
+#[test]
+fn absent_tty_path_means_daemon_stdio() {
+    let definition =
+        build_service_definition_from_registry_values("app", &[sz("ImagePath", "/sbin/app")])
+            .expect("definition");
+
+    assert_eq!(definition.console_path, None);
+}
+
+/// An empty value clears the terminal rather than being rejected, so a seeded
+/// or inherited TTYPath can be turned off without deleting the value.
+#[test]
+fn empty_tty_path_clears_the_terminal() {
+    let definition = build_service_definition_from_registry_values(
+        "app",
+        &[sz("ImagePath", "/sbin/app"), sz("TTYPath", "")],
+    )
+    .expect("definition");
+
+    assert_eq!(definition.console_path, None);
+}
+
+#[test]
+fn relative_tty_path_is_rejected() {
+    let error = build_service_definition_from_registry_values(
+        "app",
+        &[sz("ImagePath", "/sbin/app"), sz("TTYPath", "tty1")],
+    )
+    .expect_err("relative TTYPath must be rejected");
+
+    assert!(format!("{error:?}").contains("TTYPath"), "{error:?}");
+}
+
+/// `boot:settled` — a boot trigger that waits for the boot set to stop moving.
+#[test]
+fn boot_settled_trigger_is_accepted() {
+    let definition = build_service_definition_from_registry_values(
+        "login-console",
+        &[
+            sz("ImagePath", "/bin/login"),
+            multi_sz("Triggers", &["boot:settled"]),
+        ],
+    )
+    .expect("definition");
+
+    assert_eq!(definition.triggers, vec![ServiceTrigger::BootSettled]);
+    // Deliberately NOT a boot-plan member: it starts after the plan, so
+    // counting it would put it in the parallel-start budget and boot-success
+    // accounting and let it block the boot it exists to stay out of.
+    assert!(!definition.has_boot_trigger());
+    assert!(definition.has_boot_settled_trigger());
+}
+
+/// Opening the `boot:` namespace kept its arity rule rather than dropping it:
+/// a typo is still an error, not a silently-tolerated unknown trigger.
+#[test]
+fn unknown_boot_sub_triggers_are_still_rejected() {
+    for trigger in ["boot:setled", "boot:anything", "boot:"] {
+        build_service_definition_from_registry_values(
+            "app",
+            &[
+                sz("ImagePath", "/sbin/app"),
+                multi_sz("Triggers", &[trigger]),
+            ],
+        )
+        .expect_err(trigger);
+    }
 }

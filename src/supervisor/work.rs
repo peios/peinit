@@ -20,6 +20,7 @@ use crate::operation::store::OperationStore;
 use crate::service::{ServiceEnvironmentVariable, ServiceTable};
 use crate::shutdown::{ShutdownError, ShutdownRuntime, ShutdownSignalTracker};
 
+use super::boot_settle::BootSettleTracker;
 use super::boot_success::BootSuccessTracker;
 use super::cgroup_cleanup::CgroupCleanupStore;
 use super::control_boundary::PendingControlOperation;
@@ -56,6 +57,7 @@ pub(super) struct SupervisorWork {
     pub pending_process_setups: BTreeMap<i32, PendingLaunchSetup>,
     pub pending_control_operations: VecDeque<PendingControlOperation>,
     pub retained_service_launches: Vec<LaunchCreatedJobDispatch>,
+    pub boot_settle: BootSettleTracker,
     pub boot_success: BootSuccessTracker,
     pub shutdown: Option<ShutdownRuntime>,
     pub shutdown_signals: ShutdownSignalTracker,
@@ -90,6 +92,7 @@ impl SupervisorWork {
             pending_process_setups: supervisor.pending_process_setups.clone(),
             pending_control_operations: supervisor.pending_control_operations.clone(),
             retained_service_launches: supervisor.retained_service_launches.clone(),
+            boot_settle: supervisor.boot_settle.clone(),
             boot_success: supervisor.boot_success.clone(),
             shutdown: supervisor.shutdown.clone(),
             shutdown_signals: supervisor.shutdown_signals.clone(),
@@ -125,6 +128,7 @@ impl SupervisorWork {
         supervisor.pending_process_setups = self.pending_process_setups;
         supervisor.pending_control_operations = self.pending_control_operations;
         supervisor.retained_service_launches = self.retained_service_launches;
+        supervisor.boot_settle = self.boot_settle;
         supervisor.boot_success = self.boot_success;
         supervisor.shutdown = self.shutdown;
         supervisor.shutdown_signals = self.shutdown_signals;

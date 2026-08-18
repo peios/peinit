@@ -9,13 +9,15 @@ use crate::service::{ServiceDefinition, ServiceEnvironmentVariable};
 use crate::timer::state::TimerLastRunStorage;
 
 use super::boot::{
-    read_lcs_boot_success_grace_secs, read_lcs_max_parallel_starts, read_lcs_shutdown_timeout_secs,
+    read_lcs_boot_success_grace_secs, read_lcs_max_parallel_starts,
+    read_lcs_post_kill_timeout_secs, read_lcs_settle_timeout_secs, read_lcs_shutdown_timeout_secs,
 };
 use super::eventd::read_lcs_eventd_log_socket_path;
 use super::global_env::read_lcs_global_environment;
 use super::init::{
-    read_lcs_control_security, read_lcs_control_socket_limits, read_lcs_max_log_buffer_per_service,
-    read_lcs_max_log_line_length,
+    read_lcs_control_security, read_lcs_control_socket_limits, read_lcs_log_read_bytes_per_event,
+    read_lcs_max_log_buffer_per_service, read_lcs_max_log_line_length,
+    read_lcs_pre_eventd_buffer_bytes,
 };
 use super::provisioning::read_lcs_provisioned_paths;
 use super::schema::{provision_lcs_base_registry, read_lcs_services_schema_version};
@@ -60,6 +62,26 @@ impl RegistryClient for LcsRegistryClient {
 
     fn read_shutdown_timeout_secs(&mut self) -> Result<Option<u32>, BoundaryError> {
         read_lcs_shutdown_timeout_secs()
+            .map_err(|error| BoundaryError::Registry(format!("{error:?}")))
+    }
+
+    fn read_post_kill_timeout_secs(&mut self) -> Result<Option<u32>, BoundaryError> {
+        read_lcs_post_kill_timeout_secs()
+            .map_err(|error| BoundaryError::Registry(format!("{error:?}")))
+    }
+
+    fn read_settle_timeout_secs(&mut self) -> Result<Option<u32>, BoundaryError> {
+        read_lcs_settle_timeout_secs()
+            .map_err(|error| BoundaryError::Registry(format!("{error:?}")))
+    }
+
+    fn read_log_read_bytes_per_event(&mut self) -> Result<Option<u32>, BoundaryError> {
+        read_lcs_log_read_bytes_per_event()
+            .map_err(|error| BoundaryError::Registry(format!("{error:?}")))
+    }
+
+    fn read_pre_eventd_buffer_bytes(&mut self) -> Result<Option<u32>, BoundaryError> {
+        read_lcs_pre_eventd_buffer_bytes()
             .map_err(|error| BoundaryError::Registry(format!("{error:?}")))
     }
 

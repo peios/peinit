@@ -11,7 +11,8 @@ mod timer;
 mod watchdog;
 
 pub use boot::{
-    SupervisorBootDispatch, SupervisorBootSuccessDispatch,
+    SupervisorBootDispatch, SupervisorBootSettleDispatch, SupervisorBootSettleFailure,
+    SupervisorBootSettleStart, SupervisorBootSuccessDispatch,
     SupervisorFilesystemCheckCompletionDispatch, SupervisorFilesystemCheckLaunchDispatch,
     SupervisorFilesystemCheckTimeoutDispatch,
 };

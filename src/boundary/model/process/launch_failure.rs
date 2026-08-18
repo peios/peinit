@@ -81,6 +81,8 @@ pub enum ProcessPreExecStep {
     SetEnvironment,
     SetNotifySocket,
     InjectStoredFileDescriptors,
+    CreateSession,
+    AcquireControllingTerminal,
     Exec,
 }
 
@@ -98,6 +100,8 @@ impl ProcessPreExecStep {
             Self::SetNotifySocket => 9,
             Self::InjectStoredFileDescriptors => 10,
             Self::Exec => 11,
+            Self::CreateSession => 12,
+            Self::AcquireControllingTerminal => 13,
         }
     }
 
@@ -114,6 +118,8 @@ impl ProcessPreExecStep {
             9 => Some(Self::SetNotifySocket),
             10 => Some(Self::InjectStoredFileDescriptors),
             11 => Some(Self::Exec),
+            12 => Some(Self::CreateSession),
+            13 => Some(Self::AcquireControllingTerminal),
             _ => None,
         }
     }
@@ -130,6 +136,8 @@ impl ProcessPreExecStep {
             Self::SetEnvironment => "set-environment",
             Self::SetNotifySocket => "set-notify-socket",
             Self::InjectStoredFileDescriptors => "inject-stored-file-descriptors",
+            Self::CreateSession => "create-session",
+            Self::AcquireControllingTerminal => "acquire-controlling-terminal",
             Self::Exec => "exec",
         }
     }

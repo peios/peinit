@@ -109,7 +109,7 @@ impl JobRecord {
             activation_generation,
             cgroup_generation,
             operation_id: None,
-            attach_console: false,
+            console_path: None,
         })
     }
 }
@@ -170,6 +170,6 @@ fn new_service_hook_job(
         activation_generation,
         cgroup_generation,
         operation_id: Some(operation_id),
-        attach_console: false,
+        console_path: None,
     })
 }

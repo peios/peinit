@@ -1,4 +1,5 @@
 use crate::runtime::RuntimeWorkPumpTurn;
+use crate::runtime::console::ConsoleMessage;
 
 use super::{
     collect_start_dispatches_console_messages, collect_start_failure_console_messages,
@@ -7,7 +8,7 @@ use super::{
 
 pub(super) fn collect_runtime_work_pump_console_messages(
     turn: &RuntimeWorkPumpTurn,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     for dispatch in &turn.service_launches {
         push_service_started(out, &dispatch.started.job_event);

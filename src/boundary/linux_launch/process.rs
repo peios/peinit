@@ -68,12 +68,12 @@ pub(super) fn launch_linux_process(
         }
     };
 
-    // Console-attached services (the compiled-in console shell) get a live tty
+    // Terminal-attached services (a TTYPath in the definition) get a live tty
     // on 0/1/2 instead of the daemon /dev/null + capture pipes below. Opened in
     // the parent so the cloned child inherits the fd; the child dups it onto the
     // standard streams and the parent drops its copy after the clone.
-    let console = if job.attach_console {
-        match open_console() {
+    let console = if let Some(console_path) = job.console_path.as_deref() {
+        match open_console(console_path) {
             Ok(console) => Some(console),
             Err(error) => {
                 return Err(parent_setup_with_cleanup(

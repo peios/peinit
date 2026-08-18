@@ -32,8 +32,25 @@ pub enum NotifyAccess {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ServiceTrigger {
+    /// `boot` — start during the Phase 2 boot sequence.
     Boot,
-    Timer { schedule: String },
+    /// `boot:settled` — start once the Phase 2 boot set has stopped moving, or
+    /// a deadline expires, whichever comes first.
+    ///
+    /// A boot trigger, not a separate kind: the service is wanted on this boot,
+    /// just not in the middle of it. It is deliberately NOT part of the boot
+    /// plan — it does not consume the parallel-start budget, is not counted
+    /// towards boot success, and cannot block anything — so a service that
+    /// merely prefers a quiet moment cannot change what the boot means.
+    ///
+    /// Ordering it with `Requires` instead would say the wrong thing. A console
+    /// login does not *need* the boot to be quiet in order to function; it just
+    /// looks broken when its prompt is written over. That is a scheduling
+    /// preference, and the trigger is where "when do I start" belongs.
+    BootSettled,
+    Timer {
+        schedule: String,
+    },
     Other(String),
 }
 
@@ -123,22 +140,26 @@ pub struct ServiceDefinition {
     pub service_security: ServiceSecurityDescriptor,
     pub timer_persistent: bool,
     pub timer_jitter_secs: u64,
-    /// When set, the launcher attaches this service's stdio to `/dev/console`
-    /// (a real tty on fds 0/1/2) instead of the daemon default (`/dev/null`
-    /// stdin + captured stdout/stderr log pipes). Reserved for the compiled-in
-    /// console service; never set from a registry definition.
-    pub attach_console: bool,
+    /// When set, the launcher opens this tty and attaches the service's stdio
+    /// to it (a real terminal on fds 0/1/2) instead of the daemon default
+    /// (`/dev/null` stdin + captured stdout/stderr log pipes), and makes the
+    /// service a session leader owning it as its controlling terminal.
+    ///
+    /// A path rather than a flag because which terminal is a per-service
+    /// question, not a global one: a shell on `tty1` while the kernel console
+    /// is a serial line is an ordinary thing to want, and `console=ttyS0`
+    /// images need `/dev/console` to mean the serial line for some services and
+    /// not others. Absent means daemon stdio.
+    ///
+    /// Attaching a tty suppresses log capture — the pipes eventd would read are
+    /// closed — so output goes to the terminal and nowhere else.
+    pub console_path: Option<String>,
+
 }
 
 impl ServiceDefinition {
     pub const REGISTRYD_NAME: &'static str = "registryd";
-    pub const REGISTRYD_IMAGE_PATH: &'static str = "/usr/sbin/registryd";
-    /// The compiled-in console service: a SYSTEM shell on `/dev/console`,
-    /// injected into the Phase 2 boot set only when `peios.console=1` is on the
-    /// kernel command line. Not a registry entry — like registryd, peinit owns
-    /// it directly.
-    pub const CONSOLE_NAME: &'static str = "console";
-    pub const CONSOLE_IMAGE_PATH: &'static str = "/usr/bin/sh";
+    pub const REGISTRYD_IMAGE_PATH: &'static str = "/sbin/registryd";
     /// Hive specs handed to the Phase-1 registryd, in the `HiveName=Path` form
     /// the RSI source (loregd) parses. peinit owns this boot policy — where the
     /// machine registry lives — the way it owns `REGISTRYD_IMAGE_PATH`; loregd
@@ -146,8 +167,8 @@ impl ServiceDefinition {
     /// (and its parent dir) on first boot. `Machine` carries System\Services /
     /// Init / Boot (everything Phase 1 reads); `Users` is the HKU-equivalent.
     pub const REGISTRYD_ARGUMENTS: [&'static str; 2] = [
-        "Machine=/var/lib/loregd/Machine.hive",
-        "Users=/var/lib/loregd/Users.hive",
+        "Machine=/var/state/loregd/Machine.hive",
+        "Users=/var/state/loregd/Users.hive",
     ];
     pub const DEFAULT_RESTART_POLICY: RestartPolicy = RestartPolicy::OnFailure;
     pub const DEFAULT_RESTART_MAX_RETRIES: u32 = 5;
@@ -216,7 +237,7 @@ impl ServiceDefinition {
             service_security: ServiceSecurityDescriptor::Default,
             timer_persistent: Self::DEFAULT_TIMER_PERSISTENT,
             timer_jitter_secs: Self::DEFAULT_TIMER_JITTER_SECS,
-            attach_console: false,
+            console_path: None,
         }
     }
 
@@ -231,40 +252,23 @@ impl ServiceDefinition {
         service
     }
 
-    /// The compiled-in console service: a SYSTEM shell on `/dev/console`.
+    /// Whether this service belongs to the Phase 2 boot plan.
     ///
-    /// Unlike registryd it is *not* a notify-readiness daemon — a shell never
-    /// sends `READY=1`, so readiness is `Alive` (active once exec'd). It is
-    /// respawned forever (`RestartPolicy::Always`): exiting the shell yields a
-    /// fresh prompt rather than a dead console. `attach_console` routes its
-    /// stdio to the console tty in the launcher. Environment mirrors the
-    /// recovery console's shell so the prompt behaves the same.
-    pub fn compiled_in_console() -> Self {
-        let mut service = Self::simple_system_boot(Self::CONSOLE_NAME, Self::CONSOLE_IMAGE_PATH);
-        service.readiness = Readiness::Alive;
-        service.restart_policy = RestartPolicy::Always;
-        service.attach_console = true;
-        service.environment = vec![
-            ServiceEnvironmentVariable {
-                name: "PATH".to_string(),
-                value: "/usr/sbin:/usr/bin:/sbin:/bin".to_string(),
-            },
-            ServiceEnvironmentVariable {
-                name: "TERM".to_string(),
-                value: "linux".to_string(),
-            },
-            ServiceEnvironmentVariable {
-                name: "HOME".to_string(),
-                value: "/root".to_string(),
-            },
-        ];
-        service
-    }
-
+    /// `boot:settled` deliberately does NOT count: those services start after
+    /// the plan, so including them would put them in the parallel-start budget
+    /// and in boot-success accounting, and let them block the boot they are
+    /// supposed to be staying out of the way of.
     pub fn has_boot_trigger(&self) -> bool {
         self.triggers
             .iter()
             .any(|trigger| matches!(trigger, ServiceTrigger::Boot))
+    }
+
+    /// Whether this service starts once the boot set has settled.
+    pub fn has_boot_settled_trigger(&self) -> bool {
+        self.triggers
+            .iter()
+            .any(|trigger| matches!(trigger, ServiceTrigger::BootSettled))
     }
 }
 
@@ -273,24 +277,52 @@ mod tests {
     use super::*;
 
     #[test]
-    fn compiled_in_console_attaches_a_respawning_alive_system_shell() {
-        let console = ServiceDefinition::compiled_in_console();
-
-        assert_eq!(console.name, ServiceDefinition::CONSOLE_NAME);
-        assert_eq!(console.image_path, ServiceDefinition::CONSOLE_IMAGE_PATH);
-        assert_eq!(console.identity, "SYSTEM");
-        assert!(console.attach_console);
-        // A shell never sends READY=1, so it must be Alive (active once exec'd)
-        // and respawned forever so exiting the shell yields a fresh prompt.
-        assert_eq!(console.readiness, Readiness::Alive);
-        assert_eq!(console.restart_policy, RestartPolicy::Always);
-        assert!(console.has_boot_trigger());
+    fn the_registry_daemon_executes_through_a_root_level_runtime_view() {
+        // registryd is the one service peinit still defines itself, so it is
+        // the one image path that cannot be reviewed as registry data.
+        assert!(
+            ServiceDefinition::REGISTRYD_IMAGE_PATH.starts_with("/sbin/"),
+            "registryd must execute through the StrataFS runtime views",
+        );
     }
 
     #[test]
-    fn simple_system_boot_does_not_attach_a_console() {
-        let service = ServiceDefinition::simple_system_boot("svc", "/usr/bin/svc");
+    fn compiled_in_registryd_is_a_critical_boot_daemon() {
+        let registryd = ServiceDefinition::compiled_in_registryd();
 
-        assert!(!service.attach_console);
+        assert_eq!(registryd.name, ServiceDefinition::REGISTRYD_NAME);
+        assert_eq!(
+            registryd.image_path,
+            ServiceDefinition::REGISTRYD_IMAGE_PATH
+        );
+        assert_eq!(registryd.identity, "SYSTEM");
+        assert_eq!(registryd.readiness, Readiness::Notify);
+        // Nothing else can be read from the registry until this is serving, so
+        // a boot that cannot start it has not started.
+        assert_eq!(registryd.error_control, ErrorControl::Critical);
+        assert!(registryd.has_boot_trigger());
+        assert!(registryd.console_path.is_none());
+    }
+
+    /// registryd is the *only* service peinit compiles in. console, authd,
+    /// lpsd and login were compiled in too and are now ordinary registry
+    /// services; nothing should quietly reintroduce that pattern, because a
+    /// compiled-in definition cannot be inspected, overridden or disabled by
+    /// an operator.
+    #[test]
+    fn registryd_is_the_only_compiled_in_service() {
+        let registryd = ServiceDefinition::compiled_in_registryd();
+
+        assert_eq!(registryd.name, ServiceDefinition::REGISTRYD_NAME);
+        assert!(registryd.requires.is_empty());
+        assert!(registryd.wants.is_empty());
+        assert!(registryd.binds_to.is_empty());
+    }
+
+    #[test]
+    fn simple_system_boot_does_not_attach_a_terminal() {
+        let service = ServiceDefinition::simple_system_boot("svc", "/bin/svc");
+
+        assert!(service.console_path.is_none());
     }
 }

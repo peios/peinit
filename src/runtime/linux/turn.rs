@@ -40,11 +40,31 @@ impl LinuxShutdownRuntime {
         supervisor.sync_lifecycle_deadline_timer(&mut self.lifecycle_timer)
     }
 
+    /// Write what the quiet policy allows, dropping the rest.
+    ///
+    /// Dropped messages are gone, not deferred. That is a deliberate gap
+    /// pending eventd: until there is somewhere to put them, `peios.quiet=0`
+    /// is how an operator keeps the full narrative.
+    fn write_console_messages(&mut self, messages: Vec<crate::runtime::console::ConsoleMessage>) {
+        for message in messages {
+            if !self.quiet_policy.allows(message.severity) {
+                continue;
+            }
+            let _ = self.console_sink.write_console(&message.text);
+        }
+    }
+
     pub fn run_turn(
         &mut self,
         supervisor: &mut Supervisor,
     ) -> Result<RuntimeShutdownLoopTurn, RuntimeShutdownLoopError> {
         self.sync_reloadable_config(supervisor);
+        // Once per turn: terminal ownership only changes when a service does,
+        // and a turn is the granularity at which that happens. Doing it here
+        // also means both write sites below share one answer, so a message
+        // cannot be judged against a different state than the one beside it.
+        self.quiet_policy =
+            crate::runtime::console::QuietPolicy::evaluate(self.quiet, supervisor.services());
         let pre_work = {
             let control_security = supervisor.control_security().clone();
             let control_limits = self.runtime_control_limits(supervisor);
@@ -191,9 +211,7 @@ impl LinuxShutdownRuntime {
             &calendar_turns,
             &mut console_messages,
         );
-        for message in console_messages {
-            let _ = self.console_sink.write_console(&message);
-        }
+        self.write_console_messages(console_messages);
         turn.sources.extend(calendar_sources);
         turn.turns
             .extend(calendar_turns.into_iter().map(|(fd, turn)| {

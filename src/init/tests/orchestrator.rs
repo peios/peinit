@@ -2,7 +2,7 @@ use crate::boot::BootMode;
 use crate::boundary::BoundaryError;
 use crate::init::{
     InitConfig, InitFatalError, InitRecoveryReason, InitRunError, InitRunResult, KernelCommandLine,
-    MachineIdStatus, Phase1Infrastructure, Phase1InfrastructureWarning, run_init,
+    MachineIdStatus, Phase1Infrastructure, Phase1InfrastructureWarning, QuietLevel, run_init,
 };
 use crate::provisioning::{
     ProvisionedPath, ProvisionedPathApplyFailure, ProvisionedPathApplyReport, ProvisionedPathKind,
@@ -41,7 +41,9 @@ fn recovery_flag_enters_recovery_after_root_probe_and_counter_increment() {
     let mut platform = Platform::new().command_line(KernelCommandLine {
         recovery: true,
         safe_mode: false,
-        console: false,
+        boot_attempt_threshold: None,
+        notify_socket_path: None,
+        quiet: QuietLevel::default(),
     });
     let mut registry = Registry::with_services([]);
     let mut clock = ClockAt(1);
@@ -73,7 +75,9 @@ fn recovery_flag_does_not_require_readable_boot_attempt_counter() {
         .command_line(KernelCommandLine {
             recovery: true,
             safe_mode: false,
-            console: false,
+            boot_attempt_threshold: None,
+            notify_socket_path: None,
+            quiet: QuietLevel::default(),
         })
         .boot_attempt_counter_error("malformed counter");
     let mut registry = Registry::with_services([]);
@@ -308,6 +312,91 @@ fn boot_attempt_threshold_enters_recovery() {
     assert!(!runtime.entered);
 }
 
+/// `peios.bootattempts=N` overrides the compiled-in threshold. It has to be a
+/// command-line value rather than a registry one: the check runs in Phase 1,
+/// before registryd is launched, so there is nothing to read it from.
+#[test]
+fn command_line_boot_attempt_threshold_overrides_the_default() {
+    let mut platform = Platform::new()
+        .boot_attempt_counter(3)
+        .command_line(KernelCommandLine {
+            boot_attempt_threshold: Some(10),
+            ..KernelCommandLine::default()
+        });
+    let mut registry = Registry::with_services([service("app")]);
+    let mut clock = ClockAt(10);
+    let mut runtime = Runtime::default();
+
+    let result = run_init(
+        InitConfig::default(),
+        &mut platform,
+        &mut registry,
+        &mut clock,
+        &mut runtime,
+    )
+    .expect("runtime");
+
+    // 3 attempts against a threshold of 10 is a normal boot, where the
+    // compiled-in threshold of 3 would have diverted into recovery.
+    assert_eq!(result, InitRunResult::RuntimeReturned);
+    assert!(runtime.entered);
+}
+
+/// The escape hatch: a system whose boot-attempt counter is itself the problem
+/// (a root that reports failure but boots fine) can be told to stop counting.
+#[test]
+fn command_line_boot_attempt_threshold_of_zero_disables_the_check() {
+    let mut platform =
+        Platform::new()
+            .boot_attempt_counter(9_999)
+            .command_line(KernelCommandLine {
+                boot_attempt_threshold: Some(0),
+                ..KernelCommandLine::default()
+            });
+    let mut registry = Registry::with_services([service("app")]);
+    let mut clock = ClockAt(10);
+    let mut runtime = Runtime::default();
+
+    let result = run_init(
+        InitConfig::default(),
+        &mut platform,
+        &mut registry,
+        &mut clock,
+        &mut runtime,
+    )
+    .expect("runtime");
+
+    assert_eq!(result, InitRunResult::RuntimeReturned);
+    assert!(runtime.entered);
+}
+
+/// `peios.notifysocket=PATH` must be applied before registryd is launched,
+/// because binding the socket is the first thing that launch does.
+#[test]
+fn command_line_notify_socket_path_is_bound_before_registryd_starts() {
+    let mut platform = Platform::new().command_line(KernelCommandLine {
+        notify_socket_path: Some("/run/alt/notify.sock".to_string()),
+        ..KernelCommandLine::default()
+    });
+    let mut registry = Registry::with_services([service("app")]);
+    let mut clock = ClockAt(10);
+    let mut runtime = Runtime::default();
+
+    run_init(
+        InitConfig::default(),
+        &mut platform,
+        &mut registry,
+        &mut clock,
+        &mut runtime,
+    )
+    .expect("runtime");
+
+    assert_eq!(
+        platform.registryd_notify_socket_path.as_deref(),
+        Some("/run/alt/notify.sock"),
+    );
+}
+
 #[test]
 fn boot_attempt_increment_failure_treats_counter_as_zero_and_continues() {
     let mut platform = Platform::new()
@@ -369,7 +458,7 @@ fn successful_boot_enters_runtime_with_phase2_booted_supervisor() {
 
 #[test]
 fn provisioned_paths_are_applied_after_registryd_before_phase2() {
-    let entry = provisioned_directory("eventd-run", "/run/eventd", false);
+    let entry = provisioned_directory("eventd-run", "/run/services/eventd", false);
     let mut snapshot = ProvisionedPathRegistrySnapshot::empty();
     snapshot.entries.push(entry.clone());
     let mut platform = Platform::new();
@@ -469,13 +558,13 @@ fn optional_provisioned_path_failures_are_warnings_not_recovery() {
 
 #[test]
 fn required_provisioned_path_failures_enter_recovery_before_phase2() {
-    let entry = provisioned_directory("eventd", "/run/eventd", true);
+    let entry = provisioned_directory("eventd", "/run/services/eventd", true);
     let mut snapshot = ProvisionedPathRegistrySnapshot::empty();
     snapshot.entries.push(entry);
     let mut report = ProvisionedPathApplyReport::default();
     report.required_failures.push(ProvisionedPathApplyFailure {
         entry: "eventd".to_string(),
-        path: "/run/eventd".to_string(),
+        path: "/run/services/eventd".to_string(),
         message: "security rejected".to_string(),
     });
     let mut platform = Platform::new().provision_report(report);
@@ -564,7 +653,9 @@ fn safemode_flag_sets_supervisor_boot_mode() {
     let mut platform = Platform::new().command_line(KernelCommandLine {
         safe_mode: true,
         recovery: false,
-        console: false,
+        boot_attempt_threshold: None,
+        notify_socket_path: None,
+        quiet: QuietLevel::default(),
     });
     let mut registry = Registry::with_services([critical_service("core"), service("app")]);
     let mut clock = ClockAt(10);

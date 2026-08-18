@@ -1,4 +1,5 @@
 use crate::control::lifecycle::LifecycleCommandOutcome;
+use crate::runtime::console::ConsoleMessage;
 use crate::runtime::{RuntimeCalendarTimerTurn, RuntimeFilesystemCheckHelperTurn};
 use crate::supervisor::{
     SupervisorControlCommandDispatch, SupervisorControlConnectionTableTurn,
@@ -14,7 +15,7 @@ use crate::runtime::console::{
 
 pub(super) fn collect_runtime_calendar_timer_console_messages(
     turn: &RuntimeCalendarTimerTurn,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     if let RuntimeCalendarTimerTurn::Read {
         supervisor: Some(dispatch),
@@ -27,7 +28,7 @@ pub(super) fn collect_runtime_calendar_timer_console_messages(
 
 pub(super) fn collect_control_connection_table_turn_console_messages(
     turn: &SupervisorControlConnectionTableTurn,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     if let Some(frame) = &turn.turn.frame {
         collect_control_frame_turn_console_messages(&frame.frame, out);
@@ -36,14 +37,14 @@ pub(super) fn collect_control_connection_table_turn_console_messages(
 
 pub(super) fn collect_notify_dispatch_console_messages(
     dispatch: &SupervisorNotifyDispatch,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     collect_start_dispatches_console_messages(&dispatch.start_dispatches, out);
 }
 
 pub(super) fn collect_filesystem_check_helper_turn_console_messages(
     turn: &RuntimeFilesystemCheckHelperTurn,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     match turn {
         RuntimeFilesystemCheckHelperTurn::Completed { completion }
@@ -61,7 +62,7 @@ pub(super) fn collect_filesystem_check_helper_turn_console_messages(
 
 fn collect_control_frame_turn_console_messages(
     turn: &SupervisorControlFrameTurn,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     match turn {
         SupervisorControlFrameTurn::ShutdownAccepted { dispatch, .. } => {
@@ -81,7 +82,7 @@ fn collect_control_frame_turn_console_messages(
 
 fn collect_control_command_dispatch_console_messages(
     dispatch: &SupervisorControlCommandDispatch,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     match dispatch {
         SupervisorControlCommandDispatch::Shutdown(dispatch) => {
@@ -96,7 +97,7 @@ fn collect_control_command_dispatch_console_messages(
 
 fn collect_lifecycle_dispatch_console_messages(
     dispatch: &SupervisorLifecycleDispatch,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     collect_lifecycle_outcome_console_messages(&dispatch.outcome, out);
     collect_start_dispatches_console_messages(&dispatch.start_dispatches, out);
@@ -104,7 +105,7 @@ fn collect_lifecycle_dispatch_console_messages(
 
 fn collect_lifecycle_outcome_console_messages(
     outcome: &LifecycleCommandOutcome,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     match outcome {
         LifecycleCommandOutcome::SynchronousClear(clear) => {
@@ -119,14 +120,14 @@ fn collect_lifecycle_outcome_console_messages(
 
 fn collect_system_shutdown_dispatch_console_messages(
     dispatch: &SupervisorSystemShutdownDispatch,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     shutdown::collect_shutdown_dispatch_console_messages(&dispatch.shutdown, out);
 }
 
 fn collect_timer_dispatch_console_messages(
     dispatch: &SupervisorTimerDispatch,
-    out: &mut Vec<String>,
+    out: &mut Vec<ConsoleMessage>,
 ) {
     if let SupervisorTimerAction::Start {
         start_dispatches, ..

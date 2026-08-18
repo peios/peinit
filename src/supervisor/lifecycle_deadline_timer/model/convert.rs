@@ -5,6 +5,7 @@ use crate::execution::start::{
     PostStartHookDeadline, PreStartCheckDeadline, PreStartHookDeadline, ReadinessDeadline,
 };
 use crate::service::RestartBackoffDeadline;
+use crate::supervisor::boot_settle::BootSettleDeadline;
 use crate::supervisor::boot_success::BootSuccessDeadline;
 use crate::supervisor::health::{HealthCheckIntervalDeadline, HealthCheckTimeoutDeadline};
 use crate::supervisor::watchdog::WatchdogDeadline;
@@ -154,6 +155,15 @@ impl From<BootSuccessDeadline> for SupervisorLifecycleDeadline {
         Self {
             due_at_ns: deadline.due_at_ns,
             kind: SupervisorLifecycleDeadlineKind::BootSuccess,
+        }
+    }
+}
+
+impl From<BootSettleDeadline> for SupervisorLifecycleDeadline {
+    fn from(deadline: BootSettleDeadline) -> Self {
+        Self {
+            due_at_ns: deadline.due_at_ns,
+            kind: SupervisorLifecycleDeadlineKind::BootSettle,
         }
     }
 }
