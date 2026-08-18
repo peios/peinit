@@ -20,20 +20,55 @@ pub(super) fn kill_cgroup(cgroup_id: &str) -> Result<(), BoundaryError> {
     })
 }
 
+/// Whether a cgroup still holds processes.
+///
+/// A cgroup that does not exist reports `false` rather than failing. That is a
+/// statement about cgroups, not a policy choice: a tree that is gone holds
+/// nothing, and every caller is asking "may I stop waiting for this to drain?"
+/// — post-kill deadlines, cleanup deadlines, and the abandoned-service reset
+/// check all want `false` for a vanished tree.
+///
+/// It is also load-bearing for robustness. The cleanup-deadline caller runs on
+/// the lifecycle-deadline path, whose errors propagate out of the runtime turn,
+/// out of the event loop, and into recovery. A launch that fails before its
+/// cgroup is created still records a cleanup deadline, so treating the missing
+/// tree as an error turned any one service's failed launch into a failed boot
+/// for the whole system.
+///
+/// A cgroup that exists and cannot be read is still an error, which is the
+/// distinction worth keeping: "nothing to check" and "cannot check" are
+/// different answers.
 pub(super) fn cgroup_populated(cgroup_id: &str) -> Result<bool, BoundaryError> {
     let path = cgroup_events_file_path(cgroup_id)?;
-    let file = OpenOptions::new()
+    let file = match OpenOptions::new()
         .desired_access(FileAccess::READ_DATA)
         .open(None, &path)
-        .map_err(|error| {
-            BoundaryError::Process(format!("open {} failed: {error}", path.display()))
-        })?;
+    {
+        Ok(file) => file,
+        Err(error) if is_absent(&error) => return Ok(false),
+        Err(error) => {
+            return Err(BoundaryError::Process(format!(
+                "open {} failed: {error}",
+                path.display()
+            )));
+        }
+    };
     let text = read_fd_to_string(file.as_raw_fd()).map_err(|error| {
         BoundaryError::Process(format!("read {} failed: {error}", path.display()))
     })?;
     parse_cgroup_populated(&text).ok_or_else(|| {
         BoundaryError::Process(format!("{} missing populated field", path.display()))
     })
+}
+
+/// ENOENT or ENOTDIR: the cgroup, or a directory on the way to it, is gone.
+/// ENOTDIR matters because a parent removed mid-walk leaves the child path
+/// resolving through a non-directory rather than simply missing.
+fn is_absent(error: &peios::Error) -> bool {
+    matches!(
+        error.raw_os_error(),
+        Some(errno) if errno == libc::ENOENT || errno == libc::ENOTDIR
+    )
 }
 
 pub(super) fn remove_cgroup_directory(
@@ -98,6 +133,19 @@ mod tests {
             "/sys/fs/cgroup/peinit/app.gen1/cgroup.kill",
         );
         assert!(cgroup_kill_file_path("").is_err());
+    }
+
+    /// The behaviour a failed launch depends on. This runs against a path that
+    /// genuinely does not exist, so it exercises the real ENOENT branch rather
+    /// than a double: a cleanup deadline recorded for a cgroup that was never
+    /// created must report "drained", not fail — the alternative propagates out
+    /// of the runtime loop and takes the whole boot into recovery.
+    #[test]
+    fn absent_cgroup_reports_unpopulated_rather_than_failing() {
+        let populated = super::cgroup_populated("/sys/fs/cgroup/peinit/peinit-test-absent")
+            .expect("a missing cgroup is drained, not an error");
+
+        assert!(!populated);
     }
 
     #[test]
