@@ -12,10 +12,23 @@ pub(super) const DEFAULT_MOUNTINFO_PATH: &str = "/proc/self/mountinfo";
 /// The SYSTEM-owned, container+object-inheritable default SD seeded onto each
 /// fresh tmpfs root we mount. A new tmpfs carries no SD, so KACS DENY_MISSING
 /// locks every inode on it (mkdir/touch → EACCES) until this is stamped;
-/// inheritance then derives child SDs. Same descriptor prelude's seed-sd helper
-/// writes (Allow SYSTEM GENERIC_ALL, OI|CI). Requires SeRestorePrivilege in our
+/// inheritance then derives child SDs. Requires SeRestorePrivilege in our
 /// token to replace the MISSING SD — held by the boot SYSTEM token.
-const PHASE1_SEED_SDDL: &str = "O:SYG:SYD:(A;OICI;GA;;;SY)";
+///
+/// Allow SYSTEM GenericAll and Allow BUILTIN\Administrators GenericAll, both
+/// OI|CI. Because everything created beneath these roots inherits from this
+/// one descriptor, it is the access policy of `/run`, `/dev/shm` and the
+/// cgroup tree in their entirety; an ACE missing here is missing from every
+/// per-service directory under `/run/services`. Administrators is present so
+/// that an administrator can enumerate those trees at all — nothing bypasses
+/// `FILE_LIST_DIRECTORY`, so a SYSTEM-only seed makes them invisible to any
+/// signed-on principal (PEI-223).
+///
+/// This MUST stay identical to `build_seed_sd` in prelude's `seed-sd`, which
+/// stamps the same descriptor on the root the rest of the tree hangs off. The
+/// two are hand-copied; the last time they drifted, Administrators was added
+/// there and not here, and the drift went unnoticed for four days.
+const PHASE1_SEED_SDDL: &str = "O:SYG:SYD:(A;OICI;GA;;;SY)(A;OICI;GA;;;BA)";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct Phase1VirtualMount {
