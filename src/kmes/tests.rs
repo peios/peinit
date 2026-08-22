@@ -1,6 +1,6 @@
 use peios::msgpack::Reader;
 
-use crate::boot::phase2::{Phase2BootPlanError, Phase2BootRunError};
+use crate::boot::phase2::{BlockedReason, Phase2BootPlanError, Phase2BootRunError};
 use crate::control::service_security::{ServiceAccess, ServiceAccessDenied};
 use crate::control::system::{SystemAccess, SystemAccessDenied};
 use crate::execution::notify::{AuthenticatedNotifySender, NotifyAppliedField};
@@ -24,7 +24,8 @@ use crate::supervisor::{
 use super::{
     encode_critical_failure_event, encode_fd_store_rejection_event,
     encode_graph_validation_error_event, encode_graph_validation_warning_event,
-    encode_init_recovery_events, encode_job_event, encode_notify_applied_field_events,
+    encode_boot_blocked_service_event, encode_init_recovery_events, encode_job_event,
+    encode_notify_applied_field_events,
     encode_notify_rejection_event, encode_on_failure_loop_suppressed_event, encode_operation_event,
     encode_service_access_denied_event, encode_shutdown_abandoned_event,
     encode_system_access_denied_event,
@@ -473,4 +474,80 @@ fn empty_finalization_report() -> ShutdownFinalizationReport {
         sync_result: CleanupActionResult::Ok,
         reboot_result: CleanupActionResult::Ok,
     }
+}
+
+/// Boot findings reuse `graph.validation_error` and are separated from reload
+/// findings by `phase`, so one consumer filter catches both regimes.
+#[test]
+fn encodes_boot_blocked_service_payloads() {
+    let missing = encode_boot_blocked_service_event(
+        "app",
+        &BlockedReason::HardDependencyUnavailable {
+            target: "db".to_string(),
+            kind: ServiceDependencyKind::Requires,
+        },
+    )
+    .expect("missing dependency event");
+
+    assert_eq!(missing.event_type, "graph.validation_error");
+    assert_eq!(read_str(&missing.payload, "phase"), "boot");
+    assert_eq!(
+        read_str(&missing.payload, "finding"),
+        "missing_hard_dependency"
+    );
+    assert_eq!(read_str(&missing.payload, "service"), "app");
+    assert_eq!(read_str(&missing.payload, "target"), "db");
+    assert_eq!(read_str(&missing.payload, "dependency_kind"), "requires");
+
+    // The finding reload cannot produce: blocked because a dependency is
+    // blocked, which is not the same claim as the dependency being missing.
+    let blocked = encode_boot_blocked_service_event(
+        "app",
+        &BlockedReason::HardDependencyBlocked {
+            target: "db".to_string(),
+            kind: ServiceDependencyKind::BindsTo,
+        },
+    )
+    .expect("blocked dependency event");
+    assert_eq!(
+        read_str(&blocked.payload, "finding"),
+        "hard_dependency_blocked"
+    );
+    assert_eq!(read_str(&blocked.payload, "dependency_kind"), "binds_to");
+
+    let cycle = encode_boot_blocked_service_event(
+        "a",
+        &BlockedReason::CycleDetected {
+            services: vec!["a".to_string(), "b".to_string(), "a".to_string()],
+        },
+    )
+    .expect("cycle event");
+    assert_eq!(read_str(&cycle.payload, "finding"), "cycle");
+    assert_eq!(read_str_array(&cycle.payload, "services"), ["a", "b", "a"]);
+
+    let conflict = encode_boot_blocked_service_event(
+        "a",
+        &BlockedReason::ConflictingBootService {
+            target: "b".to_string(),
+        },
+    )
+    .expect("conflict event");
+    assert_eq!(
+        read_str(&conflict.payload, "finding"),
+        "conflicting_boot_services"
+    );
+    assert_eq!(read_str(&conflict.payload, "target"), "b");
+
+    let validation = encode_boot_blocked_service_event(
+        "app",
+        &BlockedReason::ValidationError {
+            message: "health check interval exceeds the restart window".to_string(),
+        },
+    )
+    .expect("validation event");
+    assert_eq!(read_str(&validation.payload, "finding"), "validation_error");
+    assert_eq!(
+        read_str(&validation.payload, "detail"),
+        "health check interval exceeds the restart window"
+    );
 }

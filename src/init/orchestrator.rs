@@ -316,6 +316,7 @@ where
         }
     };
     log_phase2_boot_progress(platform, &boot_dispatch);
+    emit_phase2_boot_audit_events(platform, &boot_dispatch);
     log_console(platform, quiet, "peinit: phase2 boot complete\n");
 
     match runtime.enter_runtime(supervisor, infrastructure) {
@@ -326,6 +327,45 @@ where
             RecoveryEnvironment::Ensure,
         ),
     }
+}
+
+/// Emit one `graph.validation_error` KMES event per boot validation finding.
+///
+/// The console lines written by `log_phase2_boot_progress` are for whoever is
+/// watching the boot; these are for whoever is reading the event stream
+/// afterwards, which is the only account that survives the boot. The reload
+/// path has emitted one event per finding since it existed; boot emitted
+/// nothing at all, so validation problems were visible to an event consumer
+/// only when they happened to arrive through a reload.
+///
+/// Every finding is emitted, not just the primary cause: the retained
+/// `additional_reasons` are exactly the ones PSD-007 6.2 says must not be
+/// suppressed, and dropping them here would put the retention back where it
+/// started.
+///
+/// Failures to encode or emit are swallowed, matching the recovery path: an
+/// audit sink that is not working must not be what stops a boot.
+#[cfg(feature = "peios-boundary")]
+fn emit_phase2_boot_audit_events<P>(platform: &mut P, dispatch: &SupervisorBootDispatch)
+where
+    P: InitPlatform + ?Sized,
+{
+    for blocked in &dispatch.plan.blocked {
+        for reason in std::iter::once(&blocked.reason).chain(&blocked.additional_reasons) {
+            let Ok(event) = crate::kmes::encode_boot_blocked_service_event(&blocked.service, reason)
+            else {
+                continue;
+            };
+            let _ = platform.emit_kmes_event(&event);
+        }
+    }
+}
+
+#[cfg(not(feature = "peios-boundary"))]
+fn emit_phase2_boot_audit_events<P>(_platform: &mut P, _dispatch: &SupervisorBootDispatch)
+where
+    P: InitPlatform + ?Sized,
+{
 }
 
 fn log_phase2_boot_progress<P>(platform: &mut P, dispatch: &SupervisorBootDispatch)
