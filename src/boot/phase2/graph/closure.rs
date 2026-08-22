@@ -4,6 +4,7 @@ use crate::boot::BootMode;
 use crate::boot::phase2::BlockedReason;
 use crate::service::{ErrorControl, ServiceDefinition, hard_dependencies};
 
+use super::blocked::block_service;
 use super::model::{BlockedServiceDraft, ServiceMap};
 
 pub(super) struct BootClosure {
@@ -61,15 +62,17 @@ fn include_closure(
             }
             _ => {
                 if mode == BootMode::Full {
-                    blocked
-                        .entry(definition.name.clone())
-                        .or_insert(BlockedServiceDraft {
-                            service: definition.name.clone(),
-                            reason: BlockedReason::HardDependencyUnavailable {
-                                target: dependency.target,
-                                kind: dependency.kind,
-                            },
-                        });
+                    // Through block_service, not or_insert: a service can be
+                    // missing more than one hard dependency, and or_insert kept
+                    // whichever was found first (PSD-007 §6.2 retention).
+                    block_service(
+                        blocked,
+                        &definition.name,
+                        BlockedReason::HardDependencyUnavailable {
+                            target: dependency.target,
+                            kind: dependency.kind,
+                        },
+                    );
                 }
             }
         }
@@ -101,14 +104,12 @@ pub(super) fn propagate_blocked(
             };
             for dependency in hard_dependencies(definition) {
                 if blocked.contains_key(&dependency.target) {
-                    blocked.insert(
-                        definition.name.clone(),
-                        BlockedServiceDraft {
-                            service: definition.name.clone(),
-                            reason: BlockedReason::HardDependencyBlocked {
-                                target: dependency.target,
-                                kind: dependency.kind,
-                            },
+                    block_service(
+                        blocked,
+                        &definition.name,
+                        BlockedReason::HardDependencyBlocked {
+                            target: dependency.target,
+                            kind: dependency.kind,
                         },
                     );
                     changed = true;

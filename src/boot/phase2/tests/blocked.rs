@@ -150,3 +150,91 @@ fn invalid_timer_schedule_blocks_service_even_when_demand_only() {
     assert_eq!(jobs.next_sequence(), 1);
     assert_eq!(operations.next_sequence(), 2);
 }
+
+/// PSD-007 §6.2: a service can have more than one finding in one validation
+/// pass, and all of them MUST be retained. Two missing hard dependencies used
+/// to collapse to whichever was walked first, because the closure inserted
+/// with `or_insert`.
+#[test]
+fn multiple_missing_hard_dependencies_are_all_retained() {
+    let mut app = ServiceDefinition::simple_system_boot("app", "/sbin/app");
+    app.requires.push("missing-a".to_string());
+    app.requires.push("missing-b".to_string());
+    let mut operations = OperationIdAllocator::new();
+    let mut jobs = JobIdAllocator::new();
+
+    let boot = prepare_phase2_boot_plan(
+        BootMode::Full,
+        &[app],
+        10,
+        OBSERVED_AT_NS,
+        &mut operations,
+        &mut jobs,
+    )
+    .expect("boot plan");
+
+    assert_eq!(boot.blocked.len(), 1);
+    assert_eq!(boot.blocked[0].service, "app");
+    // Primary is the first walked; the second is retained beside it, not lost.
+    assert_eq!(
+        boot.blocked[0].reason,
+        BlockedReason::HardDependencyUnavailable {
+            target: "missing-a".to_string(),
+            kind: DependencyKind::Requires,
+        }
+    );
+    assert_eq!(
+        boot.blocked[0].additional_reasons,
+        vec![BlockedReason::HardDependencyUnavailable {
+            target: "missing-b".to_string(),
+            kind: DependencyKind::Requires,
+        }]
+    );
+}
+
+/// The precedence rule decides the primary cause only. A higher-precedence
+/// finding arriving second must demote the previous primary, not delete it.
+#[test]
+fn a_higher_precedence_finding_demotes_rather_than_discards_the_previous_one() {
+    // `app` conflicts with `b` (ValidationError, precedence 2) and also
+    // requires a service that does not exist (DependencyFailure, precedence 1).
+    let mut app = ServiceDefinition::simple_system_boot("app", "/sbin/app");
+    app.requires.push("missing".to_string());
+    app.conflicts.push("b".to_string());
+    let b = ServiceDefinition::simple_system_boot("b", "/sbin/b");
+    let mut operations = OperationIdAllocator::new();
+    let mut jobs = JobIdAllocator::new();
+
+    let boot = prepare_phase2_boot_plan(
+        BootMode::Full,
+        &[app, b],
+        10,
+        OBSERVED_AT_NS,
+        &mut operations,
+        &mut jobs,
+    )
+    .expect("boot plan");
+
+    let app_blocked = boot
+        .blocked
+        .iter()
+        .find(|blocked| blocked.service == "app")
+        .expect("app blocked");
+
+    assert_eq!(
+        app_blocked.reason,
+        BlockedReason::ConflictingBootService {
+            target: "b".to_string(),
+        }
+    );
+    assert!(
+        app_blocked
+            .additional_reasons
+            .contains(&BlockedReason::HardDependencyUnavailable {
+                target: "missing".to_string(),
+                kind: DependencyKind::Requires,
+            }),
+        "the demoted dependency finding must survive: {:?}",
+        app_blocked.additional_reasons,
+    );
+}

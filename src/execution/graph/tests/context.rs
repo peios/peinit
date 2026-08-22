@@ -135,6 +135,7 @@ fn boot_context_keeps_blocked_members_terminal() {
                 target: "missing".to_string(),
                 kind: DependencyKind::Requires,
             },
+            additional_reasons: Vec::new(),
         }],
     };
     let mut store = GraphExecutionStore::new();
