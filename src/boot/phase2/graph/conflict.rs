@@ -46,25 +46,42 @@ pub(in crate::boot::phase2::graph) fn block_unresolvable_conflicts(
     }
 }
 
-pub(in crate::boot::phase2::graph) fn critical_boot_conflict_exists(
+/// Every critical boot conflict in the included set, as (service, target).
+///
+/// Collected rather than merely detected: these are the findings that force a
+/// Safe-mode downgrade, and an operator whose machine came up in Safe mode
+/// needs to know which services caused it. Deduplicated by ordered pair, so a
+/// symmetric conflict is reported once rather than from both ends.
+pub(in crate::boot::phase2::graph) fn critical_boot_conflicts(
     included: &BTreeSet<String>,
     by_name: &ServiceMap<'_>,
-) -> bool {
-    included.iter().any(|service| {
+) -> Vec<(String, String)> {
+    let mut found = BTreeSet::new();
+    for service in included {
         let Some(definition) = by_name.get(service.as_str()).copied() else {
-            return false;
+            continue;
         };
-        definition.has_boot_trigger()
-            && is_critical(definition)
-            && symmetric_conflicts(definition, by_name)
-                .into_iter()
-                .any(|target| {
-                    included.contains(&target)
-                        && by_name
-                            .get(target.as_str())
-                            .is_some_and(|target_definition| target_definition.has_boot_trigger())
-                })
-    })
+        if !definition.has_boot_trigger() || !is_critical(definition) {
+            continue;
+        }
+        for target in symmetric_conflicts(definition, by_name) {
+            if !included.contains(&target) {
+                continue;
+            }
+            if by_name
+                .get(target.as_str())
+                .is_some_and(|target_definition| target_definition.has_boot_trigger())
+            {
+                let pair = if definition.name <= target {
+                    (definition.name.clone(), target)
+                } else {
+                    (target, definition.name.clone())
+                };
+                found.insert(pair);
+            }
+        }
+    }
+    found.into_iter().collect()
 }
 
 fn symmetric_conflicts(definition: &ServiceDefinition, by_name: &ServiceMap<'_>) -> Vec<String> {

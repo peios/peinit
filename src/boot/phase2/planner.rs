@@ -2,7 +2,7 @@ use crate::boot::BootMode;
 use crate::ids::{JobIdAllocator, OperationIdAllocator};
 use crate::service::ServiceDefinition;
 
-use super::graph::{build_phase2_boot_graph, safe_mode_required_for_full_boot};
+use super::graph::{build_phase2_boot_graph, safe_mode_downgrade_findings};
 use super::model::{BlockedService, Phase2BootPlan, Phase2BootPlanError, PreparedStart};
 
 pub fn prepare_phase2_boot_plan(
@@ -43,13 +43,22 @@ pub(crate) fn prepare_phase2_boot_plan_with_retained(
             max_parallel_starts,
             starts: Vec::new(),
             blocked: Vec::new(),
+            safe_mode_downgrade: Vec::new(),
         });
     }
 
-    let effective_mode = if mode == BootMode::Full && safe_mode_required_for_full_boot(services)? {
-        BootMode::Safe
+    // The findings are kept, not just the verdict: the Safe-mode rebuild
+    // discards the Full-mode graph, so this is the only point at which what
+    // forced the downgrade still exists.
+    let safe_mode_downgrade = if mode == BootMode::Full {
+        safe_mode_downgrade_findings(services)?
     } else {
+        Vec::new()
+    };
+    let effective_mode = if safe_mode_downgrade.is_empty() {
         mode
+    } else {
+        BootMode::Safe
     };
 
     let graph = build_phase2_boot_graph(effective_mode, services)?;
@@ -95,6 +104,7 @@ pub(crate) fn prepare_phase2_boot_plan_with_retained(
         .collect();
 
     Ok(Phase2BootPlan {
+        safe_mode_downgrade,
         mode: effective_mode,
         observed_at_ns,
         max_parallel_starts,

@@ -350,9 +350,16 @@ fn emit_phase2_boot_audit_events<P>(platform: &mut P, dispatch: &SupervisorBootD
 where
     P: InitPlatform + ?Sized,
 {
+    for downgrade in &dispatch.plan.safe_mode_downgrade {
+        let Ok(event) = crate::kmes::encode_safe_mode_downgrade_event(downgrade) else {
+            continue;
+        };
+        let _ = platform.emit_kmes_event(&event);
+    }
     for blocked in &dispatch.plan.blocked {
         for reason in std::iter::once(&blocked.reason).chain(&blocked.additional_reasons) {
-            let Ok(event) = crate::kmes::encode_boot_blocked_service_event(&blocked.service, reason)
+            let Ok(event) =
+                crate::kmes::encode_boot_blocked_service_event(&blocked.service, reason)
             else {
                 continue;
             };
@@ -372,7 +379,17 @@ fn log_phase2_boot_progress<P>(platform: &mut P, dispatch: &SupervisorBootDispat
 where
     P: InitPlatform + ?Sized,
 {
-    // Configuration warnings first: they explain why the effective config is
+    // Why the machine is in Safe mode, before anything about individual
+    // services: it explains the shape of everything below it. The services
+    // named here are deliberately not marked Failed, so this line and the
+    // matching event are the only record that they were the cause.
+    for downgrade in &dispatch.plan.safe_mode_downgrade {
+        log_console_error(
+            platform,
+            &format!("peinit: boot downgraded to safe mode: {downgrade}\n"),
+        );
+    }
+    // Configuration warnings next: they explain why the effective config is
     // not what the registry says, which is context for anything below.
     for warning in &dispatch.config_warnings {
         log_console_error(platform, &format!("peinit warning: {warning}\n"));

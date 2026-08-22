@@ -44,6 +44,36 @@ impl BlockedReason {
     }
 }
 
+/// A finding that forced a Full boot down to Safe mode.
+///
+/// Boot-level rather than per-service, deliberately. The downgrade rebuilds
+/// the graph in Safe mode and discards the Full-mode one, so the services
+/// named here are never entered into `blocked` and never marked Failed —
+/// Safe mode was never going to start them, and a Failed state would say
+/// something about their own health that is not true. This records why the
+/// machine came up in Safe mode without making that claim.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SafeModeDowngrade {
+    CriticalCycle { services: Vec<String> },
+    CriticalBootConflict { service: String, target: String },
+}
+
+impl core::fmt::Display for SafeModeDowngrade {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::CriticalCycle { services } => write!(
+                formatter,
+                "critical service in dependency cycle {}",
+                services.join(" -> "),
+            ),
+            Self::CriticalBootConflict { service, target } => write!(
+                formatter,
+                "critical boot-triggered services {service} and {target} conflict",
+            ),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BlockedService {
     pub service: String,
@@ -72,6 +102,8 @@ pub struct Phase2BootPlan {
     pub max_parallel_starts: u32,
     pub starts: Vec<PreparedStart>,
     pub blocked: Vec<BlockedService>,
+    /// Why this boot was downgraded to Safe mode; empty if it was not.
+    pub safe_mode_downgrade: Vec<SafeModeDowngrade>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

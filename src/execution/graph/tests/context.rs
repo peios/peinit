@@ -119,6 +119,7 @@ fn boot_context_keeps_blocked_members_terminal() {
     let mut app = service("app");
     app.requires.push("missing".to_string());
     let plan = Phase2BootPlan {
+        safe_mode_downgrade: Vec::new(),
         mode: BootMode::Full,
         observed_at_ns: OBSERVED_AT_NS,
         max_parallel_starts: 10,

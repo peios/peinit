@@ -1,7 +1,7 @@
 use peios::msgpack::Writer;
 
+use crate::boot::phase2::{BlockedReason, SafeModeDowngrade};
 use crate::boundary::{BoundaryError, KmesEvent};
-use crate::boot::phase2::BlockedReason;
 use crate::service::{ServiceDependencyKind, ServiceGraphFinding, ServiceGraphWarning};
 
 use crate::kmes::labels::service_dependency_kind_label;
@@ -192,14 +192,22 @@ pub fn encode_boot_blocked_service_event(
     const PHASE: &str = "boot";
     match reason {
         BlockedReason::CycleDetected { services } => encode_graph_cycle_error(PHASE, services),
-        BlockedReason::HardDependencyUnavailable { target, kind } => {
-            encode_boot_dependency_error(PHASE, "missing_hard_dependency", service, target, *kind,
-                &format!("service {service} has missing hard dependency {target}"))
-        }
-        BlockedReason::HardDependencyBlocked { target, kind } => {
-            encode_boot_dependency_error(PHASE, "hard_dependency_blocked", service, target, *kind,
-                &format!("service {service} is blocked because hard dependency {target} is blocked"))
-        }
+        BlockedReason::HardDependencyUnavailable { target, kind } => encode_boot_dependency_error(
+            PHASE,
+            "missing_hard_dependency",
+            service,
+            target,
+            *kind,
+            &format!("service {service} has missing hard dependency {target}"),
+        ),
+        BlockedReason::HardDependencyBlocked { target, kind } => encode_boot_dependency_error(
+            PHASE,
+            "hard_dependency_blocked",
+            service,
+            target,
+            *kind,
+            &format!("service {service} is blocked because hard dependency {target} is blocked"),
+        ),
         BlockedReason::ConflictingBootService { target } => {
             let mut writer = Writer::new();
             writer.write_map(5);
@@ -252,4 +260,48 @@ fn encode_boot_dependency_error(
     );
     write_str_field(&mut writer, "message", message);
     finish_event("graph.validation_error", writer)
+}
+
+/// Encode why a Full boot was downgraded to Safe mode.
+///
+/// A distinct event type from `graph.validation_error`, because it is a
+/// different claim: not "this service is broken" but "the machine is running a
+/// reduced service set, and here is what forced that". The services named are
+/// deliberately not marked Failed — Safe mode was never going to start them —
+/// so this event is the only record that they were the cause.
+pub fn encode_safe_mode_downgrade_event(
+    downgrade: &SafeModeDowngrade,
+) -> Result<KmesEvent, BoundaryError> {
+    match downgrade {
+        SafeModeDowngrade::CriticalCycle { services } => {
+            let mut writer = Writer::new();
+            writer.write_map(3);
+            write_str_field(&mut writer, "finding", "critical_cycle");
+            write_string_array_field(&mut writer, "services", services);
+            write_str_field(
+                &mut writer,
+                "message",
+                &format!(
+                    "boot downgraded to safe mode: critical service in dependency cycle {}",
+                    services.join(" -> "),
+                ),
+            );
+            finish_event("boot.safe_mode_downgrade", writer)
+        }
+        SafeModeDowngrade::CriticalBootConflict { service, target } => {
+            let mut writer = Writer::new();
+            writer.write_map(4);
+            write_str_field(&mut writer, "finding", "critical_boot_conflict");
+            write_str_field(&mut writer, "service", service);
+            write_str_field(&mut writer, "target", target);
+            write_str_field(
+                &mut writer,
+                "message",
+                &format!(
+                    "boot downgraded to safe mode: critical boot-triggered services {service} and {target} conflict",
+                ),
+            );
+            finish_event("boot.safe_mode_downgrade", writer)
+        }
+    }
 }
