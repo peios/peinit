@@ -10,7 +10,7 @@ pub use coordinator::{
 };
 pub use model::{
     BlockedReason, BlockedService, DependencyKind, Phase2BootPlan, Phase2BootPlanError,
-    PreparedStart, StartCause,
+    PreparedStart, SafeModeDowngrade, StartCause,
 };
 pub use planner::prepare_phase2_boot_plan;
 

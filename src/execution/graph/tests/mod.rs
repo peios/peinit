@@ -27,6 +27,7 @@ fn service(name: &str) -> ServiceDefinition {
 
 fn boot_plan(starts: Vec<PreparedStart>) -> Phase2BootPlan {
     Phase2BootPlan {
+        safe_mode_downgrade: Vec::new(),
         mode: BootMode::Full,
         observed_at_ns: OBSERVED_AT_NS,
         max_parallel_starts: 10,
