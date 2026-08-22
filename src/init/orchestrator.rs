@@ -59,6 +59,44 @@ where
         "peinit: phase1 virtual filesystems mounted\n",
     );
 
+    // The static /dev nodes everyone must be able to use. Advisory: a node
+    // left unstamped is usable by administrators and denied to everyone else,
+    // which is degraded, not unbootable.
+    match platform.apply_device_node_policy() {
+        Ok(report) => {
+            for failure in &report.failures {
+                log_console_error(
+                    platform,
+                    &format!(
+                        "peinit warning: device node {} ({}) descriptor failed: {}\n",
+                        failure.path, failure.name, failure.message
+                    ),
+                );
+            }
+            for path in &report.missing {
+                log_console(
+                    platform,
+                    QuietLevel::Verbose,
+                    &format!("peinit: phase1 device node {path} absent; nothing to stamp\n"),
+                );
+            }
+            if !report.applied.is_empty() {
+                log_console(
+                    platform,
+                    QuietLevel::Verbose,
+                    &format!(
+                        "peinit: phase1 device node policy applied to {} node(s)\n",
+                        report.applied.len()
+                    ),
+                );
+            }
+        }
+        Err(error) => log_console_error(
+            platform,
+            &format!("peinit warning: device node policy failed: {error:?}\n"),
+        ),
+    }
+
     match platform.restore_random_seed() {
         Ok(true) => log_console(
             platform,
@@ -294,6 +332,11 @@ fn log_phase2_boot_progress<P>(platform: &mut P, dispatch: &SupervisorBootDispat
 where
     P: InitPlatform + ?Sized,
 {
+    // Configuration warnings first: they explain why the effective config is
+    // not what the registry says, which is context for anything below.
+    for warning in &dispatch.config_warnings {
+        log_console_error(platform, &format!("peinit warning: {warning}\n"));
+    }
     for blocked in &dispatch.plan.blocked {
         log_console_error(
             platform,

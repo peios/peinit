@@ -1,8 +1,9 @@
 use crate::boot::BootMode;
 use crate::boundary::BoundaryError;
 use crate::init::{
-    InitConfig, InitFatalError, InitRecoveryReason, InitRunError, InitRunResult, KernelCommandLine,
-    MachineIdStatus, Phase1Infrastructure, Phase1InfrastructureWarning, QuietLevel, run_init,
+    DeviceNodePolicyFailure, DeviceNodePolicyReport, InitConfig, InitFatalError,
+    InitRecoveryReason, InitRunError, InitRunResult, KernelCommandLine, MachineIdStatus,
+    Phase1Infrastructure, Phase1InfrastructureWarning, QuietLevel, run_init,
 };
 use crate::provisioning::{
     ProvisionedPath, ProvisionedPathApplyFailure, ProvisionedPathApplyReport, ProvisionedPathKind,
@@ -136,6 +137,70 @@ fn kernel_command_line_is_read_after_virtual_filesystem_mounts() {
         .position(|message| message.starts_with("peinit: entering recovery: KernelCommandLine("))
         .expect("recovery message");
     assert!(mounted_index < recovery_index);
+}
+
+#[test]
+fn device_node_policy_failures_are_warnings_not_recovery() {
+    let report = DeviceNodePolicyReport {
+        applied: vec!["/dev/zero".to_string()],
+        missing: vec!["/dev/full".to_string()],
+        failures: vec![DeviceNodePolicyFailure {
+            name: "DevNull".to_string(),
+            path: "/dev/null".to_string(),
+            message: "boom".to_string(),
+        }],
+    };
+    let mut platform = Platform::new().device_policy_report(report);
+    let mut registry = Registry::with_services([service("app")]);
+    let mut clock = ClockAt(10);
+    let mut runtime = Runtime::default();
+
+    let result = run_init(
+        InitConfig::default(),
+        &mut platform,
+        &mut registry,
+        &mut clock,
+        &mut runtime,
+    )
+    .expect("runtime");
+
+    assert_eq!(result, InitRunResult::RuntimeReturned);
+    assert!(runtime.entered);
+    assert!(platform.recovery_reasons.is_empty());
+    assert!(
+        platform.console_messages.iter().any(|message| {
+            message == "peinit warning: device node /dev/null (DevNull) descriptor failed: boom\n"
+        }),
+        "{:?}",
+        platform.console_messages,
+    );
+}
+
+#[test]
+fn device_node_policy_boundary_error_is_warning_not_recovery() {
+    let mut platform = Platform::new().device_policy_error("no /dev");
+    let mut registry = Registry::with_services([service("app")]);
+    let mut clock = ClockAt(10);
+    let mut runtime = Runtime::default();
+
+    let result = run_init(
+        InitConfig::default(),
+        &mut platform,
+        &mut registry,
+        &mut clock,
+        &mut runtime,
+    )
+    .expect("runtime");
+
+    assert_eq!(result, InitRunResult::RuntimeReturned);
+    assert!(platform.recovery_reasons.is_empty());
+    assert!(
+        platform.console_messages.iter().any(|message| {
+            message == "peinit warning: device node policy failed: Recovery(\"no /dev\")\n"
+        }),
+        "{:?}",
+        platform.console_messages,
+    );
 }
 
 #[test]

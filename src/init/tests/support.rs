@@ -3,8 +3,9 @@ use std::os::fd::{FromRawFd, OwnedFd};
 use crate::boot::BootMode;
 use crate::boundary::{BoundaryError, Clock, KmesEvent, RegistryClient};
 use crate::init::{
-    InitFatalError, InitPlatform, InitRecoveryReason, InitRuntime, KernelCommandLine,
-    MachineIdStatus, Phase1Infrastructure, Phase1InfrastructureWarning, Phase1JfsDevice,
+    DeviceNodePolicyReport, InitFatalError, InitPlatform, InitRecoveryReason, InitRuntime,
+    KernelCommandLine, MachineIdStatus, Phase1Infrastructure, Phase1InfrastructureWarning,
+    Phase1JfsDevice,
 };
 use crate::provisioning::{
     ProvisionedPath, ProvisionedPathApplyReport, ProvisionedPathRegistrySnapshot,
@@ -31,6 +32,7 @@ pub(super) struct Platform {
     registryd_result: Result<(), BoundaryError>,
     infrastructure_result: Result<Phase1Infrastructure, BoundaryError>,
     provision_report: Result<ProvisionedPathApplyReport, BoundaryError>,
+    device_policy_report: Result<DeviceNodePolicyReport, BoundaryError>,
     pub(super) provisioned_paths_seen: Vec<ProvisionedPath>,
     pub(super) root_verified: bool,
     pub(super) increment_calls: usize,
@@ -56,6 +58,7 @@ impl Platform {
             registryd_result: Ok(()),
             infrastructure_result: Ok(Phase1Infrastructure::new()),
             provision_report: Ok(ProvisionedPathApplyReport::default()),
+            device_policy_report: Ok(DeviceNodePolicyReport::default()),
             provisioned_paths_seen: Vec::new(),
             root_verified: false,
             increment_calls: 0,
@@ -128,6 +131,16 @@ impl Platform {
         self
     }
 
+    pub(super) fn device_policy_report(mut self, report: DeviceNodePolicyReport) -> Self {
+        self.device_policy_report = Ok(report);
+        self
+    }
+
+    pub(super) fn device_policy_error(mut self, message: &str) -> Self {
+        self.device_policy_report = Err(BoundaryError::Recovery(message.to_string()));
+        self
+    }
+
     pub(super) fn provision_report(mut self, report: ProvisionedPathApplyReport) -> Self {
         self.provision_report = Ok(report);
         self
@@ -159,6 +172,10 @@ impl InitPlatform for Platform {
 
     fn mount_virtual_filesystems(&mut self) -> Result<(), BoundaryError> {
         self.mount_result.clone()
+    }
+
+    fn apply_device_node_policy(&mut self) -> Result<DeviceNodePolicyReport, BoundaryError> {
+        self.device_policy_report.clone()
     }
 
     fn restore_random_seed(&mut self) -> Result<bool, BoundaryError> {

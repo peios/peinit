@@ -6,6 +6,8 @@ use crate::control::socket::LinuxControlSocket;
 use crate::provisioning::{ProvisionedPath, ProvisionedPathApplyReport};
 use crate::supervisor::{Supervisor, SupervisorError};
 
+use super::devices::DeviceNodePolicyReport;
+
 pub const DEFAULT_BOOT_ATTEMPT_THRESHOLD: u32 = 3;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -154,6 +156,15 @@ pub trait InitPlatform {
     fn verify_root_writable(&mut self) -> Result<(), BoundaryError>;
     fn increment_boot_attempt_counter(&mut self) -> Result<(), BoundaryError>;
     fn mount_virtual_filesystems(&mut self) -> Result<(), BoundaryError>;
+    /// Stamp the per-node descriptors on the static `/dev` nodes every
+    /// principal must be able to use (`/dev/null` and its kin). Runs once the
+    /// virtual filesystems are up. The report is advisory: a node that could
+    /// not be stamped stays on the inherited administrators-only default and
+    /// the boot goes on. Default is an empty report so non-Linux platforms
+    /// and test doubles need no implementation.
+    fn apply_device_node_policy(&mut self) -> Result<DeviceNodePolicyReport, BoundaryError> {
+        Ok(DeviceNodePolicyReport::default())
+    }
     fn restore_random_seed(&mut self) -> Result<bool, BoundaryError> {
         Ok(false)
     }
