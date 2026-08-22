@@ -11,11 +11,12 @@ use crate::runtime::{
 use crate::supervisor::Supervisor;
 
 use super::{
-    InitConfig, InitFatalError, InitPlatform, InitRecoveryReason, InitRuntime, KernelCommandLine,
-    MachineIdStatus, Phase1Infrastructure, run_init,
+    DeviceNodePolicyReport, InitConfig, InitFatalError, InitPlatform, InitRecoveryReason,
+    InitRuntime, KernelCommandLine, MachineIdStatus, Phase1Infrastructure, run_init,
 };
 
 mod autorun;
+mod devices;
 mod files;
 mod infrastructure;
 mod loopback;
@@ -26,6 +27,7 @@ mod recovery_console;
 mod registryd;
 mod rtc;
 
+use devices::apply_linux_device_node_policy;
 use files::LinuxInitFiles;
 use infrastructure::setup_linux_phase1_infrastructure;
 use mounts::{LinuxPhase1MountSyscalls, mount_phase1_virtual_filesystems};
@@ -81,6 +83,10 @@ impl InitPlatform for LinuxInitPlatform {
     fn mount_virtual_filesystems(&mut self) -> Result<(), BoundaryError> {
         let mut syscalls = LinuxPhase1MountSyscalls;
         mount_phase1_virtual_filesystems(self.files.mountinfo_path(), &mut syscalls)
+    }
+
+    fn apply_device_node_policy(&mut self) -> Result<DeviceNodePolicyReport, BoundaryError> {
+        Ok(apply_linux_device_node_policy())
     }
 
     fn restore_random_seed(&mut self) -> Result<bool, BoundaryError> {
