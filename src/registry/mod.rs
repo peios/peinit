@@ -21,7 +21,7 @@ pub use config::{
     build_max_log_line_length_from_registry_values, build_max_parallel_starts_from_registry_values,
     build_post_kill_timeout_from_registry_values, build_pre_eventd_buffer_from_registry_values,
     build_settle_timeout_from_registry_values, build_shutdown_timeout_from_registry_values,
-    services_schema_warnings,
+    read_log_config_from_registry, services_schema_warnings,
 };
 pub use provisioning::{
     build_provisioned_path_from_registry_values, build_provisioned_path_registry_snapshot,

@@ -1,7 +1,12 @@
 use std::fmt;
 
+use crate::boundary::{BoundaryError, RegistryClient};
 use crate::control::socket::ControlSocketLimits;
 use crate::control::system::ControlSecurityDescriptor;
+use crate::logging::{
+    DEFAULT_LOG_READ_BYTES_PER_EVENT, DEFAULT_MAX_LOG_BUFFER_PER_SERVICE_BYTES,
+    DEFAULT_MAX_LOG_LINE_BYTES, DEFAULT_PRE_EVENTD_BUFFER_BYTES, RuntimeLogConfig,
+};
 use crate::service::ServiceEnvironmentVariable;
 
 use super::value::{
@@ -26,9 +31,42 @@ const MAX_CONTROL_CONNECTIONS_FIELD: &str = "MaxControlConnections";
 const MAX_REQUEST_SIZE_FIELD: &str = "MaxRequestSize";
 const CONNECTION_TIMEOUT_FIELD: &str = "ConnectionTimeout";
 
+/// The smallest useful value for each log tuning knob.
+///
+/// None of these has a normative floor: the four keys do not appear in the
+/// PCSA books at all, and the peinit TRM states defaults without ranges. They
+/// are engineering judgement, chosen so that a value below them means the
+/// mechanism does not work rather than works differently.
+///
+/// `MaxLogBufferPerService` is the exception with a real external constraint:
+/// it is applied with `F_SETPIPE_SZ`, whose kernel minimum is one page, and
+/// the kernel rounds up to a page regardless. Asking for less is not a smaller
+/// pipe, it is the same pipe and a misleading number in the registry.
+pub const MIN_MAX_LOG_LINE_BYTES: usize = 256;
+pub const MIN_MAX_LOG_BUFFER_PER_SERVICE_BYTES: usize = 4096;
+pub const MIN_LOG_READ_BYTES_PER_EVENT: usize = 512;
+pub const MIN_PRE_EVENTD_BUFFER_BYTES: usize = 4096;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RegistryConfigWarning {
-    NewerServicesSchemaVersion { observed: u32, supported: u32 },
+    NewerServicesSchemaVersion {
+        observed: u32,
+        supported: u32,
+    },
+    /// A log tuning knob was set below its minimum useful value. The
+    /// compiled-in default is used instead.
+    ///
+    /// Kept rather than fatal, following the rule peinit already applies to
+    /// the equivalent kernel command-line knobs (`init/model.rs`): "a typo in
+    /// a logging knob must not decide how the machine boots". Warned rather
+    /// than silent, because an operator who sets a value and sees no change
+    /// has no way to tell the setting from their diagnosis.
+    LogConfigValueBelowMinimum {
+        key: &'static str,
+        configured: u32,
+        minimum: usize,
+        using: usize,
+    },
 }
 
 impl fmt::Display for RegistryConfigWarning {
@@ -41,8 +79,91 @@ impl fmt::Display for RegistryConfigWarning {
                 formatter,
                 "services schema version {observed} is newer than supported version {supported}; continuing with forward-compatible decoding",
             ),
+            Self::LogConfigValueBelowMinimum {
+                key,
+                configured,
+                minimum,
+                using,
+            } => write!(
+                formatter,
+                "Machine\\System\\Init\\{key} is {configured}, below the minimum {minimum}; using the default {using}",
+            ),
         }
     }
+}
+
+/// Read and validate all four log tuning knobs from the registry.
+///
+/// One reader shared by the boot path and `reload-config`, because they used
+/// to have one each and the two had drifted: boot read all four keys, reload
+/// read only `MaxLogLineLength` and `MaxLogBufferPerService` and left the
+/// other two at their compiled-in defaults — so every reload silently reverted
+/// them, whatever the registry said.
+///
+/// A value below its minimum keeps the default and produces a warning rather
+/// than failing: see `RegistryConfigWarning::LogConfigValueBelowMinimum`.
+///
+/// Errors are returned as the raw `BoundaryError` because the two callers wrap
+/// registry failures differently (`Phase2BootRunError` vs `ReloadConfigError`).
+pub fn read_log_config_from_registry<R>(
+    registry: &mut R,
+) -> Result<(RuntimeLogConfig, Vec<RegistryConfigWarning>), BoundaryError>
+where
+    R: RegistryClient + ?Sized,
+{
+    let mut config = RuntimeLogConfig::default();
+    let mut warnings = Vec::new();
+
+    let mut accept = |key: &'static str,
+                      configured: Option<u32>,
+                      minimum: usize,
+                      default: usize,
+                      field: &mut usize| {
+        let Some(configured) = configured else {
+            return;
+        };
+        if (configured as usize) < minimum {
+            warnings.push(RegistryConfigWarning::LogConfigValueBelowMinimum {
+                key,
+                configured,
+                minimum,
+                using: default,
+            });
+            return;
+        }
+        *field = configured as usize;
+    };
+
+    accept(
+        MAX_LOG_LINE_LENGTH_FIELD,
+        registry.read_max_log_line_length()?,
+        MIN_MAX_LOG_LINE_BYTES,
+        DEFAULT_MAX_LOG_LINE_BYTES,
+        &mut config.max_line_bytes,
+    );
+    accept(
+        MAX_LOG_BUFFER_PER_SERVICE_FIELD,
+        registry.read_max_log_buffer_per_service()?,
+        MIN_MAX_LOG_BUFFER_PER_SERVICE_BYTES,
+        DEFAULT_MAX_LOG_BUFFER_PER_SERVICE_BYTES,
+        &mut config.max_buffer_per_service_bytes,
+    );
+    accept(
+        LOG_READ_BYTES_PER_EVENT_FIELD,
+        registry.read_log_read_bytes_per_event()?,
+        MIN_LOG_READ_BYTES_PER_EVENT,
+        DEFAULT_LOG_READ_BYTES_PER_EVENT,
+        &mut config.read_bytes_per_event,
+    );
+    accept(
+        PRE_EVENTD_BUFFER_FIELD,
+        registry.read_pre_eventd_buffer_bytes()?,
+        MIN_PRE_EVENTD_BUFFER_BYTES,
+        DEFAULT_PRE_EVENTD_BUFFER_BYTES,
+        &mut config.pre_eventd_buffer_bytes,
+    );
+
+    Ok((config, warnings))
 }
 
 pub fn services_schema_warnings(schema_version: u32) -> Vec<RegistryConfigWarning> {

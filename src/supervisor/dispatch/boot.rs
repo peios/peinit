@@ -5,10 +5,18 @@ use crate::execution::start::{
     PreStartCheckCompletionDispatch, PreStartCheckTimeoutDispatch, StartExecutionDispatch,
 };
 use crate::operation::store::Phase2BootDispatch;
+use crate::registry::RegistryConfigWarning;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SupervisorBootDispatch {
     pub plan: Phase2BootPlan,
+    /// Registry configuration warnings raised while reading the boot config.
+    ///
+    /// Carried this far because boot has no other channel for them: they used
+    /// to be dropped in `Supervisor::boot`, which made every one of them
+    /// silent at boot — including the schema-version warning, which reached an
+    /// operator only through `reload-config`.
+    pub config_warnings: Vec<RegistryConfigWarning>,
     pub operation_dispatch: Phase2BootDispatch,
     pub context_id: GraphContextId,
     pub start_dispatches: Vec<StartExecutionDispatch>,

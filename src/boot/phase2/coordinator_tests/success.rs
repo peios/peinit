@@ -2,6 +2,9 @@ use crate::boot::phase2::run_phase2_boot;
 use crate::ids::{JobIdAllocator, OperationIdAllocator};
 use crate::operation::store::OperationStore;
 
+use crate::logging::RuntimeLogConfig;
+use crate::registry::RegistryConfigWarning;
+
 use super::{FixedClock, OBSERVED_AT_NS, StaticRegistry, service, settings};
 
 #[test]
@@ -168,4 +171,70 @@ fn newly_configurable_settings_fall_back_to_their_defaults() {
         run.log_config.pre_eventd_buffer_bytes,
         log_defaults.pre_eventd_buffer_bytes,
     );
+}
+
+/// A log knob below its minimum keeps the compiled-in default and reports a
+/// warning. Failing the boot over a logging typo is the outcome peinit's own
+/// command-line parser explicitly rejects; honouring it silently is the bug.
+#[test]
+fn a_log_knob_below_its_minimum_keeps_the_default_and_warns() {
+    let mut registry = StaticRegistry::services(vec![service("app", "/sbin/app")])
+        .with_pre_eventd_buffer_bytes(Ok(Some(0)));
+    let mut clock = FixedClock::at(OBSERVED_AT_NS);
+    let mut operations = OperationIdAllocator::new();
+    let mut jobs = JobIdAllocator::new();
+    let mut store = OperationStore::new();
+
+    let run = run_phase2_boot(
+        settings(),
+        &mut registry,
+        &mut clock,
+        &mut operations,
+        &mut jobs,
+        &mut store,
+    )
+    .expect("boot run");
+
+    assert_eq!(
+        run.log_config.pre_eventd_buffer_bytes,
+        RuntimeLogConfig::default().pre_eventd_buffer_bytes,
+    );
+    assert!(
+        run.config_warnings.iter().any(|warning| matches!(
+            warning,
+            RegistryConfigWarning::LogConfigValueBelowMinimum {
+                key: "PreEventdBuffer",
+                configured: 0,
+                ..
+            }
+        )),
+        "expected a below-minimum warning, got {:?}",
+        run.config_warnings,
+    );
+}
+
+/// A value at the minimum is accepted — the boundary is inclusive, so the
+/// documented minimum is a usable value rather than one below the first usable
+/// one.
+#[test]
+fn a_log_knob_exactly_at_its_minimum_is_accepted() {
+    let mut registry = StaticRegistry::services(vec![service("app", "/sbin/app")])
+        .with_pre_eventd_buffer_bytes(Ok(Some(4096)));
+    let mut clock = FixedClock::at(OBSERVED_AT_NS);
+    let mut operations = OperationIdAllocator::new();
+    let mut jobs = JobIdAllocator::new();
+    let mut store = OperationStore::new();
+
+    let run = run_phase2_boot(
+        settings(),
+        &mut registry,
+        &mut clock,
+        &mut operations,
+        &mut jobs,
+        &mut store,
+    )
+    .expect("boot run");
+
+    assert_eq!(run.log_config.pre_eventd_buffer_bytes, 4096);
+    assert!(run.config_warnings.is_empty(), "{:?}", run.config_warnings);
 }

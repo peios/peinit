@@ -1,45 +1,19 @@
 use crate::boundary::RegistryClient;
 use crate::logging::RuntimeLogConfig;
+use crate::registry::{RegistryConfigWarning, read_log_config_from_registry};
 use crate::shutdown::ShutdownSettings;
 
 use super::{Phase2BootRunError, Phase2BootSettings, Phase2RecoveryReason};
 
 pub(super) fn read_effective_log_config<R>(
     registry: &mut R,
-) -> Result<RuntimeLogConfig, Phase2BootRunError>
+) -> Result<(RuntimeLogConfig, Vec<RegistryConfigWarning>), Phase2BootRunError>
 where
     R: RegistryClient + ?Sized,
 {
-    let mut config = RuntimeLogConfig::default();
-    if let Some(max_line_bytes) = registry
-        .read_max_log_line_length()
+    read_log_config_from_registry(registry)
         .map_err(Phase2RecoveryReason::RegistryRead)
-        .map_err(Phase2BootRunError::RecoveryRequired)?
-    {
-        config.max_line_bytes = max_line_bytes as usize;
-    }
-    if let Some(max_buffer_bytes) = registry
-        .read_max_log_buffer_per_service()
-        .map_err(Phase2RecoveryReason::RegistryRead)
-        .map_err(Phase2BootRunError::RecoveryRequired)?
-    {
-        config.max_buffer_per_service_bytes = max_buffer_bytes as usize;
-    }
-    if let Some(read_bytes) = registry
-        .read_log_read_bytes_per_event()
-        .map_err(Phase2RecoveryReason::RegistryRead)
-        .map_err(Phase2BootRunError::RecoveryRequired)?
-    {
-        config.read_bytes_per_event = read_bytes as usize;
-    }
-    if let Some(buffer_bytes) = registry
-        .read_pre_eventd_buffer_bytes()
-        .map_err(Phase2RecoveryReason::RegistryRead)
-        .map_err(Phase2BootRunError::RecoveryRequired)?
-    {
-        config.pre_eventd_buffer_bytes = buffer_bytes as usize;
-    }
-    Ok(config)
+        .map_err(Phase2BootRunError::RecoveryRequired)
 }
 
 pub(super) fn read_effective_boot_settings<R>(

@@ -2,8 +2,9 @@ use crate::control::reload_config::reload_config;
 use crate::control::socket::ControlSocketLimits;
 use crate::control::system::ControlSecurityDescriptor;
 use crate::logging::DEFAULT_PRE_EVENTD_BUFFER_BYTES;
+use crate::logging::RuntimeLogConfig;
 use crate::registry::{RegistryConfigWarning, SUPPORTED_SERVICES_SCHEMA_VERSION};
-use crate::service::{Readiness, ServiceGraphWarning};
+use crate::service::{Readiness, ServiceGraphWarning, ServiceTable};
 
 use super::{StaticRegistry, service, service_table};
 
@@ -105,4 +106,58 @@ fn returns_nonfatal_validation_warnings() {
         }]
     );
     assert_eq!(services.service_names(), vec!["app", "db"]);
+}
+
+/// reload-config must read all four log knobs, not two.
+///
+/// It used to read only `MaxLogLineLength` and `MaxLogBufferPerService`,
+/// starting from `RuntimeLogConfig::default()` — so every reload silently
+/// reverted `LogReadBytesPerEvent` and `PreEventdBuffer` to their compiled-in
+/// defaults whatever the registry said. Once PEI-356 made the pre-eventd value
+/// actually resize the buffer, that revert became an active shrink on every
+/// reload.
+#[test]
+fn reload_reads_every_log_knob_not_just_the_two_it_used_to() {
+    let mut registry = StaticRegistry::services(vec![service("app", "/sbin/app")])
+        .with_max_log_line_length(Some(12_000))
+        .with_max_log_buffer_per_service(Some(128_000))
+        .with_log_read_bytes_per_event(Some(4_096))
+        .with_pre_eventd_buffer_bytes(Some(2_097_152));
+    let mut services = ServiceTable::default();
+
+    let outcome = reload_config(&mut registry, &mut services).expect("reload");
+
+    assert_eq!(outcome.log_config.max_line_bytes, 12_000);
+    assert_eq!(outcome.log_config.max_buffer_per_service_bytes, 128_000);
+    assert_eq!(outcome.log_config.read_bytes_per_event, 4_096);
+    assert_eq!(outcome.log_config.pre_eventd_buffer_bytes, 2_097_152);
+    assert!(
+        outcome.config_warnings.is_empty(),
+        "{:?}",
+        outcome.config_warnings
+    );
+}
+
+/// The same below-minimum rule applies on the reload path as at boot, and the
+/// warning reaches the caller through the reload outcome.
+#[test]
+fn reload_rejects_a_below_minimum_log_knob_and_warns() {
+    let mut registry = StaticRegistry::services(vec![service("app", "/sbin/app")])
+        .with_pre_eventd_buffer_bytes(Some(0));
+    let mut services = ServiceTable::default();
+
+    let outcome = reload_config(&mut registry, &mut services).expect("reload");
+
+    assert_eq!(
+        outcome.log_config.pre_eventd_buffer_bytes,
+        RuntimeLogConfig::default().pre_eventd_buffer_bytes,
+    );
+    assert!(
+        outcome
+            .warning_messages()
+            .iter()
+            .any(|message| message.contains("PreEventdBuffer")),
+        "expected the warning to reach the caller, got {:?}",
+        outcome.warning_messages(),
+    );
 }
