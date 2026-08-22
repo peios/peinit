@@ -37,7 +37,17 @@ impl RuntimeServiceLogPipes {
         &self.config
     }
 
+    /// Adopt a reloaded log config, including the pre-eventd buffer capacity.
+    ///
+    /// Resizing here rather than only in `new` is what makes
+    /// `Machine\System\Init\PreEventdBuffer` take effect at all: the Linux
+    /// runtime builds its pipes with `Default` before Phase 2 has read the
+    /// registry, and every turn then syncs the effective config through this
+    /// method. Without the resize the buffer stayed at the compiled-in default
+    /// for the life of the boot, however the key was set.
     pub fn update_config(&mut self, config: RuntimeLogConfig) {
+        self.pre_eventd
+            .set_capacity_bytes(config.pre_eventd_buffer_bytes);
         self.config = config;
     }
 

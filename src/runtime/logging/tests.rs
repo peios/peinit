@@ -5,7 +5,7 @@ use crate::boundary::{BoundaryError, EventdLogSink, LaunchedProcess, RealtimeClo
 use crate::execution::launch::LaunchCreatedJobDispatch;
 use crate::ids::{JobId, JobIdAllocator};
 use crate::job::{JobEvent, JobRecord, JobType};
-use crate::logging::{LogStream, ServiceLogRecord};
+use crate::logging::{DEFAULT_PRE_EVENTD_BUFFER_BYTES, LogStream, ServiceLogRecord};
 use crate::runtime::{
     RuntimeEventRegistrar, RuntimeEventRegistrationError, RuntimeEventSource, RuntimeWorkPumpTurn,
 };
@@ -311,6 +311,56 @@ fn eventd_forwarding_replays_buffer_oldest_first_when_active() {
     );
     assert!(pipes.buffered_records().is_empty());
     assert!(pipes.eventd_forwarding_enabled());
+}
+
+/// `Machine\System\Init\PreEventdBuffer` reaches the buffer only through
+/// `update_config`: the Linux runtime constructs its pipes with `Default`
+/// before Phase 2 has read the registry, then syncs the effective config on
+/// every turn. A capacity that did not follow the config left the key inert.
+#[test]
+fn update_config_applies_the_configured_pre_eventd_capacity() {
+    let mut pipes = RuntimeServiceLogPipes::default();
+    assert_eq!(
+        pipes.pre_eventd.capacity_bytes(),
+        DEFAULT_PRE_EVENTD_BUFFER_BYTES,
+    );
+
+    pipes.update_config(RuntimeLogConfig {
+        pre_eventd_buffer_bytes: 4 * 1024 * 1024,
+        ..RuntimeLogConfig::default()
+    });
+
+    assert_eq!(pipes.pre_eventd.capacity_bytes(), 4 * 1024 * 1024);
+    assert_eq!(pipes.config().pre_eventd_buffer_bytes, 4 * 1024 * 1024);
+}
+
+/// A reload that lowers the capacity takes effect immediately, dropping the
+/// oldest records rather than deferring until the buffer happens to drain.
+#[test]
+fn update_config_shrinking_capacity_evicts_buffered_records() {
+    let mut pipes = RuntimeServiceLogPipes::default();
+    pipes.pre_eventd.push(service_record("one"));
+    pipes.pre_eventd.push(service_record("two"));
+    pipes.pre_eventd.push(service_record("three"));
+
+    pipes.update_config(RuntimeLogConfig {
+        pre_eventd_buffer_bytes: 96,
+        ..RuntimeLogConfig::default()
+    });
+
+    assert_eq!(pipes.pre_eventd.capacity_bytes(), 96);
+    assert!(pipes.pre_eventd.used_bytes() <= 96);
+    // Only the newest survives: these records carry a job id, so each is 16
+    // bytes larger than the bare ones in the buffer's own tests and two no
+    // longer fit in 96.
+    assert_eq!(
+        pipes
+            .buffered_records()
+            .iter()
+            .map(|record| record.message.as_str())
+            .collect::<Vec<_>>(),
+        vec!["three"],
+    );
 }
 
 #[test]
