@@ -15,6 +15,8 @@ struct StaticRegistry {
     control_limits: ControlSocketLimits,
     max_log_line_length: Option<u32>,
     max_log_buffer_per_service: Option<u32>,
+    log_read_bytes_per_event: Option<u32>,
+    pre_eventd_buffer_bytes: Option<u32>,
     shutdown_timeout_secs: Option<u32>,
     global_environment: Vec<ServiceEnvironmentVariable>,
     eventd_log_socket_path: Option<String>,
@@ -30,6 +32,8 @@ impl StaticRegistry {
             control_limits: ControlSocketLimits::default(),
             max_log_line_length: None,
             max_log_buffer_per_service: None,
+            log_read_bytes_per_event: None,
+            pre_eventd_buffer_bytes: None,
             shutdown_timeout_secs: None,
             global_environment: Vec::new(),
             eventd_log_socket_path: None,
@@ -45,6 +49,8 @@ impl StaticRegistry {
             control_limits: ControlSocketLimits::default(),
             max_log_line_length: None,
             max_log_buffer_per_service: None,
+            log_read_bytes_per_event: None,
+            pre_eventd_buffer_bytes: None,
             shutdown_timeout_secs: None,
             global_environment: Vec::new(),
             eventd_log_socket_path: None,
@@ -84,6 +90,28 @@ impl StaticRegistry {
     }
 }
 
+impl StaticRegistry {
+    fn with_max_log_line_length(mut self, value: Option<u32>) -> Self {
+        self.max_log_line_length = value;
+        self
+    }
+
+    fn with_max_log_buffer_per_service(mut self, value: Option<u32>) -> Self {
+        self.max_log_buffer_per_service = value;
+        self
+    }
+
+    fn with_log_read_bytes_per_event(mut self, value: Option<u32>) -> Self {
+        self.log_read_bytes_per_event = value;
+        self
+    }
+
+    fn with_pre_eventd_buffer_bytes(mut self, value: Option<u32>) -> Self {
+        self.pre_eventd_buffer_bytes = value;
+        self
+    }
+}
+
 impl RegistryClient for StaticRegistry {
     fn read_service_definitions(&mut self) -> Result<Vec<ServiceDefinition>, BoundaryError> {
         self.reads += 1;
@@ -112,6 +140,14 @@ impl RegistryClient for StaticRegistry {
 
     fn read_max_log_buffer_per_service(&mut self) -> Result<Option<u32>, BoundaryError> {
         Ok(self.max_log_buffer_per_service)
+    }
+
+    fn read_log_read_bytes_per_event(&mut self) -> Result<Option<u32>, BoundaryError> {
+        Ok(self.log_read_bytes_per_event)
+    }
+
+    fn read_pre_eventd_buffer_bytes(&mut self) -> Result<Option<u32>, BoundaryError> {
+        Ok(self.pre_eventd_buffer_bytes)
     }
 
     fn read_global_environment(

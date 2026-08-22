@@ -22,7 +22,7 @@ impl Supervisor {
         let Phase2BootRun {
             settings: phase2_settings,
             services_schema_version: _,
-            config_warnings: _,
+            config_warnings,
             shutdown_settings,
             control_security,
             control_limits,
@@ -94,6 +94,7 @@ impl Supervisor {
 
         Ok(SupervisorBootDispatch {
             plan,
+            config_warnings,
             operation_dispatch: dispatch,
             context_id,
             start_dispatches,

@@ -82,7 +82,7 @@ where
         .read_control_socket_limits()
         .map_err(Phase2RecoveryReason::RegistryRead)
         .map_err(Phase2BootRunError::RecoveryRequired)?;
-    let log_config = read_effective_log_config(registry)?;
+    let (log_config, log_config_warnings) = read_effective_log_config(registry)?;
     let global_environment = registry
         .read_global_environment()
         .map_err(Phase2RecoveryReason::RegistryRead)
@@ -120,7 +120,10 @@ where
     Ok(Phase2BootRun {
         settings,
         services_schema_version,
-        config_warnings: services_schema_warnings(services_schema_version),
+        config_warnings: services_schema_warnings(services_schema_version)
+            .into_iter()
+            .chain(log_config_warnings)
+            .collect(),
         shutdown_settings,
         control_security,
         control_limits,

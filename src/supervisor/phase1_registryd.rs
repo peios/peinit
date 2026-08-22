@@ -34,6 +34,9 @@ impl Supervisor {
 
         Ok(SupervisorBootDispatch {
             plan,
+            // Phase 1 runs before the Phase 2 config read, so there is nothing
+            // to report here.
+            config_warnings: Vec::new(),
             operation_dispatch: dispatch,
             context_id,
             start_dispatches,

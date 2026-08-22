@@ -1,6 +1,7 @@
 use crate::boundary::RegistryClient;
 use crate::logging::RuntimeLogConfig;
 use crate::registry::services_schema_warnings;
+use crate::registry::{RegistryConfigWarning, read_log_config_from_registry};
 use crate::service::{ServiceTable, validate_service_graph};
 use crate::shutdown::ShutdownSettings;
 
@@ -25,7 +26,7 @@ where
     let control_limits = registry
         .read_control_socket_limits()
         .map_err(ReloadConfigError::Registry)?;
-    let log_config = read_log_config(registry)?;
+    let (log_config, log_config_warnings) = read_log_config(registry)?;
     let shutdown_settings = read_shutdown_settings(registry)?;
     let global_environment = registry
         .read_global_environment()
@@ -41,7 +42,10 @@ where
     Ok(ReloadConfigOutcome {
         summary,
         services_schema_version,
-        config_warnings: services_schema_warnings(services_schema_version),
+        config_warnings: services_schema_warnings(services_schema_version)
+            .into_iter()
+            .chain(log_config_warnings)
+            .collect(),
         control_security,
         control_limits,
         log_config,
@@ -52,24 +56,13 @@ where
     })
 }
 
-fn read_log_config<R>(registry: &mut R) -> Result<RuntimeLogConfig, ReloadConfigError>
+fn read_log_config<R>(
+    registry: &mut R,
+) -> Result<(RuntimeLogConfig, Vec<RegistryConfigWarning>), ReloadConfigError>
 where
     R: RegistryClient + ?Sized,
 {
-    let mut config = RuntimeLogConfig::default();
-    if let Some(max_line_bytes) = registry
-        .read_max_log_line_length()
-        .map_err(ReloadConfigError::Registry)?
-    {
-        config.max_line_bytes = max_line_bytes as usize;
-    }
-    if let Some(max_buffer_bytes) = registry
-        .read_max_log_buffer_per_service()
-        .map_err(ReloadConfigError::Registry)?
-    {
-        config.max_buffer_per_service_bytes = max_buffer_bytes as usize;
-    }
-    Ok(config)
+    read_log_config_from_registry(registry).map_err(ReloadConfigError::Registry)
 }
 
 fn read_shutdown_settings<R>(registry: &mut R) -> Result<ShutdownSettings, ReloadConfigError>
