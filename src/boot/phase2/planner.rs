@@ -90,6 +90,7 @@ pub(crate) fn prepare_phase2_boot_plan_with_retained(
             service: blocked.service,
             operation_id,
             reason: blocked.reason,
+            additional_reasons: blocked.additional_reasons,
         })
         .collect();
 

@@ -22,5 +22,9 @@ pub(in crate::boot::phase2) struct StartableService {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(in crate::boot::phase2) struct BlockedServiceDraft {
     pub(in crate::boot::phase2) service: String,
+    /// The primary Failed cause, by PSD-007 §6.2 precedence.
     pub(in crate::boot::phase2) reason: BlockedReason,
+    /// Every other finding for this service, in discovery order. Retained for
+    /// diagnostics only; the precedence rule decides `reason` alone.
+    pub(in crate::boot::phase2) additional_reasons: Vec<BlockedReason>,
 }

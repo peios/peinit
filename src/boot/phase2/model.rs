@@ -48,7 +48,12 @@ impl BlockedReason {
 pub struct BlockedService {
     pub service: String,
     pub operation_id: OperationId,
+    /// The primary Failed cause, by PSD-007 §6.2 precedence. This is what
+    /// `transition_cause()` turns into the service's recorded state.
     pub reason: BlockedReason,
+    /// Every other finding for this service, in discovery order. §6.2 requires
+    /// these be logged; they deliberately do not affect the primary cause.
+    pub additional_reasons: Vec<BlockedReason>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

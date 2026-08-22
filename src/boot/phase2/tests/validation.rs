@@ -101,6 +101,17 @@ fn cycle_detected_takes_primary_cause_precedence_over_validation_errors() {
         boot.blocked[0].reason,
         BlockedReason::CycleDetected { .. }
     ));
+    // §6.2: precedence picks the primary cause, it does not suppress the rest.
+    // `a` also has an invalid health-check configuration, and an administrator
+    // who breaks the cycle should not have to reboot to discover that.
+    assert!(
+        boot.blocked[0]
+            .additional_reasons
+            .iter()
+            .any(|reason| matches!(reason, BlockedReason::ValidationError { .. })),
+        "the health-check validation error must be retained beside the cycle: {:?}",
+        boot.blocked[0].additional_reasons,
+    );
 }
 
 #[test]

@@ -1,4 +1,4 @@
-use crate::boot::phase2::{BlockedReason, DependencyKind, Phase2BootPlan};
+use crate::boot::phase2::{BlockedReason, BlockedService, DependencyKind, Phase2BootPlan};
 use crate::ids::OperationId;
 use crate::operation::store::{
     OperationEvent, OperationRequest, OperationStore, OperationStoreError,
@@ -34,7 +34,7 @@ impl OperationStore {
             events.push(self.fail_operation(
                 blocked.operation_id,
                 plan.observed_at_ns,
-                blocked_failure_reason(&blocked.reason),
+                blocked_failure_message(blocked),
             )?);
             blocked_operation_ids.push(blocked.operation_id);
         }
@@ -58,6 +58,34 @@ impl OperationStore {
             events,
         })
     }
+}
+
+/// The operation's failure message: the primary cause, then every other
+/// finding for the same service.
+///
+/// PSD-007 §6.2 requires all findings be logged even though only one becomes
+/// the service's recorded Failed cause, and §5.2 is emphatic about why —
+/// "cryptic failure messages are a specification violation". An administrator
+/// whose service is both in a cycle and missing a `Requires` target should
+/// learn both facts from one boot, not one per reboot.
+///
+/// The primary stays first and unqualified so the leading text is unchanged
+/// from the single-finding case, which is the common one.
+fn blocked_failure_message(blocked: &BlockedService) -> String {
+    let primary = blocked_failure_reason(&blocked.reason);
+    if blocked.additional_reasons.is_empty() {
+        return primary;
+    }
+    let others = blocked
+        .additional_reasons
+        .iter()
+        .map(blocked_failure_reason)
+        .collect::<Vec<_>>()
+        .join("; ");
+    format!(
+        "{primary} (also: {others}) [{} findings]",
+        blocked.additional_reasons.len() + 1
+    )
 }
 
 fn blocked_failure_reason(reason: &BlockedReason) -> String {
