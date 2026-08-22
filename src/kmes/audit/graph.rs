@@ -1,7 +1,8 @@
 use peios::msgpack::Writer;
 
 use crate::boundary::{BoundaryError, KmesEvent};
-use crate::service::{ServiceGraphFinding, ServiceGraphWarning};
+use crate::boot::phase2::BlockedReason;
+use crate::service::{ServiceDependencyKind, ServiceGraphFinding, ServiceGraphWarning};
 
 use crate::kmes::labels::service_dependency_kind_label;
 use crate::kmes::payload::{
@@ -167,5 +168,88 @@ pub(super) fn encode_graph_cycle_error(
         "message",
         &format!("dependency cycle: {}", services.join(" -> ")),
     );
+    finish_event("graph.validation_error", writer)
+}
+
+/// Encode one boot-time blocked-service finding as a `graph.validation_error`.
+///
+/// Deliberately the same event type as the reload path's findings, separated
+/// by the `phase` field ("boot" here, "reload_config" there). A consumer
+/// filtering for validation problems then gets both without knowing two type
+/// names, and the phase tells it which regime it is looking at — boot marks
+/// individual services and continues, reload rejects the whole reload.
+///
+/// `BlockedReason` is not `ServiceGraphFinding` and does not map onto it one
+/// for one: `HardDependencyBlocked` — blocked *because a dependency is
+/// blocked* — is real information the reload path cannot produce, since reload
+/// rejects wholesale rather than propagating a block. It gets its own
+/// `finding` value rather than being flattened into the missing-dependency
+/// case, which would claim the target does not exist when it does.
+pub fn encode_boot_blocked_service_event(
+    service: &str,
+    reason: &BlockedReason,
+) -> Result<KmesEvent, BoundaryError> {
+    const PHASE: &str = "boot";
+    match reason {
+        BlockedReason::CycleDetected { services } => encode_graph_cycle_error(PHASE, services),
+        BlockedReason::HardDependencyUnavailable { target, kind } => {
+            encode_boot_dependency_error(PHASE, "missing_hard_dependency", service, target, *kind,
+                &format!("service {service} has missing hard dependency {target}"))
+        }
+        BlockedReason::HardDependencyBlocked { target, kind } => {
+            encode_boot_dependency_error(PHASE, "hard_dependency_blocked", service, target, *kind,
+                &format!("service {service} is blocked because hard dependency {target} is blocked"))
+        }
+        BlockedReason::ConflictingBootService { target } => {
+            let mut writer = Writer::new();
+            writer.write_map(5);
+            write_str_field(&mut writer, "phase", PHASE);
+            write_str_field(&mut writer, "finding", "conflicting_boot_services");
+            write_str_field(&mut writer, "service", service);
+            write_str_field(&mut writer, "target", target);
+            write_str_field(
+                &mut writer,
+                "message",
+                &format!("boot-triggered services {service} and {target} conflict"),
+            );
+            finish_event("graph.validation_error", writer)
+        }
+        BlockedReason::ValidationError { message } => {
+            let mut writer = Writer::new();
+            writer.write_map(5);
+            write_str_field(&mut writer, "phase", PHASE);
+            write_str_field(&mut writer, "finding", "validation_error");
+            write_str_field(&mut writer, "service", service);
+            write_str_field(&mut writer, "detail", message);
+            write_str_field(
+                &mut writer,
+                "message",
+                &format!("service {service} failed validation: {message}"),
+            );
+            finish_event("graph.validation_error", writer)
+        }
+    }
+}
+
+fn encode_boot_dependency_error(
+    phase: &str,
+    finding: &'static str,
+    service: &str,
+    target: &str,
+    kind: ServiceDependencyKind,
+    message: &str,
+) -> Result<KmesEvent, BoundaryError> {
+    let mut writer = Writer::new();
+    writer.write_map(6);
+    write_str_field(&mut writer, "phase", phase);
+    write_str_field(&mut writer, "finding", finding);
+    write_str_field(&mut writer, "service", service);
+    write_str_field(&mut writer, "target", target);
+    write_str_field(
+        &mut writer,
+        "dependency_kind",
+        service_dependency_kind_label(kind),
+    );
+    write_str_field(&mut writer, "message", message);
     finish_event("graph.validation_error", writer)
 }

@@ -4,7 +4,8 @@ mod labels;
 mod payload;
 
 pub use audit::{
-    encode_critical_failure_event, encode_graph_validation_error_event,
+    encode_boot_blocked_service_event, encode_critical_failure_event,
+    encode_graph_validation_error_event,
     encode_graph_validation_warning_event, encode_init_recovery_events,
     encode_on_failure_loop_suppressed_event, encode_service_access_denied_event,
     encode_shutdown_abandoned_event, encode_system_access_denied_event,
