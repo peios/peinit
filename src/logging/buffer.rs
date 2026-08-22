@@ -36,6 +36,29 @@ impl PreEventdLogBuffer {
             .push_back(BufferedLogRecord { record, size_bytes });
     }
 
+    /// Adopt a new capacity, evicting from the front until the contents fit.
+    ///
+    /// Dropping the oldest records is what `push` already does on overflow, so
+    /// a shrink and a steady-state overrun lose the same end of the buffer. The
+    /// alternative — refusing to shrink while full — would leave the configured
+    /// value untrue for as long as the buffer stayed busy, which is the failure
+    /// this method exists to remove.
+    pub fn set_capacity_bytes(&mut self, capacity_bytes: usize) {
+        self.capacity_bytes = capacity_bytes;
+        while self.used_bytes > self.capacity_bytes {
+            let Some(removed) = self.records.pop_front() else {
+                // No records left to evict: used_bytes is stale, not oversized.
+                self.used_bytes = 0;
+                break;
+            };
+            self.used_bytes = self.used_bytes.saturating_sub(removed.size_bytes);
+        }
+    }
+
+    pub fn capacity_bytes(&self) -> usize {
+        self.capacity_bytes
+    }
+
     pub fn clear(&mut self) {
         self.records.clear();
         self.used_bytes = 0;
