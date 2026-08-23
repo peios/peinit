@@ -111,11 +111,10 @@ fn post_kill_stop_cleanup_empty_cgroup_finishes_stop_and_removes_tree() {
     controller.set_cgroup_populated("/sys/fs/cgroup/peinit/app/main", false);
 
     let cleanup_due = due_at_ns + 5_000_000_000;
-    assert!(
-        supervisor
-            .process_due_cgroup_cleanups(&mut controller, cleanup_due)
-            .expect("cleanup")
-    );
+    supervisor
+        .process_due_cgroup_cleanups(&mut controller, cleanup_due)
+        .expect("cleanup")
+        .expect("a cleanup deadline was due");
 
     let status = supervisor.service_status("app").expect("app");
     assert_eq!(status.state, ServiceState::Inactive);
@@ -162,11 +161,10 @@ fn post_kill_stop_cleanup_populated_cgroup_marks_abandoned_and_fails_stop() {
         .expect("escalation");
 
     let cleanup_due = due_at_ns + 5_000_000_000;
-    assert!(
-        supervisor
-            .process_due_cgroup_cleanups(&mut controller, cleanup_due)
-            .expect("cleanup")
-    );
+    supervisor
+        .process_due_cgroup_cleanups(&mut controller, cleanup_due)
+        .expect("cleanup")
+        .expect("a cleanup deadline was due");
 
     let status = supervisor.service_status("app").expect("app");
     assert_eq!(status.state, ServiceState::Abandoned);

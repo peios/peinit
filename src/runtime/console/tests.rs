@@ -22,6 +22,112 @@ use crate::supervisor::{
 use super::collect_runtime_loop_console_messages;
 
 #[test]
+fn a_reset_that_leaves_the_abandoned_cgroup_leaked_warns_on_the_console() {
+    let dispatch = crate::supervisor::SupervisorLifecycleDispatch {
+        outcome: crate::control::lifecycle::LifecycleCommandOutcome::Noop(
+            crate::control::lifecycle::ServiceStatusSnapshot {
+                service: "task".to_string(),
+                state: ServiceState::Inactive,
+                cause: None,
+                generation: 1,
+                definition_removed: false,
+            },
+        ),
+        context_id: None,
+        pending_control_operation: None,
+        lifecycle_warnings: vec![
+            "abandoned main cgroup for service task is still populated after reset -- cgroup remains leaked; underlying D-state process requires investigation"
+                .to_string(),
+        ],
+        start_dispatches: Vec::new(),
+    };
+    let turn = RuntimeShutdownEventTurn::ControlConnection {
+        fd: 44,
+        supervisor: Box::new(crate::supervisor::SupervisorControlConnectionTableTurn {
+            fd: 44,
+            turn: crate::supervisor::SupervisorControlConnectionTurn {
+                read: crate::control::connection::ControlConnectionReadTurn::WouldBlock {
+                    buffered_bytes: 0,
+                },
+                frame: Some(crate::supervisor::SupervisorControlConnectionFrameTurn {
+                    frame: crate::supervisor::SupervisorControlFrameTurn::CommandAccepted {
+                        response_line: None,
+                        dispatch: Some(Box::new(
+                            crate::supervisor::SupervisorControlCommandDispatch::Lifecycle(
+                                Box::new(dispatch),
+                            ),
+                        )),
+                        wait: None,
+                        access_denials: Vec::new(),
+                        remaining_bytes: 0,
+                    },
+                    pending_write_bytes: 0,
+                    close_after_write: false,
+                }),
+                write: crate::control::connection::ControlConnectionWriteTurn::Idle {
+                    close_after_write: false,
+                },
+                close_connection: false,
+            },
+            removed: false,
+            active_connections: 1,
+        }),
+        deadline_timer: None,
+    };
+
+    let mut messages = Vec::new();
+    collect_runtime_loop_console_messages(
+        &RuntimeWorkPumpTurn::default(),
+        &[turn],
+        &RuntimeWorkPumpTurn::default(),
+        &[],
+        &mut messages,
+    );
+
+    assert_eq!(
+        messages,
+        vec![crate::runtime::console::ConsoleMessage::error(
+            "peinit warning: abandoned main cgroup for service task is still populated after reset -- cgroup remains leaked; underlying D-state process requires investigation\n"
+        )],
+    );
+}
+
+#[test]
+fn a_leaked_cgroup_is_announced_on_the_console() {
+    let turn = RuntimeShutdownEventTurn::LifecycleDeadlineTimer {
+        read: crate::boundary::LinuxTimerFdRead::Expired { expirations: 1 },
+        drive: Some(Box::new(
+            crate::supervisor::SupervisorLifecycleDeadlineDispatch {
+                cgroup_leaks: vec![crate::supervisor::SupervisorLeakedCgroupDispatch {
+                    service: "jellyfin".to_string(),
+                    path: "/sys/fs/cgroup/peinit/jellyfin/health".to_string(),
+                    kind: crate::service::runtime::LeakedCgroupKind::Health,
+                    detected_at_ns: 1_000,
+                }],
+                ..crate::supervisor::SupervisorLifecycleDeadlineDispatch::default()
+            },
+        )),
+        deadline_timer: crate::supervisor::SupervisorLifecycleDeadlineTimerTurn::Disarmed,
+    };
+
+    let mut messages = Vec::new();
+    collect_runtime_loop_console_messages(
+        &RuntimeWorkPumpTurn::default(),
+        &[turn],
+        &RuntimeWorkPumpTurn::default(),
+        &[],
+        &mut messages,
+    );
+
+    assert_eq!(
+        messages,
+        vec![crate::runtime::console::ConsoleMessage::error(
+            "peinit: service jellyfin leaked its health cgroup /sys/fs/cgroup/peinit/jellyfin/health; underlying process is not responding to the kernel\n"
+        )],
+    );
+}
+
+#[test]
 fn service_launch_emits_console_progress() {
     let work = RuntimeWorkPumpTurn {
         service_launches: vec![SupervisorLaunchDispatch {

@@ -72,6 +72,21 @@ pub(super) fn collect_lifecycle_deadline_dispatch_console_messages(
     for timeout in &dispatch.watchdog_timeouts {
         collect_watchdog_timeout_console_messages(timeout, out);
     }
+    // A leak means something underneath the service stopped answering the
+    // kernel, and no amount of restarting the service fixes it. The service
+    // itself carries on, so without this line nothing on the console says the
+    // machine is now missing a cgroup it can never reclaim.
+    for leak in &dispatch.cgroup_leaks {
+        crate::runtime::console::push_error(
+            out,
+            format!(
+                "peinit: service {} leaked its {} cgroup {}; underlying process is not responding to the kernel\n",
+                leak.service,
+                leaked_cgroup_kind_console(leak.kind),
+                leak.path,
+            ),
+        );
+    }
     for settle in &dispatch.boot_settles {
         // Say when the wait was cut short, because it changes what the operator
         // is looking at: a prompt started on a timeout may still be written
@@ -172,5 +187,15 @@ fn collect_watchdog_timeout_console_messages(
     collect_service_transitions_console_messages(&dispatch.service_transitions, out);
     if dispatch.critical_reboot.is_some() {
         push_critical_service_failure(out, &dispatch.service, "watchdog timeout");
+    }
+}
+
+fn leaked_cgroup_kind_console(kind: crate::service::runtime::LeakedCgroupKind) -> &'static str {
+    use crate::service::runtime::LeakedCgroupKind;
+    match kind {
+        LeakedCgroupKind::ServiceTree => "service_tree",
+        LeakedCgroupKind::Health => "health",
+        LeakedCgroupKind::Hooks => "hooks",
+        LeakedCgroupKind::Helper => "helper",
     }
 }

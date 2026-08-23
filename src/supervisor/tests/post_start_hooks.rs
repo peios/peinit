@@ -225,11 +225,10 @@ fn exec_start_post_leaked_hooks_cgroup_is_projected_as_warning() {
     controller.set_cgroup_populated("/sys/fs/cgroup/peinit/app/hooks", true);
     let cleanup_due = POST_HOOK_DONE_NS + 5_000_000_000;
 
-    assert!(
-        supervisor
-            .process_due_cgroup_cleanups(&mut controller, cleanup_due)
-            .expect("cleanup")
-    );
+    supervisor
+        .process_due_cgroup_cleanups(&mut controller, cleanup_due)
+        .expect("cleanup")
+        .expect("a cleanup deadline was due");
 
     let status = supervisor.service_status("app").expect("app status");
     assert_eq!(status.warnings.len(), 1);

@@ -161,9 +161,10 @@ impl Supervisor {
                 dispatch.watchdog_timeouts.extend(timeouts);
             }
             SupervisorLifecycleDeadlineKind::CgroupCleanup { .. } => {
-                if !self.process_due_cgroup_cleanups(controller, now_ns)? {
+                let Some(leaks) = self.process_due_cgroup_cleanups(controller, now_ns)? else {
                     return Ok(false);
-                }
+                };
+                dispatch.cgroup_leaks.extend(leaks);
             }
             SupervisorLifecycleDeadlineKind::BootSuccess => {
                 let Some(boot_success) =

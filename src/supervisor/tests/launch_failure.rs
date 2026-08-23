@@ -54,11 +54,10 @@ fn parent_setup_launch_failure_marks_start_failed_and_service_backoff() {
 
     let mut controller = TestProcessController::default();
     controller.set_cgroup_populated("/sys/fs/cgroup/peinit/authd", false);
-    assert!(
-        supervisor
-            .process_due_cgroup_cleanups(&mut controller, AUTHD_LAUNCH_NS)
-            .expect("process cleanup")
-    );
+    supervisor
+        .process_due_cgroup_cleanups(&mut controller, AUTHD_LAUNCH_NS)
+        .expect("process cleanup")
+        .expect("a cleanup deadline was due");
     assert_eq!(
         controller.cgroup_populated_checks,
         vec!["/sys/fs/cgroup/peinit/authd"]
