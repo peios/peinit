@@ -1,30 +1,39 @@
 use crate::boundary::{
-    BootAttemptCounter, Clock, LinuxTimerFdRead, ProcessController, ShutdownDeadlineTimer,
-    ShutdownFinalizer,
+    Clock, FilesystemCheckHelperReader, LinuxTimerFdRead, ProcessController, RealtimeClock,
+    ShutdownDeadlineTimer, ShutdownFinalizer,
 };
+use crate::control::service_security::ServiceAccessChecker;
+use crate::control::system::SystemAccessChecker;
 use crate::supervisor::{Supervisor, SupervisorError, SupervisorLifecycleDeadlineTimerTurn};
 
 use super::model::{
-    RuntimeEventRegistrar, RuntimeLifecycleDeadlineTimer, RuntimeShutdownEventTurn,
-    RuntimeShutdownEventTurnError,
+    RuntimeEventRegistrar, RuntimeLifecycleDeadlineTimer, RuntimeShutdownEventContext,
+    RuntimeShutdownEventTurn, RuntimeShutdownEventTurnError,
 };
 
-pub(super) fn process_lifecycle_deadline_timer_event<D, C, P, F, R>(
+pub(super) fn process_lifecycle_deadline_timer_event<D, C, P, F, A, R, H>(
     supervisor: &mut Supervisor,
     deadline_timer: &mut D,
-    clock: &mut C,
-    controller: &mut P,
-    boot_attempt_counter: &mut dyn BootAttemptCounter,
-    finalizer: &mut F,
-    registrar: &mut R,
+    filesystem_check_reader: &mut H,
+    context: RuntimeShutdownEventContext<'_, C, P, F, A, R>,
 ) -> Result<RuntimeShutdownEventTurn, RuntimeShutdownEventTurnError>
 where
     D: RuntimeLifecycleDeadlineTimer + ?Sized,
-    C: Clock + ?Sized,
+    C: Clock + RealtimeClock + ?Sized,
     P: ProcessController + ?Sized,
     F: ShutdownFinalizer,
+    A: SystemAccessChecker + ServiceAccessChecker + ?Sized,
     R: RuntimeEventRegistrar + ?Sized,
+    H: FilesystemCheckHelperReader + ?Sized,
 {
+    let RuntimeShutdownEventContext {
+        clock,
+        controller,
+        finalizer,
+        registrar,
+        boot_attempt_counter,
+        ..
+    } = context;
     let read = deadline_timer
         .read_lifecycle_deadline()
         .map_err(RuntimeShutdownEventTurnError::DeadlineRead)?;
@@ -42,7 +51,7 @@ where
                 )
                 .map_err(RuntimeShutdownEventTurnError::Supervisor)?;
             if let Some(dispatch) = &dispatch {
-                unregister_filesystem_check_timeouts(dispatch, registrar)?;
+                release_filesystem_check_timeouts(dispatch, registrar, filesystem_check_reader)?;
             }
             dispatch.map(Box::new)
         }
@@ -57,20 +66,25 @@ where
     })
 }
 
-fn unregister_filesystem_check_timeouts<R>(
+/// A timed-out helper is the third and last way a helper leaves the store, so
+/// its descriptors are released here for the same reason as on the completion
+/// paths -- see `super::pre_start_check::release_helper_fds`.
+fn release_filesystem_check_timeouts<R, H>(
     dispatch: &crate::supervisor::SupervisorLifecycleDeadlineDispatch,
     registrar: &mut R,
+    reader: &mut H,
 ) -> Result<(), RuntimeShutdownEventTurnError>
 where
     R: RuntimeEventRegistrar + ?Sized,
+    H: FilesystemCheckHelperReader + ?Sized,
 {
     for timeout in &dispatch.pre_start_check_timeouts {
-        registrar
-            .unregister_source(timeout.timeout.completion.result_fd)
-            .map_err(RuntimeShutdownEventTurnError::EventRegistration)?;
-        registrar
-            .unregister_source(timeout.timeout.pidfd)
-            .map_err(RuntimeShutdownEventTurnError::EventRegistration)?;
+        super::pre_start_check::release_helper_fds(
+            timeout.timeout.completion.result_fd,
+            timeout.timeout.pidfd,
+            registrar,
+            reader,
+        )?;
     }
     Ok(())
 }

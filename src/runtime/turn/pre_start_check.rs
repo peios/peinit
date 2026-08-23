@@ -23,7 +23,11 @@ where
     H: FilesystemCheckHelperReader + ?Sized,
 {
     let Some(helper) = supervisor.filesystem_check_helper_by_result_fd(result_fd) else {
-        let _ = registrar.unregister_source(result_fd);
+        // No unregister here. A stale event means the helper already completed
+        // through one of the terminal paths below, which unregistered and then
+        // closed both descriptors -- so the number may already have been reused
+        // by an unrelated source, and unregistering it would drop that source
+        // out of the event set.
         return Ok(RuntimeShutdownEventTurn::FilesystemCheckHelper {
             result_fd,
             turn: RuntimeFilesystemCheckHelperTurn::Stale { fd: result_fd },
@@ -45,7 +49,7 @@ where
                 failed_report(&helper),
                 clock,
             )?;
-            unregister_helper_sources(&helper, registrar)?;
+            release_helper_sources(&helper, registrar, reader)?;
             return Ok(RuntimeShutdownEventTurn::FilesystemCheckHelper {
                 result_fd,
                 turn: RuntimeFilesystemCheckHelperTurn::ReadFailedClosed {
@@ -58,7 +62,7 @@ where
     };
 
     let completion = complete_filesystem_check_with_report(supervisor, result_fd, report, clock)?;
-    unregister_helper_sources(&helper, registrar)?;
+    release_helper_sources(&helper, registrar, reader)?;
     Ok(RuntimeShutdownEventTurn::FilesystemCheckHelper {
         result_fd,
         turn: RuntimeFilesystemCheckHelperTurn::Completed {
@@ -80,7 +84,8 @@ where
     H: FilesystemCheckHelperReader + ?Sized,
 {
     let Some(helper) = supervisor.filesystem_check_helper_by_pidfd(pidfd) else {
-        let _ = registrar.unregister_source(pidfd);
+        // See `process_filesystem_check_helper_event`: a stale descriptor has
+        // already been closed, so it must not be unregistered.
         return Ok(RuntimeShutdownEventTurn::FilesystemCheckHelperExit {
             pidfd,
             turn: RuntimeFilesystemCheckHelperTurn::Stale { fd: pidfd },
@@ -99,7 +104,7 @@ where
     };
     let completion =
         complete_filesystem_check_with_report(supervisor, helper.result_fd, report, clock)?;
-    unregister_helper_sources(&helper, registrar)?;
+    release_helper_sources(&helper, registrar, reader)?;
     let turn = match failure {
         Some(error) => RuntimeFilesystemCheckHelperTurn::ReadFailedClosed {
             result_fd: helper.result_fd,
@@ -134,18 +139,39 @@ where
         .map_err(RuntimeShutdownEventTurnError::Supervisor)
 }
 
-fn unregister_helper_sources<R>(
+/// Retire a finished helper: unregister both descriptors, then close them.
+///
+/// Both steps run for both descriptors even if one fails, so a registrar error
+/// on the result descriptor cannot strand the pidfd. The close is unconditional
+/// for the same reason -- an unregister failure is not a reason to leak a
+/// descriptor in PID 1.
+fn release_helper_sources<R, H>(
     helper: &LaunchedFilesystemCheckHelper,
     registrar: &mut R,
+    reader: &mut H,
 ) -> Result<(), RuntimeShutdownEventTurnError>
 where
     R: RuntimeEventRegistrar + ?Sized,
+    H: FilesystemCheckHelperReader + ?Sized,
 {
-    registrar
-        .unregister_source(helper.result_fd)
-        .map_err(RuntimeShutdownEventTurnError::EventRegistration)?;
-    registrar
-        .unregister_source(helper.pidfd)
+    release_helper_fds(helper.result_fd, helper.pidfd, registrar, reader)
+}
+
+pub(super) fn release_helper_fds<R, H>(
+    result_fd: i32,
+    pidfd: i32,
+    registrar: &mut R,
+    reader: &mut H,
+) -> Result<(), RuntimeShutdownEventTurnError>
+where
+    R: RuntimeEventRegistrar + ?Sized,
+    H: FilesystemCheckHelperReader + ?Sized,
+{
+    let result = registrar.unregister_source(result_fd);
+    let exit = registrar.unregister_source(pidfd);
+    reader.release_filesystem_check_helper_fds(result_fd, pidfd);
+    result
+        .and(exit)
         .map_err(RuntimeShutdownEventTurnError::EventRegistration)
 }
 

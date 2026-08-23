@@ -135,6 +135,7 @@ fn runtime_filesystem_condition_completion_queues_and_launches_service_job() {
     assert_eq!(result.turn.post_work.service_launches.len(), 1);
     assert_eq!(result.launched_jobs, vec!["app"]);
     assert_eq!(result.registrar_unregister_calls, vec![81, 80]);
+    assert_eq!(result.filesystem_check_released_fds, vec![(81, 80)]);
     assert_eq!(
         supervisor.service_status("app").expect("app").state,
         ServiceState::Active,
@@ -167,6 +168,7 @@ fn runtime_filesystem_condition_read_failure_skips_service_fail_closed() {
     ));
     assert!(result.turn.post_work.is_empty());
     assert_eq!(result.registrar_unregister_calls, vec![81, 80]);
+    assert_eq!(result.filesystem_check_released_fds, vec![(81, 80)]);
     assert_eq!(
         supervisor.service_status("app").expect("app").state,
         ServiceState::Skipped,
@@ -207,6 +209,7 @@ fn runtime_lifecycle_timeout_kills_helper_and_skips_filesystem_condition() {
         vec!["/sys/fs/cgroup/peinit/app/checks".to_string()],
     );
     assert_eq!(result.registrar_unregister_calls, vec![81, 80]);
+    assert_eq!(result.filesystem_check_released_fds, vec![(81, 80)]);
     assert_eq!(
         supervisor.service_status("app").expect("app").state,
         ServiceState::Skipped,
@@ -240,11 +243,64 @@ fn runtime_pidfd_exit_without_report_skips_filesystem_condition_fail_closed() {
         }],
     ));
     assert_eq!(result.registrar_unregister_calls, vec![81, 80]);
+    assert_eq!(result.filesystem_check_released_fds, vec![(81, 80)]);
     assert_eq!(
         supervisor.service_status("app").expect("app").state,
         ServiceState::Skipped,
     );
     assert!(supervisor.next_pre_start_check_timeout().is_none());
+}
+
+#[test]
+fn runtime_filesystem_helper_exit_after_completion_leaves_the_reused_fd_registered() {
+    let (app, check) = filesystem_condition_app();
+    let mut supervisor = boot_supervisor(vec![app]);
+    let operation_id = supervisor.pending_pre_start_check_launches()[0];
+
+    run_loop(
+        &mut supervisor,
+        LoopScript::new([FILESYSTEM_CHECK_NS], Vec::new()),
+    );
+
+    // Both helper descriptors can become ready in one epoll batch. The result
+    // descriptor is handled first and closes both, so by the time the exit
+    // event is handled the pidfd number may already belong to something else --
+    // unregistering it here would evict that unrelated source.
+    let result = run_loop(
+        &mut supervisor,
+        LoopScript::new(
+            [FILESYSTEM_CHECK_NS, FILESYSTEM_CHECK_NS + 1],
+            vec![process(4242, 9)],
+        )
+        .events([
+            RuntimeEventSource::FilesystemCheckHelper { result_fd: 81 },
+            RuntimeEventSource::FilesystemCheckHelperExit { pidfd: 80 },
+        ])
+        .filesystem_reports([Ok(Some(FilesystemCheckReport {
+            service: "app".to_string(),
+            operation_id,
+            results: vec![FilesystemCheckResult {
+                check,
+                satisfied: true,
+            }],
+        }))]),
+    );
+
+    assert!(matches!(
+        result.turn.turns.as_slice(),
+        [
+            RuntimeShutdownEventTurn::FilesystemCheckHelper {
+                turn: RuntimeFilesystemCheckHelperTurn::Completed { .. },
+                ..
+            },
+            RuntimeShutdownEventTurn::FilesystemCheckHelperExit {
+                pidfd: 80,
+                turn: RuntimeFilesystemCheckHelperTurn::Stale { fd: 80 },
+            },
+        ],
+    ));
+    assert_eq!(result.registrar_unregister_calls, vec![81, 80]);
+    assert_eq!(result.filesystem_check_released_fds, vec![(81, 80)]);
 }
 
 #[test]

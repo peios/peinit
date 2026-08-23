@@ -205,6 +205,7 @@ struct TestFilesystemCheckLauncher {
 struct TestFilesystemCheckReader {
     helpers: Vec<LaunchedFilesystemCheckHelper>,
     reports: VecDeque<Result<Option<FilesystemCheckReport>, BoundaryError>>,
+    released_fds: Vec<(i32, i32)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -429,6 +430,7 @@ impl TestFilesystemCheckReader {
         Self {
             helpers: Vec::new(),
             reports: reports.into(),
+            released_fds: Vec::new(),
         }
     }
 }
@@ -440,6 +442,10 @@ impl FilesystemCheckHelperReader for TestFilesystemCheckReader {
     ) -> Result<Option<FilesystemCheckReport>, BoundaryError> {
         self.helpers.push(helper.clone());
         self.reports.pop_front().unwrap_or(Ok(None))
+    }
+
+    fn release_filesystem_check_helper_fds(&mut self, result_fd: i32, pidfd: i32) {
+        self.released_fds.push((result_fd, pidfd));
     }
 }
 

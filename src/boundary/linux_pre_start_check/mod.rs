@@ -43,6 +43,24 @@ impl FilesystemCheckHelperReader for LinuxFilesystemCheckHelper {
     ) -> Result<Option<FilesystemCheckReport>, BoundaryError> {
         read_linux_filesystem_check_report(helper)
     }
+
+    fn release_filesystem_check_helper_fds(&mut self, result_fd: i32, pidfd: i32) {
+        close_helper_fd(result_fd);
+        close_helper_fd(pidfd);
+    }
+}
+
+fn close_helper_fd(fd: i32) {
+    if fd < 0 {
+        return;
+    }
+    // SAFETY: `launch_linux_filesystem_check_helper` created both descriptors
+    // and released them from Rust ownership with `into_raw_fd`. The runtime
+    // calls this once, after unregistering them, and never uses them again, so
+    // this is the only close.
+    unsafe {
+        libc::close(fd);
+    }
 }
 
 fn launch_linux_filesystem_check_helper(
