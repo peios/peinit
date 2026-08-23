@@ -231,7 +231,11 @@ mod tests {
         for policy in DEVICE_NODE_POLICIES {
             assert!(policy.sddl.contains("(A;;FRFW;;;WD)"), "{}", policy.path);
             assert!(!policy.sddl.contains("GA;;;WD"), "{}", policy.path);
-            assert!(!policy.sddl.contains("OICI"), "{}: leaves carry no inheritance flags", policy.path);
+            assert!(
+                !policy.sddl.contains("OICI"),
+                "{}: leaves carry no inheritance flags",
+                policy.path
+            );
         }
     }
 
