@@ -245,10 +245,24 @@ fn a_populated_filesystem_check_helper_cgroup_is_recorded_as_leaked() {
     // Still populated after the kill: D-state processes, nothing to be done.
     controller.set_cgroup_populated("/sys/fs/cgroup/peinit/app/checks", true);
 
-    assert!(
-        supervisor
-            .process_due_cgroup_cleanups(&mut controller, due_at_ns + 5_000_000_000)
-            .expect("cleanup")
+    let leaks = supervisor
+        .process_due_cgroup_cleanups(&mut controller, due_at_ns + 5_000_000_000)
+        .expect("cleanup")
+        .expect("a cleanup deadline was due");
+
+    // The leak is reported out of the turn, not only recorded on the service:
+    // a `status` poll finds the record, but nobody is necessarily polling the
+    // service that leaked.
+    assert_eq!(
+        leaks
+            .iter()
+            .map(|leak| (leak.service.as_str(), leak.path.as_str(), leak.kind))
+            .collect::<Vec<_>>(),
+        vec![(
+            "app",
+            "/sys/fs/cgroup/peinit/app/checks",
+            LeakedCgroupKind::Helper,
+        )],
     );
 
     let runtime = &supervisor.services().get("app").expect("app").runtime;
@@ -303,11 +317,10 @@ fn timed_out_filesystem_condition_helper_records_cleanup_and_removes_empty_cgrou
         .expect("timeout dispatch");
     controller.set_cgroup_populated("/sys/fs/cgroup/peinit/app/checks", false);
 
-    assert!(
-        supervisor
-            .process_due_cgroup_cleanups(&mut controller, due_at_ns + 5_000_000_000)
-            .expect("cleanup")
-    );
+    supervisor
+        .process_due_cgroup_cleanups(&mut controller, due_at_ns + 5_000_000_000)
+        .expect("cleanup")
+        .expect("a cleanup deadline was due");
 
     assert_eq!(
         controller.cgroup_kills,

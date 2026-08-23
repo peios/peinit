@@ -25,6 +25,45 @@ use crate::supervisor::{
 use super::collect_runtime_loop_kmes_events;
 
 #[test]
+fn runtime_loop_collector_pushes_a_leaked_cgroup_as_an_audit_event() {
+    let turn = RuntimeShutdownEventTurn::LifecycleDeadlineTimer {
+        read: LinuxTimerFdRead::Expired { expirations: 1 },
+        drive: Some(Box::new(
+            crate::supervisor::SupervisorLifecycleDeadlineDispatch {
+                cgroup_leaks: vec![crate::supervisor::SupervisorLeakedCgroupDispatch {
+                    service: "jellyfin".to_string(),
+                    path: "/sys/fs/cgroup/peinit/jellyfin/health".to_string(),
+                    kind: crate::service::runtime::LeakedCgroupKind::Health,
+                    detected_at_ns: 1_000,
+                }],
+                ..crate::supervisor::SupervisorLifecycleDeadlineDispatch::default()
+            },
+        )),
+        deadline_timer: crate::supervisor::SupervisorLifecycleDeadlineTimerTurn::Disarmed,
+    };
+
+    let mut events = Vec::new();
+    collect_runtime_loop_kmes_events(
+        &RuntimeWorkPumpTurn::default(),
+        &SupervisorOperationMaintenanceTurn::default(),
+        &[turn],
+        &RuntimeWorkPumpTurn::default(),
+        &SupervisorOperationMaintenanceTurn::default(),
+        &[],
+        &mut events,
+    )
+    .expect("collected KMES events");
+
+    assert_eq!(
+        events
+            .iter()
+            .map(|event| event.event_type.as_str())
+            .collect::<Vec<_>>(),
+        vec!["cgroup.leaked"],
+    );
+}
+
+#[test]
 fn runtime_loop_collector_preserves_phase_order_for_maintenance_events_and_calendar_timers() {
     let before_id = operation_id(1);
     let after_id = operation_id(2);

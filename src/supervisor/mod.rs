@@ -50,6 +50,7 @@ mod work;
 #[cfg(test)]
 mod tests;
 
+pub use cgroup_cleanup::SupervisorLeakedCgroupDispatch;
 pub use child_reap::{SupervisorChildReapDispatch, SupervisorChildReapTurn};
 pub use control_boundary::{PendingControlOperation, PendingControlRequirement};
 pub use control_command::{

@@ -59,11 +59,10 @@ fn health_check_timeout_records_leaked_sub_cgroup_warning_after_post_kill_timeou
         .expect("health timeout");
     controller.set_cgroup_populated("/sys/fs/cgroup/peinit/app/health", true);
 
-    assert!(
-        supervisor
-            .process_due_cgroup_cleanups(&mut controller, cleanup_due)
-            .expect("cgroup cleanup")
-    );
+    supervisor
+        .process_due_cgroup_cleanups(&mut controller, cleanup_due)
+        .expect("cgroup cleanup")
+        .expect("a cleanup deadline was due");
 
     let status = supervisor.service_status("app").expect("status");
     assert!(

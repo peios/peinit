@@ -100,6 +100,13 @@ fn collect_lifecycle_dispatch_console_messages(
     out: &mut Vec<ConsoleMessage>,
 ) {
     collect_lifecycle_outcome_console_messages(&dispatch.outcome, out);
+    // The reset succeeded and the service is back to Inactive, so nothing in
+    // the transitions above says the cgroup is still leaked. An operator who
+    // issues the reset without reading its acknowledgement would otherwise
+    // never learn that.
+    for warning in &dispatch.lifecycle_warnings {
+        crate::runtime::console::push_error(out, format!("peinit warning: {warning}\n"));
+    }
     collect_start_dispatches_console_messages(&dispatch.start_dispatches, out);
 }
 

@@ -2,7 +2,10 @@ use crate::boundary::ProcessController;
 use crate::service::runtime::LeakedCgroupKind;
 
 use super::stop_main::{apply_stop_main_abandoned, apply_stop_main_empty};
-use super::{CgroupCleanupDeadline, CgroupCleanupKind, cleanup_service_cgroup_tree};
+use super::{
+    CgroupCleanupDeadline, CgroupCleanupKind, SupervisorLeakedCgroupDispatch,
+    cleanup_service_cgroup_tree,
+};
 use crate::supervisor::state::{Supervisor, SupervisorError};
 use crate::supervisor::work::SupervisorWork;
 
@@ -13,21 +16,25 @@ impl Supervisor {
         self.cgroup_cleanup.next_deadline()
     }
 
+    /// Returns the leaks newly recorded by this pass, or `None` if no deadline
+    /// was actually due -- the caller distinguishes "nothing happened" from
+    /// "a cleanup ran and reclaimed everything".
     pub(in crate::supervisor) fn process_due_cgroup_cleanups<P>(
         &mut self,
         controller: &mut P,
         now_ns: u64,
-    ) -> Result<bool, SupervisorError>
+    ) -> Result<Option<Vec<SupervisorLeakedCgroupDispatch>>, SupervisorError>
     where
         P: ProcessController + ?Sized,
     {
         let due = self.cgroup_cleanup.due_deadlines(now_ns);
         if due.is_empty() {
-            return Ok(false);
+            return Ok(None);
         }
 
         let mut work = SupervisorWork::from_supervisor(self);
         let mut processed = false;
+        let mut leaks = Vec::new();
         let mut all_start_dispatches = Vec::new();
         for deadline in due {
             let Some(deadline) = work.cgroup_cleanup.remove(&deadline.cgroup_id) else {
@@ -43,6 +50,7 @@ impl Supervisor {
                     deadline,
                     now_ns,
                     self.settings.phase2.max_parallel_starts,
+                    &mut leaks,
                 )?;
             } else {
                 let start_dispatches = process_empty_cgroup_cleanup(
@@ -57,7 +65,7 @@ impl Supervisor {
         }
         work.queue_restart_start_dispatches(&all_start_dispatches);
         work.commit(self);
-        Ok(processed)
+        Ok(processed.then_some(leaks))
     }
 }
 
@@ -66,6 +74,7 @@ fn process_populated_cgroup_cleanup(
     deadline: CgroupCleanupDeadline,
     now_ns: u64,
     max_parallel_starts: u32,
+    leaks: &mut Vec<SupervisorLeakedCgroupDispatch>,
 ) -> Result<(), SupervisorError> {
     match deadline.kind {
         CgroupCleanupKind::Hooks => record_leaked_cgroup(
@@ -74,6 +83,7 @@ fn process_populated_cgroup_cleanup(
             deadline.cgroup_id,
             LeakedCgroupKind::Hooks,
             now_ns,
+            leaks,
         ),
         CgroupCleanupKind::Health => record_leaked_cgroup(
             work,
@@ -81,6 +91,7 @@ fn process_populated_cgroup_cleanup(
             deadline.cgroup_id,
             LeakedCgroupKind::Health,
             now_ns,
+            leaks,
         ),
         CgroupCleanupKind::Helper => record_leaked_cgroup(
             work,
@@ -88,6 +99,7 @@ fn process_populated_cgroup_cleanup(
             deadline.cgroup_id,
             LeakedCgroupKind::Helper,
             now_ns,
+            leaks,
         ),
         CgroupCleanupKind::ServiceTree => record_leaked_cgroup(
             work,
@@ -95,6 +107,7 @@ fn process_populated_cgroup_cleanup(
             deadline.cgroup_id,
             LeakedCgroupKind::ServiceTree,
             now_ns,
+            leaks,
         ),
         CgroupCleanupKind::StopMain {
             operation_id,
@@ -155,12 +168,26 @@ fn record_leaked_cgroup(
     cgroup_id: String,
     kind: LeakedCgroupKind,
     now_ns: u64,
+    leaks: &mut Vec<SupervisorLeakedCgroupDispatch>,
 ) -> Result<(), SupervisorError> {
-    work.services
-        .record_leaked_cgroup(service, cgroup_id, kind, now_ns)
+    let recorded = work
+        .services
+        .record_leaked_cgroup(service, cgroup_id.clone(), kind, now_ns)
         .map_err(|error| {
             SupervisorError::Control(
                 crate::execution::control::ControlExecutionError::ServiceTable(error),
             )
-        })
+        })?;
+    // Recording is idempotent, so only report a leak the first time it is seen.
+    // Re-announcing the same path on every subsequent cleanup pass would turn
+    // one broken disk into a stream of identical events.
+    if recorded {
+        leaks.push(SupervisorLeakedCgroupDispatch {
+            service: service.to_string(),
+            path: cgroup_id,
+            kind,
+            detected_at_ns: now_ns,
+        });
+    }
+    Ok(())
 }

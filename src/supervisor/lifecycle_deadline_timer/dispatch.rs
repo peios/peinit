@@ -1,3 +1,4 @@
+use crate::supervisor::cgroup_cleanup::SupervisorLeakedCgroupDispatch;
 use crate::supervisor::dispatch::{
     SupervisorBootSettleDispatch, SupervisorBootSuccessDispatch,
     SupervisorFilesystemCheckTimeoutDispatch, SupervisorHealthCheckIntervalDispatch,
@@ -23,6 +24,7 @@ pub struct SupervisorLifecycleDeadlineDispatch {
     pub watchdog_timeouts: Vec<SupervisorWatchdogTimeoutDispatch>,
     pub boot_successes: Vec<SupervisorBootSuccessDispatch>,
     pub boot_settles: Vec<SupervisorBootSettleDispatch>,
+    pub cgroup_leaks: Vec<SupervisorLeakedCgroupDispatch>,
 }
 
 impl SupervisorLifecycleDeadlineDispatch {
@@ -40,5 +42,6 @@ impl SupervisorLifecycleDeadlineDispatch {
             && self.watchdog_timeouts.is_empty()
             && self.boot_successes.is_empty()
             && self.boot_settles.is_empty()
+            && self.cgroup_leaks.is_empty()
     }
 }
