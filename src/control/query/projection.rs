@@ -94,6 +94,7 @@ fn service_status_warnings(entry: &ServiceEntry) -> Vec<ServiceStatusWarning> {
                 LeakedCgroupKind::ServiceTree => ServiceStatusWarningType::ServiceTree,
                 LeakedCgroupKind::Health => ServiceStatusWarningType::Health,
                 LeakedCgroupKind::Hooks => ServiceStatusWarningType::Hooks,
+                LeakedCgroupKind::Helper => ServiceStatusWarningType::Helper,
             },
             detected_at_ns: leak.detected_at_ns,
         })

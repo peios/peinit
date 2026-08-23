@@ -56,6 +56,7 @@ pub enum ServiceStatusWarningType {
     ServiceTree,
     Health,
     Hooks,
+    Helper,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
