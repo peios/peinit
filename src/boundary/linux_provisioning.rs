@@ -15,6 +15,27 @@ use crate::service::ServiceDefinition;
 #[cfg(feature = "peios-boundary")]
 const DEFAULT_PROVISIONED_PATH_SDDL: &str = "O:SYG:SYD:(A;;GA;;;SY)(A;;GA;;;BA)(A;;FR;;;BU)";
 
+/// Every KACS-native open has to name a data right -- `READ_DATA`,
+/// `WRITE_DATA`, `APPEND_DATA` -- or `EXECUTE`, because that is what gives the
+/// returned descriptor a file mode; a mask of metadata and standard rights
+/// alone fails with `EINVAL`.
+///
+/// For a directory the only one available is `LIST_DIRECTORY`, which is
+/// `READ_DATA` under another name. Its write aliases `ADD_FILE` and
+/// `ADD_SUBDIRECTORY` are not cacheable directory handle rights and are
+/// rejected with `EOPNOTSUPP` -- they authorize namespace operations on the
+/// parent, evaluated live, rather than being carried by a handle.
+#[cfg(feature = "peios-boundary")]
+const DIRECTORY_CREATE_ACCESS: FileAccess = FileAccess::LIST_DIRECTORY
+    .union(FileAccess::READ_ATTRIBUTES)
+    .union(FileAccess::SYNCHRONIZE);
+
+#[cfg(feature = "peios-boundary")]
+const FILE_CREATE_ACCESS: FileAccess = FileAccess::READ_DATA
+    .union(FileAccess::WRITE_DATA)
+    .union(FileAccess::READ_ATTRIBUTES)
+    .union(FileAccess::SYNCHRONIZE);
+
 pub fn provision_linux_boot_paths(paths: &[ProvisionedPath]) -> ProvisionedPathApplyReport {
     let mut report = ProvisionedPathApplyReport::default();
     for entry in paths {
@@ -125,20 +146,30 @@ fn security_from_registry_bytes(_bytes: &[u8]) -> io::Result<ResolvedSecurity> {
 
 fn ensure_directory(path: &Path, sd: &ResolvedSecurity) -> io::Result<()> {
     ensure_parent_exists(path)?;
-    let directory =
+    let (directory, created) =
         create_or_open_directory(path, sd).map_err(|e| step_error("create directory", path, e))?;
+    if created {
+        // The creator descriptor was applied atomically at create time, which
+        // is the whole point of supplying one. Re-stamping it would be a
+        // no-op with a window in front of it.
+        return Ok(());
+    }
     apply_fd_security(&directory, sd)
         .map_err(|e| step_error("apply security descriptor to directory", path, e))
 }
 
 fn ensure_file(path: &Path, sd: &ResolvedSecurity) -> io::Result<()> {
     ensure_parent_exists(path)?;
-    let file = create_or_open_file(path, sd).map_err(|e| step_error("create file", path, e))?;
+    let (file, created) =
+        create_or_open_file(path, sd).map_err(|e| step_error("create file", path, e))?;
     if !fd_is_regular_file(file.as_raw_fd())? {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
             format!("{} exists but is not a regular file", path.display()),
         ));
+    }
+    if created {
+        return Ok(());
     }
     apply_fd_security(&file, sd)
         .map_err(|e| step_error("apply security descriptor to file", path, e))
@@ -170,69 +201,108 @@ fn ensure_parent_exists(path: &Path) -> io::Result<()> {
     }
 }
 
+/// Create `path` carrying `sd`, or open it if something is already there.
+///
+/// Returns the handle and whether this call created it.
+///
+/// **Two dispositions, not one `FILE_OPEN_IF`.** A creator descriptor is only
+/// meaningful on a branch that creates: KACS rejects `FILE_OPEN_IF` carrying
+/// one when it resolves to an existing object, with `EINVAL`, deliberately --
+/// there is nothing for the descriptor to apply to and silently dropping it
+/// would be worse. So creation and the already-there case are separate opens,
+/// and the second applies the descriptor afterwards.
 #[cfg(feature = "peios-boundary")]
-fn create_or_open_directory(path: &Path, sd: &ResolvedSecurity) -> io::Result<peios::file::File> {
+fn create_or_open_directory(
+    path: &Path,
+    sd: &ResolvedSecurity,
+) -> io::Result<(peios::file::File, bool)> {
     let ResolvedSecurity::Descriptor(sd) = sd;
-    let (file, _) = OpenOptions::new()
-        .desired_access(
-            FileAccess::READ_ATTRIBUTES
-                | FileAccess::WRITE_DAC
-                | FileAccess::WRITE_OWNER
-                | FileAccess::SYNCHRONIZE,
-        )
-        .disposition(Disposition::OpenIf)
+    match OpenOptions::new()
+        .desired_access(DIRECTORY_CREATE_ACCESS)
+        .disposition(Disposition::Create)
         .options(CreateOptions::DIRECTORY)
         .flags(OpenFlags::SYMLINK_NOFOLLOW)
         .creator_sd(sd)
         .create(None, path)
+    {
+        Ok((file, _)) => return Ok((file, true)),
+        Err(error) if error.raw_os_error() == Some(libc::EEXIST) => {}
+        Err(error) => return Err(io::Error::from(error)),
+    }
+    let (file, _) = OpenOptions::new()
+        .desired_access(DIRECTORY_CREATE_ACCESS | FileAccess::WRITE_DAC | FileAccess::WRITE_OWNER)
+        .disposition(Disposition::Open)
+        .options(CreateOptions::DIRECTORY)
+        .flags(OpenFlags::SYMLINK_NOFOLLOW)
+        .create(None, path)
         .map_err(io::Error::from)?;
-    Ok(file)
+    Ok((file, false))
 }
 
 #[cfg(not(feature = "peios-boundary"))]
-fn create_or_open_directory(path: &Path, _sd: &ResolvedSecurity) -> io::Result<std::fs::File> {
-    match std::fs::create_dir(path) {
-        Ok(()) => {}
-        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}
+fn create_or_open_directory(
+    path: &Path,
+    _sd: &ResolvedSecurity,
+) -> io::Result<(std::fs::File, bool)> {
+    let created = match std::fs::create_dir(path) {
+        Ok(()) => true,
+        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => false,
         Err(error) => return Err(error),
-    }
+    };
     if !path.symlink_metadata()?.is_dir() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
             format!("{} exists but is not a directory", path.display()),
         ));
     }
-    std::fs::File::open(path)
+    std::fs::File::open(path).map(|file| (file, created))
 }
 
+/// The file counterpart of [`create_or_open_directory`], split for the same
+/// reason.
 #[cfg(feature = "peios-boundary")]
-fn create_or_open_file(path: &Path, sd: &ResolvedSecurity) -> io::Result<peios::file::File> {
+fn create_or_open_file(
+    path: &Path,
+    sd: &ResolvedSecurity,
+) -> io::Result<(peios::file::File, bool)> {
     let ResolvedSecurity::Descriptor(sd) = sd;
-    let (file, _) = OpenOptions::new()
-        .desired_access(
-            FileAccess::READ_DATA
-                | FileAccess::WRITE_DATA
-                | FileAccess::READ_ATTRIBUTES
-                | FileAccess::WRITE_DAC
-                | FileAccess::WRITE_OWNER
-                | FileAccess::SYNCHRONIZE,
-        )
-        .disposition(Disposition::OpenIf)
+    match OpenOptions::new()
+        .desired_access(FILE_CREATE_ACCESS)
+        .disposition(Disposition::Create)
         .flags(OpenFlags::SYMLINK_NOFOLLOW)
         .creator_sd(sd)
         .create(None, path)
+    {
+        Ok((file, _)) => return Ok((file, true)),
+        Err(error) if error.raw_os_error() == Some(libc::EEXIST) => {}
+        Err(error) => return Err(io::Error::from(error)),
+    }
+    let (file, _) = OpenOptions::new()
+        .desired_access(FILE_CREATE_ACCESS | FileAccess::WRITE_DAC | FileAccess::WRITE_OWNER)
+        .disposition(Disposition::Open)
+        .flags(OpenFlags::SYMLINK_NOFOLLOW)
+        .create(None, path)
         .map_err(io::Error::from)?;
-    Ok(file)
+    Ok((file, false))
 }
 
 #[cfg(not(feature = "peios-boundary"))]
-fn create_or_open_file(path: &Path, _sd: &ResolvedSecurity) -> io::Result<std::fs::File> {
+fn create_or_open_file(path: &Path, _sd: &ResolvedSecurity) -> io::Result<(std::fs::File, bool)> {
+    match std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .open(path)
+    {
+        Ok(file) => return Ok((file, true)),
+        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}
+        Err(error) => return Err(error),
+    }
     std::fs::OpenOptions::new()
         .read(true)
         .write(true)
-        .create(true)
-        .truncate(false)
         .open(path)
+        .map(|file| (file, false))
 }
 
 fn fd_is_regular_file(fd: i32) -> io::Result<bool> {
@@ -295,6 +365,53 @@ mod tests {
             message.contains("/tmp/peinit-test-missing-parent"),
             "message should name the path: {message}",
         );
+    }
+
+    /// The create-then-open split has two branches and provisioning is meant to
+    /// be idempotent, so both have to work on the same path in a row.
+    ///
+    /// This exercises the non-KACS variant -- the real bug was in the KACS
+    /// masks, which no host test can reach -- but it does pin the `created`
+    /// flag, which is what decides whether the descriptor is applied a second
+    /// time.
+    #[test]
+    fn provisioning_a_path_twice_creates_it_once_and_then_opens_it() {
+        let root =
+            std::path::PathBuf::from(format!("/tmp/peinit-test-provision-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).expect("test root");
+        let directory = root.join("dir");
+        let file = root.join("file");
+
+        let paths = vec![
+            ProvisionedPath {
+                name: "dir".to_string(),
+                kind: ProvisionedPathKind::Directory,
+                path: directory.display().to_string(),
+                security: ProvisionedPathSecurity::Default,
+                required: true,
+            },
+            ProvisionedPath {
+                name: "file".to_string(),
+                kind: ProvisionedPathKind::File,
+                path: file.display().to_string(),
+                security: ProvisionedPathSecurity::Default,
+                required: true,
+            },
+        ];
+
+        for pass in 0..2 {
+            let report = provision_linux_boot_paths(&paths);
+            assert!(
+                report.required_failures.is_empty() && report.warnings.is_empty(),
+                "pass {pass} failed: {report:?}",
+            );
+            assert_eq!(report.applied, vec!["dir".to_string(), "file".to_string()]);
+        }
+        assert!(directory.is_dir());
+        assert!(file.is_file());
+
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]
