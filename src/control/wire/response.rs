@@ -86,6 +86,7 @@ fn status_warning_type_wire(warning_type: ServiceStatusWarningType) -> &'static 
         ServiceStatusWarningType::ServiceTree => "service_tree",
         ServiceStatusWarningType::Health => "health",
         ServiceStatusWarningType::Hooks => "hooks",
+        ServiceStatusWarningType::Helper => "helper",
     }
 }
 

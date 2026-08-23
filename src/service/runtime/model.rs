@@ -79,6 +79,14 @@ pub enum LeakedCgroupKind {
     ServiceTree,
     Health,
     Hooks,
+    /// A pre-start check helper's `<service>/checks` cgroup.
+    ///
+    /// PSD-007 §4.1: such a helper "is leaked and abandoned exactly as a
+    /// service process that survives SIGKILL". It used to be abandoned
+    /// without being recorded, so it left no trace at all -- and, worse, did
+    /// not bump the cgroup generation, so the next start reused a tree
+    /// containing an unkillable process.
+    Helper,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

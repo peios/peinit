@@ -82,7 +82,13 @@ fn process_populated_cgroup_cleanup(
             LeakedCgroupKind::Health,
             now_ns,
         ),
-        CgroupCleanupKind::Helper => Ok(()),
+        CgroupCleanupKind::Helper => record_leaked_cgroup(
+            work,
+            &deadline.service,
+            deadline.cgroup_id,
+            LeakedCgroupKind::Helper,
+            now_ns,
+        ),
         CgroupCleanupKind::ServiceTree => record_leaked_cgroup(
             work,
             &deadline.service,

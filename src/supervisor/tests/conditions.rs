@@ -3,7 +3,7 @@ use crate::boundary::{
     FilesystemCheckReport, FilesystemCheckResult, LaunchedFilesystemCheckHelper,
 };
 use crate::operation::OperationState;
-use crate::service::runtime::{ServiceState, TransitionCause};
+use crate::service::runtime::{LeakedCgroupKind, ServiceState, TransitionCause};
 use crate::service::{ServiceCheck, ServiceCheckKind};
 use crate::supervisor::{Supervisor, SupervisorSettings};
 
@@ -194,6 +194,80 @@ fn filesystem_condition_queues_and_launches_helper_without_service_job() {
         "/sys/fs/cgroup/peinit/app/checks",
     );
     assert_eq!(launcher.requests[0].checks, launch.helper.checks);
+}
+
+/// The D-state path for a pre-start check helper.
+///
+/// A helper whose cgroup is still populated after SIGKILL cannot be removed,
+/// so it is abandoned. It used to be abandoned *silently* -- the cleanup
+/// matched `CgroupCleanupKind::Helper => Ok(())` and dropped it, so there was
+/// no record anywhere and, worse, no generation bump, leaving the next start
+/// to reuse a tree containing an unkillable process.
+#[test]
+fn a_populated_filesystem_check_helper_cgroup_is_recorded_as_leaked() {
+    let mut app = alive_service("app");
+    app.conditions = vec![ServiceCheck {
+        kind: ServiceCheckKind::Path,
+        argument: "/srv/app".to_string(),
+    }];
+
+    let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
+    let mut registry = StaticRegistry::services(vec![app]);
+    let mut clock = ScriptedClock::new([BOOT_NS]);
+
+    let boot = supervisor
+        .run_phase2_boot(&mut registry, &mut clock)
+        .expect("boot supervisor");
+    let operation_id = operation_for_service(&boot.plan, "app");
+    let mut launcher = TestFilesystemCheckLauncher::default();
+    supervisor
+        .launch_next_pending_filesystem_check_helper(&mut launcher, BOOT_NS + 1)
+        .expect("launch helper")
+        .expect("helper dispatch");
+    let due_at_ns = supervisor
+        .next_pre_start_check_timeout()
+        .expect("helper timeout")
+        .due_at_ns;
+    let mut controller = TestProcessController::default();
+
+    supervisor
+        .process_due_filesystem_check_timeout(operation_id, due_at_ns, &mut controller)
+        .expect("helper timeout")
+        .expect("timeout dispatch");
+
+    let generation_before = supervisor
+        .services()
+        .get("app")
+        .expect("app")
+        .runtime
+        .cgroup_generation;
+
+    // Still populated after the kill: D-state processes, nothing to be done.
+    controller.set_cgroup_populated("/sys/fs/cgroup/peinit/app/checks", true);
+
+    assert!(
+        supervisor
+            .process_due_cgroup_cleanups(&mut controller, due_at_ns + 5_000_000_000)
+            .expect("cleanup")
+    );
+
+    let runtime = &supervisor.services().get("app").expect("app").runtime;
+    assert_eq!(
+        runtime
+            .leaked_cgroups
+            .iter()
+            .map(|leak| (leak.path.as_str(), leak.kind))
+            .collect::<Vec<_>>(),
+        vec![("/sys/fs/cgroup/peinit/app/checks", LeakedCgroupKind::Helper)],
+    );
+    // The bump is the load-bearing half: without it the next start reuses a
+    // tree that still contains the unkillable process.
+    assert!(
+        runtime.cgroup_generation > generation_before,
+        "a leaked helper cgroup must bump the generation",
+    );
+    // Abandoned, not removed -- removing a populated cgroup cannot work.
+    assert!(controller.cgroup_removes.is_empty());
 }
 
 #[test]
