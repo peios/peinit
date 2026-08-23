@@ -118,6 +118,7 @@ pub(super) struct LoopResult {
     pub(super) active_log_pipe_count: usize,
     pub(super) filesystem_check_requests: Vec<FilesystemCheckHelperRequest>,
     pub(super) filesystem_check_reader_helpers: Vec<LaunchedFilesystemCheckHelper>,
+    pub(super) filesystem_check_released_fds: Vec<(i32, i32)>,
 }
 
 pub(super) fn run_loop(supervisor: &mut Supervisor, script: LoopScript) -> LoopResult {
@@ -189,6 +190,7 @@ pub(super) fn run_loop(supervisor: &mut Supervisor, script: LoopScript) -> LoopR
     let active_log_pipe_count = log_pipes.active_pipe_count();
     let filesystem_check_requests = filesystem_check_launcher.requests.clone();
     let filesystem_check_reader_helpers = filesystem_check_reader.helpers.clone();
+    let filesystem_check_released_fds = filesystem_check_reader.released_fds.clone();
 
     LoopResult {
         turn,
@@ -201,6 +203,7 @@ pub(super) fn run_loop(supervisor: &mut Supervisor, script: LoopScript) -> LoopR
         active_log_pipe_count,
         filesystem_check_requests,
         filesystem_check_reader_helpers,
+        filesystem_check_released_fds,
     }
 }
 

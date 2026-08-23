@@ -112,11 +112,8 @@ where
         RuntimeEventSource::LifecycleDeadlineTimer => process_lifecycle_deadline_timer_event(
             supervisor,
             &mut *sources.lifecycle_timer,
-            context.clock,
-            context.controller,
-            context.boot_attempt_counter,
-            context.finalizer,
-            context.registrar,
+            &mut *sources.filesystem_check_reader,
+            context,
         ),
         RuntimeEventSource::NotifySocket => process_notify_event(
             supervisor,
