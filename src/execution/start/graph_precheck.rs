@@ -13,6 +13,7 @@ use super::job_id::job_id_for_request;
 use super::model::{
     GraphPreStartCheckOutcome, StartExecutionDispatch, StartExecutionError, StartExecutionRequest,
 };
+use super::skipped::clear_skipped_for_explicit_start;
 use super::store::StartExecutionStore;
 
 pub fn begin_graph_pre_start_check(
@@ -25,6 +26,11 @@ pub fn begin_graph_pre_start_check(
     let mut transaction =
         GraphPreStartCheckTransaction::from_stores(services, operations, graph, start_store);
 
+    let cleared_skipped = clear_skipped_for_explicit_start(
+        &mut transaction.services,
+        &request.ready.service,
+        request.ready.transition_cause,
+    )?;
     let activation = transaction
         .services
         .prepare_activation_snapshot(&request.ready.service)
@@ -36,17 +42,21 @@ pub fn begin_graph_pre_start_check(
         &activation.definition.asserts,
     ) {
         PreStartCheckDecision::Passed => {
-            outcome::apply_passed(&mut transaction, request, activation)
+            outcome::apply_passed(&mut transaction, request, activation, cleared_skipped)
         }
         PreStartCheckDecision::ConditionSkipped(check) => {
-            outcome::apply_condition_skipped(&mut transaction, request, check)
+            outcome::apply_condition_skipped(&mut transaction, request, check, cleared_skipped)
         }
         PreStartCheckDecision::AssertionFailed(check) => {
-            outcome::apply_assertion_failed(&mut transaction, request, check)
+            outcome::apply_assertion_failed(&mut transaction, request, check, cleared_skipped)
         }
-        PreStartCheckDecision::RequiresFilesystemHelper { checks } => {
-            outcome::apply_filesystem_pending(&mut transaction, request, activation, checks)
-        }
+        PreStartCheckDecision::RequiresFilesystemHelper { checks } => outcome::apply_filesystem_pending(
+            &mut transaction,
+            request,
+            activation,
+            checks,
+            cleared_skipped,
+        ),
     }?;
 
     transaction.commit_to_stores(services, operations, graph, start_store);
@@ -124,6 +134,7 @@ pub fn begin_prechecked_ready_start(
         ready: request.ready,
         job_id: initial.job_id,
         operation_event,
+        cleared_skipped: prechecked.cleared_skipped,
         service_transition,
         job_event: initial.job_event,
         job_kind: initial.job_kind,

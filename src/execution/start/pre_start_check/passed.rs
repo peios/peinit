@@ -11,6 +11,10 @@ pub(super) fn apply_check_passed(
     result_fd: i32,
     pending: PendingPreStartCheck,
 ) -> Result<PreStartCheckCompletionDispatch, StartExecutionError> {
+    // Read before `pending.start` is moved by the match below. This is the
+    // `Skipped -> Inactive` the start performed before the helper ran; it is
+    // reported here, with the transition the checks' outcome produces.
+    let cleared_skipped = pending.cleared_skipped.clone();
     let (
         job_id,
         operation_id,
@@ -60,6 +64,7 @@ pub(super) fn apply_check_passed(
                     resolved_identity,
                     token_summary,
                     checked_at_ns: pending.started_at_ns,
+                    cleared_skipped,
                 });
             let graph_context_ids = transaction
                 .graph
@@ -115,7 +120,10 @@ pub(super) fn apply_check_passed(
         job_event: Some(initial.job_event),
         job_kind: Some(initial.job_kind),
         operation_events: Vec::new(),
-        service_transitions: service_transition.into_iter().collect(),
+        service_transitions: cleared_skipped
+            .into_iter()
+            .chain(service_transition)
+            .collect(),
         graph_events: Vec::new(),
         graph_context_ids,
     })

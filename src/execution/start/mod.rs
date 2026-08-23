@@ -11,6 +11,7 @@ mod post;
 mod pre_dependency;
 mod pre_start_check;
 mod restart;
+mod skipped;
 mod store;
 mod terminal;
 mod terminal_apply;

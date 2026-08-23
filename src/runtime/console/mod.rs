@@ -87,6 +87,9 @@ pub(super) fn collect_start_dispatches_console_messages(
     out: &mut Vec<ConsoleMessage>,
 ) {
     for dispatch in dispatches {
+        if let Some(cleared) = &dispatch.cleared_skipped {
+            collect_service_transition_console_message(cleared, out);
+        }
         collect_service_transition_console_message(&dispatch.service_transition, out);
     }
 }

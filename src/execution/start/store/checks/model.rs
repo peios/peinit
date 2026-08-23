@@ -1,7 +1,7 @@
 use crate::execution::graph::ReadyGraphOperation;
 use crate::ids::OperationId;
 use crate::security::TokenSummary;
-use crate::service::{ServiceActivationSnapshot, ServiceCheck};
+use crate::service::{ServiceActivationSnapshot, ServiceCheck, ServiceTableTransition};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PendingPreStartCheck {
@@ -13,6 +13,11 @@ pub struct PendingPreStartCheck {
     pub timeout_secs: u64,
     pub operation_deadline_ns: u64,
     pub start: PendingPreStartCheckStart,
+    /// The `Skipped -> Inactive` this start performed before evaluating the
+    /// checks, if it performed one. Carried so it reaches the operator on the
+    /// completion that eventually reports the activation, rather than being
+    /// dropped on the pending dispatch, which has no consumer.
+    pub cleared_skipped: Option<ServiceTableTransition>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,6 +51,9 @@ pub struct PrecheckedGraphStart {
     pub resolved_identity: String,
     pub token_summary: TokenSummary,
     pub checked_at_ns: u64,
+    /// See `PendingPreStartCheck::cleared_skipped`. The graph path splits the
+    /// checks from the start, so the clear has to survive the gap between them.
+    pub cleared_skipped: Option<ServiceTableTransition>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -84,7 +92,13 @@ impl PendingPreStartCheck {
             timeout_secs,
             operation_deadline_ns,
             start,
+            cleared_skipped: None,
         }
+    }
+
+    pub fn with_cleared_skipped(mut self, cleared: Option<ServiceTableTransition>) -> Self {
+        self.cleared_skipped = cleared;
+        self
     }
 
     pub fn service_cgroup_id(&self) -> String {
