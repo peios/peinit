@@ -1,5 +1,5 @@
 use crate::service::runtime::{ServiceState, ServiceTransition, TransitionCause};
-use crate::service::{ServiceActivationSnapshot, ServiceCheck};
+use crate::service::{ServiceActivationSnapshot, ServiceCheck, ServiceTableTransition};
 
 use super::super::checks::format_check;
 use super::super::deadline::start_operation_deadline_ns;
@@ -18,6 +18,7 @@ pub(super) fn apply_passed(
     transaction: &mut GraphPreStartCheckTransaction,
     request: StartExecutionRequest,
     activation: ServiceActivationSnapshot,
+    cleared_skipped: Option<ServiceTableTransition>,
 ) -> Result<GraphPreStartCheckOutcome, StartExecutionError> {
     transaction
         .start_store
@@ -27,6 +28,7 @@ pub(super) fn apply_passed(
             resolved_identity: request.resolved_identity,
             token_summary: request.token_summary,
             checked_at_ns: request.started_at_ns,
+            cleared_skipped,
         });
     let graph_context_ids = transaction
         .graph
@@ -47,6 +49,7 @@ pub(super) fn apply_condition_skipped(
     transaction: &mut GraphPreStartCheckTransaction,
     request: StartExecutionRequest,
     check: ServiceCheck,
+    cleared_skipped: Option<ServiceTableTransition>,
 ) -> Result<GraphPreStartCheckOutcome, StartExecutionError> {
     let check = format_check(&check);
     let transition = transaction
@@ -88,7 +91,10 @@ pub(super) fn apply_condition_skipped(
             ready: request.ready,
             outcome: StartPreCheckTerminalOutcome::ConditionSkipped { check },
             operation_events,
-            service_transitions: vec![transition],
+            service_transitions: cleared_skipped
+                .into_iter()
+                .chain(std::iter::once(transition))
+                .collect(),
             graph_events,
         },
     ))
@@ -98,6 +104,7 @@ pub(super) fn apply_assertion_failed(
     transaction: &mut GraphPreStartCheckTransaction,
     request: StartExecutionRequest,
     check: ServiceCheck,
+    cleared_skipped: Option<ServiceTableTransition>,
 ) -> Result<GraphPreStartCheckOutcome, StartExecutionError> {
     let check = format_check(&check);
     let failure = apply_pending_pre_dependency_failure(
@@ -115,7 +122,10 @@ pub(super) fn apply_assertion_failed(
             ready: request.ready,
             outcome: StartPreCheckTerminalOutcome::AssertionFailed { check },
             operation_events: failure.operation_events,
-            service_transitions: failure.service_transitions,
+            service_transitions: cleared_skipped
+                .into_iter()
+                .chain(failure.service_transitions)
+                .collect(),
             graph_events: failure.graph_events,
         },
     ))
@@ -126,6 +136,7 @@ pub(super) fn apply_filesystem_pending(
     request: StartExecutionRequest,
     activation: ServiceActivationSnapshot,
     checks: Vec<ServiceCheck>,
+    cleared_skipped: Option<ServiceTableTransition>,
 ) -> Result<GraphPreStartCheckOutcome, StartExecutionError> {
     let pending = PendingPreStartCheck::new(
         request.ready.operation_id,
@@ -151,7 +162,8 @@ pub(super) fn apply_filesystem_pending(
             resolved_identity: request.resolved_identity,
             token_summary: request.token_summary,
         },
-    );
+    )
+    .with_cleared_skipped(cleared_skipped);
     let registration = transaction
         .start_store
         .record_pending_pre_start_check(pending);

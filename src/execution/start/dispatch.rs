@@ -15,6 +15,7 @@ use super::model::{
     StartExecutionOutcome, StartExecutionRequest, StartExecutionTerminalDispatch,
     StartPreCheckTerminalOutcome,
 };
+use super::skipped::clear_skipped_for_explicit_start;
 use super::store::{PendingPreStartCheck, PendingPreStartCheckStart, StartExecutionStore};
 
 pub fn begin_ready_start(
@@ -33,6 +34,11 @@ pub fn begin_ready_start(
     let mut next_job_ids = job_ids.clone();
     let mut next_start_store = start_store.clone();
 
+    let cleared_skipped = clear_skipped_for_explicit_start(
+        &mut next_services,
+        &request.ready.service,
+        request.ready.transition_cause,
+    )?;
     let activation = next_services
         .prepare_activation_snapshot(&request.ready.service)
         .map_err(StartExecutionError::ServiceTable)?;
@@ -93,7 +99,10 @@ pub fn begin_ready_start(
                         check: format_check(&check),
                     },
                     operation_events: vec![operation_event, completed],
-                    service_transitions: vec![transition],
+                    service_transitions: cleared_skipped
+                        .into_iter()
+                        .chain(std::iter::once(transition))
+                        .collect(),
                     graph_events,
                 },
             ));
@@ -126,7 +135,10 @@ pub fn begin_ready_start(
                     operation_events: std::iter::once(operation_event)
                         .chain(failure.operation_events)
                         .collect(),
-                    service_transitions: failure.service_transitions,
+                    service_transitions: cleared_skipped
+                        .into_iter()
+                        .chain(failure.service_transitions)
+                        .collect(),
                     graph_events: failure.graph_events,
                 },
             ));
@@ -144,7 +156,8 @@ pub fn begin_ready_start(
                     resolved_identity: request.resolved_identity,
                     token_summary: request.token_summary,
                 },
-            );
+            )
+            .with_cleared_skipped(cleared_skipped);
             let registration = next_start_store.record_pending_pre_start_check(pending);
 
             *operations = next_operations;
@@ -201,6 +214,7 @@ pub fn begin_ready_start(
             ready: request.ready,
             job_id: initial.job_id,
             operation_event,
+            cleared_skipped,
             service_transition,
             job_event: initial.job_event,
             job_kind: initial.job_kind,

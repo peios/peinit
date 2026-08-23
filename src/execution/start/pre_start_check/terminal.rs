@@ -14,6 +14,7 @@ pub(super) fn apply_condition_skipped(
     pending: PendingPreStartCheck,
     reason: String,
 ) -> Result<PreStartCheckCompletionDispatch, StartExecutionError> {
+    let cleared_skipped = pending.cleared_skipped.clone();
     let transition = transaction
         .services
         .transition_service(
@@ -64,7 +65,10 @@ pub(super) fn apply_condition_skipped(
         job_event: None,
         job_kind: None,
         operation_events,
-        service_transitions: vec![transition],
+        service_transitions: cleared_skipped
+            .into_iter()
+            .chain(std::iter::once(transition))
+            .collect(),
         graph_events,
         graph_context_ids: Vec::new(),
     })
@@ -76,6 +80,7 @@ pub(super) fn apply_assertion_failed(
     pending: PendingPreStartCheck,
     reason: String,
 ) -> Result<PreStartCheckCompletionDispatch, StartExecutionError> {
+    let cleared_skipped = pending.cleared_skipped.clone();
     if matches!(
         pending.start,
         PendingPreStartCheckStart::GraphPreDependency { .. }
@@ -95,7 +100,10 @@ pub(super) fn apply_assertion_failed(
             job_event: None,
             job_kind: None,
             operation_events: failure.operation_events,
-            service_transitions: failure.service_transitions,
+            service_transitions: cleared_skipped
+                .into_iter()
+                .chain(failure.service_transitions)
+                .collect(),
             graph_events: failure.graph_events,
             graph_context_ids: Vec::new(),
         });
@@ -121,7 +129,10 @@ pub(super) fn apply_assertion_failed(
         job_event: None,
         job_kind: None,
         operation_events: failure.operation_events,
-        service_transitions: failure.service_transitions,
+        service_transitions: cleared_skipped
+            .into_iter()
+            .chain(failure.service_transitions)
+            .collect(),
         graph_events: failure.graph_events,
         graph_context_ids: Vec::new(),
     })

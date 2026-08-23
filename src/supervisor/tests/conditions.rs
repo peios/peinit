@@ -8,8 +8,8 @@ use crate::service::{ServiceCheck, ServiceCheckKind};
 use crate::supervisor::{Supervisor, SupervisorSettings};
 
 use super::{
-    APP_LAUNCH_NS, BOOT_NS, ScriptedClock, StaticRegistry, TestProcessController,
-    TestProcessLauncher, TestTokenProvider, alive_service, process, settings,
+    APP_LAUNCH_NS, BOOT_NS, LIFECYCLE_COMMAND_NS, ScriptedClock, StaticRegistry,
+    TestProcessController, TestProcessLauncher, TestTokenProvider, alive_service, process, settings,
 };
 
 #[test]
@@ -494,4 +494,146 @@ fn operation_for_service(
         .find(|start| start.service == service)
         .expect("planned start")
         .operation_id
+}
+
+/// PEI-340: `start` on a Skipped service used to raise an internal error.
+///
+/// `Skipped -> Starting` is not a permitted edge and nothing performed the
+/// permitted `Skipped -> Inactive` first, so the start died inside the
+/// supervisor with `InvalidTransition` -- in exactly the case the edge exists
+/// for. The operator's documented recourse, `start`, was the one thing that
+/// could not work.
+#[test]
+fn explicit_start_on_a_skipped_service_re_evaluates_its_conditions() {
+    let mut app = alive_service("app");
+    app.conditions = vec![registry_check("Machine\\System\\Services\\missing")];
+
+    let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
+    let mut registry = StaticRegistry::services(vec![app]);
+    let mut clock = ScriptedClock::new([
+        BOOT_NS,
+        LIFECYCLE_COMMAND_NS,
+        LIFECYCLE_COMMAND_NS + 1,
+        LIFECYCLE_COMMAND_NS + 2,
+    ]);
+
+    supervisor
+        .run_phase2_boot(&mut registry, &mut clock)
+        .expect("boot supervisor");
+    assert_eq!(
+        supervisor.service_status("app").expect("app").state,
+        ServiceState::Skipped,
+    );
+
+    supervisor
+        .start_service("app", None, &mut clock)
+        .expect("start a skipped service");
+
+    // The condition is still unmet, so the answer is the same -- but it is an
+    // answer, reached by re-evaluating, rather than an internal error.
+    assert_eq!(
+        supervisor.service_status("app").expect("app").state,
+        ServiceState::Skipped,
+    );
+    assert_eq!(
+        supervisor.service_status("app").expect("app").cause,
+        Some(TransitionCause::ConditionSkipped),
+    );
+}
+
+/// The other half of PEI-340: once the precondition is fixed, the service runs.
+#[test]
+fn explicit_start_on_a_skipped_service_starts_it_once_the_condition_holds() {
+    let check = ServiceCheck {
+        kind: ServiceCheckKind::Path,
+        argument: "/srv/app".to_string(),
+    };
+    let mut app = alive_service("app");
+    app.conditions = vec![check.clone()];
+
+    let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
+    let mut registry = StaticRegistry::services(vec![app]);
+    let mut clock = ScriptedClock::new([
+        BOOT_NS,
+        LIFECYCLE_COMMAND_NS,
+        LIFECYCLE_COMMAND_NS + 1,
+        LIFECYCLE_COMMAND_NS + 2,
+    ]);
+
+    let boot = supervisor
+        .run_phase2_boot(&mut registry, &mut clock)
+        .expect("boot supervisor");
+    let boot_operation = operation_for_service(&boot.plan, "app");
+    let mut launcher = TestFilesystemCheckLauncher::default();
+    supervisor
+        .launch_next_pending_filesystem_check_helper(&mut launcher, BOOT_NS + 1)
+        .expect("launch helper")
+        .expect("helper dispatch");
+
+    // The path is not there yet: skipped at boot.
+    supervisor
+        .complete_filesystem_check_helper(
+            81,
+            FilesystemCheckReport {
+                service: "app".to_string(),
+                operation_id: boot_operation,
+                results: vec![FilesystemCheckResult {
+                    check: check.clone(),
+                    satisfied: false,
+                }],
+            },
+            BOOT_NS + 2,
+        )
+        .expect("complete boot helper");
+    assert_eq!(
+        supervisor.service_status("app").expect("app").state,
+        ServiceState::Skipped,
+    );
+
+    // The operator creates the directory and starts the service.
+    let dispatch = supervisor
+        .start_service("app", None, &mut clock)
+        .expect("start a skipped service");
+    let start_operation = dispatch
+        .context_id
+        .map(|_| ())
+        .and_then(|()| supervisor.pending_pre_start_check_launches().first().copied())
+        .expect("a pre-start check was queued");
+    supervisor
+        .launch_next_pending_filesystem_check_helper(&mut launcher, LIFECYCLE_COMMAND_NS + 3)
+        .expect("launch helper")
+        .expect("helper dispatch");
+
+    let completion = supervisor
+        .complete_filesystem_check_helper(
+            81,
+            FilesystemCheckReport {
+                service: "app".to_string(),
+                operation_id: start_operation,
+                results: vec![FilesystemCheckResult {
+                    check,
+                    satisfied: true,
+                }],
+            },
+            LIFECYCLE_COMMAND_NS + 4,
+        )
+        .expect("complete start helper");
+
+    assert_eq!(completion.start_dispatches.len(), 1);
+    assert_eq!(completion.start_dispatches[0].ready.service, "app");
+    assert_eq!(
+        supervisor.service_status("app").expect("app").state,
+        ServiceState::Starting,
+    );
+
+    // The clear is reported, so an operator watching the console does not see
+    // the service jump out of Skipped without explanation.
+    let cleared = completion
+        .start_dispatches
+        .iter()
+        .find_map(|dispatch| dispatch.cleared_skipped.as_ref())
+        .expect("the Skipped -> Inactive clear is carried to the operator");
+    assert_eq!(cleared.event.from, ServiceState::Skipped);
+    assert_eq!(cleared.event.to, ServiceState::Inactive);
+    assert_eq!(cleared.event.cause, TransitionCause::ExplicitStart);
 }

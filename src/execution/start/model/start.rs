@@ -18,6 +18,11 @@ pub struct StartExecutionDispatch {
     pub ready: ReadyGraphOperation,
     pub job_id: JobId,
     pub operation_event: OperationEvent,
+    /// The `Skipped -> Inactive` performed before this start's conditions were
+    /// re-evaluated, if the service was Skipped and the start was explicit.
+    /// Reported alongside the transition into Starting so the operator sees the
+    /// state they knew the service to be in, rather than an unexplained jump.
+    pub cleared_skipped: Option<ServiceTableTransition>,
     pub service_transition: ServiceTableTransition,
     pub job_event: JobEvent,
     pub job_kind: StartExecutionJobKind,
