@@ -4,7 +4,7 @@ use crate::operation::store::OperationStore;
 use crate::registry::services_schema_warnings;
 use crate::service::ServiceTable;
 
-use super::planner::prepare_phase2_boot_plan_with_retained;
+use super::planner::{Phase2PlanContext, prepare_phase2_boot_plan_with_retained};
 
 mod model;
 mod registry;
@@ -66,10 +66,12 @@ where
     }
     let shutdown_settings = read_effective_shutdown_settings(registry)?;
 
-    let services = registry
-        .read_service_definitions()
+    let services_read = registry
+        .read_service_definitions_partial()
         .map_err(Phase2RecoveryReason::RegistryRead)
         .map_err(Phase2BootRunError::RecoveryRequired)?;
+    let services = services_read.definitions;
+    let undecodable = services_read.undecodable;
     let services_schema_version = registry
         .read_services_schema_version()
         .map_err(Phase2RecoveryReason::RegistryRead)
@@ -102,7 +104,10 @@ where
         observed_at_ns,
         &mut next_operation_ids,
         &mut next_job_ids,
-        retained_satisfied,
+        Phase2PlanContext {
+            retained_satisfied,
+            undecodable: &undecodable,
+        },
     )
     .map_err(Phase2BootRunError::Plan)?;
 

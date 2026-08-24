@@ -46,8 +46,47 @@ pub enum TimerLastRunWriteOutcome {
     Queued,
 }
 
+/// A service key that exists but whose values will not decode.
+///
+/// Carried by name rather than as a `ServiceDefinition`, because there is no
+/// valid definition to carry — which is the whole problem. `BlockedReason`
+/// keys on the name alone, so this is enough to mark the service Failed with
+/// `TransitionCause::ValidationError`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UndecodableService {
+    pub name: String,
+    pub message: String,
+}
+
+/// The result of a read that tolerates individual bad definitions.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ServiceDefinitionsRead {
+    pub definitions: Vec<ServiceDefinition>,
+    pub undecodable: Vec<UndecodableService>,
+}
+
 pub trait RegistryClient {
     fn read_service_definitions(&mut self) -> Result<Vec<ServiceDefinition>, BoundaryError>;
+
+    /// Read definitions, reporting undecodable keys instead of failing.
+    ///
+    /// Boot uses this; reload-config deliberately does not. Reload is atomic
+    /// and has somewhere to fall back to — the configuration already running —
+    /// so refusing the whole transaction is right there. Boot has no such
+    /// fallback, which is why the same all-or-nothing policy has the opposite
+    /// consequence: one typo in one service key took the machine to the
+    /// recovery console.
+    ///
+    /// The default is the conservative one, so an implementation that has not
+    /// thought about partial reads keeps its existing behaviour.
+    fn read_service_definitions_partial(
+        &mut self,
+    ) -> Result<ServiceDefinitionsRead, BoundaryError> {
+        Ok(ServiceDefinitionsRead {
+            definitions: self.read_service_definitions()?,
+            undecodable: Vec::new(),
+        })
+    }
 
     fn read_max_parallel_starts(&mut self) -> Result<Option<u32>, BoundaryError> {
         Ok(None)

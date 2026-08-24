@@ -1,3 +1,4 @@
+use crate::boundary::{ServiceDefinitionsRead, UndecodableService};
 use crate::registry::{
     SERVICES_ROOT_KEY, apply_inherited_service_security,
     build_service_definition_from_registry_values, build_service_security_from_registry_value,
@@ -8,7 +9,7 @@ use super::error::LcsRegistryReadError;
 use super::name::decode_name;
 use super::value::{raw_named_registry_value_from_peios, raw_registry_value_from_peios};
 
-pub(super) fn read_lcs_service_definitions() -> Result<Vec<ServiceDefinition>, LcsRegistryReadError>
+pub(super) fn read_lcs_service_definitions() -> Result<ServiceDefinitionsRead, LcsRegistryReadError>
 {
     use peios::registry::{Key, KeyAccess, OpenFlags};
 
@@ -32,12 +33,29 @@ pub(super) fn read_lcs_service_definitions() -> Result<Vec<ServiceDefinition>, L
     let names = unique_sorted_service_names(names);
 
     let mut definitions = Vec::new();
+    let mut undecodable = Vec::new();
     for name in names {
-        definitions.push(read_lcs_service_definition(&name)?);
+        // Per key, not all-or-nothing. A single bad value -- an invalid
+        // service name, an unclosed quote in a command, a relative argv[0], a
+        // duplicate field differing only in case -- used to become
+        // BoundaryError::Registry and take the machine to the recovery
+        // console. The caller decides what that means; boot marks the one
+        // service Failed with ValidationError and continues, which is what
+        // the state machine already has a cause for.
+        match read_lcs_service_definition(&name) {
+            Ok(definition) => definitions.push(definition),
+            Err(error) => undecodable.push(UndecodableService {
+                name,
+                message: format!("{error:?}"),
+            }),
+        }
     }
     apply_inherited_service_security(&mut definitions, inherited_security);
 
-    Ok(definitions)
+    Ok(ServiceDefinitionsRead {
+        definitions,
+        undecodable,
+    })
 }
 
 fn unique_sorted_service_names(mut names: Vec<String>) -> Vec<String> {

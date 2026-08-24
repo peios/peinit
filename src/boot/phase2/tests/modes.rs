@@ -1,9 +1,11 @@
 use crate::boot::BootMode;
+use crate::boundary::UndecodableService;
 use crate::ids::{JobIdAllocator, OperationIdAllocator};
+use crate::service::runtime::TransitionCause;
 use crate::service::{ErrorControl, ServiceDefinition};
 
 use super::super::SafeModeDowngrade;
-use super::super::planner::prepare_phase2_boot_plan_with_retained;
+use super::super::planner::{Phase2PlanContext, prepare_phase2_boot_plan_with_retained};
 use super::super::prepare_phase2_boot_plan;
 use super::OBSERVED_AT_NS;
 
@@ -222,7 +224,10 @@ fn retained_phase1_registryd_is_not_started_again() {
         OBSERVED_AT_NS,
         &mut operations,
         &mut jobs,
-        &["registryd".to_string()],
+        Phase2PlanContext {
+            retained_satisfied: &["registryd".to_string()],
+            ..Default::default()
+        },
     )
     .expect("retained boot plan");
 
@@ -232,4 +237,97 @@ fn retained_phase1_registryd_is_not_started_again() {
         .map(|start| start.service.as_str())
         .collect::<Vec<_>>();
     assert_eq!(services, vec!["app"]);
+}
+
+#[test]
+fn an_undecodable_definition_fails_only_that_service() {
+    // PSD-007 §2.2: "Service definition fails validation | Service marked
+    // Failed (ValidationError). Other services continue."
+    //
+    // The registry read used to propagate the first decode error, which became
+    // BoundaryError::Registry -> Phase2RecoveryReason::RegistryRead and took
+    // the machine to the recovery console. One typo in one service key bricked
+    // the next boot.
+    let healthy = ServiceDefinition::simple_system_boot("healthy", "/sbin/healthy");
+    let other = ServiceDefinition::simple_system_boot("other", "/sbin/other");
+    let undecodable = [UndecodableService {
+        name: "broken".to_string(),
+        message: "unclosed double quote in ImagePath".to_string(),
+    }];
+
+    let mut operations = OperationIdAllocator::new();
+    let mut jobs = JobIdAllocator::new();
+    let boot = prepare_phase2_boot_plan_with_retained(
+        BootMode::Full,
+        &[healthy, other],
+        10,
+        OBSERVED_AT_NS,
+        &mut operations,
+        &mut jobs,
+        Phase2PlanContext {
+            undecodable: &undecodable,
+            ..Default::default()
+        },
+    )
+    .expect("a bad definition must not fail the whole plan");
+
+    assert_eq!(
+        boot.starts
+            .iter()
+            .map(|start| start.service.as_str())
+            .collect::<Vec<_>>(),
+        vec!["healthy", "other"],
+    );
+    assert_eq!(boot.blocked.len(), 1);
+    assert_eq!(boot.blocked[0].service, "broken");
+    assert_eq!(
+        boot.blocked[0].reason.transition_cause(),
+        TransitionCause::ValidationError,
+        "the spec's per-definition outcome, and the cause the state machine already has",
+    );
+}
+
+#[test]
+fn a_dependent_of_an_undecodable_definition_fails_through_dependency_failure() {
+    // The blast radius is bounded by what actually depended on it, rather than
+    // by the whole machine.
+    let mut dependent = ServiceDefinition::simple_system_boot("dependent", "/sbin/dependent");
+    dependent.requires.push("broken".to_string());
+    let unrelated = ServiceDefinition::simple_system_boot("unrelated", "/sbin/unrelated");
+    let undecodable = [UndecodableService {
+        name: "broken".to_string(),
+        message: "invalid service name".to_string(),
+    }];
+
+    let mut operations = OperationIdAllocator::new();
+    let mut jobs = JobIdAllocator::new();
+    let boot = prepare_phase2_boot_plan_with_retained(
+        BootMode::Full,
+        &[dependent, unrelated],
+        10,
+        OBSERVED_AT_NS,
+        &mut operations,
+        &mut jobs,
+        Phase2PlanContext {
+            undecodable: &undecodable,
+            ..Default::default()
+        },
+    )
+    .expect("boot plan");
+
+    assert_eq!(
+        boot.starts
+            .iter()
+            .map(|start| start.service.as_str())
+            .collect::<Vec<_>>(),
+        vec!["unrelated"],
+        "only the dependent is lost",
+    );
+    let causes = boot
+        .blocked
+        .iter()
+        .map(|blocked| (blocked.service.as_str(), blocked.reason.transition_cause()))
+        .collect::<Vec<_>>();
+    assert!(causes.contains(&("broken", TransitionCause::ValidationError)));
+    assert!(causes.contains(&("dependent", TransitionCause::DependencyFailure)));
 }
