@@ -191,6 +191,7 @@ impl InitRuntime for LinuxRuntimeEntrypoint {
                 .map_err(|error| {
                     BoundaryError::Recovery(format!("calendar timer registration failed: {error}"))
                 })?;
+        log_rejected_calendar_timers(&timer_registration.rejected);
         runtime
             .emit_boot_calendar_timer_turns(&timer_registration.catch_up_turns)
             .map_err(|error| {
@@ -234,6 +235,20 @@ fn random_seed_restore_error(error: crate::boundary::LinuxRandomSeedError) -> Bo
 
 fn machine_id_error(error: crate::boundary::LinuxMachineIdError) -> BoundaryError {
     BoundaryError::Recovery(format!("{error:?}"))
+}
+
+/// Report timers that will not arm.
+///
+/// A malformed or unsatisfiable schedule used to abort registration of every
+/// timer and drop the machine into the recovery console. It now fails only
+/// that trigger — which is right, and would be worse than useless if it also
+/// happened silently.
+fn log_rejected_calendar_timers(rejected: &[crate::timer::boot::TimerBootPlanError]) {
+    for error in rejected {
+        let _ = write_console(&format!(
+            "peinit warning: calendar timer not armed: {error:?}\n"
+        ));
+    }
 }
 
 fn log_phase1_registration_warning(

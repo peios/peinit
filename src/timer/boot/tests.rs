@@ -7,7 +7,7 @@ use crate::boundary::{BoundaryError, RegistryClient};
 use crate::service::{ServiceDefinition, ServiceTrigger};
 use crate::timer::state::TimerLastRunStorage;
 
-use super::{TimerBootPlanError, plan_timer_boot, plan_timer_reload};
+use super::{CalendarNextError, TimerBootPlanError, plan_timer_boot, plan_timer_reload};
 
 #[test]
 fn non_persistent_timer_ignores_history_and_uses_next_future_occurrence() {
@@ -182,17 +182,90 @@ fn invalid_schedule_reports_service_and_schedule() {
     let mut registry = TimerHistory::default();
     let service = timer_service("backup", ["*-*-* 02:00:00.5 UTC"]);
 
-    let error = plan_timer_boot(&[service], &mut registry, ns_utc(2024, 5, 1, 12, 0, 0))
-        .expect_err("invalid schedule");
+    let plan = plan_timer_boot(&[service], &mut registry, ns_utc(2024, 5, 1, 12, 0, 0))
+        .expect("a bad schedule must not fail the whole plan");
 
+    assert!(plan.registrations.is_empty());
     assert!(matches!(
-        error,
-        TimerBootPlanError::ParseSchedule {
+        &plan.rejected[..],
+        [TimerBootPlanError::ParseSchedule {
             service,
             schedule,
             ..
-        } if service == "backup" && schedule == "*-*-* 02:00:00.5 UTC"
+        }] if service == "backup" && schedule == "*-*-* 02:00:00.5 UTC"
     ));
+}
+
+#[test]
+fn one_bad_schedule_does_not_stop_the_others_arming() {
+    // The whole point: at boot this used to abort registration of every timer
+    // and drop the machine into recovery; on reload it ended PID 1's loop.
+    let mut registry = TimerHistory::default();
+    let services = [
+        timer_service("early", ["*-*-* 02:00 UTC"]),
+        timer_service("broken", ["*-*-* 02:00:00.5 UTC"]),
+        timer_service("late", ["*-*-* 03:00 UTC"]),
+    ];
+    let now = ns_utc(2024, 5, 1, 12, 0, 0);
+
+    for (label, plan) in [
+        (
+            "boot",
+            plan_timer_boot(&services, &mut registry, now).expect("boot plan"),
+        ),
+        (
+            "reload",
+            plan_timer_reload(&services, now).expect("reload plan"),
+        ),
+    ] {
+        assert_eq!(
+            plan.registrations
+                .iter()
+                .map(|registration| registration.service.as_str())
+                .collect::<Vec<_>>(),
+            vec!["early", "late"],
+            "{label} dropped the healthy timers"
+        );
+        assert_eq!(plan.rejected.len(), 1, "{label} rejections");
+    }
+}
+
+#[test]
+fn a_schedule_that_can_never_match_is_reported_rather_than_walked() {
+    // Parses fine, matches nothing: February has no 30th. This used to walk
+    // roughly 2.9 million days before saying so.
+    let mut registry = TimerHistory::default();
+    let service = timer_service("impossible", ["*-02-30 02:00 UTC"]);
+
+    let plan = plan_timer_boot(&[service], &mut registry, ns_utc(2024, 5, 1, 12, 0, 0))
+        .expect("an unsatisfiable schedule must not fail the whole plan");
+
+    assert!(plan.registrations.is_empty());
+    assert!(matches!(
+        &plan.rejected[..],
+        [TimerBootPlanError::ComputeNext {
+            service,
+            source: CalendarNextError::NoFutureOccurrence,
+            ..
+        }] if service == "impossible"
+    ));
+}
+
+#[test]
+fn a_leap_day_schedule_still_arms_across_the_horizon() {
+    // The sparsest legitimate schedule there is: 29 February. It must survive
+    // the search bound, or the bound has broken real configurations.
+    let mut registry = TimerHistory::default();
+    let service = timer_service("leap", ["*-02-29 02:00 UTC"]);
+
+    let plan = plan_timer_boot(&[service], &mut registry, ns_utc(2025, 3, 1, 12, 0, 0))
+        .expect("leap plan");
+
+    assert_eq!(plan.rejected.len(), 0);
+    assert_eq!(
+        plan.registrations[0].next_scheduled_ns,
+        ns_utc(2028, 2, 29, 2, 0, 0),
+    );
 }
 
 #[derive(Default)]

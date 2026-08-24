@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use crate::boundary::write_linux_console_message;
 use crate::boundary::{Clock, RealtimeClock};
 use crate::runtime::{RuntimeEventRegistrar, RuntimeEventSource};
 use crate::supervisor::Supervisor;
@@ -27,6 +28,15 @@ impl LinuxCalendarTimerTable {
             .map_err(LinuxCalendarTimerError::Clock)?;
         let plan = plan_timer_reload(&definitions, realtime_now_ns)
             .map_err(LinuxCalendarTimerError::BootPlan)?;
+        // A bad schedule introduced by an edit used to come out of the run
+        // loop and end PID 1's event loop -- and any drained registry watch
+        // event triggers a reload, so writing the schedule was enough, without
+        // anyone running `reload-config`. It now costs that one trigger.
+        for error in &plan.rejected {
+            let _ = write_linux_console_message(&format!(
+                "peinit warning: calendar timer not armed after reload: {error:?}\n"
+            ));
+        }
         let mut replacement = BTreeMap::new();
         let mut sources = Vec::new();
 

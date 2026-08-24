@@ -18,7 +18,7 @@ pub(super) fn next_after_ns(
     let mut date = after.to_zoned(timezone.clone()).date();
     let times = scheduled_seconds_of_day(schedule);
 
-    loop {
+    for _ in 0..SEARCH_HORIZON_DAYS {
         if date_matches(schedule, date) {
             for second_of_day in &times {
                 let candidate = candidate_ns(date, *second_of_day, &timezone)?;
@@ -32,7 +32,25 @@ pub(super) fn next_after_ns(
             .tomorrow()
             .map_err(|_| CalendarNextError::NoFutureOccurrence)?;
     }
+
+    Err(CalendarNextError::NoFutureOccurrence)
 }
+
+/// How far forward a next-occurrence search walks before giving up: ten years.
+///
+/// The walk used to run until `Date::tomorrow()` hit the end of the
+/// representable range, so a schedule that parses but can never match —
+/// `*-02-30`, or a fixed year already past like `2020-*-* 00:00:00` — burned
+/// roughly 2.9 million iterations before reporting it. Unsatisfiable is a much
+/// easier mistake to make than unparseable, and much harder to spot by
+/// reading.
+///
+/// Ten years clears every legitimately sparse schedule with room to spare. The
+/// widest real gap is `*-02-29`, which skips a century year not divisible by
+/// 400 and so can run eight years (1896 to 1904, next 2096 to 2104). A
+/// schedule whose first occurrence is further out than a decade is reported
+/// against that one service rather than silently costing the walk.
+const SEARCH_HORIZON_DAYS: u32 = 3653;
 
 fn resolve_timezone(schedule: &CalendarSchedule) -> Result<TimeZone, CalendarNextError> {
     match &schedule.timezone {
