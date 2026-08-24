@@ -9,7 +9,31 @@ pub const PATH: &str = "PATH";
 pub const NOTIFY_SOCKET: &str = "NOTIFY_SOCKET";
 pub const LISTEN_FDS: &str = "LISTEN_FDS";
 pub const LISTEN_FDNAMES: &str = "LISTEN_FDNAMES";
+pub const LISTEN_PID: &str = "LISTEN_PID";
 pub const DEFAULT_PATH: &str = "/sbin:/bin";
+
+/// The protocol variables, which PSPU §4.20 reserves to peinit.
+///
+/// All four MUST be absent when nothing is passed, and no configurable layer
+/// may set any of them.
+///
+/// Insertion order alone does not enforce that. It is enough for
+/// `NOTIFY_SOCKET`, which is inserted unconditionally after both configurable
+/// layers — but the `LISTEN_*` inserts are guarded on there being descriptors
+/// to inject, and with `FdStoreMax` defaulting to 0 that is every service by
+/// default. So a `Machine\System\Init\EnvVars\LISTEN_FDS=3` used to reach
+/// every fd-store-less service untouched, pointing its `sd_listen_fds`-style
+/// code at whatever happened to sit at descriptor 3.
+///
+/// `LISTEN_PID` is here too even though the child appends it after the clone
+/// rather than going through this map: a configurable layer setting it would
+/// put a second `LISTEN_PID=` in the block ahead of the real one, and `getenv`
+/// returns the first match.
+const PROTOCOL_VARIABLES: [&str; 4] = [NOTIFY_SOCKET, LISTEN_FDS, LISTEN_FDNAMES, LISTEN_PID];
+
+fn is_protocol_variable(name: &str) -> bool {
+    PROTOCOL_VARIABLES.contains(&name)
+}
 
 pub fn build_launch_environment(
     job: &JobRecord,
@@ -28,10 +52,16 @@ pub fn build_launch_environment_with_inherited_fds(
     variables.insert(PATH.to_string(), DEFAULT_PATH.to_string());
     if !uses_compiled_in_environment_only(job) {
         for variable in global_environment {
+            if is_protocol_variable(&variable.name) {
+                continue;
+            }
             variables.insert(variable.name.clone(), variable.value.clone());
         }
     }
     for variable in &job.environment {
+        if is_protocol_variable(&variable.name) {
+            continue;
+        }
         variables.insert(variable.name.clone(), variable.value.clone());
     }
     variables.insert(NOTIFY_SOCKET.to_string(), notify_socket_path.to_string());
