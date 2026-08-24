@@ -7,6 +7,21 @@ use super::state::TimerLastRunStorage;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TimerBootPlan {
     pub registrations: Vec<TimerBootRegistration>,
+    /// Triggers whose schedule will not parse or has no future occurrence.
+    ///
+    /// Per-trigger, not fatal. The planner used to propagate the first of
+    /// these with `?`, which at boot aborted registration of *every* timer and
+    /// dropped the machine into the recovery console, and on reload came out
+    /// of the run loop and ended PID 1's event loop — reachable without anyone
+    /// running `reload-config`, since any drained registry watch event
+    /// triggers a reload.
+    ///
+    /// The code already had the right policy elsewhere: graph validation
+    /// treats an invalid schedule as a per-service `ValidationError`, blocks
+    /// that service and continues. This matches it, so which policy applies no
+    /// longer depends on whether the schedule fails at validation or at
+    /// timerfd registration.
+    pub rejected: Vec<TimerBootPlanError>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -49,6 +64,7 @@ where
     R: RegistryClient + ?Sized,
 {
     let mut registrations = Vec::new();
+    let mut rejected = Vec::new();
     for service in services.iter().filter(|service| !service.disabled) {
         let schedules = timer_schedules(service);
         let storage = if schedules.len() == 1 {
@@ -58,17 +74,21 @@ where
         };
 
         for schedule in schedules {
-            registrations.push(plan_timer_trigger(
-                service,
-                schedule,
-                storage,
-                registry,
-                now_realtime_ns,
-            )?);
+            match plan_timer_trigger(service, schedule, storage, registry, now_realtime_ns) {
+                Ok(registration) => registrations.push(registration),
+                // A registry read failure is infrastructure, not a bad
+                // definition: it means registryd is in trouble, which is not
+                // this service's fault and will not be fixed by skipping it.
+                Err(error @ TimerBootPlanError::Registry { .. }) => return Err(error),
+                Err(error) => rejected.push(error),
+            }
         }
     }
 
-    Ok(TimerBootPlan { registrations })
+    Ok(TimerBootPlan {
+        registrations,
+        rejected,
+    })
 }
 
 pub fn plan_timer_reload(
@@ -76,6 +96,7 @@ pub fn plan_timer_reload(
     now_realtime_ns: u64,
 ) -> Result<TimerBootPlan, TimerBootPlanError> {
     let mut registrations = Vec::new();
+    let mut rejected = Vec::new();
     for service in services.iter().filter(|service| !service.disabled) {
         let schedules = timer_schedules(service);
         let storage = if schedules.len() == 1 {
@@ -85,27 +106,41 @@ pub fn plan_timer_reload(
         };
 
         for schedule in schedules {
-            let calendar = CalendarSchedule::parse(schedule).map_err(|source| {
-                TimerBootPlanError::ParseSchedule {
-                    service: service.name.clone(),
-                    schedule: schedule.to_string(),
-                    source,
-                }
-            })?;
-            registrations.push(TimerBootRegistration {
-                service: service.name.clone(),
-                schedule: schedule.to_string(),
-                storage,
-                persistent: service.timer_persistent,
-                jitter_secs: service.timer_jitter_secs,
-                missed_firing: false,
-                next_scheduled_ns: next_after(&service.name, schedule, &calendar, now_realtime_ns)?,
-                last_run_ns: None,
-            });
+            match plan_reload_trigger(service, schedule, storage, now_realtime_ns) {
+                Ok(registration) => registrations.push(registration),
+                Err(error) => rejected.push(error),
+            }
         }
     }
 
-    Ok(TimerBootPlan { registrations })
+    Ok(TimerBootPlan {
+        registrations,
+        rejected,
+    })
+}
+
+fn plan_reload_trigger(
+    service: &ServiceDefinition,
+    schedule: &str,
+    storage: TimerLastRunStorage,
+    now_realtime_ns: u64,
+) -> Result<TimerBootRegistration, TimerBootPlanError> {
+    let calendar =
+        CalendarSchedule::parse(schedule).map_err(|source| TimerBootPlanError::ParseSchedule {
+            service: service.name.clone(),
+            schedule: schedule.to_string(),
+            source,
+        })?;
+    Ok(TimerBootRegistration {
+        service: service.name.clone(),
+        schedule: schedule.to_string(),
+        storage,
+        persistent: service.timer_persistent,
+        jitter_secs: service.timer_jitter_secs,
+        missed_firing: false,
+        next_scheduled_ns: next_after(&service.name, schedule, &calendar, now_realtime_ns)?,
+        last_run_ns: None,
+    })
 }
 
 fn plan_timer_trigger<R>(

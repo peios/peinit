@@ -3,7 +3,7 @@ use crate::boundary::{
 };
 use crate::runtime::{RuntimeCalendarTimerTurn, RuntimeEventRegistrar, RuntimeEventSource};
 use crate::supervisor::Supervisor;
-use crate::timer::boot::plan_timer_boot;
+use crate::timer::boot::{TimerBootPlanError, plan_timer_boot};
 
 use super::error::LinuxCalendarTimerError;
 use super::registration::{definitions_from_supervisor, register_calendar_timer};
@@ -16,6 +16,11 @@ mod tests;
 pub(crate) struct LinuxCalendarTimerBootRegistration {
     pub sources: Vec<RuntimeEventSource>,
     pub catch_up_turns: Vec<(i32, RuntimeCalendarTimerTurn)>,
+    /// Triggers whose schedule was rejected, for the caller to report.
+    ///
+    /// Carried out rather than dropped: skipping a bad timer silently would
+    /// trade one over-severe failure for an invisible one.
+    pub rejected: Vec<TimerBootPlanError>,
 }
 
 impl LinuxCalendarTimerTable {
@@ -39,6 +44,7 @@ impl LinuxCalendarTimerTable {
             .map_err(LinuxCalendarTimerError::Clock)?;
         let plan = plan_timer_boot(&definitions, registry, realtime_now_ns)
             .map_err(LinuxCalendarTimerError::BootPlan)?;
+        let rejected = plan.rejected;
         let mut sources = Vec::new();
         let mut catch_up_turns = Vec::new();
         for registration in plan.registrations {
@@ -79,6 +85,7 @@ impl LinuxCalendarTimerTable {
         Ok(LinuxCalendarTimerBootRegistration {
             sources,
             catch_up_turns,
+            rejected,
         })
     }
 }
