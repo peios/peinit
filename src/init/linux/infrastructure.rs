@@ -1,5 +1,5 @@
 use std::io;
-use std::os::fd::{FromRawFd, IntoRawFd, OwnedFd};
+use std::os::fd::{AsRawFd, FromRawFd, IntoRawFd, OwnedFd};
 use std::path::Path;
 
 use peios::file::{FileAccess, OpenOptions};
@@ -80,7 +80,12 @@ impl JfsDeviceOpener for LinuxJfsDeviceOpener {
             .desired_access(FileAccess::READ_DATA | FileAccess::WRITE_DATA)
             .open(None, path)
             .map_err(io::Error::from)?;
-        Ok(unsafe { OwnedFd::from_raw_fd(file.into_raw_fd()) })
+        let fd = unsafe { OwnedFd::from_raw_fd(file.into_raw_fd()) };
+        // Held for the whole runtime and never closed in the child, so without
+        // CLOEXEC the ad-hoc job submission channel reaches every service and
+        // the recovery shell. peinit TRM §5.4 names this fd specifically.
+        crate::boundary::set_cloexec(fd.as_raw_fd())?;
+        Ok(fd)
     }
 }
 
