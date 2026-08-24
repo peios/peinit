@@ -9,7 +9,8 @@ use crate::supervisor::{Supervisor, SupervisorSettings};
 
 use super::{
     APP_LAUNCH_NS, BOOT_NS, LIFECYCLE_COMMAND_NS, ScriptedClock, StaticRegistry,
-    TestProcessController, TestProcessLauncher, TestTokenProvider, alive_service, process, settings,
+    TestProcessController, TestProcessLauncher, TestTokenProvider, alive_service, process,
+    settings,
 };
 
 #[test]
@@ -597,7 +598,12 @@ fn explicit_start_on_a_skipped_service_starts_it_once_the_condition_holds() {
     let start_operation = dispatch
         .context_id
         .map(|_| ())
-        .and_then(|()| supervisor.pending_pre_start_check_launches().first().copied())
+        .and_then(|()| {
+            supervisor
+                .pending_pre_start_check_launches()
+                .first()
+                .copied()
+        })
         .expect("a pre-start check was queued");
     supervisor
         .launch_next_pending_filesystem_check_helper(&mut launcher, LIFECYCLE_COMMAND_NS + 3)

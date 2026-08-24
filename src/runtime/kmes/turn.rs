@@ -272,8 +272,8 @@ fn notify_rejection_reason(rejection: &RuntimeNotifyRejection) -> String {
         RuntimeNotifyRejection::Parse { error, .. } => format!("parse: {error:?}"),
         RuntimeNotifyRejection::Apply { error, .. } => format!("apply: {error:?}"),
         RuntimeNotifyRejection::Shutdown(error) => format!("shutdown: {error:?}"),
-        RuntimeNotifyRejection::Truncated { payload, control } => format!(
-            "truncated: payload={payload} control={control}"
-        ),
+        RuntimeNotifyRejection::Truncated { payload, control } => {
+            format!("truncated: payload={payload} control={control}")
+        }
     }
 }
