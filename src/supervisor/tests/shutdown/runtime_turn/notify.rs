@@ -1,3 +1,5 @@
+use crate::notify::NotifySocketReadError;
+use crate::runtime::RuntimeShutdownEventTurnError;
 use crate::control::connection::ControlConnectionTable;
 use crate::execution::notify::{NotifyAppliedField, NotifyApplyError};
 use crate::notify::{NotifyCredentials, NotifyDatagram};
@@ -192,14 +194,84 @@ struct NotifyEventResult {
     deadline_timer: FakeDeadlineTimer,
 }
 
+/// §1.4's all-or-nothing rule: a datagram that is not delivered whole has no
+/// fields applied from it.
+///
+/// peinit implemented that faithfully against a malformed *line* and was blind
+/// to a truncated one — the case it cannot see, because a truncated tail can
+/// parse as a complete, valid KEY=VALUE line. A long enough STATUS= produced a
+/// datagram whose last line was wherever the cut landed, and if the cut fell
+/// after an `=` it was well-formed and was applied.
+///
+/// It has to arrive as a *rejection*, not as a read error: the datagram was
+/// consumed and is gone, so ending the runtime loop over it would be a worse
+/// answer than the silent truncation it replaces.
+#[test]
+fn a_truncated_notify_datagram_is_rejected_rather_than_applied() {
+    for (payload, control) in [(true, false), (false, true), (true, true)] {
+        let mut supervisor = notify_app_supervisor();
+        let result = run_notify_read(
+            &mut supervisor,
+            NOTIFY_NS,
+            Err(NotifySocketReadError::Truncated { payload, control }),
+        );
+
+        let RuntimeShutdownEventTurn::Notify {
+            supervisor:
+                Some(RuntimeNotifySupervisorTurn::Rejected(RuntimeNotifyRejection::Truncated {
+                    payload: got_payload,
+                    control: got_control,
+                })),
+            ..
+        } = result.turn
+        else {
+            panic!("expected a truncation rejection, got {:?}", result.turn);
+        };
+        assert_eq!((got_payload, got_control), (payload, control));
+    }
+}
+
+/// And an ordinary read failure is still a read failure — the truncation path
+/// must not swallow every error into a rejection.
+#[test]
+fn a_read_failure_is_still_a_read_failure() {
+    let mut supervisor = notify_app_supervisor();
+    let outcome = try_notify_read(
+        &mut supervisor,
+        NOTIFY_NS,
+        Err(NotifySocketReadError::MissingCredentials),
+    );
+    assert!(
+        outcome.is_err(),
+        "a socket-level failure must not be reported as a rejected datagram"
+    );
+}
+
 fn run_notify_event(
     supervisor: &mut Supervisor,
     now_ns: u64,
     datagram: NotifyDatagram,
 ) -> NotifyEventResult {
+    run_notify_read(supervisor, now_ns, Ok(Some(datagram)))
+}
+
+/// [`run_notify_event`] over a raw socket result, so a test can drive an error.
+fn run_notify_read(
+    supervisor: &mut Supervisor,
+    now_ns: u64,
+    read: Result<Option<NotifyDatagram>, NotifySocketReadError>,
+) -> NotifyEventResult {
+    try_notify_read(supervisor, now_ns, read).expect("runtime event")
+}
+
+fn try_notify_read(
+    supervisor: &mut Supervisor,
+    now_ns: u64,
+    read: Result<Option<NotifyDatagram>, NotifySocketReadError>,
+) -> Result<NotifyEventResult, RuntimeShutdownEventTurnError> {
     let mut signal = FakeSignalSource::would_block();
     let mut child_reaper = FakeChildReaper::empty();
-    let mut notify = FakeNotifySource::new([Ok(Some(datagram))]);
+    let mut notify = FakeNotifySource::new([read]);
     let mut listener = FakeControlListener::default();
     let mut connections = ControlConnectionTable::new(4);
     let mut deadline_timer = FakeDeadlineTimer::would_block();
@@ -238,13 +310,12 @@ fn run_notify_event(
             &mut registrar,
             &mut boot_attempt_counter,
         ),
-    )
-    .expect("runtime event");
+    )?;
 
-    NotifyEventResult {
+    Ok(NotifyEventResult {
         turn,
         deadline_timer,
-    }
+    })
 }
 
 struct NotifyLoopResult {

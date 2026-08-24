@@ -44,6 +44,12 @@ pub enum NotifySocketReadError {
     WouldBlock,
     Recv(io::Error),
     MissingCredentials,
+    /// The kernel did not deliver the datagram whole.
+    ///
+    /// Not a socket failure: the datagram was consumed and is gone. It is a
+    /// rejection of that one message, and the runtime records it the way it
+    /// records a malformed line.
+    Truncated { payload: bool, control: bool },
 }
 
 impl NotifySocket {

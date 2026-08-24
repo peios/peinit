@@ -44,7 +44,7 @@ pub(super) struct ChildExecSpec {
 // Runs after clone in the child. Keep this path to prebuilt pointers, raw fd
 // integers, and direct syscalls; parent-side launch code must do allocation and
 // formatting before reaching this point.
-pub(super) fn child_exec(token: &Token, command: &LaunchCommand, spec: ChildExecSpec) -> ! {
+pub(super) fn child_exec(token: &Token, command: &mut LaunchCommand, spec: ChildExecSpec) -> ! {
     let ChildExecSpec {
         exec_error_read_fd,
         exec_error_write_fd,
@@ -161,6 +161,13 @@ pub(super) fn child_exec(token: &Token, command: &LaunchCommand, spec: ChildExec
             errno,
         );
     }
+
+    // LISTEN_PID, now that there is a child PID to name. A conforming
+    // sd_listen_fds refuses the descriptors without it, which made the whole
+    // fd store unreachable from the software the convention exists for. It
+    // also stops a service that execs a helper leaking LISTEN_FDS into it,
+    // where the helper would adopt whatever is at descriptors 3 and 4 by then.
+    command.set_listen_pid(unsafe { libc::getpid() });
 
     unsafe {
         libc::execve(

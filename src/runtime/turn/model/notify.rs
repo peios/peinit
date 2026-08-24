@@ -57,4 +57,6 @@ pub enum RuntimeNotifyRejection {
         attribution: Option<AuthenticatedNotifySender>,
     },
     Shutdown(ShutdownError),
+    /// The kernel truncated the datagram, so no field from it was applied.
+    Truncated { payload: bool, control: bool },
 }
