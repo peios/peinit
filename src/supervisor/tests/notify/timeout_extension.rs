@@ -200,4 +200,3 @@ fn active_command_reload_supervisor() -> crate::supervisor::Supervisor {
         .expect("app launch");
     supervisor
 }
-

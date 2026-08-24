@@ -50,13 +50,15 @@ pub fn begin_graph_pre_start_check(
         PreStartCheckDecision::AssertionFailed(check) => {
             outcome::apply_assertion_failed(&mut transaction, request, check, cleared_skipped)
         }
-        PreStartCheckDecision::RequiresFilesystemHelper { checks } => outcome::apply_filesystem_pending(
-            &mut transaction,
-            request,
-            activation,
-            checks,
-            cleared_skipped,
-        ),
+        PreStartCheckDecision::RequiresFilesystemHelper { checks } => {
+            outcome::apply_filesystem_pending(
+                &mut transaction,
+                request,
+                activation,
+                checks,
+                cleared_skipped,
+            )
+        }
     }?;
 
     transaction.commit_to_stores(services, operations, graph, start_store);

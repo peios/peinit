@@ -58,5 +58,8 @@ pub enum RuntimeNotifyRejection {
     },
     Shutdown(ShutdownError),
     /// The kernel truncated the datagram, so no field from it was applied.
-    Truncated { payload: bool, control: bool },
+    Truncated {
+        payload: bool,
+        control: bool,
+    },
 }

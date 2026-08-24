@@ -1,6 +1,6 @@
-use crate::notify::NotifySocketReadError;
 use crate::boundary::{Clock, ProcessController};
 use crate::execution::notify::NotifyAppliedField;
+use crate::notify::NotifySocketReadError;
 use crate::shutdown::ShutdownError;
 use crate::supervisor::{Supervisor, SupervisorError};
 
