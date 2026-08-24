@@ -17,7 +17,18 @@ pub(super) fn apply_transition_timeout_extensions(
     notify: &NotifyApplyDispatch,
     observed_at_ns: u64,
 ) -> Result<(), TimeoutExtensionError> {
-    if work.shutdown.is_some() {
+    // A shutdown is in progress, and this service's wave has already begun, so
+    // its extension belongs to `apply_shutdown_timeout_extensions` — which
+    // finds it by its entry in `stop_deadlines`.
+    //
+    // Returning here for *every* service during a shutdown was the bug. A
+    // service in a later wave, still winding down a start or a reload when the
+    // shutdown was requested, has no stop deadline yet — so the shutdown path
+    // finds nothing and returns too, and its EXTEND_TIMEOUT_USEC was dropped by
+    // both. That is the service most likely to need it: it was in the middle of
+    // something when the shutdown began, and its start or reload phase kept its
+    // original deadline while its own wave was still far off.
+    if work.shutdown.is_some() && has_stop_deadline(work, &notify.sender.service) {
         return Ok(());
     }
     for field in &notify.applied_fields {
@@ -27,6 +38,16 @@ pub(super) fn apply_transition_timeout_extensions(
         apply_transition_timeout_extension(work, &notify.sender.service, value, observed_at_ns)?;
     }
     Ok(())
+}
+
+/// Whether this service's stop wave has begun.
+fn has_stop_deadline(work: &SupervisorWork, service: &str) -> bool {
+    work.shutdown.as_ref().is_some_and(|shutdown| {
+        shutdown
+            .stop_deadlines
+            .iter()
+            .any(|deadline| deadline.service == service)
+    })
 }
 
 fn apply_transition_timeout_extension(
@@ -172,7 +193,16 @@ fn clamped_deadline(
             .saturating_mul(NANOS_PER_SEC),
     );
     let requested_ns = observed_at_ns.saturating_add(requested_usec.saturating_mul(NANOS_PER_USEC));
-    Ok(requested_ns.min(cap_ns))
+    // During a shutdown the global deadline binds too. A service whose wave has
+    // not begun still reaches this path, and no phase extension may outlive the
+    // shutdown it is running inside — the shutdown path applies the same cap
+    // for a service already in its wave.
+    let global_cap_ns = work
+        .shutdown
+        .as_ref()
+        .map(|shutdown| shutdown.global_deadline_ns)
+        .unwrap_or(u64::MAX);
+    Ok(requested_ns.min(cap_ns).min(global_cap_ns))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
