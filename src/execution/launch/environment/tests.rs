@@ -9,8 +9,8 @@ use crate::service::ServiceDefinition;
 use crate::service::ServiceEnvironmentVariable;
 
 use super::{
-    DEFAULT_PATH, LISTEN_FDNAMES, LISTEN_FDS, NOTIFY_SOCKET, PATH, build_launch_environment,
-    build_launch_environment_with_inherited_fds,
+    DEFAULT_PATH, LISTEN_FDNAMES, LISTEN_FDS, LISTEN_PID, NOTIFY_SOCKET, PATH,
+    build_launch_environment, build_launch_environment_with_inherited_fds,
 };
 
 #[test]
@@ -224,6 +224,54 @@ fn launch_environment_adds_fd_store_protocol_variables() {
             .collect::<Vec<_>>(),
         vec![(LISTEN_FDNAMES, "listener:cache"), (LISTEN_FDS, "2")],
     );
+}
+
+#[test]
+fn protocol_variables_from_a_configurable_layer_never_reach_the_child() {
+    // PSPU §4.20: all four MUST be absent when nothing is passed, and no
+    // configurable layer may set any of them.
+    //
+    // The un-injected case is the one that used to leak: with no descriptors,
+    // the guarded LISTEN_* inserts never run, so nothing overwrote the
+    // configurable layers. FdStoreMax defaults to 0, so that is every service.
+    let names = [NOTIFY_SOCKET, LISTEN_FDS, LISTEN_FDNAMES, LISTEN_PID];
+
+    for (label, from_global) in [("EnvVars", true), ("service Environment", false)] {
+        for name in names {
+            let mut job = test_job();
+            let entry = vec![ServiceEnvironmentVariable {
+                name: name.to_string(),
+                value: "3".to_string(),
+            }];
+            let global: &[ServiceEnvironmentVariable] = if from_global { &entry } else { &[] };
+            if !from_global {
+                job.environment = entry.clone();
+            }
+
+            let environment = build_launch_environment_with_inherited_fds(
+                &job,
+                "/run/test/notify.sock",
+                global,
+                &[],
+            );
+
+            let value = environment
+                .iter()
+                .find(|variable| variable.name == name)
+                .map(|variable| variable.value.as_str());
+
+            match name {
+                // Inserted unconditionally by peinit, so it is present — but
+                // it must carry peinit's value, not the layer's.
+                NOTIFY_SOCKET => assert_eq!(
+                    value,
+                    Some("/run/test/notify.sock"),
+                    "{label} overrode {name}"
+                ),
+                _ => assert_eq!(value, None, "{label} smuggled {name} through with no fds"),
+            }
+        }
+    }
 }
 
 fn test_job() -> JobRecord {
