@@ -34,7 +34,7 @@ pub(super) fn launch_linux_process(
         output_pipe_buffer_bytes,
     } = spec;
     let token = token_from_handle(token)?;
-    let command = match LaunchCommand::new(job, &environment) {
+    let mut command = match LaunchCommand::new(job, &environment) {
         Ok(command) => command,
         Err(error) => {
             return Err(parent_setup_with_cleanup(
@@ -117,7 +117,7 @@ pub(super) fn launch_linux_process(
         Ok(CloneProcessResult::Child) => {
             child_exec(
                 &token,
-                &command,
+                &mut command,
                 ChildExecSpec {
                     exec_error_read_fd: exec_error_read.as_raw_fd(),
                     exec_error_write_fd: exec_error_write.as_raw_fd(),

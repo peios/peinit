@@ -1,3 +1,4 @@
+use crate::notify::NotifySocketReadError;
 use crate::boundary::{Clock, ProcessController};
 use crate::execution::notify::NotifyAppliedField;
 use crate::shutdown::ShutdownError;
@@ -23,15 +24,31 @@ where
     C: Clock + ?Sized,
     P: ProcessController + ?Sized,
 {
-    let Some(datagram) = notify_source
-        .read_notify_datagram()
-        .map_err(RuntimeShutdownEventTurnError::NotifyRead)?
-    else {
-        return Ok(RuntimeShutdownEventTurn::Notify {
-            read: RuntimeNotifyRead::WouldBlock,
-            supervisor: None,
-            deadline_timer: None,
-        });
+    let datagram = match notify_source.read_notify_datagram() {
+        Ok(Some(datagram)) => datagram,
+        Ok(None) => {
+            return Ok(RuntimeShutdownEventTurn::Notify {
+                read: RuntimeNotifyRead::WouldBlock,
+                supervisor: None,
+                deadline_timer: None,
+            });
+        }
+        // A truncated datagram is a rejection of that one message, not a
+        // failure of the socket: it was consumed and is gone, and nothing from
+        // it was applied. Recording it the way a malformed line is recorded is
+        // what the all-or-nothing rule asks for; ending the runtime loop over
+        // it would be a far worse answer than the silent truncation it
+        // replaces.
+        Err(NotifySocketReadError::Truncated { payload, control }) => {
+            return Ok(RuntimeShutdownEventTurn::Notify {
+                read: RuntimeNotifyRead::WouldBlock,
+                supervisor: Some(RuntimeNotifySupervisorTurn::Rejected(
+                    RuntimeNotifyRejection::Truncated { payload, control },
+                )),
+                deadline_timer: None,
+            });
+        }
+        Err(error) => return Err(RuntimeShutdownEventTurnError::NotifyRead(error)),
     };
 
     let read_datagram = RuntimeNotifyDatagram::from_datagram(&datagram);

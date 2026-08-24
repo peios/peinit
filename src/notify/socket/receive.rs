@@ -30,7 +30,32 @@ pub(super) fn receive_datagram(fd: RawFd) -> Result<NotifyDatagram, NotifySocket
     }
     payload.truncate(len as usize);
 
+    // Parse before the truncation check, so any descriptors that *did* arrive
+    // are owned and closed on the way out rather than leaked.
     let (credentials, fds) = unsafe { parse_control_messages(&msg)? };
+
+    // §1.4's all-or-nothing rule: a datagram that is not delivered whole has no
+    // fields applied from it. peinit implements that faithfully against a
+    // malformed *line* — the parser fails before anything is applied — and was
+    // blind to a truncated one, which is the case it cannot see: the kernel
+    // silently cuts an oversized datagram, and a truncated tail can parse as a
+    // complete, valid KEY=VALUE line. A long enough STATUS= produced a datagram
+    // whose last line was whatever the cut happened to land on, and if the cut
+    // fell after an `=` it was well-formed and was applied.
+    //
+    // MSG_CTRUNC is the same failure for descriptors: beyond the sixty-fourth,
+    // they never reach peinit at all, so a service sending seventy with
+    // FDSTORE=1 had six vanish with no error and no way to know.
+    let payload_truncated = msg.msg_flags & libc::MSG_TRUNC != 0;
+    let control_truncated = msg.msg_flags & libc::MSG_CTRUNC != 0;
+    if payload_truncated || control_truncated {
+        // `fds` drops here, closing whatever arrived.
+        return Err(NotifySocketReadError::Truncated {
+            payload: payload_truncated,
+            control: control_truncated,
+        });
+    }
+
     let credentials = credentials.ok_or(NotifySocketReadError::MissingCredentials)?;
     Ok(NotifyDatagram {
         payload,

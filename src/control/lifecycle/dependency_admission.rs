@@ -1,6 +1,7 @@
 use crate::ids::OperationIdAllocator;
 use crate::operation::store::OperationStore;
 use crate::service::ServiceTable;
+use crate::service::runtime::ServiceState;
 
 use super::admission::{admit_operation, rejects_definition_removed, status_for};
 use super::matrix::{CommandAdmission, OperationExpectation, classify};
@@ -32,7 +33,7 @@ pub fn admit_lifecycle_command_with_operation_ids(
             state: status.state,
         }),
         CommandAdmission::Operation { expectation }
-            if should_plan_on_demand_start(request.command, expectation) =>
+            if should_plan_on_demand_start(request.command, expectation, status.state) =>
         {
             admit_on_demand_start(services, operations, operation_ids, request)
         }
@@ -45,11 +46,43 @@ pub fn admit_lifecycle_command_with_operation_ids(
     }
 }
 
+/// Whether this command starts a service that is not running.
+///
+/// §8.1: "If the service has no running process (Inactive, Completed, Failed,
+/// Skipped), the stop phase is skipped and peinit proceeds directly to the
+/// start phase. **The operation type remains Restart for observability.**"
+///
+/// Only `Start` was routed here, so a `Restart` from one of those four states
+/// went to the control boundary, where `process_target` unconditionally looks
+/// for a live main job and errors with `MissingCurrentMainJob` or
+/// `JobNotRunning`. That is four of the ten states — and they are the states an
+/// operator most often restarts from: a service that failed, a Oneshot that
+/// completed, a service somebody stopped earlier. An operator scripting a
+/// restart across a set of services got an error for every one that happened
+/// not to be running.
+///
+/// `Backoff` is deliberately not here. The matrix gives it `Restart`, and a
+/// service in Backoff has a restart already pending, so the stop phase has
+/// something to do.
 fn should_plan_on_demand_start(
     command: LifecycleCommand,
     expectation: OperationExpectation,
+    state: ServiceState,
 ) -> bool {
-    command == LifecycleCommand::Start && expectation == OperationExpectation::Any
+    if expectation != OperationExpectation::Any {
+        return false;
+    }
+    match command {
+        LifecycleCommand::Start => true,
+        LifecycleCommand::Restart => matches!(
+            state,
+            ServiceState::Inactive
+                | ServiceState::Completed
+                | ServiceState::Failed
+                | ServiceState::Skipped
+        ),
+        _ => false,
+    }
 }
 
 fn admit_on_demand_start(
