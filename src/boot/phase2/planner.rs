@@ -1,9 +1,12 @@
 use crate::boot::BootMode;
+use crate::boundary::UndecodableService;
 use crate::ids::{JobIdAllocator, OperationIdAllocator};
 use crate::service::ServiceDefinition;
 
-use super::graph::{build_phase2_boot_graph, safe_mode_downgrade_findings};
-use super::model::{BlockedService, Phase2BootPlan, Phase2BootPlanError, PreparedStart};
+use super::graph::{BlockedServiceDraft, build_phase2_boot_graph, safe_mode_downgrade_findings};
+use super::model::{
+    BlockedReason, BlockedService, Phase2BootPlan, Phase2BootPlanError, PreparedStart,
+};
 
 pub fn prepare_phase2_boot_plan(
     mode: BootMode,
@@ -20,8 +23,20 @@ pub fn prepare_phase2_boot_plan(
         observed_at_ns,
         operation_ids,
         job_ids,
-        &[],
+        Phase2PlanContext::default(),
     )
+}
+
+/// What the planner needs beyond the definitions themselves.
+///
+/// Grouped rather than passed as two more slices: both describe services the
+/// plan must account for but that are not ordinary members of `services` —
+/// ones already satisfied by a retained process, and ones whose key would not
+/// decode at all.
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct Phase2PlanContext<'a> {
+    pub(crate) retained_satisfied: &'a [String],
+    pub(crate) undecodable: &'a [UndecodableService],
 }
 
 pub(crate) fn prepare_phase2_boot_plan_with_retained(
@@ -31,8 +46,12 @@ pub(crate) fn prepare_phase2_boot_plan_with_retained(
     observed_at_ns: u64,
     operation_ids: &mut OperationIdAllocator,
     job_ids: &mut JobIdAllocator,
-    retained_satisfied: &[String],
+    context: Phase2PlanContext<'_>,
 ) -> Result<Phase2BootPlan, Phase2BootPlanError> {
+    let Phase2PlanContext {
+        retained_satisfied,
+        undecodable,
+    } = context;
     if max_parallel_starts == 0 {
         return Err(Phase2BootPlanError::InvalidMaxParallelStarts);
     }
@@ -62,12 +81,27 @@ pub(crate) fn prepare_phase2_boot_plan_with_retained(
     };
 
     let graph = build_phase2_boot_graph(effective_mode, services)?;
+    // Keys that exist but will not decode are Failed with ValidationError,
+    // exactly as a definition that fails graph validation is. They are not in
+    // `services` -- there is no definition to put there -- so they are seeded
+    // here rather than found by the graph walk. Anything depending on one
+    // fails through the ordinary DependencyFailure propagation, so the blast
+    // radius is bounded by what actually needed it.
+    let mut blocked = graph.blocked;
+    for service in undecodable {
+        blocked.push(BlockedServiceDraft {
+            service: service.name.clone(),
+            reason: BlockedReason::ValidationError {
+                message: format!("Service definition failed to decode: {}", service.message),
+            },
+            additional_reasons: Vec::new(),
+        });
+    }
     let order = graph
         .ordered_startable
         .into_iter()
         .filter(|service| !retained_satisfied.contains(&service.name))
         .collect::<Vec<_>>();
-    let blocked = graph.blocked;
     let start_count = order.len();
     let mut next_operation_ids = operation_ids.clone();
     let mut next_job_ids = job_ids.clone();

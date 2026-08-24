@@ -29,7 +29,8 @@ pub use process::{
 pub use recovery::RecoveryConsole;
 pub use registry::{
     RegistryClient, RegistryWatchEvent, RegistryWatchEventKind, RegistryWatchRoot,
-    RegistryWatchSource, TimerLastRunWriteOutcome, TimerLastRunWriteRequest, TimerLastRunWriter,
+    RegistryWatchSource, ServiceDefinitionsRead, TimerLastRunWriteOutcome,
+    TimerLastRunWriteRequest, TimerLastRunWriter, UndecodableService,
 };
 pub use shutdown::{ShutdownDeadlineTimer, ShutdownFinalizer};
 pub use time::{ChildExitStatus, ChildReap, ChildReaper, Clock, RealtimeClock};

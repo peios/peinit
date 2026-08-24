@@ -1,6 +1,6 @@
 use crate::boundary::{
-    BoundaryError, RegistryClient, TimerLastRunWriteOutcome, TimerLastRunWriteRequest,
-    TimerLastRunWriter,
+    BoundaryError, RegistryClient, ServiceDefinitionsRead, TimerLastRunWriteOutcome,
+    TimerLastRunWriteRequest, TimerLastRunWriter,
 };
 use crate::control::socket::ControlSocketLimits;
 use crate::control::system::ControlSecurityDescriptor;
@@ -32,6 +32,22 @@ pub struct LcsTimerLastRunWriter;
 
 impl RegistryClient for LcsRegistryClient {
     fn read_service_definitions(&mut self) -> Result<Vec<ServiceDefinition>, BoundaryError> {
+        let read = self.read_service_definitions_partial()?;
+        // The strict view, for reload-config: any undecodable key fails the
+        // whole read, so the transaction aborts and the running configuration
+        // stands.
+        if let Some(first) = read.undecodable.first() {
+            return Err(BoundaryError::Registry(format!(
+                "service {} failed to decode: {}",
+                first.name, first.message
+            )));
+        }
+        Ok(read.definitions)
+    }
+
+    fn read_service_definitions_partial(
+        &mut self,
+    ) -> Result<ServiceDefinitionsRead, BoundaryError> {
         read_lcs_service_definitions()
             .map_err(|error| BoundaryError::Registry(format!("{error:?}")))
     }
