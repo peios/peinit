@@ -58,6 +58,40 @@ pub fn provision_linux_boot_paths(paths: &[ProvisionedPath]) -> ProvisionedPathA
     report
 }
 
+#[cfg(all(feature = "peios-boundary", feature = "peios-registry"))]
+/// Create a runtime directory carrying an explicit descriptor, by SDDL.
+///
+/// The peinit socket parents used to go through a bare `create_dir_all`, which
+/// leaves them inheriting the Phase 1 `/run` seed -- exactly one ACE,
+/// `O:SYG:SYD:(A;OICI;GA;;;SY)`. Boot ordering rules ordinary provisioning out:
+/// registryd creates the directory and binds the notify socket before
+/// `provision_boot_paths` runs at all.
+///
+/// The result was that peinit's own default ControlSecurity, which grants
+/// Administrators full access, was unreachable -- an admin token is refused at
+/// `connect()` by `inode_permission`, long before AccessCheck sees the
+/// descriptor.
+pub(crate) fn ensure_runtime_directory(path: &Path, sddl: &str) -> io::Result<()> {
+    let sd = security_from_sddl(sddl)?;
+    ensure_directory(path, &sd)
+}
+
+#[cfg(all(feature = "peios-boundary", feature = "peios-registry"))]
+/// Stamp a descriptor onto an already-bound pathname socket, by SDDL.
+///
+/// By path rather than by fd: `fd_set_sd` is a method on `peios::file::File`,
+/// which can only be produced by opening, so there is no way to reach it from
+/// a socket fd. These are pathname sockets, so the path form addresses the
+/// same inode.
+///
+/// The window between `bind` and this call carries the inherited descriptor,
+/// which is narrower than the one being installed -- so the failure direction
+/// is refusal, not exposure.
+pub(crate) fn set_path_security(path: &Path, sddl: &str) -> io::Result<()> {
+    let sd = security_from_sddl(sddl)?;
+    apply_path_security(path, &sd)
+}
+
 pub fn provision_linux_service_runtime_directories(
     service: &ServiceDefinition,
 ) -> Result<(), io::Error> {
@@ -130,6 +164,26 @@ fn service_runtime_directory_security_for_sid(sid: &str) -> io::Result<ResolvedS
 #[cfg(not(feature = "peios-boundary"))]
 fn service_runtime_directory_security_for_sid(_sid: &str) -> io::Result<ResolvedSecurity> {
     Ok(ResolvedSecurity::Noop)
+}
+
+#[cfg(all(feature = "peios-boundary", feature = "peios-registry"))]
+fn security_from_sddl(sddl: &str) -> io::Result<ResolvedSecurity> {
+    peios::security::sddl::parse(sddl)
+        .map(ResolvedSecurity::Descriptor)
+        .map_err(io::Error::from)
+}
+
+#[cfg(all(feature = "peios-boundary", feature = "peios-registry"))]
+fn apply_path_security(path: &Path, sd: &ResolvedSecurity) -> io::Result<()> {
+    let ResolvedSecurity::Descriptor(sd) = sd;
+    peios::file::set_sd(
+        None,
+        path,
+        SecInfo::OWNER | SecInfo::GROUP | SecInfo::DACL,
+        sd,
+        libc::AT_SYMLINK_NOFOLLOW,
+    )
+    .map_err(io::Error::from)
 }
 
 #[cfg(feature = "peios-boundary")]
