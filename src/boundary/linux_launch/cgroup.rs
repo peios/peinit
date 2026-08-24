@@ -1,4 +1,4 @@
-use std::os::fd::OwnedFd;
+use std::os::fd::{AsRawFd, OwnedFd};
 use std::path::{Path, PathBuf};
 
 use peios::file::{CreateOptions, Disposition, FileAccess, OpenOptions};
@@ -24,7 +24,16 @@ pub(super) fn open_cgroup_directory(cgroup_id: &str) -> Result<OwnedFd, Boundary
         .map_err(|error| {
             BoundaryError::Process(format!("open cgroup directory {cgroup_id} failed: {error}"))
         })?;
-    Ok(file.into())
+    let fd: OwnedFd = file.into();
+    // child_exec closes the stdio pipes, /dev/null, the console and the token
+    // fd by hand, but not this one — so without CLOEXEC every service inherits
+    // a traversable descriptor on its own cgroup directory.
+    crate::boundary::set_cloexec(fd.as_raw_fd()).map_err(|error| {
+        BoundaryError::Process(format!(
+            "cloexec cgroup directory {cgroup_id} failed: {error}"
+        ))
+    })?;
+    Ok(fd)
 }
 
 fn create_service_main_cgroup_tree(main_cgroup_id: &str) -> Result<(), BoundaryError> {
