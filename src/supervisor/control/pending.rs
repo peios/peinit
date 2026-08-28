@@ -1,6 +1,6 @@
 use crate::boundary::{Clock, ProcessController};
 use crate::execution::control::{
-    ControlExecutionContext, ControlExecutionDetail, ControlOperationRequest,
+    ControlExecutionContext, ControlExecutionDetail, ControlOperationKind, ControlOperationRequest,
     begin_control_operation,
 };
 
@@ -50,6 +50,25 @@ impl Supervisor {
             .map_err(SupervisorError::Control)?;
             if let ControlExecutionDetail::ReloadCommand { job_id, .. } = &execution.detail {
                 work.pending_control_launches.push_back(*job_id);
+            }
+            // A stop that lands while the service's ExecStartPost hooks are
+            // still running supersedes them: the sequence will never complete,
+            // and its deadline must not fire later against a hooks cgroup the
+            // stop has already torn down (PEI-491). Kill what is still running
+            // now; the stop's own cleanup removes the tree.
+            if matches!(
+                execution.kind,
+                ControlOperationKind::Stop | ControlOperationKind::RestartStopLeg
+            ) {
+                for deadline in work.start.cancel_post_start_for_service(&execution.service) {
+                    controller
+                        .kill_cgroup(&deadline.hooks_cgroup_id)
+                        .map_err(|error| {
+                            SupervisorError::Control(
+                                crate::execution::control::ControlExecutionError::Boundary(error),
+                            )
+                        })?;
+                }
             }
             apply_health_scheduling_after_transitions(
                 &mut work,
