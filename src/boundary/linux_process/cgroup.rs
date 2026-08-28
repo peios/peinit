@@ -7,14 +7,32 @@ use peios::file::{FileAccess, OpenOptions};
 
 use crate::boundary::{BoundaryError, CgroupRemoveOutcome, read_fd_to_string, write_all_fd};
 
+/// Kill every process in a cgroup.
+///
+/// A cgroup that no longer exists is treated as killed, for the same reason
+/// `cgroup_populated` reports a vanished tree as empty: the caller is asking
+/// for the tree to hold nothing, and a tree that is gone already does. The
+/// case is not hypothetical. A stop that lands while a service's post-start
+/// hooks are still running removes the hooks cgroup, and the hook deadline
+/// that was armed for those hooks can still fire afterwards; it runs on the
+/// lifecycle-deadline path, whose errors leave the runtime loop and put PID 1
+/// into recovery. Killing what is already dead must not be that error
+/// (PEI-491).
 pub(super) fn kill_cgroup(cgroup_id: &str) -> Result<(), BoundaryError> {
     let path = cgroup_kill_file_path(cgroup_id)?;
-    let file = OpenOptions::new()
+    let file = match OpenOptions::new()
         .desired_access(FileAccess::WRITE_DATA)
         .open(None, &path)
-        .map_err(|error| {
-            BoundaryError::Process(format!("open {} failed: {error}", path.display()))
-        })?;
+    {
+        Ok(file) => file,
+        Err(error) if is_absent(&error) => return Ok(()),
+        Err(error) => {
+            return Err(BoundaryError::Process(format!(
+                "open {} failed: {error}",
+                path.display()
+            )));
+        }
+    };
     write_all_fd(file.as_raw_fd(), b"1").map_err(|error| {
         BoundaryError::Process(format!("write {} failed: {error}", path.display()))
     })

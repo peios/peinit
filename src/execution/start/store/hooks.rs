@@ -158,6 +158,30 @@ impl StartExecutionStore {
         self.post_start_hook_deadlines.remove(&operation_id)
     }
 
+    /// Forget every post-start hook sequence and deadline a service has, and
+    /// hand back the deadlines so the caller can kill the hooks cgroups they
+    /// name.
+    ///
+    /// For a service being stopped while its `ExecStartPost` hooks are still
+    /// running. Nothing else removes that state: the hooks' cgroup goes with
+    /// the service's tree, but the deadline stayed armed and fired later into a
+    /// cgroup that no longer existed — an error on the lifecycle-deadline path,
+    /// which put PID 1 into recovery (PEI-491). A stopped service has no
+    /// post-start sequence to time out.
+    pub fn cancel_post_start_for_service(&mut self, service: &str) -> Vec<PostStartHookDeadline> {
+        self.post_start_sequences
+            .retain(|_, sequence| sequence.service != service);
+        let (cancelled, kept): (Vec<_>, Vec<_>) =
+            std::mem::take(&mut self.post_start_hook_deadlines)
+                .into_iter()
+                .partition(|(_, deadline)| deadline.service == service);
+        self.post_start_hook_deadlines = kept.into_iter().collect();
+        cancelled
+            .into_iter()
+            .map(|(_, deadline)| deadline)
+            .collect()
+    }
+
     pub fn due_post_start_hook_deadlines(&self, now_ns: u64) -> Vec<PostStartHookDeadline> {
         self.post_start_hook_deadlines
             .values()
@@ -171,5 +195,82 @@ impl StartExecutionStore {
             .values()
             .min_by_key(|deadline| (deadline.due_at_ns, deadline.service.clone()))
             .cloned()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{PostStartHookDeadline, PostStartHookSequence, StartExecutionStore};
+    use crate::ids::{JobId, JobIdAllocator, OperationId, OperationIdAllocator};
+    use crate::security::TokenSummary;
+    use crate::service::ServiceDefinition;
+
+    fn sequence(service: &str, operation_id: OperationId) -> PostStartHookSequence {
+        PostStartHookSequence {
+            service: service.to_string(),
+            operation_id,
+            definition: ServiceDefinition::simple_system_boot(service, "/sbin/x"),
+            resolved_identity: "SYSTEM".to_string(),
+            token_summary: TokenSummary::new("SYSTEM", "S-1-5-18", vec![], vec![], vec![]),
+            activation_generation: 1,
+            cgroup_generation: 1,
+            commands: vec![vec!["/libexec/hook".to_string()]],
+            next_index: 1,
+            deadline_ns: 60,
+            readiness_result: "alive".to_string(),
+            had_failure: false,
+        }
+    }
+
+    fn deadline(service: &str, operation_id: OperationId, job_id: JobId) -> PostStartHookDeadline {
+        PostStartHookDeadline {
+            operation_id,
+            job_id,
+            service: service.to_string(),
+            hooks_cgroup_id: format!("/sys/fs/cgroup/peinit/{service}/hooks"),
+            service_cgroup_id: format!("/sys/fs/cgroup/peinit/{service}"),
+            due_at_ns: 60,
+        }
+    }
+
+    /// PEI-491: a stop must forget the stopped service's post-start hooks —
+    /// sequence and deadline both — and only that service's.
+    #[test]
+    fn cancel_post_start_for_service_forgets_only_that_service() {
+        let mut store = StartExecutionStore::default();
+        let ops = OperationIdAllocator::new()
+            .allocate_batch(2, 1_000)
+            .expect("operation ids");
+        let jobs = JobIdAllocator::new()
+            .allocate_batch(2, 1_000)
+            .expect("job ids");
+        let (a, b) = (ops[0], ops[1]);
+        store.record_post_start_sequence(sequence("eudev", a));
+        store.record_post_start_hook_deadline(deadline("eudev", a, jobs[0]));
+        store.record_post_start_sequence(sequence("authd", b));
+        store.record_post_start_hook_deadline(deadline("authd", b, jobs[1]));
+
+        let cancelled = store.cancel_post_start_for_service("eudev");
+
+        assert_eq!(cancelled.len(), 1);
+        assert_eq!(
+            cancelled[0].hooks_cgroup_id,
+            "/sys/fs/cgroup/peinit/eudev/hooks"
+        );
+        assert!(store.post_start_sequence(a).is_none());
+        assert!(
+            store
+                .due_post_start_hook_deadlines(u64::MAX)
+                .iter()
+                .all(|d| d.service == "authd")
+        );
+        assert!(store.post_start_sequence(b).is_some());
+        assert_eq!(store.due_post_start_hook_deadlines(u64::MAX).len(), 1);
+    }
+
+    #[test]
+    fn cancel_post_start_for_service_without_hooks_is_a_no_op() {
+        let mut store = StartExecutionStore::default();
+        assert!(store.cancel_post_start_for_service("eudev").is_empty());
     }
 }
