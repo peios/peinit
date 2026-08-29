@@ -33,6 +33,7 @@ fn runtime_control_listener_event_accepts_and_registers_connection_fd() {
     let mut registrar = FakeRegistrar::default();
     let mut boot_attempt_counter = FakeBootAttemptCounter::default();
 
+    let mut jobs_channel = crate::runtime::NoJobsChannel;
     let turn = process_runtime_shutdown_event(
         &mut supervisor,
         RuntimeEventSource::ControlListener,
@@ -47,6 +48,7 @@ fn runtime_control_listener_event_accepts_and_registers_connection_fd() {
             power_button_source: &mut power_button,
             filesystem_check_reader: &mut filesystem_check_reader,
             log_pipes: &mut log_pipes,
+            jobs_channel: &mut jobs_channel,
         },
         context(
             &mut clock,
@@ -97,6 +99,7 @@ fn runtime_control_listener_event_closes_accepted_connection_when_registration_f
     let mut registrar = FakeRegistrar::failing_registration();
     let mut boot_attempt_counter = FakeBootAttemptCounter::default();
 
+    let mut jobs_channel = crate::runtime::NoJobsChannel;
     let err = process_runtime_shutdown_event(
         &mut supervisor,
         RuntimeEventSource::ControlListener,
@@ -111,6 +114,7 @@ fn runtime_control_listener_event_closes_accepted_connection_when_registration_f
             power_button_source: &mut power_button,
             filesystem_check_reader: &mut filesystem_check_reader,
             log_pipes: &mut log_pipes,
+            jobs_channel: &mut jobs_channel,
         },
         context(
             &mut clock,

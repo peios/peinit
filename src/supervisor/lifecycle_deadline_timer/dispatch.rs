@@ -6,7 +6,7 @@ use crate::supervisor::dispatch::{
     SupervisorPreStartHookTimeoutDispatch, SupervisorReadinessTimeoutDispatch,
     SupervisorReloadCommandTimeoutDispatch, SupervisorReloadDetectionDispatch,
     SupervisorRestartBackoffDispatch, SupervisorStopEscalationDispatch,
-    SupervisorWatchdogTimeoutDispatch,
+    SupervisorSubmittedDeadlineDispatch, SupervisorWatchdogTimeoutDispatch,
 };
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -25,6 +25,7 @@ pub struct SupervisorLifecycleDeadlineDispatch {
     pub boot_successes: Vec<SupervisorBootSuccessDispatch>,
     pub boot_settles: Vec<SupervisorBootSettleDispatch>,
     pub cgroup_leaks: Vec<SupervisorLeakedCgroupDispatch>,
+    pub submitted_jobs: Vec<SupervisorSubmittedDeadlineDispatch>,
 }
 
 impl SupervisorLifecycleDeadlineDispatch {
@@ -43,5 +44,6 @@ impl SupervisorLifecycleDeadlineDispatch {
             && self.boot_successes.is_empty()
             && self.boot_settles.is_empty()
             && self.cgroup_leaks.is_empty()
+            && self.submitted_jobs.is_empty()
     }
 }

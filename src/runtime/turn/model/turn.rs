@@ -3,7 +3,8 @@ use crate::boundary::{
     LinuxTimerFdRead, RegistryWatchEvent, TimerLastRunWriteOutcome,
 };
 use crate::control::reload_config::{ReloadConfigError, ReloadConfigOutcome};
-use crate::runtime::{RuntimeEventSource, RuntimeLogPipeTurn};
+use crate::jobs::connection::JobsConnectionAcceptTurn;
+use crate::runtime::{RuntimeEventSource, RuntimeJobsConnectionTurn, RuntimeLogPipeTurn};
 use crate::supervisor::{
     SupervisorChildReapTurn, SupervisorControlConnectionTableTurn,
     SupervisorFilesystemCheckCompletionDispatch, SupervisorLifecycleDeadlineDispatch,
@@ -79,6 +80,17 @@ pub enum RuntimeShutdownEventTurn {
     PowerButton {
         fd: i32,
         turn: RuntimePowerButtonTurn,
+    },
+    JobsListener {
+        accept: JobsConnectionAcceptTurn,
+        registration: Option<RuntimeEventSource>,
+    },
+    JobsConnection {
+        fd: i32,
+        turn: RuntimeJobsConnectionTurn,
+    },
+    IdleJobsConnectionsClosed {
+        fds: Vec<i32>,
     },
 }
 

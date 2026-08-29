@@ -52,19 +52,28 @@ impl SubmittedJobDefinition {
 pub enum SubmittedJobDefinitionError {
     /// The field, and why. The wire answer is `INVALID_ARGUMENTS` for all of
     /// them; the detail is for the message and the audit record.
-    InvalidField { field: &'static str, reason: String },
+    InvalidField {
+        field: &'static str,
+        reason: String,
+    },
     /// `descriptors` (plus `output`) does not match the attached count.
-    DescriptorCountMismatch { expected: usize, attached: usize },
-    ArgumentsTooLarge { bytes: usize, limit: usize },
+    DescriptorCountMismatch {
+        expected: usize,
+        attached: usize,
+    },
+    ArgumentsTooLarge {
+        bytes: usize,
+        limit: usize,
+    },
 }
 
 impl SubmittedJobDefinitionError {
     pub fn message(&self) -> String {
         match self {
             Self::InvalidField { field, reason } => format!("invalid {field}: {reason}"),
-            Self::DescriptorCountMismatch { expected, attached } => format!(
-                "descriptors names {expected} descriptors but {attached} were attached"
-            ),
+            Self::DescriptorCountMismatch { expected, attached } => {
+                format!("descriptors names {expected} descriptors but {attached} were attached")
+            }
             Self::ArgumentsTooLarge { bytes, limit } => {
                 format!("arguments and environment total {bytes} bytes, over the {limit} limit")
             }

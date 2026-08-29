@@ -16,6 +16,7 @@ use super::control_connection::process_control_connection_event;
 use super::control_listener::process_control_listener_event;
 use super::deadline::process_shutdown_deadline_timer_event;
 use super::event_sources::NoRuntimeRegistryClient;
+use super::jobs::{process_jobs_connection_event, process_jobs_listener_event};
 use super::lifecycle_deadline::process_lifecycle_deadline_timer_event;
 use super::notify::process_notify_event;
 use super::power_button::process_power_button_event;
@@ -39,7 +40,11 @@ where
     C: Clock + RealtimeClock + ?Sized,
     P: ProcessController + ?Sized,
     F: crate::boundary::ShutdownFinalizer,
-    A: SystemAccessChecker + ServiceAccessChecker + ?Sized,
+    A: SystemAccessChecker
+        + ServiceAccessChecker
+        + crate::submitted::JobAccessChecker
+        + crate::submitted::JobDescriptorFactory
+        + ?Sized,
     R: RuntimeEventRegistrar + ?Sized,
     G: RegistryClient,
 {
@@ -70,7 +75,11 @@ where
     C: Clock + RealtimeClock + ?Sized,
     P: ProcessController + ?Sized,
     F: crate::boundary::ShutdownFinalizer,
-    A: SystemAccessChecker + ServiceAccessChecker + ?Sized,
+    A: SystemAccessChecker
+        + ServiceAccessChecker
+        + crate::submitted::JobAccessChecker
+        + crate::submitted::JobDescriptorFactory
+        + ?Sized,
     R: RuntimeEventRegistrar + ?Sized,
 {
     match source {
@@ -184,5 +193,15 @@ where
             &mut *sources.deadline_timer,
             context,
         ),
+        RuntimeEventSource::JobsListener => {
+            let accepted_at_ns = context
+                .clock
+                .monotonic_ns()
+                .map_err(RuntimeShutdownEventTurnError::Clock)?;
+            process_jobs_listener_event(sources.jobs_channel, context.registrar, accepted_at_ns)
+        }
+        RuntimeEventSource::JobsConnection { fd } => {
+            process_jobs_connection_event(supervisor, fd, sources.jobs_channel, context)
+        }
     }
 }

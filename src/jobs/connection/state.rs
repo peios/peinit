@@ -94,9 +94,8 @@ impl JobsConnectionState {
         if self.pending_wait.is_some() || !self.outgoing.is_empty() {
             return None;
         }
-        self.last_activity_ns.map(|last| {
-            last.saturating_add(timeout_secs.saturating_mul(1_000_000_000))
-        })
+        self.last_activity_ns
+            .map(|last| last.saturating_add(timeout_secs.saturating_mul(1_000_000_000)))
     }
 
     pub fn idle_timeout_expired(&self, now_ns: u64, timeout_secs: u64) -> bool {

@@ -202,6 +202,11 @@ pub fn control_error_response_line(
     response_line(&response)
 }
 
+/// One frame from an arbitrary object, for response shapes built elsewhere.
+pub fn response_line_from_value(response: serde_json::Value) -> Result<Vec<u8>, serde_json::Error> {
+    response_line(&response)
+}
+
 fn response_line(response: &serde_json::Value) -> Result<Vec<u8>, serde_json::Error> {
     let mut line = serde_json::to_vec(response)?;
     line.push(b'\n');

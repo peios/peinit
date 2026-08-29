@@ -62,6 +62,9 @@ pub(super) fn collect_runtime_shutdown_turn_console_messages(
         | RuntimeShutdownEventTurn::StaleControlConnection { .. }
         | RuntimeShutdownEventTurn::Notify { .. }
         | RuntimeShutdownEventTurn::ServiceLogPipe { .. }
+        | RuntimeShutdownEventTurn::JobsListener { .. }
+        | RuntimeShutdownEventTurn::JobsConnection { .. }
+        | RuntimeShutdownEventTurn::IdleJobsConnectionsClosed { .. }
         | RuntimeShutdownEventTurn::RegistryWatch { .. } => {}
     }
 }

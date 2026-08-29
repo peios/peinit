@@ -167,6 +167,7 @@ struct TestSources {
     lifecycle_timer: FakeDeadlineTimer,
     filesystem_check_reader: crate::supervisor::tests::TestFilesystemCheckReader,
     log_pipes: crate::runtime::RuntimeServiceLogPipes,
+    jobs_channel: crate::runtime::NoJobsChannel,
 }
 
 impl TestSources {
@@ -194,6 +195,7 @@ impl TestSources {
             power_button_source: power_button,
             filesystem_check_reader: &mut self.filesystem_check_reader,
             log_pipes: &mut self.log_pipes,
+            jobs_channel: &mut self.jobs_channel,
         }
     }
 }
@@ -210,6 +212,7 @@ impl Default for TestSources {
             lifecycle_timer: FakeDeadlineTimer::would_block(),
             filesystem_check_reader: crate::supervisor::tests::TestFilesystemCheckReader::default(),
             log_pipes: crate::runtime::RuntimeServiceLogPipes::default(),
+            jobs_channel: crate::runtime::NoJobsChannel,
         }
     }
 }

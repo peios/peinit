@@ -96,11 +96,10 @@ pub(in crate::boundary) fn materialize_linux_prepared_token(
         )));
     }
     let token = unsafe { BorrowedFd::borrow_raw(prepared_token_fd) };
-    let token = Token::from(
-        token
-            .try_clone_to_owned()
-            .map_err(|error| BoundaryError::Token(format!("duplicate prepared token fd: {error}")))?,
-    );
+    let token =
+        Token::from(token.try_clone_to_owned().map_err(|error| {
+            BoundaryError::Token(format!("duplicate prepared token fd: {error}"))
+        })?);
     let summary = summarize_token_for_identity(&job.resolved_identity, &token)?;
     // The launch owns the fd it is handed and closes it after the clone;
     // the original prepared fd is closed by the caller once the launch has

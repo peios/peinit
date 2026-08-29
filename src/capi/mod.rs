@@ -1,10 +1,12 @@
 mod control;
 mod error;
+mod jobs;
 mod notify;
 mod types;
 
 pub use control::*;
 pub use error::*;
+pub use jobs::*;
 pub use notify::*;
 pub use types::*;
 

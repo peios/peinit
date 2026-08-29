@@ -19,8 +19,7 @@ pub fn parse_jobs_request(body: &[u8]) -> Result<ParsedJobsRequest, JobsRequestP
         .get("command")
         .and_then(Value::as_str)
         .ok_or(JobsRequestParseError::InvalidCommand)?;
-    let command =
-        JobsCommand::parse(command_value).ok_or(JobsRequestParseError::InvalidCommand)?;
+    let command = JobsCommand::parse(command_value).ok_or(JobsRequestParseError::InvalidCommand)?;
 
     let job_id = if command == JobsCommand::Submit {
         None

@@ -1,4 +1,4 @@
-use crate::execution::launch::LaunchCreatedJobRequest;
+use crate::execution::launch::{LaunchCreatedJobRequest, LaunchTokenSource};
 use crate::job::JobType;
 use crate::service::ServiceDefinition;
 
@@ -10,12 +10,22 @@ impl Supervisor {
         job_id: crate::ids::JobId,
         launched_at_ns: u64,
     ) -> LaunchCreatedJobRequest {
+        self.launch_request_with_token(job_id, launched_at_ns, LaunchTokenSource::ServiceIdentity)
+    }
+
+    pub(in crate::supervisor) fn launch_request_with_token(
+        &self,
+        job_id: crate::ids::JobId,
+        launched_at_ns: u64,
+        token_source: LaunchTokenSource,
+    ) -> LaunchCreatedJobRequest {
         LaunchCreatedJobRequest {
             job_id,
             launched_at_ns,
             notify_socket_path: self.settings.notify_socket_path.clone(),
             setup_timeout_secs: self.launch_setup_timeout_secs(job_id),
             output_pipe_buffer_bytes: self.log_config.max_buffer_per_service_bytes,
+            token_source,
         }
     }
 

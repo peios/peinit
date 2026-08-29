@@ -8,6 +8,7 @@ use super::shutdown_completed::clear_completed_services;
 use super::shutdown_starting::kill_starting_services;
 use super::shutdown_wave::begin_first_stop_wave;
 use super::state::{Supervisor, SupervisorError};
+use super::submitted::{live_submitted_jobs_remain, stop_submitted_jobs_for_shutdown};
 use super::work::SupervisorWork;
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
@@ -50,13 +51,21 @@ impl Supervisor {
         let first_wave =
             begin_first_stop_wave(&mut work, &plan, controller, now_ns, &mut stop_deadlines)
                 .map_err(SupervisorError::Shutdown)?;
+        let submitted_stops = stop_submitted_jobs_for_shutdown(
+            &mut work,
+            controller,
+            now_ns,
+            self.settings.shutdown.post_kill_timeout_secs,
+        )?;
 
-        let finalization =
-            if plan.stop_waves.is_empty() && starting_kills.post_kill_deadlines.is_empty() {
-                ShutdownFinalizationState::Ready
-            } else {
-                ShutdownFinalizationState::WaitingForServices
-            };
+        let finalization = if plan.stop_waves.is_empty()
+            && starting_kills.post_kill_deadlines.is_empty()
+            && !live_submitted_jobs_remain(&work)
+        {
+            ShutdownFinalizationState::Ready
+        } else {
+            ShutdownFinalizationState::WaitingForServices
+        };
         let runtime = ShutdownRuntime {
             kind,
             initiated_at_ns: now_ns,
@@ -78,6 +87,7 @@ impl Supervisor {
             completed_transitions,
             killed_starting: starting_kills.killed_starting,
             first_wave,
+            submitted_stops,
             startup_operation_events: starting_kills.operation_events,
             startup_job_events: starting_kills.job_events,
         })

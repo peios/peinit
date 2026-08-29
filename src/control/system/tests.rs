@@ -31,6 +31,8 @@ fn rejects_non_shutdown_command() {
 #[test]
 fn rejects_shutdown_command_without_parsed_kind() {
     let parsed = ParsedControlRequest {
+        job_id: None,
+        job_filter: None,
         command: ControlCommand::Shutdown,
         service: None,
         wait: false,

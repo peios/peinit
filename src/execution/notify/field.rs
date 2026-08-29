@@ -107,6 +107,18 @@ fn apply_stopping(
 
 fn record_advisory_field(field: &NotifyField, dispatch: &mut NotifyApplyDispatch) {
     match field {
+        NotifyField::Progress(value) => {
+            dispatch.applied_fields.push(NotifyAppliedField::Progress {
+                value: value.clone(),
+            });
+        }
+        NotifyField::ProgressUnit(value) => {
+            dispatch
+                .applied_fields
+                .push(NotifyAppliedField::ProgressUnit {
+                    value: value.clone(),
+                });
+        }
         NotifyField::Errno(value) => dispatch.applied_fields.push(NotifyAppliedField::Errno {
             value: value.clone(),
         }),

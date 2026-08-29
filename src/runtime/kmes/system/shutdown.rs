@@ -42,6 +42,9 @@ pub(in crate::runtime::kmes) fn collect_shutdown_drive_dispatch(
         for abandoned in &timeout.abandoned {
             push_shutdown_abandoned(out, abandoned)?;
         }
+        for dispatch in &timeout.submitted {
+            super::super::submitted::collect_submitted_deadline(dispatch, out)?;
+        }
     }
     Ok(())
 }

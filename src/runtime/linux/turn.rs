@@ -7,10 +7,11 @@ use self::support::{
     CalendarTimerMaintenanceStep, calendar_timer_maintenance_steps, reload_config_succeeded,
 };
 use self::support::{
-    append_idle_closure_turn, emit_runtime_loop_kmes_events, flush_operation_waits_at,
-    prepend_idle_closure_turn, process_due_operation_maintenance_at,
+    append_idle_closure_turn, append_idle_jobs_closure_turn, emit_runtime_loop_kmes_events,
+    flush_operation_waits_at, prepend_idle_closure_turn, prepend_idle_jobs_closure_turn,
+    process_due_operation_maintenance_at,
 };
-use crate::boundary::{Clock, ConsoleSink};
+use crate::boundary::{Clock, ConsoleSink, RealtimeClock};
 use crate::runtime::{
     RuntimeEventRegistrationError, RuntimeEventSource, RuntimeEventWaiter,
     RuntimeShutdownEventSources, RuntimeShutdownLoopContext, RuntimeShutdownLoopError,
@@ -78,6 +79,7 @@ impl LinuxShutdownRuntime {
                 power_button_source: &mut self.power_buttons,
                 filesystem_check_reader: &mut self.filesystem_check_reader,
                 log_pipes: &mut self.log_pipes,
+                jobs_channel: &mut self.jobs_channel,
             };
             let mut context = RuntimeShutdownLoopContext {
                 clock: &mut self.clock,
@@ -93,6 +95,8 @@ impl LinuxShutdownRuntime {
                 max_events: self.config.max_events,
                 control_limits,
                 work_pump: self.config.work_pump.clone(),
+                job_identity_provider: &mut self.job_identity_provider,
+                jobs_limits: supervisor.jobs_limits(),
             };
             prepare_runtime_shutdown_loop_turn(supervisor, &mut event_sources, &mut context)?
         };
@@ -100,10 +104,20 @@ impl LinuxShutdownRuntime {
             .clock
             .monotonic_ns()
             .map_err(RuntimeShutdownLoopError::Clock)?;
+        let before_wait_realtime_ns = self
+            .clock
+            .realtime_ns()
+            .map_err(RuntimeShutdownLoopError::Clock)?;
         let maintenance_before_wait =
             process_due_operation_maintenance_at(supervisor, &mut self.controller, before_wait_ns)?;
-        flush_operation_waits_at(supervisor, &mut self.control_connections, before_wait_ns)?;
+        flush_operation_waits_at(
+            supervisor,
+            &mut self.control_connections,
+            before_wait_ns,
+            before_wait_realtime_ns,
+        )?;
         let idle_closed_before_wait = self.close_idle_control_connections(before_wait_ns);
+        let idle_jobs_closed_before_wait = self.close_idle_jobs_connections(before_wait_ns);
         let wait_timeout_ms = self.runtime_wait_timeout_ms(supervisor, before_wait_ns);
         let sources = self
             .epoll
@@ -137,6 +151,7 @@ impl LinuxShutdownRuntime {
                 power_button_source: &mut self.power_buttons,
                 filesystem_check_reader: &mut self.filesystem_check_reader,
                 log_pipes: &mut self.log_pipes,
+                jobs_channel: &mut self.jobs_channel,
             },
             control_registry,
             registry_watch,
@@ -154,23 +169,37 @@ impl LinuxShutdownRuntime {
                 max_events: self.config.max_events,
                 control_limits,
                 work_pump: self.config.work_pump.clone(),
+                job_identity_provider: &mut self.job_identity_provider,
+                jobs_limits: supervisor.jobs_limits(),
             },
         )?;
         prepend_idle_closure_turn(&mut turn, idle_closed_before_wait);
+        prepend_idle_jobs_closure_turn(&mut turn, idle_jobs_closed_before_wait);
         let after_sources_ns = self
             .clock
             .monotonic_ns()
+            .map_err(RuntimeShutdownLoopError::Clock)?;
+        let after_sources_realtime_ns = self
+            .clock
+            .realtime_ns()
             .map_err(RuntimeShutdownLoopError::Clock)?;
         let maintenance_after_sources = process_due_operation_maintenance_at(
             supervisor,
             &mut self.controller,
             after_sources_ns,
         )?;
-        flush_operation_waits_at(supervisor, &mut self.control_connections, after_sources_ns)?;
+        flush_operation_waits_at(
+            supervisor,
+            &mut self.control_connections,
+            after_sources_ns,
+            after_sources_realtime_ns,
+        )?;
         append_idle_closure_turn(
             &mut turn,
             self.close_idle_control_connections(after_sources_ns),
         );
+        let idle_jobs_closed_after = self.close_idle_jobs_connections(after_sources_ns);
+        append_idle_jobs_closure_turn(&mut turn, idle_jobs_closed_after);
         self.sync_reloadable_config(supervisor);
         #[cfg(feature = "peios-registry")]
         let calendar_turns = {

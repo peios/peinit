@@ -111,6 +111,34 @@ int peinit_reload_config(peinit_client_t *client,
 			 peinit_error_t **error_out);
 
 /*
+ * Submitted jobs, as the control socket sees them (PSPU §4.14).
+ *
+ * peinit_job_status answers with the job view under "job"; the caller needs
+ * JOB_QUERY on the job. peinit_job_list answers with "jobs", the views the
+ * caller holds JOB_QUERY on that match the filter; filter_json is NULL or a
+ * JSON object with any of "submitter", "identity" (SIDs), "logon_session"
+ * (integer) and "state". peinit_job_stop asks Peinit to stop the job (the
+ * caller needs JOB_STOP); with wait true the response is the terminal view.
+ *
+ * Submitting a job is not a control command: see <peinit/jobs.h>.
+ */
+int peinit_job_status(peinit_client_t *client,
+		      const char *job_id,
+		      peinit_response_t **response_out,
+		      peinit_error_t **error_out);
+
+int peinit_job_list(peinit_client_t *client,
+		    const char *filter_json,
+		    peinit_response_t **response_out,
+		    peinit_error_t **error_out);
+
+int peinit_job_stop(peinit_client_t *client,
+		    const char *job_id,
+		    bool wait,
+		    peinit_response_t **response_out,
+		    peinit_error_t **error_out);
+
+/*
  * peinit_system_shutdown - request graceful poweroff/reboot/halt.
  *
  * shutdown_kind must be PEINIT_SHUTDOWN_POWEROFF, PEINIT_SHUTDOWN_REBOOT, or
@@ -147,6 +175,16 @@ int peinit_response_is_ok(const peinit_response_t *response);
  */
 const char *peinit_response_error_code(const peinit_response_t *response);
 const char *peinit_response_error_message(const peinit_response_t *response);
+
+/*
+ * peinit_response_take_pidfd - take the process handle a response carried.
+ *
+ * A jobs-socket submit answered with a running job carries the job's pidfd
+ * (PSPU §7.6). This returns it and transfers ownership to the caller, who
+ * closes it; every later call, and any response that carried no handle,
+ * returns -1. Freeing a response closes a handle that was not taken.
+ */
+int peinit_response_take_pidfd(peinit_response_t *response);
 
 #ifdef __cplusplus
 }

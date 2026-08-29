@@ -4,6 +4,23 @@ use crate::service::ServiceTable;
 
 use super::model::{AuthenticatedNotifySender, NotifyApplyError};
 
+/// Whether some service's current main job is recorded under `sender_pid`.
+///
+/// This is the pure routing question — which door a notification goes
+/// through — asked before either door verifies the sender against its pidfd,
+/// so a sender is verified exactly once whichever way it is routed.
+pub fn service_claims_notify_sender(
+    services: &ServiceTable,
+    jobs: &JobStore,
+    sender_pid: u32,
+) -> bool {
+    services.service_names().into_iter().any(|service| {
+        jobs.current_service_main_job(service)
+            .and_then(|job_id| jobs.get(job_id))
+            .is_some_and(|job| job.pid == Some(sender_pid))
+    })
+}
+
 pub fn authenticate_notify_sender<P>(
     services: &ServiceTable,
     jobs: &JobStore,

@@ -5,8 +5,9 @@ use crate::control::connection::{
     ControlConnectionIo, ControlConnectionRecord, ControlConnectionTable, ControlListener,
 };
 use crate::runtime::{
-    RuntimeLifecycleDeadlineTimer, RuntimeNotifySource, RuntimePid1SignalSource,
-    RuntimePowerButtonSource, RuntimeServiceLogPipes, RuntimeShutdownDeadlineTimer,
+    RuntimeJobsChannel, RuntimeLifecycleDeadlineTimer, RuntimeNotifySource,
+    RuntimePid1SignalSource, RuntimePowerButtonSource, RuntimeServiceLogPipes,
+    RuntimeShutdownDeadlineTimer,
 };
 
 pub struct RuntimeShutdownEventSources<'a, I, L, S, H, N, D, T>
@@ -29,6 +30,7 @@ where
     pub power_button_source: &'a mut dyn RuntimePowerButtonSource,
     pub filesystem_check_reader: &'a mut dyn FilesystemCheckHelperReader,
     pub log_pipes: &'a mut RuntimeServiceLogPipes,
+    pub jobs_channel: &'a mut dyn RuntimeJobsChannel,
 }
 
 pub(crate) struct NoRuntimeRegistryClient;

@@ -32,6 +32,9 @@ pub(in crate::runtime::kmes) fn collect_child_reap_turn(
         SupervisorChildReapDispatch::Shutdown(dispatch) => {
             collect_shutdown_terminal_dispatch(dispatch, out)?;
         }
+        SupervisorChildReapDispatch::Submitted(dispatch) => {
+            super::super::submitted::collect_submitted_terminal(dispatch, out)?;
+        }
     }
     Ok(())
 }

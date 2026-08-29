@@ -11,6 +11,7 @@ impl Supervisor {
         let outcome = reload_config(registry, &mut self.services)?;
         self.control_security = outcome.control_security.clone();
         self.control_limits = outcome.control_limits;
+        self.jobs_limits = outcome.jobs_limits;
         self.log_config = outcome.log_config.clone();
         self.settings.shutdown = outcome.shutdown_settings.clone();
         self.global_environment = outcome.global_environment.clone();

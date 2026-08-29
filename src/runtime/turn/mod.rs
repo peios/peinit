@@ -10,6 +10,7 @@ mod control_listener;
 mod deadline;
 mod dispatch;
 mod event_sources;
+mod jobs;
 mod lifecycle_deadline;
 mod model;
 mod notify;
@@ -27,12 +28,11 @@ pub(crate) use event_sources::NoRuntimeRegistryClient;
 pub use event_sources::RuntimeShutdownEventSources;
 pub use model::{
     RuntimeCalendarTimerTurn, RuntimeEventRegistrar, RuntimeEventRegistrationError,
-    RuntimeFilesystemCheckHelperTurn, RuntimeLifecycleDeadlineTimer,
-    RuntimeNotifyDatagram, RuntimeNotifyRead, RuntimeNotifyRejection, RuntimeNotifySource,
-    RuntimeNotifySupervisorTurn, RuntimePid1SignalSource, RuntimePowerButtonSource,
-    RuntimePowerButtonTurn, RuntimeProcessSetupTurn, RuntimeRegistryWatchTurn,
-    RuntimeShutdownDeadlineTimer, RuntimeShutdownEventContext, RuntimeShutdownEventTurn,
-    RuntimeShutdownEventTurnError,
+    RuntimeFilesystemCheckHelperTurn, RuntimeLifecycleDeadlineTimer, RuntimeNotifyDatagram,
+    RuntimeNotifyRead, RuntimeNotifyRejection, RuntimeNotifySource, RuntimeNotifySupervisorTurn,
+    RuntimePid1SignalSource, RuntimePowerButtonSource, RuntimePowerButtonTurn,
+    RuntimeProcessSetupTurn, RuntimeRegistryWatchTurn, RuntimeShutdownDeadlineTimer,
+    RuntimeShutdownEventContext, RuntimeShutdownEventTurn, RuntimeShutdownEventTurnError,
 };
 pub(crate) use pre_start_check::register_filesystem_check_helper_sources;
 pub(crate) use process_setup::register_process_setup_sources;

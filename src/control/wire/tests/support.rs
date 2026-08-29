@@ -65,6 +65,7 @@ pub(super) fn job_id(_sequence: u64) -> JobId {
 
 pub(super) fn reload_config_outcome() -> ReloadConfigOutcome {
     ReloadConfigOutcome {
+        jobs_limits: crate::jobs::socket::JobsSocketLimits::default(),
         summary: ServiceReloadSummary {
             added: vec!["new".to_string()],
             updated: Vec::new(),

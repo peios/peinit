@@ -62,6 +62,8 @@ fn runtime_loop_arms_lifecycle_timer_before_waiting() {
         crate::supervisor::tests::TestFilesystemCheckLauncher::default();
     let mut boot_attempt_counter = FakeBootAttemptCounter::default();
 
+    let mut jobs_channel = crate::runtime::NoJobsChannel;
+    let mut job_identity_provider = crate::runtime::NoJobIdentityProvider;
     let turn = process_runtime_shutdown_loop_turn(
         &mut supervisor,
         &mut waiter,
@@ -76,6 +78,7 @@ fn runtime_loop_arms_lifecycle_timer_before_waiting() {
             power_button_source: &mut power_button,
             filesystem_check_reader: &mut filesystem_check_reader,
             log_pipes: &mut log_pipes,
+            jobs_channel: &mut jobs_channel,
         },
         RuntimeShutdownLoopContext {
             clock: &mut clock,
@@ -95,6 +98,8 @@ fn runtime_loop_arms_lifecycle_timer_before_waiting() {
                 crate::control::socket::DEFAULT_CONNECTION_TIMEOUT_SECS,
             ),
             work_pump: RuntimeWorkPumpConfig::default(),
+            job_identity_provider: &mut job_identity_provider,
+            jobs_limits: crate::jobs::socket::JobsSocketLimits::default(),
         },
     )
     .expect("loop turn");

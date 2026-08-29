@@ -58,6 +58,10 @@ pub enum SupervisorLifecycleDeadlineKind {
     },
     BootSuccess,
     BootSettle,
+    SubmittedJob {
+        job_id: JobId,
+        kind: crate::submitted::SubmittedJobDeadlineKind,
+    },
 }
 
 impl SupervisorLifecycleDeadlineKind {
@@ -77,6 +81,7 @@ impl SupervisorLifecycleDeadlineKind {
             Self::CgroupCleanup { .. } => 11,
             Self::BootSuccess => 12,
             Self::BootSettle => 13,
+            Self::SubmittedJob { .. } => 14,
         }
     }
 
@@ -94,7 +99,7 @@ impl SupervisorLifecycleDeadlineKind {
             | Self::HealthCheckTimeout { service, .. }
             | Self::WatchdogTimeout { service, .. }
             | Self::CgroupCleanup { service, .. } => service,
-            Self::BootSuccess | Self::BootSettle => "",
+            Self::BootSuccess | Self::BootSettle | Self::SubmittedJob { .. } => "",
         }
     }
 
@@ -111,7 +116,8 @@ impl SupervisorLifecycleDeadlineKind {
             Self::HealthCheckInterval { .. }
             | Self::HealthCheckTimeout { .. }
             | Self::WatchdogTimeout { .. }
-            | Self::CgroupCleanup { .. } => None,
+            | Self::CgroupCleanup { .. }
+            | Self::SubmittedJob { .. } => None,
         }
     }
 
@@ -121,7 +127,9 @@ impl SupervisorLifecycleDeadlineKind {
             | Self::PostStartHookTimeout { job_id, .. }
             | Self::ReadinessTimeout { job_id, .. }
             | Self::ReloadCommandTimeout { job_id, .. } => Some(*job_id),
-            Self::HealthCheckTimeout { job_id, .. } => Some(*job_id),
+            Self::HealthCheckTimeout { job_id, .. } | Self::SubmittedJob { job_id, .. } => {
+                Some(*job_id)
+            }
             Self::PreStartCheckTimeout { .. }
             | Self::StopTimeout { .. }
             | Self::ReloadDetection { .. }

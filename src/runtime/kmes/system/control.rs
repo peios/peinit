@@ -37,18 +37,22 @@ fn collect_control_frame_turn(
         }
         SupervisorControlFrameTurn::CommandAccepted {
             access_denials,
+            job_access_denials,
             dispatch: Some(dispatch),
             ..
         } => {
             collect_access_denials(access_denials, out)?;
+            collect_job_access_denials(job_access_denials, out)?;
             collect_control_command_dispatch(dispatch, out)?;
         }
         SupervisorControlFrameTurn::CommandAccepted {
             access_denials,
+            job_access_denials,
             dispatch: None,
             ..
         } => {
             collect_access_denials(access_denials, out)?;
+            collect_job_access_denials(job_access_denials, out)?;
         }
         SupervisorControlFrameTurn::ShutdownRejected { error, .. } => {
             collect_shutdown_rejection(error, out)?;
@@ -76,6 +80,9 @@ fn collect_control_command_dispatch(
         SupervisorControlCommandDispatch::ReloadConfig(outcome) => {
             collect_reload_config_warnings(outcome, out)?;
         }
+        SupervisorControlCommandDispatch::Job(dispatch) => {
+            super::super::submitted::collect_jobs_command_dispatch(dispatch, out)?;
+        }
     }
     Ok(())
 }
@@ -91,6 +98,9 @@ fn collect_control_command_rejection(
         SupervisorControlCommandBodyError::ServiceAccessDenied(denied) => {
             out.push(encode_service_access_denied_event(denied)?);
         }
+        SupervisorControlCommandBodyError::JobAccessDenied(denied) => {
+            out.push(crate::kmes::encode_job_access_denied_event(denied)?);
+        }
         SupervisorControlCommandBodyError::ReloadConfig(error) => {
             if let ReloadConfigError::Validation(failure) = error.as_ref() {
                 for finding in &failure.findings {
@@ -102,6 +112,16 @@ fn collect_control_command_rejection(
             }
         }
         _ => {}
+    }
+    Ok(())
+}
+
+fn collect_job_access_denials(
+    denials: &[crate::submitted::JobAccessDenied],
+    out: &mut Vec<KmesEvent>,
+) -> Result<(), BoundaryError> {
+    for denied in denials {
+        out.push(crate::kmes::encode_job_access_denied_event(denied)?);
     }
     Ok(())
 }

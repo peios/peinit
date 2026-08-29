@@ -31,7 +31,11 @@ where
     C: Clock + RealtimeClock + ?Sized,
     P: ProcessController + ?Sized,
     F: ShutdownFinalizer,
-    A: SystemAccessChecker + ServiceAccessChecker + ?Sized,
+    A: SystemAccessChecker
+        + ServiceAccessChecker
+        + crate::submitted::JobAccessChecker
+        + crate::submitted::JobDescriptorFactory
+        + ?Sized,
     R: RuntimeEventRegistrar + ?Sized,
     T: TokenProvider + ?Sized,
     K: ProcessLauncher,
@@ -47,17 +51,29 @@ where
         .map_err(RuntimeShutdownLoopError::EventRegistration)?;
     register_process_setup_sources(&pre_work, context.registrar)
         .map_err(RuntimeShutdownLoopError::EventRegistration)?;
-    let wait_flush_observed_at_ns = if event_sources.control_connections.has_pending_waits() {
-        context
-            .clock
-            .monotonic_ns()
-            .map_err(RuntimeShutdownLoopError::Clock)?
-    } else {
-        0
-    };
+    let (wait_flush_observed_at_ns, wait_flush_realtime_ns) =
+        if event_sources.control_connections.has_pending_waits() {
+            (
+                context
+                    .clock
+                    .monotonic_ns()
+                    .map_err(RuntimeShutdownLoopError::Clock)?,
+                context
+                    .clock
+                    .realtime_ns()
+                    .map_err(RuntimeShutdownLoopError::Clock)?,
+            )
+        } else {
+            (0, 0)
+        };
     supervisor
-        .flush_terminal_control_waits(event_sources.control_connections, wait_flush_observed_at_ns)
+        .flush_terminal_control_waits(
+            event_sources.control_connections,
+            wait_flush_observed_at_ns,
+            wait_flush_realtime_ns,
+        )
         .map_err(RuntimeShutdownLoopError::ControlWait)?;
+    flush_jobs_waits(supervisor, event_sources.jobs_channel, context.clock)?;
     supervisor
         .sync_lifecycle_deadline_timer(event_sources.lifecycle_timer)
         .map_err(|error| RuntimeShutdownLoopError::Event {
@@ -65,4 +81,35 @@ where
             error: RuntimeShutdownEventTurnError::Supervisor(error),
         })?;
     Ok(pre_work)
+}
+
+/// Answer every jobs-channel wait whose condition now holds.
+pub(super) fn flush_jobs_waits<C>(
+    supervisor: &Supervisor,
+    jobs_channel: &mut dyn crate::runtime::RuntimeJobsChannel,
+    clock: &mut C,
+) -> Result<(), RuntimeShutdownLoopError>
+where
+    C: Clock + RealtimeClock + ?Sized,
+{
+    if !jobs_channel.has_pending_jobs_waits() {
+        return Ok(());
+    }
+    let monotonic_now_ns = clock
+        .monotonic_ns()
+        .map_err(RuntimeShutdownLoopError::Clock)?;
+    let realtime_now_ns = clock
+        .realtime_ns()
+        .map_err(RuntimeShutdownLoopError::Clock)?;
+    jobs_channel
+        .flush_jobs_waits(
+            supervisor,
+            crate::control::wire::ControlResponseTimeProjection::new(
+                monotonic_now_ns,
+                realtime_now_ns,
+            ),
+            monotonic_now_ns,
+        )
+        .map(|_| ())
+        .map_err(RuntimeShutdownLoopError::JobsWait)
 }

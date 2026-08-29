@@ -45,5 +45,11 @@ pub(crate) fn collect_runtime_work_pump_kmes_events(
     for dispatch in &turn.service_launch_failures {
         collect_service_launch_failure(dispatch, out)?;
     }
+    for dispatch in &turn.submitted_launches {
+        super::submitted::collect_submitted_launch(dispatch, out)?;
+    }
+    for dispatch in &turn.submitted_launch_failures {
+        super::submitted::collect_submitted_launch_failure(dispatch, out)?;
+    }
     Ok(())
 }

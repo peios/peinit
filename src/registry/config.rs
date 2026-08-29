@@ -3,6 +3,7 @@ use std::fmt;
 use crate::boundary::{BoundaryError, RegistryClient};
 use crate::control::socket::ControlSocketLimits;
 use crate::control::system::ControlSecurityDescriptor;
+use crate::jobs::socket::JobsSocketLimits;
 use crate::logging::{
     DEFAULT_LOG_READ_BYTES_PER_EVENT, DEFAULT_MAX_LOG_BUFFER_PER_SERVICE_BYTES,
     DEFAULT_MAX_LOG_LINE_BYTES, DEFAULT_PRE_EVENTD_BUFFER_BYTES, RuntimeLogConfig,
@@ -30,6 +31,10 @@ const CONTROL_SECURITY_FIELD: &str = "ControlSecurity";
 const MAX_CONTROL_CONNECTIONS_FIELD: &str = "MaxControlConnections";
 const MAX_REQUEST_SIZE_FIELD: &str = "MaxRequestSize";
 const CONNECTION_TIMEOUT_FIELD: &str = "ConnectionTimeout";
+const MAX_JOBS_CONNECTIONS_FIELD: &str = "MaxJobsConnections";
+const MAX_JOB_MESSAGE_SIZE_FIELD: &str = "MaxJobMessageSize";
+const JOBS_CONNECTION_TIMEOUT_FIELD: &str = "JobsConnectionTimeout";
+const MAX_JOBS_PER_SUBMITTER_FIELD: &str = "MaxJobsPerSubmitter";
 
 /// The smallest useful value for each log tuning knob.
 ///
@@ -304,6 +309,27 @@ pub fn build_control_socket_limits_from_registry_values(
         connection_timeout_secs: optional_init_dword(values, CONNECTION_TIMEOUT_FIELD)?
             .map(u64::from)
             .unwrap_or(defaults.connection_timeout_secs),
+    })
+}
+
+/// The jobs socket bounds of PSPU §7.A, from `Machine\System\Init\`.
+pub fn build_jobs_socket_limits_from_registry_values(
+    values: &[RawRegistryValue],
+) -> Result<JobsSocketLimits, ServiceRegistryDecodeError> {
+    let defaults = JobsSocketLimits::default();
+    Ok(JobsSocketLimits {
+        max_connections: optional_init_dword(values, MAX_JOBS_CONNECTIONS_FIELD)?
+            .map(|value| value as usize)
+            .unwrap_or(defaults.max_connections),
+        max_message_bytes: optional_init_dword(values, MAX_JOB_MESSAGE_SIZE_FIELD)?
+            .map(|value| value as usize)
+            .unwrap_or(defaults.max_message_bytes),
+        connection_timeout_secs: optional_init_dword(values, JOBS_CONNECTION_TIMEOUT_FIELD)?
+            .map(u64::from)
+            .unwrap_or(defaults.connection_timeout_secs),
+        max_jobs_per_submitter: optional_init_dword(values, MAX_JOBS_PER_SUBMITTER_FIELD)?
+            .map(|value| value as usize)
+            .unwrap_or(defaults.max_jobs_per_submitter),
     })
 }
 

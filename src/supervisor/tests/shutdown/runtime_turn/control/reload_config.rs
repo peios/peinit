@@ -67,6 +67,8 @@ fn runtime_sources_reject_reload_config_during_shutdown() {
     let mut filesystem_check_launcher =
         crate::supervisor::tests::TestFilesystemCheckLauncher::default();
 
+    let mut jobs_channel = crate::runtime::NoJobsChannel;
+    let mut job_identity_provider = crate::runtime::NoJobIdentityProvider;
     let turn = process_runtime_shutdown_sources_with_registry(
         &mut supervisor,
         vec![RuntimeEventSource::ControlConnection { fd: 47 }],
@@ -81,6 +83,7 @@ fn runtime_sources_reject_reload_config_during_shutdown() {
             power_button_source: &mut power_button,
             filesystem_check_reader: &mut filesystem_check_reader,
             log_pipes: &mut log_pipes,
+            jobs_channel: &mut jobs_channel,
         },
         Some(&mut registry),
         None,
@@ -102,6 +105,8 @@ fn runtime_sources_reject_reload_config_during_shutdown() {
                 crate::control::socket::DEFAULT_CONNECTION_TIMEOUT_SECS,
             ),
             work_pump: RuntimeWorkPumpConfig::default(),
+            job_identity_provider: &mut job_identity_provider,
+            jobs_limits: crate::jobs::socket::JobsSocketLimits::default(),
         },
     )
     .expect("runtime sources");

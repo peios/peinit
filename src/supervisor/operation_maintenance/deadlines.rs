@@ -18,6 +18,7 @@ impl Supervisor {
             self.services.next_restart_window_reset_deadline_ns(),
             self.operations
                 .next_terminal_retention_deadline_ns(DEFAULT_TERMINAL_OPERATION_RETENTION_NS),
+            self.submitted.next_retention_deadline_ns(),
         ]
         .into_iter()
         .flatten()

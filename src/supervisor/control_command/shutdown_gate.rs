@@ -26,6 +26,11 @@ impl Supervisor {
 fn is_shutdown_allowed_query(command: ControlCommand) -> bool {
     matches!(
         command,
-        ControlCommand::Status | ControlCommand::List | ControlCommand::OperationStatus
+        ControlCommand::Status
+            | ControlCommand::List
+            | ControlCommand::OperationStatus
+            | ControlCommand::JobStatus
+            | ControlCommand::JobList
+            | ControlCommand::JobStop
     )
 }

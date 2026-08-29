@@ -1,7 +1,7 @@
 use crate::execution::notify::{AuthenticatedNotifySender, NotifyApplyError};
 use crate::notify::{NotifyDatagram, NotifyParseError, NotifySocket, NotifySocketReadError};
 use crate::shutdown::ShutdownError;
-use crate::supervisor::SupervisorNotifyDispatch;
+use crate::supervisor::{SupervisorNotifyDispatch, SupervisorSubmittedNotifyDispatch};
 
 pub trait RuntimeNotifySource {
     fn read_notify_datagram(&mut self) -> Result<Option<NotifyDatagram>, NotifySocketReadError>;
@@ -43,6 +43,7 @@ impl RuntimeNotifyDatagram {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RuntimeNotifySupervisorTurn {
     Applied(Box<SupervisorNotifyDispatch>),
+    AppliedToJob(Box<SupervisorSubmittedNotifyDispatch>),
     Rejected(RuntimeNotifyRejection),
 }
 

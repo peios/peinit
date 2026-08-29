@@ -202,3 +202,210 @@ fn temp_socket_path(prefix: &str) -> std::path::PathBuf {
         .as_nanos();
     std::env::temp_dir().join(format!("{prefix}-{}-{nanos}.sock", std::process::id()))
 }
+
+#[test]
+fn job_status_over_the_control_socket_returns_the_view() {
+    let path = temp_socket_path("libpeinit-job-status");
+    let Some(listener) = bind_listener_or_skip(&path) else {
+        return;
+    };
+    let server = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().expect("accept control client");
+        let request = read_line(&mut stream);
+        let value: Value = serde_json::from_slice(&request).expect("request json");
+        assert_eq!(value["command"], "job-status");
+        assert_eq!(value["job_id"], "job-1");
+        stream
+            .write_all(br#"{"status":"ok","job":{"id":"job-1","state":"running"}}"#)
+            .expect("write response");
+        stream.write_all(b"\n").expect("write response newline");
+    });
+
+    let path_c = CString::new(path.to_str().expect("utf8 temp path")).expect("path cstring");
+    let job_c = CString::new("job-1").expect("job cstring");
+    let mut client: *mut peinit_client_t = std::ptr::null_mut();
+    let mut response: *mut peinit_response_t = std::ptr::null_mut();
+    let mut error: *mut peinit_error_t = std::ptr::null_mut();
+
+    unsafe {
+        assert_eq!(
+            peinit_client_connect_path(path_c.as_ptr(), &mut client, &mut error),
+            PEINIT_OK,
+        );
+        assert_eq!(
+            peinit_job_status(client, job_c.as_ptr(), &mut response, &mut error),
+            PEINIT_OK,
+        );
+        assert!(error.is_null());
+        assert_eq!(peinit_response_is_ok(response), 1);
+        assert_eq!(
+            borrowed_str(peinit_response_json(response)),
+            r#"{"status":"ok","job":{"id":"job-1","state":"running"}}"#,
+        );
+        assert_eq!(
+            peinit_response_take_pidfd(response),
+            -1,
+            "a control response never carries a handle"
+        );
+        peinit_response_free(response);
+        peinit_client_free(client);
+    }
+
+    server.join().expect("mock control server");
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
+fn job_list_rejects_a_filter_that_is_not_a_job_list_filter() {
+    let path = temp_socket_path("libpeinit-job-list");
+    let Some(listener) = bind_listener_or_skip(&path) else {
+        return;
+    };
+    // The refusal is local: the server never sees a request.
+    let server = thread::spawn(move || {
+        let (stream, _) = listener.accept().expect("accept control client");
+        drop(stream);
+    });
+
+    let path_c = CString::new(path.to_str().expect("utf8 temp path")).expect("path cstring");
+    let filter_c = CString::new(r#"{"service":"app"}"#).expect("filter cstring");
+    let mut client: *mut peinit_client_t = std::ptr::null_mut();
+    let mut response: *mut peinit_response_t = std::ptr::null_mut();
+    let mut error: *mut peinit_error_t = std::ptr::null_mut();
+
+    unsafe {
+        assert_eq!(
+            peinit_client_connect_path(path_c.as_ptr(), &mut client, &mut error),
+            PEINIT_OK,
+        );
+        assert_eq!(
+            peinit_job_list(client, filter_c.as_ptr(), &mut response, &mut error),
+            PEINIT_ERR_INVALID_ARGUMENT,
+        );
+        assert!(response.is_null());
+        assert!(!error.is_null());
+        assert!(borrowed_str(peinit_error_message(error)).contains("service"));
+        peinit_error_free(error);
+        peinit_client_free(client);
+    }
+
+    server.join().expect("mock control server");
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
+fn jobs_client_reports_a_missing_socket_as_io() {
+    let path = temp_socket_path("libpeinit-jobs-missing");
+    let path_c = CString::new(path.to_str().expect("utf8 temp path")).expect("path cstring");
+    let mut jobs: *mut peinit_jobs_t = std::ptr::null_mut();
+    let mut error: *mut peinit_error_t = std::ptr::null_mut();
+
+    unsafe {
+        assert_eq!(
+            peinit_jobs_connect_path(path_c.as_ptr(), &mut jobs, &mut error),
+            PEINIT_ERR_IO,
+        );
+        assert!(jobs.is_null());
+        assert!(!error.is_null());
+        assert_eq!(peinit_jobs_fd(jobs), -1);
+        peinit_error_free(error);
+    }
+}
+
+#[test]
+fn job_submit_validates_its_arguments_before_sending() {
+    let path = temp_socket_path("libpeinit-jobs-args");
+    let Some(listener) = seqpacket_listener_or_skip(&path) else {
+        return;
+    };
+    let path_c = CString::new(path.to_str().expect("utf8 temp path")).expect("path cstring");
+    let mut jobs: *mut peinit_jobs_t = std::ptr::null_mut();
+    let mut response: *mut peinit_response_t = std::ptr::null_mut();
+    let mut error: *mut peinit_error_t = std::ptr::null_mut();
+
+    unsafe {
+        assert_eq!(
+            peinit_jobs_connect_path(path_c.as_ptr(), &mut jobs, &mut error),
+            PEINIT_OK,
+        );
+        assert!(peinit_jobs_fd(jobs) >= 0);
+
+        let not_object = CString::new("[]").expect("cstring");
+        assert_eq!(
+            peinit_job_submit(
+                jobs,
+                not_object.as_ptr(),
+                -1,
+                std::ptr::null(),
+                0,
+                &mut response,
+                &mut error
+            ),
+            PEINIT_ERR_INVALID_ARGUMENT,
+        );
+        peinit_error_free(error);
+
+        let definition = CString::new(r#"{"image_path":"/bin/true"}"#).expect("cstring");
+        let bad_fds = [-1_i32];
+        assert_eq!(
+            peinit_job_submit(
+                jobs,
+                definition.as_ptr(),
+                -1,
+                bad_fds.as_ptr(),
+                bad_fds.len(),
+                &mut response,
+                &mut error
+            ),
+            PEINIT_ERR_INVALID_ARGUMENT,
+        );
+        peinit_error_free(error);
+        assert_eq!(
+            peinit_job_submit(
+                jobs,
+                definition.as_ptr(),
+                -2,
+                std::ptr::null(),
+                0,
+                &mut response,
+                &mut error
+            ),
+            PEINIT_ERR_INVALID_ARGUMENT,
+        );
+        peinit_error_free(error);
+        assert!(response.is_null());
+        peinit_jobs_free(jobs);
+    }
+    drop(listener);
+    let _ = std::fs::remove_file(path);
+}
+
+/// A bound SOCK_SEQPACKET listener, or None where the sandbox forbids one.
+fn seqpacket_listener_or_skip(path: &std::path::Path) -> Option<std::os::fd::OwnedFd> {
+    use std::os::fd::FromRawFd;
+
+    let address = crate::control::socket::address::unix_socket_address(path).ok()?;
+    let fd = unsafe { libc::socket(libc::AF_UNIX, libc::SOCK_SEQPACKET | libc::SOCK_CLOEXEC, 0) };
+    if fd < 0 {
+        return None;
+    }
+    let socket = unsafe { std::os::fd::OwnedFd::from_raw_fd(fd) };
+    let bound = unsafe {
+        libc::bind(
+            fd,
+            (&address.addr as *const libc::sockaddr_un).cast::<libc::sockaddr>(),
+            address.len,
+        )
+    };
+    if bound < 0 {
+        let error = std::io::Error::last_os_error();
+        if error.kind() == ErrorKind::PermissionDenied {
+            return None;
+        }
+        panic!("bind seqpacket listener: {error}");
+    }
+    if unsafe { libc::listen(fd, 1) } < 0 {
+        panic!("listen: {}", std::io::Error::last_os_error());
+    }
+    Some(socket)
+}

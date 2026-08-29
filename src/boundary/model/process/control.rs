@@ -14,6 +14,8 @@ pub enum ProcessSignal {
     Sigkill,
     Sighup,
     Named(String),
+    /// A raw signal number, as a submitter's `signal` command names it.
+    Number(i32),
 }
 
 impl ProcessSignal {
@@ -23,6 +25,7 @@ impl ProcessSignal {
             Self::Sigkill => "SIGKILL",
             Self::Sighup => "SIGHUP",
             Self::Named(name) => name,
+            Self::Number(_) => "signal",
         }
     }
 }
@@ -55,4 +58,30 @@ pub trait ProcessController {
     fn cgroup_populated(&mut self, cgroup_id: &str) -> Result<bool, BoundaryError>;
 
     fn remove_cgroup(&mut self, cgroup_id: &str) -> Result<CgroupRemoveOutcome, BoundaryError>;
+}
+
+impl<T: ProcessController + ?Sized> ProcessController for &mut T {
+    fn pidfd_matches_pid(&mut self, pidfd: i32, pid: u32) -> Result<bool, BoundaryError> {
+        (**self).pidfd_matches_pid(pidfd, pid)
+    }
+
+    fn signal_main(
+        &mut self,
+        target: &ProcessTarget,
+        signal: ProcessSignal,
+    ) -> Result<(), BoundaryError> {
+        (**self).signal_main(target, signal)
+    }
+
+    fn kill_cgroup(&mut self, cgroup_id: &str) -> Result<(), BoundaryError> {
+        (**self).kill_cgroup(cgroup_id)
+    }
+
+    fn cgroup_populated(&mut self, cgroup_id: &str) -> Result<bool, BoundaryError> {
+        (**self).cgroup_populated(cgroup_id)
+    }
+
+    fn remove_cgroup(&mut self, cgroup_id: &str) -> Result<CgroupRemoveOutcome, BoundaryError> {
+        (**self).remove_cgroup(cgroup_id)
+    }
 }

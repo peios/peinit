@@ -1,7 +1,7 @@
 use crate::boundary::ProcessController;
 use crate::execution::notify::{
     AuthenticatedNotifySender, NotifyApplyContext, NotifyApplyError, NotifyApplyRequest,
-    apply_notify_message, authenticate_notify_sender,
+    apply_notify_message, authenticate_notify_sender, service_claims_notify_sender,
 };
 use crate::notify::{NotifyDatagram, parse_notify_message};
 
@@ -12,6 +12,7 @@ use crate::supervisor::dispatch::SupervisorNotifyDispatch;
 use crate::supervisor::health::apply_health_scheduling_after_transitions;
 use crate::supervisor::relationships::apply_relationship_reactions_after_transitions;
 use crate::supervisor::state::{Supervisor, SupervisorError};
+use crate::supervisor::submitted::SupervisorNotifyOutcome;
 use crate::supervisor::watchdog::{
     apply_watchdog_notify_fields, apply_watchdog_scheduling_after_transitions,
 };
@@ -34,7 +35,7 @@ impl Supervisor {
         datagram: NotifyDatagram,
         observed_at_ns: u64,
         controller: &mut P,
-    ) -> Result<SupervisorNotifyDispatch, SupervisorError>
+    ) -> Result<SupervisorNotifyOutcome, SupervisorError>
     where
         P: ProcessController + ?Sized,
     {
@@ -44,6 +45,18 @@ impl Supervisor {
             fds,
         } = datagram;
         let message = parse_notify_message(&payload).map_err(SupervisorError::NotifyParse)?;
+        // A submitted job is authenticated the same way a service's main job
+        // is, less the generation step; it is tried when no service claims
+        // the sender, so a service's job can never be shadowed by one.
+        if !service_claims_notify_sender(&self.services, &self.jobs, credentials.pid)
+            && let Some(job_id) = self
+                .authenticate_submitted_notify_sender(credentials.pid, controller)
+                .map_err(SupervisorError::Notify)?
+        {
+            drop(fds);
+            let dispatch = self.apply_submitted_notify(job_id, &message, observed_at_ns)?;
+            return Ok(SupervisorNotifyOutcome::SubmittedJob(dispatch));
+        }
         let mut work = SupervisorWork::from_supervisor(self);
         let notify = apply_notify_message(
             NotifyApplyContext {
@@ -101,11 +114,13 @@ impl Supervisor {
 
         work.commit(self);
 
-        Ok(SupervisorNotifyDispatch {
-            notify,
-            fd_store_rejections,
-            watchdog_notifications,
-            start_dispatches,
-        })
+        Ok(SupervisorNotifyOutcome::Service(Box::new(
+            SupervisorNotifyDispatch {
+                notify,
+                fd_store_rejections,
+                watchdog_notifications,
+                start_dispatches,
+            },
+        )))
     }
 }

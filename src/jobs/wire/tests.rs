@@ -4,8 +4,8 @@ use super::{
 
 #[test]
 fn submit_keeps_the_object_for_the_definition_parser() {
-    let parsed = parse_jobs_request(br#"{"command":"submit","image_path":"/bin/true"}"#)
-        .expect("parsed");
+    let parsed =
+        parse_jobs_request(br#"{"command":"submit","image_path":"/bin/true"}"#).expect("parsed");
     assert_eq!(parsed.command, JobsCommand::Submit);
     assert_eq!(parsed.job_id, None);
     assert_eq!(

@@ -7,6 +7,8 @@ pub(super) fn origin_for_job(event: &JobEvent) -> String {
         JobType::PostExecHook => hook_origin(service, "ExecStartPost", event.hook_index),
         JobType::ReloadHook => format!("{service}/ExecReload"),
         JobType::HealthCheck => format!("{service}/HealthCheck"),
+        // A submitted job has no service; its origin is the job itself.
+        JobType::Submitted => format!("jobs/{}", event.job_id),
         _ => service.to_string(),
     }
 }

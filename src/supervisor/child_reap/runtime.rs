@@ -21,15 +21,9 @@ impl Supervisor {
         F: ShutdownFinalizer,
     {
         match job_type {
-            JobType::ServiceMain | JobType::Submitted => Ok(SupervisorChildReapDispatch::Runtime(
-                Box::new(self.apply_service_main_reap(
-                    job_id,
-                    status,
-                    ended_at_ns,
-                    controller,
-                    finalizer,
-                )?),
-            )),
+            JobType::ServiceMain => Ok(SupervisorChildReapDispatch::Runtime(Box::new(
+                self.apply_service_main_reap(job_id, status, ended_at_ns, controller, finalizer)?,
+            ))),
             JobType::PreExecHook => Ok(SupervisorChildReapDispatch::PreStartHook(Box::new(
                 match status {
                     ChildExitStatus::Exited { code } => {
@@ -81,6 +75,9 @@ impl Supervisor {
                     )?,
                 },
             ))),
+            JobType::Submitted => Err(SupervisorError::Submitted(
+                crate::submitted::SubmittedJobStoreError::UnknownJob { id: job_id },
+            )),
             JobType::HealthCheck => Ok(SupervisorChildReapDispatch::HealthCheck(Box::new(
                 match status {
                     ChildExitStatus::Exited { code } => self

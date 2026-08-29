@@ -54,6 +54,7 @@ impl Supervisor {
             dispatch: None,
             wait: None,
             access_denials,
+            job_access_denials: Vec::new(),
         })
     }
 

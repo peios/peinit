@@ -30,6 +30,16 @@ impl Supervisor {
                 }),
         );
         deadlines.extend(
+            self.due_submitted_job_deadlines(u64::MAX)
+                .into_iter()
+                .map(|deadline| ShutdownDeadline {
+                    due_at_ns: deadline.due_at_ns,
+                    kind: ShutdownDeadlineKind::SubmittedJob {
+                        job_id: deadline.job_id,
+                    },
+                }),
+        );
+        deadlines.extend(
             shutdown
                 .post_kill_deadlines
                 .iter()
@@ -101,6 +111,7 @@ fn deadline_sort_key(kind: &ShutdownDeadlineKind) -> u8 {
     match kind {
         ShutdownDeadlineKind::StopTimeout { .. } => 0,
         ShutdownDeadlineKind::PostKillTimeout { .. } => 1,
+        ShutdownDeadlineKind::SubmittedJob { .. } => 1,
         ShutdownDeadlineKind::GlobalTimeout => 2,
         ShutdownDeadlineKind::FinalActionRetry => 3,
     }

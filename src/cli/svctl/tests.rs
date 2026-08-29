@@ -240,3 +240,271 @@ fn temp_socket_path(prefix: &str) -> std::path::PathBuf {
         .as_nanos();
     std::env::temp_dir().join(format!("{prefix}-{}-{nanos}.sock", std::process::id()))
 }
+
+#[test]
+fn job_list_sends_filters_and_renders_a_table() {
+    let Some(server) = MockControlServer::start(
+        |request| {
+            assert_eq!(request["command"], "job-list");
+            assert_eq!(request["state"], "running");
+            assert_eq!(request["submitter"], "S-1-5-21-1-2-3-1001");
+            assert!(request.get("identity").is_none());
+        },
+        r#"{"status":"ok","jobs":[{"id":"job-1","type":"submitted","state":"running","submitter":"S-1-5-21-1-2-3-1001","identity":"S-1-5-21-1-2-3-1001","description":"nightly","progress":{"current":3,"total":5,"bounded":true,"unit":"items"}}]}"#,
+    ) else {
+        return;
+    };
+
+    let mut out = Vec::new();
+    let mut err = Vec::new();
+    let code = run_with_io(
+        [
+            OsString::from("svctl"),
+            OsString::from("--socket"),
+            server.path().into_os_string(),
+            OsString::from("job"),
+            OsString::from("list"),
+            OsString::from("--state=running"),
+            OsString::from("--submitter"),
+            OsString::from("S-1-5-21-1-2-3-1001"),
+        ],
+        &mut out,
+        &mut err,
+    );
+
+    assert_eq!(code, 0);
+    let out = String::from_utf8(out).expect("stdout utf8");
+    assert!(out.starts_with("JOB"), "{out}");
+    assert!(out.contains("job-1"));
+    assert!(out.contains("3/5 items"));
+    assert!(out.contains("nightly"));
+    assert!(err.is_empty());
+    server.join();
+}
+
+#[test]
+fn job_status_renders_the_view() {
+    let Some(server) = MockControlServer::start(
+        |request| {
+            assert_eq!(request["command"], "job-status");
+            assert_eq!(request["job_id"], "job-1");
+        },
+        r#"{"status":"ok","job":{"id":"job-1","type":"submitted","state":"failed","cause":"timeout","submitter":"S-1-5-18","identity":"S-1-5-21-1-2-3-1001","logon_session":999,"description":"","image_path":"/usr/bin/backup","pid":null,"ready":null,"exit_code":null,"exit_signal":15,"status_text":"Backing up /data","progress":{"current":7,"total":null,"bounded":true,"unit":null},"created_at":"2026-08-29T10:00:00Z","started_at":"2026-08-29T10:00:01Z","ended_at":"2026-08-29T10:30:01Z"}}"#,
+    ) else {
+        return;
+    };
+
+    let mut out = Vec::new();
+    let mut err = Vec::new();
+    let code = run_with_io(
+        [
+            OsString::from("svctl"),
+            OsString::from("--socket"),
+            server.path().into_os_string(),
+            OsString::from("job"),
+            OsString::from("status"),
+            OsString::from("job-1"),
+        ],
+        &mut out,
+        &mut err,
+    );
+
+    assert_eq!(code, 0);
+    assert_eq!(
+        String::from_utf8(out).expect("stdout utf8"),
+        "job job-1: failed\n\
+         cause: timeout\n\
+         image: /usr/bin/backup\n\
+         submitter: S-1-5-18\n\
+         identity: S-1-5-21-1-2-3-1001\n\
+         logon session: 0x3e7\n\
+         status: Backing up /data\n\
+         progress: 7/?\n\
+         exit signal: 15\n\
+         created: 2026-08-29T10:00:00Z\n\
+         started: 2026-08-29T10:00:01Z\n\
+         ended: 2026-08-29T10:30:01Z\n",
+    );
+    assert!(err.is_empty());
+    server.join();
+}
+
+#[test]
+fn job_stop_defaults_to_waiting() {
+    let Some(server) = MockControlServer::start(
+        |request| {
+            assert_eq!(request["command"], "job-stop");
+            assert_eq!(request["job_id"], "job-1");
+            assert_eq!(request["wait"], true);
+        },
+        r#"{"status":"ok","job":{"id":"job-1","state":"failed","cause":"explicit_stop"}}"#,
+    ) else {
+        return;
+    };
+
+    let mut out = Vec::new();
+    let mut err = Vec::new();
+    let code = run_with_io(
+        [
+            OsString::from("svctl"),
+            OsString::from("--socket"),
+            server.path().into_os_string(),
+            OsString::from("--json"),
+            OsString::from("job"),
+            OsString::from("stop"),
+            OsString::from("job-1"),
+        ],
+        &mut out,
+        &mut err,
+    );
+
+    assert_eq!(code, 0);
+    assert!(
+        String::from_utf8(out)
+            .expect("stdout utf8")
+            .contains("explicit_stop")
+    );
+    assert!(err.is_empty());
+    server.join();
+}
+
+#[test]
+fn job_submit_builds_the_definition_from_its_options() {
+    use super::args::{ParseOutcome, parse};
+    use super::command::Command;
+    use super::execute::submission_definition;
+
+    let parsed = parse([
+        "svctl",
+        "--wait",
+        "job",
+        "submit",
+        "--description=nightly",
+        "--cwd",
+        "/var/backups",
+        "--env",
+        "MODE=full",
+        "--env=LEVEL=3",
+        "--timeout",
+        "3600",
+        "--stop-timeout=30",
+        "--readiness",
+        "notify",
+        "--readiness-timeout=20",
+        "--success-exit-code",
+        "0",
+        "--success-exit-code",
+        "3",
+        "--fd",
+        "control=7",
+        "--output",
+        "--security-descriptor",
+        "O:BAG:BAD:(A;;0x7;;;BA)",
+        "/usr/bin/backup",
+        "--full",
+        "--target=/mnt",
+    ])
+    .expect("parse");
+    let ParseOutcome::Run(invocation) = parsed else {
+        panic!("expected run");
+    };
+    let Command::JobSubmit { submission, wait } = invocation.command else {
+        panic!("expected job submit, got {:?}", invocation.command);
+    };
+    assert!(wait);
+    assert_eq!(submission.descriptors, vec![("control".to_string(), 7)]);
+    assert!(submission.output);
+    let definition = submission_definition(&submission);
+    assert_eq!(
+        definition,
+        serde_json::json!({
+            "image_path": "/usr/bin/backup",
+            "arguments": ["--full", "--target=/mnt"],
+            "environment": {"MODE": "full", "LEVEL": "3"},
+            "working_directory": "/var/backups",
+            "description": "nightly",
+            "timeout": 3600,
+            "stop_timeout": 30,
+            "readiness": "notify",
+            "readiness_timeout": 20,
+            "success_exit_codes": [0, 3],
+            "descriptors": ["control"],
+            "output": true,
+            "security_descriptor": "O:BAG:BAD:(A;;0x7;;;BA)",
+        })
+    );
+}
+
+#[test]
+fn job_submit_rejects_a_relative_image_and_a_bad_fd() {
+    use super::args::parse;
+
+    let error = parse(["svctl", "job", "submit", "backup"]).expect_err("relative image");
+    assert!(error.message.contains("absolute"));
+    let error = parse([
+        "svctl",
+        "job",
+        "submit",
+        "--fd",
+        "control",
+        "/usr/bin/backup",
+    ])
+    .expect_err("fd");
+    assert!(error.message.contains("NAME=FD"));
+    let error = parse(["svctl", "job", "submit"]).expect_err("no image");
+    assert!(error.message.contains("image path"));
+}
+
+#[test]
+fn job_wait_and_signal_parse_their_arguments() {
+    use super::args::{ParseOutcome, parse};
+    use super::command::Command;
+
+    let ParseOutcome::Run(invocation) =
+        parse(["svctl", "job", "wait", "--for", "ready", "job-1"]).expect("parse")
+    else {
+        panic!("expected run");
+    };
+    assert_eq!(
+        invocation.command,
+        Command::JobWait {
+            job_id: "job-1".to_string(),
+            for_ready: true,
+        }
+    );
+    let ParseOutcome::Run(invocation) =
+        parse(["svctl", "job", "signal", "job-1", "SIGUSR1"]).expect("parse")
+    else {
+        panic!("expected run");
+    };
+    assert_eq!(
+        invocation.command,
+        Command::JobSignal {
+            job_id: "job-1".to_string(),
+            signal: libc::SIGUSR1,
+        }
+    );
+    let error = parse(["svctl", "--wait", "job", "wait", "job-1"]).expect_err("usage");
+    assert!(error.message.contains("not valid for job wait"));
+    let error = parse(["svctl", "job", "signal", "job-1", "0"]).expect_err("usage");
+    assert!(error.message.contains("signal number or name"));
+}
+
+#[test]
+fn jobs_socket_path_is_a_separate_global() {
+    use super::args::{ParseOutcome, parse};
+
+    let ParseOutcome::Run(invocation) =
+        parse(["svctl", "--jobs-socket=/tmp/j.sock", "job", "wait", "job-1"]).expect("parse")
+    else {
+        panic!("expected run");
+    };
+    assert_eq!(
+        invocation.jobs_socket_path,
+        std::path::PathBuf::from("/tmp/j.sock")
+    );
+    assert_eq!(
+        invocation.socket_path,
+        std::path::PathBuf::from(crate::control::socket::CONTROL_SOCKET_PATH)
+    );
+}

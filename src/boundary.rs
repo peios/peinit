@@ -48,9 +48,9 @@ pub use linux_epoll::{
 #[cfg(feature = "peios-boundary")]
 pub(crate) use linux_io::{read_fd_to_string, set_cloexec, write_all_fd};
 #[cfg(feature = "peios-boundary")]
-pub use linux_kmes::LinuxKmesEventSink;
-#[cfg(feature = "peios-boundary")]
 pub use linux_jobs::LinuxJobIdentityProvider;
+#[cfg(feature = "peios-boundary")]
+pub use linux_kmes::LinuxKmesEventSink;
 #[cfg(feature = "peios-boundary")]
 pub use linux_launch::{LinuxProcessLauncher, LinuxSystemTokenProvider};
 pub use linux_machine_id::{

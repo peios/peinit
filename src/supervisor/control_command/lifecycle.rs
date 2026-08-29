@@ -1,5 +1,5 @@
 use crate::boundary::{Clock, ProcessController, RealtimeClock};
-use crate::control::connection::ControlOperationWait;
+use crate::control::connection::{ControlOperationWait, ControlPendingWait};
 use crate::control::lifecycle::{LifecycleCommand, LifecycleCommandOutcome};
 use crate::control::service_security::ServiceAccessChecker;
 use crate::control::system::ControlPeer;
@@ -64,6 +64,7 @@ impl Supervisor {
                 ))),
                 wait: None,
                 access_denials: Vec::new(),
+                job_access_denials: Vec::new(),
             });
         }
 
@@ -75,11 +76,12 @@ impl Supervisor {
                 dispatch: Some(Box::new(SupervisorControlCommandDispatch::Lifecycle(
                     Box::new(dispatch),
                 ))),
-                wait: Some(ControlOperationWait {
+                wait: Some(ControlPendingWait::Operation(ControlOperationWait {
                     operation_id,
                     service: service.to_string(),
-                }),
+                })),
                 access_denials: Vec::new(),
+                job_access_denials: Vec::new(),
             });
         }
 
@@ -103,6 +105,7 @@ impl Supervisor {
             ))),
             wait: None,
             access_denials: Vec::new(),
+            job_access_denials: Vec::new(),
         })
     }
 

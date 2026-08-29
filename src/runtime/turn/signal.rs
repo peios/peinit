@@ -28,7 +28,11 @@ where
     C: Clock + RealtimeClock + ?Sized,
     P: ProcessController + ?Sized,
     F: ShutdownFinalizer,
-    A: SystemAccessChecker + ServiceAccessChecker + ?Sized,
+    A: SystemAccessChecker
+        + ServiceAccessChecker
+        + crate::submitted::JobAccessChecker
+        + crate::submitted::JobDescriptorFactory
+        + ?Sized,
     R: RuntimeEventRegistrar + ?Sized,
 {
     let read = signal_source

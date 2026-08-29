@@ -59,6 +59,7 @@ fn a_reset_that_leaves_the_abandoned_cgroup_leaked_warns_on_the_console() {
                         )),
                         wait: None,
                         access_denials: Vec::new(),
+                        job_access_denials: Vec::new(),
                         remaining_bytes: 0,
                     },
                     pending_write_bytes: 0,
@@ -169,6 +170,7 @@ fn service_log_pipe_turn_does_not_echo_output_to_console() {
             closed: false,
             would_block: false,
             buffered_records: 0,
+            output_dropped: None,
         },
     };
 
@@ -244,6 +246,7 @@ fn shutdown_signal_emits_shutdown_progress() {
             SupervisorShutdownSignalDispatch {
                 signal: crate::shutdown::ShutdownSignal::Sigterm,
                 action: SupervisorShutdownSignalAction::Graceful(SupervisorShutdownDispatch {
+                    submitted_stops: Vec::new(),
                     runtime: shutdown_runtime(ShutdownKind::Poweroff),
                     completed_transitions: Vec::new(),
                     killed_starting: Vec::new(),

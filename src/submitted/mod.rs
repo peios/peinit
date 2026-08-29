@@ -38,4 +38,6 @@ pub use store::{
     SubmittedJobDeadline, SubmittedJobDeadlineKind, SubmittedJobListFilter, SubmittedJobStore,
     SubmittedJobStoreError,
 };
-pub use view::{JobView, JobViewState, job_view, job_view_json};
+pub use view::{
+    JobView, JobViewState, job_state_wire, job_view, job_view_json, parse_job_state_wire,
+};

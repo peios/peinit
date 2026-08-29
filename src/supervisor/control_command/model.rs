@@ -1,5 +1,5 @@
 use crate::boundary::{Clock, ProcessController, RealtimeClock, RegistryClient};
-use crate::control::connection::ControlOperationWait;
+use crate::control::connection::ControlPendingWait;
 use crate::control::reload_config::ReloadConfigOutcome;
 use crate::control::service_security::ServiceAccessChecker;
 use crate::control::service_security::ServiceAccessDenied;
@@ -12,7 +12,7 @@ pub struct SupervisorControlCommandBodyContext<'a, 'r, C, P, A>
 where
     C: Clock + RealtimeClock + ?Sized,
     P: ProcessController + ?Sized,
-    A: SystemAccessChecker + ServiceAccessChecker + ?Sized,
+    A: SystemAccessChecker + ServiceAccessChecker + crate::submitted::JobAccessChecker + ?Sized,
 {
     pub peer: &'a ControlPeer,
     pub control_security: &'a ControlSecurityDescriptor,
@@ -27,8 +27,9 @@ pub enum SupervisorControlCommandBodyResponse {
     Accepted {
         response_line: Option<Vec<u8>>,
         dispatch: Option<Box<SupervisorControlCommandDispatch>>,
-        wait: Option<ControlOperationWait>,
+        wait: Option<ControlPendingWait>,
         access_denials: Vec<ServiceAccessDenied>,
+        job_access_denials: Vec<crate::submitted::JobAccessDenied>,
     },
     Rejected {
         response_line: Vec<u8>,
@@ -37,12 +38,13 @@ pub enum SupervisorControlCommandBodyResponse {
 }
 
 impl SupervisorControlCommandBodyResponse {
-    pub(super) fn accepted_response(response_line: Vec<u8>) -> Self {
+    pub(in crate::supervisor) fn accepted_response(response_line: Vec<u8>) -> Self {
         Self::Accepted {
             response_line: Some(response_line),
             dispatch: None,
             wait: None,
             access_denials: Vec::new(),
+            job_access_denials: Vec::new(),
         }
     }
 }
@@ -52,4 +54,5 @@ pub enum SupervisorControlCommandDispatch {
     Shutdown(Box<SupervisorSystemShutdownDispatch>),
     Lifecycle(Box<SupervisorLifecycleDispatch>),
     ReloadConfig(Box<ReloadConfigOutcome>),
+    Job(Box<crate::supervisor::dispatch::SupervisorJobsCommandDispatch>),
 }

@@ -16,4 +16,5 @@ pub enum RuntimeShutdownEventTurnError {
     DeadlineRead(LinuxTimerFdReadError),
     EventRegistration(RuntimeEventRegistrationError),
     Supervisor(SupervisorError),
+    Jobs(crate::runtime::RuntimeJobsChannelError),
 }

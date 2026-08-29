@@ -175,6 +175,14 @@ impl Supervisor {
                 };
                 dispatch.boot_successes.push(boot_success);
             }
+            SupervisorLifecycleDeadlineKind::SubmittedJob { job_id, kind } => {
+                let Some(dispatched) =
+                    self.process_due_submitted_job_deadline(job_id, kind, controller, now_ns)?
+                else {
+                    return Ok(false);
+                };
+                dispatch.submitted_jobs.push(dispatched);
+            }
             SupervisorLifecycleDeadlineKind::BootSettle => {
                 let Some(due) = self.boot_settle.take_due(&self.services, now_ns) else {
                     return Ok(false);

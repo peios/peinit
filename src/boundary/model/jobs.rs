@@ -47,3 +47,12 @@ pub trait JobIdentityProvider {
         source: JobIdentitySource,
     ) -> Result<PreparedJobIdentity, JobIdentityError>;
 }
+
+impl<T: JobIdentityProvider + ?Sized> JobIdentityProvider for &mut T {
+    fn prepare_job_identity(
+        &mut self,
+        source: JobIdentitySource,
+    ) -> Result<PreparedJobIdentity, JobIdentityError> {
+        (**self).prepare_job_identity(source)
+    }
+}

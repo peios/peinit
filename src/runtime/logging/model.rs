@@ -8,6 +8,9 @@ pub enum RuntimeLogPipeTurn {
         closed: bool,
         would_block: bool,
         buffered_records: usize,
+        /// A submitted job's output sink dropped its first line on this
+        /// read; reported once per job (PSPU §7.9).
+        output_dropped: Option<crate::ids::JobId>,
     },
     Stale {
         fd: i32,

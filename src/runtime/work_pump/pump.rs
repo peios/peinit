@@ -4,7 +4,7 @@ use crate::boundary::{
 use crate::supervisor::{
     Supervisor, SupervisorControlLaunchResult, SupervisorError, SupervisorHealthCheckLaunchResult,
     SupervisorPostStartHookLaunchResult, SupervisorServiceLaunchDispatch,
-    SupervisorStartHookLaunchResult,
+    SupervisorStartHookLaunchResult, SupervisorSubmittedLaunchResult,
 };
 
 use super::model::{
@@ -45,6 +45,7 @@ where
         pending_control_launches: supervisor.pending_control_launch_jobs().len(),
         pending_health_check_launches: supervisor.pending_health_check_launch_jobs().len(),
         pending_service_launches: supervisor.pending_launch_jobs().len(),
+        pending_submitted_launches: supervisor.pending_submitted_launch_jobs().len(),
     })
 }
 
@@ -184,12 +185,32 @@ where
         }
         None => (None, None, None),
     };
+    let submitted_launch = supervisor
+        .launch_next_pending_submitted_job(
+            context.token_provider,
+            context.process_launcher,
+            context.clock,
+            context.controller,
+        )
+        .map_err(RuntimeWorkPumpError::Supervisor)?;
+    let (submitted_launch, submitted_launch_failure, submitted_pending_setup) =
+        match submitted_launch {
+            Some(SupervisorSubmittedLaunchResult::Launched(dispatch)) => {
+                (Some(dispatch), None, None)
+            }
+            Some(SupervisorSubmittedLaunchResult::Failed(dispatch)) => (None, Some(dispatch), None),
+            Some(SupervisorSubmittedLaunchResult::PendingSetup(dispatch)) => {
+                (None, None, Some(dispatch))
+            }
+            None => (None, None, None),
+        };
     let pending_process_setups = [
         start_hook_pending_setup,
         post_hook_pending_setup,
         control_pending_setup,
         health_check_pending_setup,
         service_pending_setup,
+        submitted_pending_setup,
     ]
     .into_iter()
     .flatten()
@@ -209,6 +230,8 @@ where
         health_check_launch_cancellation,
         service_launch,
         service_launch_failure,
+        submitted_launch,
+        submitted_launch_failure,
         stale_control_operations,
     })
 }
@@ -221,4 +244,5 @@ fn has_pending_runtime_work(supervisor: &Supervisor) -> bool {
         || !supervisor.pending_control_launch_jobs().is_empty()
         || !supervisor.pending_health_check_launch_jobs().is_empty()
         || !supervisor.pending_launch_jobs().is_empty()
+        || !supervisor.pending_submitted_launch_jobs().is_empty()
 }

@@ -93,3 +93,28 @@ pub trait JobAccessChecker {
         request: JobAccessCheckRequest<'_>,
     ) -> Result<JobAccessDecision, JobAccessCheckError>;
 }
+
+impl<T: JobDescriptorFactory + ?Sized> JobDescriptorFactory for &mut T {
+    fn default_job_descriptor(
+        &mut self,
+        submitter_sid: &str,
+    ) -> Result<JobSecurityDescriptor, JobDescriptorError> {
+        (**self).default_job_descriptor(submitter_sid)
+    }
+
+    fn job_descriptor_from_sddl(
+        &mut self,
+        sddl: &str,
+    ) -> Result<JobSecurityDescriptor, JobDescriptorError> {
+        (**self).job_descriptor_from_sddl(sddl)
+    }
+}
+
+impl<T: JobAccessChecker + ?Sized> JobAccessChecker for &mut T {
+    fn check_job_access(
+        &mut self,
+        request: JobAccessCheckRequest<'_>,
+    ) -> Result<JobAccessDecision, JobAccessCheckError> {
+        (**self).check_job_access(request)
+    }
+}

@@ -98,10 +98,23 @@ pub(crate) fn collect_runtime_shutdown_turn_kmes_events(
         RuntimeShutdownEventTurn::PowerButton { turn, .. } => {
             collect_power_button_turn(turn, out)?;
         }
+        RuntimeShutdownEventTurn::ServiceLogPipe { pipe } => {
+            if let crate::runtime::RuntimeLogPipeTurn::Read {
+                output_dropped: Some(job_id),
+                ..
+            } = pipe
+            {
+                super::submitted::collect_output_dropped(*job_id, out)?;
+            }
+        }
+        RuntimeShutdownEventTurn::JobsConnection { turn, .. } => {
+            super::submitted::collect_jobs_connection_turn(turn, out)?;
+        }
         RuntimeShutdownEventTurn::ControlListener { .. }
         | RuntimeShutdownEventTurn::IdleControlConnectionsClosed { .. }
         | RuntimeShutdownEventTurn::StaleControlConnection { .. }
-        | RuntimeShutdownEventTurn::ServiceLogPipe { .. }
+        | RuntimeShutdownEventTurn::JobsListener { .. }
+        | RuntimeShutdownEventTurn::IdleJobsConnectionsClosed { .. }
         | RuntimeShutdownEventTurn::RegistryWatch { .. } => {}
     }
     Ok(())
@@ -152,6 +165,12 @@ fn collect_process_setup_turn(
         crate::supervisor::SupervisorProcessSetupDispatch::HealthCheckFailed(dispatch) => {
             collect_health_check_launch_failure(dispatch, out)
         }
+        crate::supervisor::SupervisorProcessSetupDispatch::SubmittedLaunched(dispatch) => {
+            super::submitted::collect_submitted_launch(dispatch, out)
+        }
+        crate::supervisor::SupervisorProcessSetupDispatch::SubmittedFailed(dispatch) => {
+            super::submitted::collect_submitted_launch_failure(dispatch, out)
+        }
         crate::supervisor::SupervisorProcessSetupDispatch::ControlTimeout(_)
         | crate::supervisor::SupervisorProcessSetupDispatch::Pending(_)
         | crate::supervisor::SupervisorProcessSetupDispatch::Stale { .. } => Ok(()),
@@ -194,6 +213,9 @@ fn collect_notify_supervisor_turn(
 ) -> Result<(), BoundaryError> {
     match turn {
         RuntimeNotifySupervisorTurn::Applied(dispatch) => collect_notify_dispatch(dispatch, out),
+        RuntimeNotifySupervisorTurn::AppliedToJob(dispatch) => {
+            super::submitted::collect_submitted_notify(dispatch, out)
+        }
         RuntimeNotifySupervisorTurn::Rejected(rejection) => {
             let sender_pid = notify_sender_pid(read);
             let attribution = notify_rejection_attribution(rejection);

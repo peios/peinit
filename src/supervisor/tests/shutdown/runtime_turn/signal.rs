@@ -39,6 +39,7 @@ fn runtime_pid1_signal_event_enters_shutdown_and_arms_deadline_timer() {
     let mut registrar = FakeRegistrar::default();
     let mut boot_attempt_counter = FakeBootAttemptCounter::default();
 
+    let mut jobs_channel = crate::runtime::NoJobsChannel;
     let turn = process_runtime_shutdown_event(
         &mut supervisor,
         RuntimeEventSource::Pid1Signal,
@@ -53,6 +54,7 @@ fn runtime_pid1_signal_event_enters_shutdown_and_arms_deadline_timer() {
             power_button_source: &mut power_button,
             filesystem_check_reader: &mut filesystem_check_reader,
             log_pipes: &mut log_pipes,
+            jobs_channel: &mut jobs_channel,
         },
         context(
             &mut clock,
@@ -120,6 +122,7 @@ fn runtime_sigchld_event_reaps_tracked_and_untracked_children() {
     let mut registrar = FakeRegistrar::default();
     let mut boot_attempt_counter = FakeBootAttemptCounter::default();
 
+    let mut jobs_channel = crate::runtime::NoJobsChannel;
     let turn = process_runtime_shutdown_event(
         &mut supervisor,
         RuntimeEventSource::Pid1Signal,
@@ -134,6 +137,7 @@ fn runtime_sigchld_event_reaps_tracked_and_untracked_children() {
             power_button_source: &mut power_button,
             filesystem_check_reader: &mut filesystem_check_reader,
             log_pipes: &mut log_pipes,
+            jobs_channel: &mut jobs_channel,
         },
         context(
             &mut clock,
@@ -217,6 +221,7 @@ fn runtime_sigchld_event_advances_shutdown_waves_and_resyncs_deadline_timer() {
         .expect("begin shutdown");
     controller.signals.clear();
 
+    let mut jobs_channel = crate::runtime::NoJobsChannel;
     let turn = process_runtime_shutdown_event(
         &mut supervisor,
         RuntimeEventSource::Pid1Signal,
@@ -231,6 +236,7 @@ fn runtime_sigchld_event_advances_shutdown_waves_and_resyncs_deadline_timer() {
             power_button_source: &mut power_button,
             filesystem_check_reader: &mut filesystem_check_reader,
             log_pipes: &mut log_pipes,
+            jobs_channel: &mut jobs_channel,
         },
         context(
             &mut clock,
@@ -338,6 +344,7 @@ fn runtime_sigchld_event_finalizes_shutdown_when_last_service_exits() {
         .expect("complete draining");
     controller.signals.clear();
 
+    let mut jobs_channel = crate::runtime::NoJobsChannel;
     let turn = process_runtime_shutdown_event(
         &mut supervisor,
         RuntimeEventSource::Pid1Signal,
@@ -352,6 +359,7 @@ fn runtime_sigchld_event_finalizes_shutdown_when_last_service_exits() {
             power_button_source: &mut power_button,
             filesystem_check_reader: &mut filesystem_check_reader,
             log_pipes: &mut log_pipes,
+            jobs_channel: &mut jobs_channel,
         },
         context(
             &mut clock,

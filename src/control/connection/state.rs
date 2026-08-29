@@ -7,12 +7,29 @@ pub struct ControlOperationWait {
     pub service: String,
 }
 
+/// What a control connection is blocked on: an operation's outcome, or a
+/// submitted job's end (`job-stop` with `wait`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ControlPendingWait {
+    Operation(ControlOperationWait),
+    Job { job_id: crate::ids::JobId },
+}
+
+impl ControlPendingWait {
+    pub fn operation(&self) -> Option<&ControlOperationWait> {
+        match self {
+            Self::Operation(wait) => Some(wait),
+            Self::Job { .. } => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ControlConnectionState {
     read_buffer: ControlConnectionBuffer,
     write_buffer: ControlWriteBuffer,
     close_after_write: bool,
-    pending_wait: Option<ControlOperationWait>,
+    pending_wait: Option<ControlPendingWait>,
     last_activity_ns: Option<u64>,
 }
 
@@ -54,15 +71,15 @@ impl ControlConnectionState {
         self.close_after_write = true;
     }
 
-    pub fn pending_wait(&self) -> Option<&ControlOperationWait> {
+    pub fn pending_wait(&self) -> Option<&ControlPendingWait> {
         self.pending_wait.as_ref()
     }
 
-    pub fn set_pending_wait(&mut self, wait: ControlOperationWait) {
+    pub fn set_pending_wait(&mut self, wait: ControlPendingWait) {
         self.pending_wait = Some(wait);
     }
 
-    pub fn clear_pending_wait(&mut self) -> Option<ControlOperationWait> {
+    pub fn clear_pending_wait(&mut self) -> Option<ControlPendingWait> {
         self.pending_wait.take()
     }
 

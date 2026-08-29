@@ -84,6 +84,10 @@ where
         .read_control_socket_limits()
         .map_err(Phase2RecoveryReason::RegistryRead)
         .map_err(Phase2BootRunError::RecoveryRequired)?;
+    let jobs_limits = registry
+        .read_jobs_socket_limits()
+        .map_err(Phase2RecoveryReason::RegistryRead)
+        .map_err(Phase2BootRunError::RecoveryRequired)?;
     let (log_config, log_config_warnings) = read_effective_log_config(registry)?;
     let global_environment = registry
         .read_global_environment()
@@ -132,6 +136,7 @@ where
         shutdown_settings,
         control_security,
         control_limits,
+        jobs_limits,
         log_config,
         service_table,
         global_environment,

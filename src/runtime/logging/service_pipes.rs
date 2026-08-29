@@ -1,8 +1,22 @@
 use std::collections::BTreeMap;
+use std::os::fd::OwnedFd;
 
+use crate::ids::JobId;
 use crate::logging::{PreEventdLogBuffer, RuntimeLogConfig, ServiceLogRecord};
 
 use super::pipe::ServiceLogPipe;
+
+/// A submitter's output sink (PSPU §7.9): every line the job's pipes yield
+/// is written here too, best-effort, until the last pipe closes.
+#[derive(Debug)]
+pub(in crate::runtime::logging) struct OutputSink {
+    pub fd: OwnedFd,
+    /// Pipes still open for the job; the sink closes with the last one.
+    pub open_pipes: usize,
+    pub dropped: u64,
+    /// Whether the first drop has been reported on the event stream.
+    pub drop_reported: bool,
+}
 
 mod read;
 mod registration;
@@ -13,6 +27,7 @@ pub struct RuntimeServiceLogPipes {
     pub(in crate::runtime::logging) pipes: BTreeMap<i32, ServiceLogPipe>,
     pub(in crate::runtime::logging) pre_eventd: PreEventdLogBuffer,
     pub(in crate::runtime::logging) eventd_socket_path: Option<String>,
+    pub(in crate::runtime::logging) sinks: BTreeMap<JobId, OutputSink>,
 }
 
 impl RuntimeServiceLogPipes {
@@ -22,7 +37,12 @@ impl RuntimeServiceLogPipes {
             eventd_socket_path: None,
             config,
             pipes: BTreeMap::new(),
+            sinks: BTreeMap::new(),
         }
+    }
+
+    pub fn active_sink_count(&self) -> usize {
+        self.sinks.len()
     }
 
     pub fn buffered_records(&self) -> Vec<ServiceLogRecord> {

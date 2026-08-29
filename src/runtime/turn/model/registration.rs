@@ -47,3 +47,17 @@ pub enum RuntimeEventRegistrationError {
         message: String,
     },
 }
+
+impl<T: RuntimeEventRegistrar + ?Sized> RuntimeEventRegistrar for &mut T {
+    fn register_source(
+        &mut self,
+        fd: i32,
+        source: RuntimeEventSource,
+    ) -> Result<(), RuntimeEventRegistrationError> {
+        (**self).register_source(fd, source)
+    }
+
+    fn unregister_source(&mut self, fd: i32) -> Result<(), RuntimeEventRegistrationError> {
+        (**self).unregister_source(fd)
+    }
+}

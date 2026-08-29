@@ -92,6 +92,28 @@ pub fn launch_created_post_exec_hook_job_with_environment(
     )
 }
 
+/// Launch a submitted job: its prepared primary token, its attached
+/// descriptors injected from 3 upward, and the global environment layer
+/// beneath its own (PSPU §7.6).
+pub fn launch_created_submitted_job(
+    jobs: &mut JobStore,
+    token_provider: &mut (impl TokenProvider + ?Sized),
+    process_launcher: &mut (impl ProcessLauncher + ?Sized),
+    request: LaunchCreatedJobRequest,
+    global_environment: &[ServiceEnvironmentVariable],
+    inherited_fds: Vec<crate::boundary::ProcessInheritedFd>,
+) -> Result<LaunchCreatedJobResult, LaunchCreatedJobError> {
+    launch_created_job_result(
+        jobs,
+        token_provider,
+        process_launcher,
+        request,
+        LaunchTarget::Submitted,
+        global_environment,
+        inherited_fds,
+    )
+}
+
 pub fn launch_created_health_check_job_with_environment(
     jobs: &mut JobStore,
     token_provider: &mut (impl TokenProvider + ?Sized),

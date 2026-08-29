@@ -1,3 +1,5 @@
+use std::os::fd::FromRawFd;
+
 use crate::execution::launch::LaunchCreatedJobDispatch;
 use crate::job::JobEvent;
 use crate::logging::LogStream;
@@ -34,7 +36,44 @@ impl RuntimeServiceLogPipes {
         for dispatch in &turn.service_launches {
             self.register_launch(&dispatch.launch, registrar, &mut registrations)?;
         }
+        for dispatch in &turn.submitted_launches {
+            self.register_submitted_launch(dispatch, registrar, &mut registrations)?;
+        }
         Ok(registrations)
+    }
+
+    /// A submitted job's pipes, plus its output sink when the submitter
+    /// attached one. The sink is adopted here and closed when the pipes go.
+    pub fn register_submitted_launch<R>(
+        &mut self,
+        dispatch: &crate::supervisor::SupervisorSubmittedLaunchDispatch,
+        registrar: &mut R,
+        registrations: &mut Vec<RuntimeEventSource>,
+    ) -> Result<(), RuntimeEventRegistrationError>
+    where
+        R: RuntimeEventRegistrar + ?Sized,
+    {
+        let before = registrations.len();
+        self.register_launch(&dispatch.launch, registrar, registrations)?;
+        let open_pipes = registrations.len() - before;
+        if let Some(fd) = dispatch.output_sink_fd {
+            let fd = unsafe { std::os::fd::OwnedFd::from_raw_fd(fd) };
+            if open_pipes == 0 || set_nonblocking(&fd).is_err() {
+                // Nothing will ever be written: close it now rather than hold
+                // a descriptor nobody feeds.
+                return Ok(());
+            }
+            self.sinks.insert(
+                dispatch.launch.job_id,
+                super::OutputSink {
+                    fd,
+                    open_pipes,
+                    dropped: 0,
+                    drop_reported: false,
+                },
+            );
+        }
+        Ok(())
     }
 
     pub fn register_retained_launches<R>(
@@ -123,4 +162,17 @@ impl RuntimeServiceLogPipes {
         self.pipes.insert(fd, pipe);
         Ok(())
     }
+}
+
+fn set_nonblocking(fd: &std::os::fd::OwnedFd) -> std::io::Result<()> {
+    use std::os::fd::AsRawFd;
+
+    let flags = unsafe { libc::fcntl(fd.as_raw_fd(), libc::F_GETFL) };
+    if flags < 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    if unsafe { libc::fcntl(fd.as_raw_fd(), libc::F_SETFL, flags | libc::O_NONBLOCK) } < 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    Ok(())
 }

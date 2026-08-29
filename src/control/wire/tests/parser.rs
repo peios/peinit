@@ -8,6 +8,8 @@ fn parses_shutdown_request_with_required_type() {
     assert_eq!(
         request,
         ParsedControlRequest {
+            job_id: None,
+            job_filter: None,
             command: ControlCommand::Shutdown,
             service: None,
             wait: false,

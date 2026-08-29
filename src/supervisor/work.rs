@@ -15,10 +15,12 @@ use crate::execution::start::{StartExecutionJobKind, StartExecutionStore};
 use crate::fd_store::FdStoreTable;
 use crate::ids::{JobId, JobIdAllocator, OperationIdAllocator};
 use crate::job::JobStore;
+use crate::jobs::socket::JobsSocketLimits;
 use crate::logging::RuntimeLogConfig;
 use crate::operation::store::OperationStore;
 use crate::service::{ServiceEnvironmentVariable, ServiceTable};
 use crate::shutdown::{ShutdownError, ShutdownRuntime, ShutdownSignalTracker};
+use crate::submitted::SubmittedJobStore;
 
 use super::boot_settle::BootSettleTracker;
 use super::boot_success::BootSuccessTracker;
@@ -42,6 +44,7 @@ pub(super) struct SupervisorWork {
     pub watchdog: WatchdogStore,
     pub control_security: ControlSecurityDescriptor,
     pub control_limits: ControlSocketLimits,
+    pub jobs_limits: JobsSocketLimits,
     pub log_config: RuntimeLogConfig,
     pub fd_store: FdStoreTable,
     pub relationships: RelationshipStore,
@@ -54,6 +57,8 @@ pub(super) struct SupervisorWork {
     pub pending_post_hook_launches: VecDeque<JobId>,
     pub pending_control_launches: VecDeque<JobId>,
     pub pending_health_launches: VecDeque<JobId>,
+    pub submitted: SubmittedJobStore,
+    pub pending_submitted_launches: VecDeque<JobId>,
     pub pending_process_setups: BTreeMap<i32, PendingLaunchSetup>,
     pub pending_control_operations: VecDeque<PendingControlOperation>,
     pub retained_service_launches: Vec<LaunchCreatedJobDispatch>,
@@ -77,6 +82,7 @@ impl SupervisorWork {
             watchdog: supervisor.watchdog.clone(),
             control_security: supervisor.control_security.clone(),
             control_limits: supervisor.control_limits,
+            jobs_limits: supervisor.jobs_limits,
             log_config: supervisor.log_config.clone(),
             fd_store: supervisor.fd_store.clone(),
             relationships: supervisor.relationships.clone(),
@@ -89,6 +95,8 @@ impl SupervisorWork {
             pending_post_hook_launches: supervisor.pending_post_hook_launches.clone(),
             pending_control_launches: supervisor.pending_control_launches.clone(),
             pending_health_launches: supervisor.pending_health_launches.clone(),
+            submitted: supervisor.submitted.clone(),
+            pending_submitted_launches: supervisor.pending_submitted_launches.clone(),
             pending_process_setups: supervisor.pending_process_setups.clone(),
             pending_control_operations: supervisor.pending_control_operations.clone(),
             retained_service_launches: supervisor.retained_service_launches.clone(),
@@ -113,6 +121,7 @@ impl SupervisorWork {
         supervisor.watchdog = self.watchdog;
         supervisor.control_security = self.control_security;
         supervisor.control_limits = self.control_limits;
+        supervisor.jobs_limits = self.jobs_limits;
         supervisor.log_config = self.log_config;
         supervisor.fd_store = fd_store;
         supervisor.relationships = self.relationships;
@@ -125,6 +134,8 @@ impl SupervisorWork {
         supervisor.pending_post_hook_launches = self.pending_post_hook_launches;
         supervisor.pending_control_launches = self.pending_control_launches;
         supervisor.pending_health_launches = self.pending_health_launches;
+        supervisor.submitted = self.submitted;
+        supervisor.pending_submitted_launches = self.pending_submitted_launches;
         supervisor.pending_process_setups = self.pending_process_setups;
         supervisor.pending_control_operations = self.pending_control_operations;
         supervisor.retained_service_launches = self.retained_service_launches;

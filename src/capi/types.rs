@@ -3,6 +3,7 @@
 use libc::{c_char, c_int, c_void};
 
 pub type peinit_client_t = c_void;
+pub type peinit_jobs_t = c_void;
 pub type peinit_response_t = c_void;
 pub type peinit_error_t = c_void;
 

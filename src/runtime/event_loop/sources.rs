@@ -35,7 +35,11 @@ where
     C: Clock + RealtimeClock + ?Sized,
     P: ProcessController + ?Sized,
     F: ShutdownFinalizer,
-    A: SystemAccessChecker + ServiceAccessChecker + ?Sized,
+    A: SystemAccessChecker
+        + ServiceAccessChecker
+        + crate::submitted::JobAccessChecker
+        + crate::submitted::JobDescriptorFactory
+        + ?Sized,
     R: RuntimeEventRegistrar + ?Sized,
     T: TokenProvider + ?Sized,
     K: ProcessLauncher,
@@ -87,7 +91,11 @@ where
     C: Clock + RealtimeClock + ?Sized,
     P: ProcessController + ?Sized,
     F: ShutdownFinalizer,
-    A: SystemAccessChecker + ServiceAccessChecker + ?Sized,
+    A: SystemAccessChecker
+        + ServiceAccessChecker
+        + crate::submitted::JobAccessChecker
+        + crate::submitted::JobDescriptorFactory
+        + ?Sized,
     R: RuntimeEventRegistrar + ?Sized,
     T: TokenProvider + ?Sized,
     K: ProcessLauncher,
@@ -135,17 +143,29 @@ where
         .map_err(RuntimeShutdownLoopError::EventRegistration)?;
     register_process_setup_sources(&post_work, context.registrar)
         .map_err(RuntimeShutdownLoopError::EventRegistration)?;
-    let wait_flush_observed_at_ns = if event_sources.control_connections.has_pending_waits() {
-        context
-            .clock
-            .monotonic_ns()
-            .map_err(RuntimeShutdownLoopError::Clock)?
-    } else {
-        0
-    };
+    let (wait_flush_observed_at_ns, wait_flush_realtime_ns) =
+        if event_sources.control_connections.has_pending_waits() {
+            (
+                context
+                    .clock
+                    .monotonic_ns()
+                    .map_err(RuntimeShutdownLoopError::Clock)?,
+                context
+                    .clock
+                    .realtime_ns()
+                    .map_err(RuntimeShutdownLoopError::Clock)?,
+            )
+        } else {
+            (0, 0)
+        };
     supervisor
-        .flush_terminal_control_waits(event_sources.control_connections, wait_flush_observed_at_ns)
+        .flush_terminal_control_waits(
+            event_sources.control_connections,
+            wait_flush_observed_at_ns,
+            wait_flush_realtime_ns,
+        )
         .map_err(RuntimeShutdownLoopError::ControlWait)?;
+    super::prepare::flush_jobs_waits(supervisor, event_sources.jobs_channel, context.clock)?;
     let eventd_flush = event_sources.log_pipes.sync_eventd_forwarding(
         eventd_active(supervisor),
         supervisor.eventd_log_socket_path(),

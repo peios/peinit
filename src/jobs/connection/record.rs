@@ -1,8 +1,7 @@
 use std::os::fd::AsRawFd;
 
 use crate::jobs::socket::{
-    JobsSocketRead, JobsSocketReadError, JobsSocketWrite, JobsSocketWriteError,
-    LinuxJobsConnection,
+    JobsSocketRead, JobsSocketReadError, JobsSocketWrite, JobsSocketWriteError, LinuxJobsConnection,
 };
 
 use super::accept::JobsPeer;

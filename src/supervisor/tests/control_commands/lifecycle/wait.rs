@@ -1,5 +1,5 @@
 use crate::control::connection::{
-    ControlConnectionRecord, ControlConnectionTable, ControlOperationWait,
+    ControlConnectionRecord, ControlConnectionTable, ControlOperationWait, ControlPendingWait,
 };
 use crate::control::socket::ControlSocketRead;
 use crate::ids::OperationIdAllocator;
@@ -70,6 +70,7 @@ fn start_default_wait_registers_connection_wait_and_flushes_on_terminal_operatio
     else {
         panic!("expected registered wait");
     };
+    let wait = wait.operation().expect("operation wait").clone();
     assert_eq!(wait.service, "app");
     assert!(
         connections
@@ -98,7 +99,7 @@ fn start_default_wait_registers_connection_wait_and_flushes_on_terminal_operatio
     .expect("drain work");
 
     let flush = supervisor
-        .flush_terminal_control_waits(&mut connections, 123)
+        .flush_terminal_control_waits(&mut connections, 123, 0)
         .expect("flush waits");
 
     assert_eq!(flush.completed.len(), 1);
@@ -234,7 +235,7 @@ fn wait_true_lifecycle_command_flushes_operation_timeout_error() {
     };
 
     let flush = supervisor
-        .flush_terminal_control_waits(&mut connections, LIFECYCLE_COMMAND_NS + 1_000_000_000)
+        .flush_terminal_control_waits(&mut connections, LIFECYCLE_COMMAND_NS + 1_000_000_000, 0)
         .expect("flush waits");
 
     assert_eq!(flush.completed.len(), 1);
@@ -257,10 +258,13 @@ fn wait_true_lifecycle_command_flushes_operation_timeout_error() {
     assert_eq!(json["status"], "error");
     assert_eq!(json["code"], "OPERATION_TIMEOUT");
     assert!(
-        json["message"]
-            .as_str()
-            .expect("message")
-            .contains(&wait.operation_id.to_canonical_string())
+        json["message"].as_str().expect("message").contains(
+            &wait
+                .operation()
+                .expect("operation wait")
+                .operation_id
+                .to_canonical_string()
+        )
     );
 }
 
@@ -281,13 +285,13 @@ fn stale_pending_wait_flushes_unknown_operation_and_clears_wait() {
         .get_mut(44)
         .expect("connection")
         .state_mut()
-        .set_pending_wait(ControlOperationWait {
+        .set_pending_wait(ControlPendingWait::Operation(ControlOperationWait {
             operation_id,
             service: "app".to_string(),
-        });
+        }));
 
     let flush = supervisor
-        .flush_terminal_control_waits(&mut connections, LIFECYCLE_COMMAND_NS)
+        .flush_terminal_control_waits(&mut connections, LIFECYCLE_COMMAND_NS, 0)
         .expect("flush waits");
 
     assert_eq!(flush.completed.len(), 1);
