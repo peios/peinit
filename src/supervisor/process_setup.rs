@@ -166,7 +166,7 @@ fn complete_started_launch(
         JobType::HealthCheck => Ok(SupervisorProcessSetupDispatch::HealthCheckLaunched(
             apply_started_health_check_launch(work, launch, launched_at_ns)?,
         )),
-        JobType::AdHoc => Err(SupervisorError::Launch(LaunchCreatedJobError::Boundary(
+        JobType::Submitted => Err(SupervisorError::Launch(LaunchCreatedJobError::Boundary(
             BoundaryError::Process("ad-hoc pending process setup is unsupported".to_string()),
         ))),
     }
@@ -249,7 +249,7 @@ where
                 SupervisorHealthCheckLaunchFailureDispatch { terminal },
             )))
         }
-        JobType::ReloadHook | JobType::AdHoc => Err(SupervisorError::Launch(failed.error)),
+        JobType::ReloadHook | JobType::Submitted => Err(SupervisorError::Launch(failed.error)),
     }
 }
 

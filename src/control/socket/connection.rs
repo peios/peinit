@@ -74,7 +74,7 @@ impl LinuxControlConnection {
     }
 }
 
-pub(super) fn is_would_block(error: &io::Error) -> bool {
+pub(crate) fn is_would_block(error: &io::Error) -> bool {
     matches!(
         error.raw_os_error(),
         Some(code) if code == libc::EAGAIN || code == libc::EWOULDBLOCK

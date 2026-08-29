@@ -38,6 +38,8 @@ pub mod init;
 #[doc(hidden)]
 pub mod job;
 #[doc(hidden)]
+pub mod jobs;
+#[doc(hidden)]
 #[cfg(feature = "peios-boundary")]
 pub mod kmes;
 #[doc(hidden)]
@@ -59,6 +61,8 @@ pub mod security;
 pub mod service;
 #[doc(hidden)]
 pub mod shutdown;
+#[doc(hidden)]
+pub mod submitted;
 #[doc(hidden)]
 pub mod supervisor;
 #[doc(hidden)]

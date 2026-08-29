@@ -29,6 +29,14 @@ impl LinuxSystemTokenProvider {
 }
 
 impl TokenProvider for LinuxSystemTokenProvider {
+    fn materialize_prepared_token(
+        &mut self,
+        job: &JobRecord,
+        prepared_token_fd: i32,
+    ) -> Result<TokenHandle, BoundaryError> {
+        super::linux_jobs::materialize_linux_prepared_token(job, prepared_token_fd)
+    }
+
     fn materialize_service_token(&mut self, job: &JobRecord) -> Result<TokenHandle, BoundaryError> {
         let identity = job.resolved_identity.clone();
         let token = match token_materialization_request(job)? {
@@ -47,6 +55,15 @@ impl TokenProvider for LinuxSystemTokenProvider {
             summary,
         })
     }
+}
+
+/// Summarise a token for a job whose identity is a SID rather than a
+/// service identity string.
+pub(in crate::boundary) fn summarize_token_for_identity(
+    identity: &str,
+    token: &peios::token::Token,
+) -> Result<crate::security::TokenSummary, BoundaryError> {
+    token_info::summarize_token(identity, token)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

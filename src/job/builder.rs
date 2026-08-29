@@ -3,7 +3,7 @@ use crate::ids::{JobId, OperationId};
 use crate::security::TokenSummary;
 use crate::service::{ErrorControl, ServiceDefinition};
 
-use super::cgroup::{ServiceCgroupKind, ad_hoc_cgroup_path, service_job_cgroup_path};
+use super::cgroup::{ServiceCgroupKind, service_job_cgroup_path, submitted_job_cgroup_path};
 use super::model::{JobRecord, JobState, JobType};
 
 #[derive(Debug, Clone)]
@@ -14,6 +14,17 @@ pub struct ServiceMainJobSpec<'a> {
     pub activation_generation: u64,
     pub cgroup_generation: u64,
     pub operation_id: OperationId,
+    pub created_at_ns: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SubmittedJobSpec {
+    pub identity_user_sid: String,
+    pub token_summary: TokenSummary,
+    pub image_path: String,
+    pub arguments: Vec<String>,
+    pub environment: Vec<crate::service::ServiceEnvironmentVariable>,
+    pub working_directory: String,
     pub created_at_ns: u64,
 }
 
@@ -72,29 +83,36 @@ impl JobRecord {
         }
     }
 
-    pub fn new_ad_hoc(
-        id: JobId,
-        resolved_identity: impl Into<String>,
-        token_summary: TokenSummary,
-        image_path: impl Into<String>,
-        arguments: Vec<String>,
-        created_at_ns: u64,
-    ) -> Self {
+    /// The record for a job submitted on the jobs socket.
+    ///
+    /// `resolved_identity` is the job identity's user SID: there is no
+    /// identity *string* to resolve, because a submitted job's identity is a
+    /// token the kernel conveyed, never a name.
+    pub fn new_submitted(id: JobId, spec: SubmittedJobSpec) -> Self {
+        let SubmittedJobSpec {
+            identity_user_sid,
+            token_summary,
+            image_path,
+            arguments,
+            environment,
+            working_directory,
+            created_at_ns,
+        } = spec;
         Self {
             id,
             service: None,
-            job_type: JobType::AdHoc,
+            job_type: JobType::Submitted,
             hook_index: None,
             state: JobState::Created,
             pid: None,
             pidfd: None,
-            resolved_identity: resolved_identity.into(),
+            resolved_identity: identity_user_sid,
             token_summary,
             required_privileges: Vec::new(),
-            image_path: image_path.into(),
+            image_path,
             arguments,
-            environment: Vec::new(),
-            working_directory: ServiceDefinition::DEFAULT_WORKING_DIRECTORY.to_string(),
+            environment,
+            working_directory,
             limit_nofile: None,
             limit_core: None,
             oom_score_adj: 0,
@@ -104,7 +122,7 @@ impl JobRecord {
             exit_code: None,
             exit_signal: None,
             failure_cause: None,
-            cgroup_id: ad_hoc_cgroup_path(id),
+            cgroup_id: submitted_job_cgroup_path(id),
             activation_generation: 0,
             cgroup_generation: 0,
             operation_id: None,

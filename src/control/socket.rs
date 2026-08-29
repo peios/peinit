@@ -1,4 +1,4 @@
-mod address;
+pub(crate) mod address;
 mod connection;
 mod listener;
 mod model;
@@ -7,6 +7,7 @@ mod model;
 mod tests;
 
 pub use connection::LinuxControlConnection;
+pub(crate) use connection::is_would_block;
 pub use listener::LinuxControlSocket;
 pub use model::{
     CONTROL_SOCKET_LISTEN_BACKLOG, CONTROL_SOCKET_PATH, ControlSocketAccept,

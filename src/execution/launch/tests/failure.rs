@@ -61,15 +61,19 @@ fn process_launch_failure_does_not_mark_job_running() {
 fn invalid_job_is_rejected_before_boundaries_are_called() {
     let (job_id, _) = ids();
     let mut jobs = JobStore::new();
-    jobs.create_job(JobRecord::new_ad_hoc(
+    jobs.create_job(JobRecord::new_submitted(
         job_id,
-        "SYSTEM",
-        token_summary(),
-        "/bin/true",
-        Vec::new(),
-        CREATED_AT_NS,
+        crate::job::SubmittedJobSpec {
+            identity_user_sid: "S-1-5-18".to_string(),
+            token_summary: token_summary(),
+            image_path: "/bin/true".to_string(),
+            arguments: Vec::new(),
+            environment: Vec::new(),
+            working_directory: "/".to_string(),
+            created_at_ns: CREATED_AT_NS,
+        },
     ))
-    .expect("create ad-hoc");
+    .expect("create submitted");
     let mut tokens = FakeTokenProvider::success();
     let mut launcher = FakeProcessLauncher::success();
 

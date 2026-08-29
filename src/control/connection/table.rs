@@ -99,6 +99,14 @@ impl<R> ControlConnectionTable<R> {
     pub fn fds(&self) -> Vec<i32> {
         self.records.keys().copied().collect()
     }
+
+    pub fn records(&self) -> impl Iterator<Item = &R> {
+        self.records.values()
+    }
+
+    pub fn entries(&self) -> impl Iterator<Item = (i32, &R)> {
+        self.records.iter().map(|(fd, record)| (*fd, record))
+    }
 }
 
 impl<I> ControlConnectionTable<ControlConnectionRecord<I>> {
