@@ -96,10 +96,11 @@ fn build_system_token(
     let mut builder = TokenBuilder::new();
     builder
         .user(&template.user)
-        // A primary token's impersonation level must be Anonymous — the level
-        // only has meaning for impersonation tokens, and the kernel rejects a
-        // Primary token carrying any other level with EINVAL.
-        .token_type(TokenType::Primary, ImpersonationLevel::Anonymous)
+        // The impersonation level is a ratchet on every token: nothing captured
+        // from, conveyed by, or duplicated out of this token can act above it.
+        // A SYSTEM service starts at the top, like the bootstrap SYSTEM token
+        // it is copied from. (Kernel TRM §3.5.1)
+        .token_type(TokenType::Primary, ImpersonationLevel::Delegation)
         .integrity(template.integrity)
         .privileges(template.privileges.present, template.privileges.enabled)
         // The create-spec field is the LogonSession LUID/auth_id. It is not
