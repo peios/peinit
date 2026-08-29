@@ -56,9 +56,6 @@ pub enum RuntimeShutdownEventTurn {
     ServiceLogPipe {
         pipe: RuntimeLogPipeTurn,
     },
-    JfsDevice {
-        turn: RuntimeJfsDeviceTurn,
-    },
     CalendarTimer {
         fd: i32,
         turn: RuntimeCalendarTimerTurn,
@@ -95,14 +92,6 @@ pub enum RuntimeCalendarTimerTurn {
         supervisor: Option<Box<SupervisorTimerDispatch>>,
         last_run_write: Option<Result<TimerLastRunWriteOutcome, BoundaryError>>,
         next_scheduled_ns: Option<u64>,
-    },
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RuntimeJfsDeviceTurn {
-    ParseBoundaryReached {
-        fd: i32,
-        source_disabled_until_abi_exists: bool,
     },
 }
 

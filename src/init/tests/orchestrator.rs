@@ -488,7 +488,7 @@ fn boot_attempt_increment_failure_treats_counter_as_zero_and_continues() {
 
 #[test]
 fn successful_boot_enters_runtime_with_phase2_booted_supervisor() {
-    let mut platform = Platform::new().with_jfs_infrastructure();
+    let mut platform = Platform::new();
     let mut registry = Registry::with_services([service("app")]);
     let mut clock = ClockAt(10);
     let mut runtime = Runtime::default();
@@ -504,7 +504,6 @@ fn successful_boot_enters_runtime_with_phase2_booted_supervisor() {
 
     assert_eq!(result, InitRunResult::RuntimeReturned);
     assert!(runtime.entered);
-    assert!(runtime.received_jfs);
     assert_eq!(runtime.supervisor_mode, Some(BootMode::Full));
     assert!(runtime.service_names.contains(&"app".to_string()));
     assert_eq!(
@@ -664,10 +663,6 @@ fn required_provisioned_path_failures_enter_recovery_before_phase2() {
 #[test]
 fn phase1_infrastructure_warnings_are_logged_and_do_not_block_runtime() {
     let mut infrastructure = Phase1Infrastructure::new();
-    infrastructure.push_warning(Phase1InfrastructureWarning::JfsDeviceOpen {
-        path: "/dev/jfs".to_string(),
-        message: "missing".to_string(),
-    });
     infrastructure.push_warning(Phase1InfrastructureWarning::LoopbackBringUp {
         interface: "lo".to_string(),
         message: "netlink failed".to_string(),
@@ -691,10 +686,6 @@ fn phase1_infrastructure_warnings_are_logged_and_do_not_block_runtime() {
     assert_eq!(
         platform.warning_logs,
         vec![
-            Phase1InfrastructureWarning::JfsDeviceOpen {
-                path: "/dev/jfs".to_string(),
-                message: "missing".to_string(),
-            },
             Phase1InfrastructureWarning::LoopbackBringUp {
                 interface: "lo".to_string(),
                 message: "netlink failed".to_string(),

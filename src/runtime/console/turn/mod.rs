@@ -62,7 +62,6 @@ pub(super) fn collect_runtime_shutdown_turn_console_messages(
         | RuntimeShutdownEventTurn::StaleControlConnection { .. }
         | RuntimeShutdownEventTurn::Notify { .. }
         | RuntimeShutdownEventTurn::ServiceLogPipe { .. }
-        | RuntimeShutdownEventTurn::JfsDevice { .. }
         | RuntimeShutdownEventTurn::RegistryWatch { .. } => {}
     }
 }

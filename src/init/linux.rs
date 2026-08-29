@@ -6,7 +6,7 @@ use crate::boundary::{
 use crate::provisioning::{ProvisionedPath, ProvisionedPathApplyReport};
 use crate::registry::LcsRegistryClient;
 use crate::runtime::{
-    LinuxRuntimeConfig, LinuxRuntimeSetupError, LinuxShutdownRuntime, Phase1JfsRegistration,
+    LinuxRuntimeConfig, LinuxRuntimeSetupError, LinuxShutdownRuntime,
 };
 use crate::supervisor::Supervisor;
 
@@ -168,16 +168,14 @@ impl InitRuntime for LinuxRuntimeEntrypoint {
         mut supervisor: Supervisor,
         mut infrastructure: Phase1Infrastructure,
     ) -> Result<(), BoundaryError> {
-        let (mut runtime, registration) =
-            LinuxShutdownRuntime::setup_with_infrastructure_registration(
-                LinuxRuntimeConfig {
-                    quiet: supervisor.settings().quiet,
-                    ..LinuxRuntimeConfig::default()
-                },
-                &mut infrastructure,
-            )
-            .map_err(runtime_setup_error)?;
-        log_phase1_registration_warning(&registration);
+        let mut runtime = LinuxShutdownRuntime::setup_with_infrastructure(
+            LinuxRuntimeConfig {
+                quiet: supervisor.settings().quiet,
+                ..LinuxRuntimeConfig::default()
+            },
+            &mut infrastructure,
+        )
+        .map_err(runtime_setup_error)?;
         runtime
             .register_retained_service_launches(&mut supervisor)
             .map_err(|error| {
@@ -247,16 +245,6 @@ fn log_rejected_calendar_timers(rejected: &[crate::timer::boot::TimerBootPlanErr
     for error in rejected {
         let _ = write_console(&format!(
             "peinit warning: calendar timer not armed: {error:?}\n"
-        ));
-    }
-}
-
-fn log_phase1_registration_warning(
-    registration: &crate::runtime::Phase1InfrastructureRegistration,
-) {
-    if let Phase1JfsRegistration::RegisterFailed { fd, path, error } = &registration.jfs {
-        let _ = write_console(&format!(
-            "peinit warning: JFS device {path} fd {fd} event-loop registration failed: {error:?}\n"
         ));
     }
 }

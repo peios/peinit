@@ -1,7 +1,6 @@
 #[cfg(any(test, feature = "peios-boundary"))]
 mod console;
 mod event_loop;
-mod jfs;
 #[cfg(feature = "peios-boundary")]
 mod kmes;
 #[cfg(feature = "peios-boundary")]
@@ -29,7 +28,6 @@ pub use event_loop::{
 #[cfg(feature = "peios-boundary")]
 pub use linux::{
     DEFAULT_MAX_RUNTIME_EVENTS, LinuxRuntimeConfig, LinuxRuntimeSetupError, LinuxShutdownRuntime,
-    Phase1InfrastructureRegistration, Phase1JfsRegistration,
 };
 pub use logging::{
     DEFAULT_LOG_READ_BYTES_PER_EVENT, DEFAULT_MAX_LOG_BUFFER_PER_SERVICE_BYTES,
@@ -42,7 +40,7 @@ pub(crate) use turn::{
 };
 pub use turn::{
     RuntimeCalendarTimerTurn, RuntimeEventRegistrar, RuntimeEventRegistrationError,
-    RuntimeFilesystemCheckHelperTurn, RuntimeJfsDeviceTurn, RuntimeLifecycleDeadlineTimer,
+    RuntimeFilesystemCheckHelperTurn, RuntimeLifecycleDeadlineTimer,
     RuntimeNotifyDatagram, RuntimeNotifyRead, RuntimeNotifyRejection, RuntimeNotifySource,
     RuntimeNotifySupervisorTurn, RuntimePid1SignalSource, RuntimePowerButtonSource,
     RuntimePowerButtonTurn, RuntimeProcessSetupTurn, RuntimeRegistryWatchTurn,

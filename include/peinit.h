@@ -12,8 +12,9 @@
  *   - <peinit/control.h>: synchronous client helpers for the Peinit control
  *     socket at /run/services/peinit/control.sock.
  *
- * Registry editing, eventd queries, auth/token operations, JFS submission, and
- * service-definition parsing are intentionally outside this ABI. Those belong to
+ * Registry editing, eventd queries, auth/token operations, job submission
+ * (the jobs socket has its own client surface), and service-definition
+ * parsing are intentionally outside this ABI. Those belong to
  * their own subsystem libraries unless a future Peinit protocol explicitly pulls
  * them in.
  */

@@ -3,15 +3,13 @@
 //! The runtime layer owns Linux/event-loop objects and translates readable
 //! sources into supervisor turns. It may call `Supervisor` directly, but it
 //! should not encode service-manager policy beyond event ordering, source
-//! registration, and fail-soft handling for optional producers such as eventd
-//! and JFS.
+//! registration, and fail-soft handling for optional producers such as eventd.
 
 mod control_connection;
 mod control_listener;
 mod deadline;
 mod dispatch;
 mod event_sources;
-mod jfs;
 mod lifecycle_deadline;
 mod model;
 mod notify;
@@ -29,7 +27,7 @@ pub(crate) use event_sources::NoRuntimeRegistryClient;
 pub use event_sources::RuntimeShutdownEventSources;
 pub use model::{
     RuntimeCalendarTimerTurn, RuntimeEventRegistrar, RuntimeEventRegistrationError,
-    RuntimeFilesystemCheckHelperTurn, RuntimeJfsDeviceTurn, RuntimeLifecycleDeadlineTimer,
+    RuntimeFilesystemCheckHelperTurn, RuntimeLifecycleDeadlineTimer,
     RuntimeNotifyDatagram, RuntimeNotifyRead, RuntimeNotifyRejection, RuntimeNotifySource,
     RuntimeNotifySupervisorTurn, RuntimePid1SignalSource, RuntimePowerButtonSource,
     RuntimePowerButtonTurn, RuntimeProcessSetupTurn, RuntimeRegistryWatchTurn,

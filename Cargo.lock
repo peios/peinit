@@ -275,7 +275,7 @@ dependencies = [
 
 [[package]]
 name = "peios"
-version = "0.2.0"
+version = "0.4.0"
 dependencies = [
  "bitflags 2.13.0",
  "libc",
@@ -284,7 +284,7 @@ dependencies = [
 
 [[package]]
 name = "peios-sys"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "bindgen",
  "pkg-config",

@@ -27,21 +27,10 @@ impl LinuxShutdownRuntime {
         config: LinuxRuntimeConfig,
         infrastructure: &mut crate::init::Phase1Infrastructure,
     ) -> Result<Self, LinuxRuntimeSetupError> {
-        let (runtime, _) = Self::setup_with_infrastructure_registration(config, infrastructure)?;
-        Ok(runtime)
-    }
-
-    pub fn setup_with_infrastructure_registration(
-        config: LinuxRuntimeConfig,
-        infrastructure: &mut crate::init::Phase1Infrastructure,
-    ) -> Result<(Self, crate::runtime::Phase1InfrastructureRegistration), LinuxRuntimeSetupError>
-    {
         let control_listener = infrastructure
             .take_control_socket()
             .ok_or(LinuxRuntimeSetupError::MissingControlSocket)?;
-        let mut runtime = Self::setup_with_control_listener(config, control_listener)?;
-        let registration = runtime.register_phase1_infrastructure(infrastructure);
-        Ok((runtime, registration))
+        Self::setup_with_control_listener(config, control_listener)
     }
 
     fn setup_with_control_listener(
@@ -100,7 +89,6 @@ impl LinuxShutdownRuntime {
             quiet: config.quiet,
             quiet_policy: crate::runtime::console::QuietPolicy::new(config.quiet, false),
             log_pipes: RuntimeServiceLogPipes::default(),
-            jfs_device: None,
             power_buttons,
             clock: LinuxMonotonicClock::new(),
             controller: LinuxProcessController::new(),

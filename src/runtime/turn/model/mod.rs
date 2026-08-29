@@ -17,7 +17,7 @@ pub use source::{
     RuntimeShutdownDeadlineTimer,
 };
 pub use turn::{
-    RuntimeCalendarTimerTurn, RuntimeFilesystemCheckHelperTurn, RuntimeJfsDeviceTurn,
+    RuntimeCalendarTimerTurn, RuntimeFilesystemCheckHelperTurn,
     RuntimePowerButtonTurn, RuntimeProcessSetupTurn, RuntimeRegistryWatchTurn,
     RuntimeShutdownEventTurn,
 };

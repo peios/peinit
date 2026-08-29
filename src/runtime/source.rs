@@ -5,7 +5,6 @@ const KIND_SHUTDOWN_DEADLINE_TIMER: u32 = 4;
 const KIND_NOTIFY_SOCKET: u32 = 5;
 const KIND_LIFECYCLE_DEADLINE_TIMER: u32 = 6;
 const KIND_SERVICE_LOG_PIPE: u32 = 7;
-const KIND_JFS_DEVICE: u32 = 8;
 const KIND_CALENDAR_TIMER: u32 = 9;
 const KIND_FILESYSTEM_CHECK_HELPER: u32 = 10;
 const KIND_FILESYSTEM_CHECK_HELPER_EXIT: u32 = 11;
@@ -22,7 +21,6 @@ pub enum RuntimeEventSource {
     NotifySocket,
     LifecycleDeadlineTimer,
     ServiceLogPipe { fd: i32 },
-    JfsDevice { fd: i32 },
     CalendarTimer { fd: i32 },
     FilesystemCheckHelper { result_fd: i32 },
     FilesystemCheckHelperExit { pidfd: i32 },
@@ -41,7 +39,6 @@ impl RuntimeEventSource {
             Self::NotifySocket => encode_token(KIND_NOTIFY_SOCKET, 0),
             Self::LifecycleDeadlineTimer => encode_token(KIND_LIFECYCLE_DEADLINE_TIMER, 0),
             Self::ServiceLogPipe { fd } => encode_token(KIND_SERVICE_LOG_PIPE, fd as u32),
-            Self::JfsDevice { fd } => encode_token(KIND_JFS_DEVICE, fd as u32),
             Self::CalendarTimer { fd } => encode_token(KIND_CALENDAR_TIMER, fd as u32),
             Self::FilesystemCheckHelper { result_fd } => {
                 encode_token(KIND_FILESYSTEM_CHECK_HELPER, result_fd as u32)
@@ -61,10 +58,6 @@ impl RuntimeEventSource {
 
     pub fn service_log_pipe(fd: i32) -> Result<Self, RuntimeEventSourceDecodeError> {
         source_from_fd(fd, |fd| Self::ServiceLogPipe { fd })
-    }
-
-    pub fn jfs_device(fd: i32) -> Result<Self, RuntimeEventSourceDecodeError> {
-        source_from_fd(fd, |fd| Self::JfsDevice { fd })
     }
 
     pub fn calendar_timer(fd: i32) -> Result<Self, RuntimeEventSourceDecodeError> {
@@ -104,7 +97,6 @@ impl RuntimeEventSource {
             KIND_NOTIFY_SOCKET if value == 0 => Ok(Self::NotifySocket),
             KIND_LIFECYCLE_DEADLINE_TIMER if value == 0 => Ok(Self::LifecycleDeadlineTimer),
             KIND_SERVICE_LOG_PIPE => source_from_token_fd(value, |fd| Self::ServiceLogPipe { fd }),
-            KIND_JFS_DEVICE => source_from_token_fd(value, |fd| Self::JfsDevice { fd }),
             KIND_CALENDAR_TIMER => source_from_token_fd(value, |fd| Self::CalendarTimer { fd }),
             KIND_FILESYSTEM_CHECK_HELPER => {
                 source_from_token_fd(value, |fd| Self::FilesystemCheckHelper { result_fd: fd })
@@ -165,7 +157,6 @@ mod tests {
             RuntimeEventSource::NotifySocket,
             RuntimeEventSource::LifecycleDeadlineTimer,
             RuntimeEventSource::ServiceLogPipe { fd: 43 },
-            RuntimeEventSource::JfsDevice { fd: 44 },
             RuntimeEventSource::CalendarTimer { fd: 45 },
             RuntimeEventSource::FilesystemCheckHelper { result_fd: 46 },
             RuntimeEventSource::FilesystemCheckHelperExit { pidfd: 47 },
@@ -186,14 +177,6 @@ mod tests {
     fn control_connection_source_rejects_negative_fd() {
         assert_eq!(
             RuntimeEventSource::control_connection(-1),
-            Err(RuntimeEventSourceDecodeError::NegativeFd { fd: -1 }),
-        );
-    }
-
-    #[test]
-    fn jfs_device_source_rejects_negative_fd() {
-        assert_eq!(
-            RuntimeEventSource::jfs_device(-1),
             Err(RuntimeEventSourceDecodeError::NegativeFd { fd: -1 }),
         );
     }

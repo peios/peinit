@@ -52,22 +52,3 @@ pub enum LinuxRuntimeSetupError {
     Timer(LinuxTimerFdCreateError),
     RegistryWatch(BoundaryError),
 }
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Phase1InfrastructureRegistration {
-    pub jfs: Phase1JfsRegistration,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Phase1JfsRegistration {
-    Unavailable,
-    Registered {
-        fd: i32,
-        path: String,
-    },
-    RegisterFailed {
-        fd: i32,
-        path: String,
-        error: RuntimeEventRegistrationError,
-    },
-}
