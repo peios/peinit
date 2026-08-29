@@ -16,7 +16,6 @@ use super::control_connection::process_control_connection_event;
 use super::control_listener::process_control_listener_event;
 use super::deadline::process_shutdown_deadline_timer_event;
 use super::event_sources::NoRuntimeRegistryClient;
-use super::jfs::process_jfs_device_event;
 use super::lifecycle_deadline::process_lifecycle_deadline_timer_event;
 use super::notify::process_notify_event;
 use super::power_button::process_power_button_event;
@@ -127,7 +126,6 @@ where
                 .log_pipes
                 .process_pipe_event(fd, context.clock, context.registrar),
         }),
-        RuntimeEventSource::JfsDevice { fd } => process_jfs_device_event(fd, context.registrar),
         RuntimeEventSource::CalendarTimer { fd } => Ok(RuntimeShutdownEventTurn::CalendarTimer {
             fd,
             turn: crate::runtime::turn::model::RuntimeCalendarTimerTurn::NoRuntimeTable { fd },

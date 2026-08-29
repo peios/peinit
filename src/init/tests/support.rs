@@ -1,11 +1,8 @@
-use std::os::fd::{FromRawFd, OwnedFd};
-
 use crate::boot::BootMode;
 use crate::boundary::{BoundaryError, Clock, KmesEvent, RegistryClient};
 use crate::init::{
     DeviceNodePolicyReport, InitFatalError, InitPlatform, InitRecoveryReason, InitRuntime,
     KernelCommandLine, MachineIdStatus, Phase1Infrastructure, Phase1InfrastructureWarning,
-    Phase1JfsDevice,
 };
 use crate::provisioning::{
     ProvisionedPath, ProvisionedPathApplyReport, ProvisionedPathRegistrySnapshot,
@@ -116,13 +113,6 @@ impl Platform {
 
     pub(super) fn machine_id_status(mut self, status: MachineIdStatus) -> Self {
         self.machine_id_result = Ok(status);
-        self
-    }
-
-    pub(super) fn with_jfs_infrastructure(mut self) -> Self {
-        self.infrastructure_result = Ok(Phase1Infrastructure::with_jfs_device(
-            Phase1JfsDevice::new(pipe_read_fd(), "/dev/jfs"),
-        ));
         self
     }
 
@@ -295,7 +285,6 @@ impl Clock for ClockAt {
 pub(super) struct Runtime {
     pub(super) entered: bool,
     fail: bool,
-    pub(super) received_jfs: bool,
     pub(super) supervisor_mode: Option<BootMode>,
     pub(super) service_names: Vec<String>,
     service_states: Vec<(String, ServiceState)>,
@@ -319,10 +308,9 @@ impl InitRuntime for Runtime {
     fn enter_runtime(
         &mut self,
         supervisor: Supervisor,
-        infrastructure: Phase1Infrastructure,
+        _infrastructure: Phase1Infrastructure,
     ) -> Result<(), BoundaryError> {
         self.entered = true;
-        self.received_jfs = infrastructure.jfs_device().is_some();
         self.supervisor_mode = Some(supervisor.settings().phase2.mode);
         self.service_names = supervisor
             .services()
@@ -359,19 +347,4 @@ pub(super) fn critical_service(name: &str) -> ServiceDefinition {
     service.error_control = crate::service::ErrorControl::Critical;
     service.safe_mode = true;
     service
-}
-
-fn pipe_read_fd() -> OwnedFd {
-    let mut fds = [0_i32; 2];
-    let result = unsafe { libc::pipe2(fds.as_mut_ptr(), libc::O_CLOEXEC) };
-    assert_eq!(
-        result,
-        0,
-        "pipe2 failed: {}",
-        std::io::Error::last_os_error()
-    );
-    unsafe {
-        libc::close(fds[1]);
-        OwnedFd::from_raw_fd(fds[0])
-    }
 }

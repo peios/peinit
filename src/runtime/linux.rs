@@ -3,10 +3,7 @@ mod model;
 mod setup;
 mod turn;
 
-pub use model::{
-    DEFAULT_MAX_RUNTIME_EVENTS, LinuxRuntimeConfig, LinuxRuntimeSetupError,
-    Phase1InfrastructureRegistration, Phase1JfsRegistration,
-};
+pub use model::{DEFAULT_MAX_RUNTIME_EVENTS, LinuxRuntimeConfig, LinuxRuntimeSetupError};
 
 use std::path::Path;
 
@@ -24,8 +21,6 @@ use crate::notify::NotifySocket;
 use crate::registry::{LcsRegistryClient, LcsRegistryWatches};
 use crate::runtime::RuntimeServiceLogPipes;
 use crate::shutdown::LinuxShutdownFinalizer;
-
-use super::jfs::RuntimeJfsDevice;
 
 #[derive(Debug)]
 pub struct LinuxShutdownRuntime {
@@ -47,7 +42,6 @@ pub struct LinuxShutdownRuntime {
     /// which that happens.
     quiet_policy: crate::runtime::console::QuietPolicy,
     log_pipes: RuntimeServiceLogPipes,
-    jfs_device: Option<RuntimeJfsDevice>,
     power_buttons: LinuxPowerButtonDevices,
     clock: LinuxMonotonicClock,
     controller: LinuxProcessController,
@@ -76,10 +70,6 @@ impl LinuxShutdownRuntime {
 
     pub fn notify_socket_path(&self) -> &Path {
         self.notify_socket.path()
-    }
-
-    pub fn jfs_device_fd(&self) -> Option<i32> {
-        self.jfs_device.as_ref().map(RuntimeJfsDevice::fd)
     }
 }
 

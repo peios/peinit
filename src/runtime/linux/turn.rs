@@ -1,6 +1,5 @@
 mod calendar;
 mod control_config;
-mod phase1;
 mod support;
 
 #[cfg(feature = "peios-registry")]

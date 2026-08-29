@@ -102,7 +102,6 @@ pub(crate) fn collect_runtime_shutdown_turn_kmes_events(
         | RuntimeShutdownEventTurn::IdleControlConnectionsClosed { .. }
         | RuntimeShutdownEventTurn::StaleControlConnection { .. }
         | RuntimeShutdownEventTurn::ServiceLogPipe { .. }
-        | RuntimeShutdownEventTurn::JfsDevice { .. }
         | RuntimeShutdownEventTurn::RegistryWatch { .. } => {}
     }
     Ok(())

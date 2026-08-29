@@ -17,6 +17,6 @@ pub use linux::{LinuxInitError, run_linux_peinit};
 pub use model::{
     DEFAULT_BOOT_ATTEMPT_THRESHOLD, InitConfig, InitFatalError, InitPlatform, InitRecoveryReason,
     InitRunError, InitRunResult, InitRuntime, KernelCommandLine, MachineIdStatus,
-    Phase1Infrastructure, Phase1InfrastructureWarning, Phase1JfsDevice, QuietLevel,
+    Phase1Infrastructure, Phase1InfrastructureWarning, QuietLevel,
 };
 pub use orchestrator::run_init;

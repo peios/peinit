@@ -14,7 +14,6 @@ pub enum RuntimeShutdownEventTurnError {
     ControlRegistration(RuntimeEventRegistrationError),
     ControlConnection(SupervisorControlConnectionTableTurnError),
     DeadlineRead(LinuxTimerFdReadError),
-    JfsRegistration(RuntimeEventRegistrationError),
     EventRegistration(RuntimeEventRegistrationError),
     Supervisor(SupervisorError),
 }

@@ -8,7 +8,6 @@ pub enum BoundaryError {
     Process(String),
     ProcessLaunch(ProcessLaunchError),
     Timer(String),
-    Jfs(String),
     Recovery(String),
     Shutdown(String),
     EventdLog(String),

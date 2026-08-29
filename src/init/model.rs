@@ -1,4 +1,3 @@
-use std::os::fd::{AsRawFd, OwnedFd};
 
 use crate::boot::phase2::Phase2BootSettings;
 use crate::boundary::{BoundaryError, RegistryClient};
@@ -224,7 +223,6 @@ pub trait InitRuntime {
 #[derive(Debug, Default)]
 pub struct Phase1Infrastructure {
     control_socket: Option<LinuxControlSocket>,
-    jfs_device: Option<Phase1JfsDevice>,
     warnings: Vec<Phase1InfrastructureWarning>,
 }
 
@@ -233,20 +231,8 @@ impl Phase1Infrastructure {
         Self::default()
     }
 
-    pub fn with_jfs_device(jfs_device: Phase1JfsDevice) -> Self {
-        Self {
-            control_socket: None,
-            jfs_device: Some(jfs_device),
-            warnings: Vec::new(),
-        }
-    }
-
     pub fn control_socket(&self) -> Option<&LinuxControlSocket> {
         self.control_socket.as_ref()
-    }
-
-    pub fn jfs_device(&self) -> Option<&Phase1JfsDevice> {
-        self.jfs_device.as_ref()
     }
 
     pub fn set_control_socket(&mut self, control_socket: LinuxControlSocket) {
@@ -262,51 +248,19 @@ impl Phase1Infrastructure {
     }
 
     #[cfg_attr(not(feature = "peios-boundary"), allow(dead_code))]
-    pub(crate) fn take_jfs_device(&mut self) -> Option<Phase1JfsDevice> {
-        self.jfs_device.take()
-    }
-
-    #[cfg_attr(not(feature = "peios-boundary"), allow(dead_code))]
     pub(crate) fn take_control_socket(&mut self) -> Option<LinuxControlSocket> {
         self.control_socket.take()
     }
 }
 
-#[derive(Debug)]
-pub struct Phase1JfsDevice {
-    fd: OwnedFd,
-    path: String,
-}
-
-impl Phase1JfsDevice {
-    pub fn new(fd: OwnedFd, path: impl Into<String>) -> Self {
-        Self {
-            fd,
-            path: path.into(),
-        }
-    }
-
-    pub fn as_raw_fd(&self) -> i32 {
-        self.fd.as_raw_fd()
-    }
-
-    pub fn path(&self) -> &str {
-        &self.path
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Phase1InfrastructureWarning {
-    JfsDeviceOpen { path: String, message: String },
     LoopbackBringUp { interface: String, message: String },
 }
 
 impl std::fmt::Display for Phase1InfrastructureWarning {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::JfsDeviceOpen { path, message } => {
-                write!(f, "JFS device {path} open failed: {message}")
-            }
             Self::LoopbackBringUp { interface, message } => {
                 write!(
                     f,
