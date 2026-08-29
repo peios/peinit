@@ -147,6 +147,8 @@ pub struct SubmittedJobEntry {
     /// When the last `job.status` event was emitted for this job, for the
     /// per-job rate bound.
     pub last_status_event_ns: Option<u64>,
+    /// The job sent `STOPPING=1`: a stop sends no termination signal.
+    pub stopping_acknowledged: bool,
     /// The cause peinit recorded when it decided the job's end. `None` while
     /// the job runs undisturbed, and afterwards if the process ended of its
     /// own accord.

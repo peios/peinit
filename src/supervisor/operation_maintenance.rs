@@ -95,6 +95,7 @@ impl Supervisor {
 
         turn.relationship_audit_events = self.relationships.drain_audit_events();
         turn.purged_operations = self.purge_retained_terminal_operations(now_ns);
+        turn.purged_jobs = self.submitted.purge_retained_until(now_ns);
         Ok(turn)
     }
 }

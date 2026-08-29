@@ -4,8 +4,8 @@ use crate::ids::JobId;
 use crate::job::{JobEvent, JobEventDetail, JobState};
 
 use super::model::{
-    DEFAULT_SUBMITTED_JOB_RETENTION_NS, JobReadiness, SubmittedJobCause, SubmittedJobEntry,
-    SubmittedJobOutcome, SubmittedJobStop, SubmittedJobStopPhase,
+    JobReadiness, SubmittedJobCause, SubmittedJobEntry, SubmittedJobOutcome, SubmittedJobStop,
+    SubmittedJobStopPhase,
 };
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
@@ -184,7 +184,10 @@ impl SubmittedJobStore {
     }
 
     /// The earliest deadline held against any submitted job, with what it is.
-    pub fn next_deadline(&self, started_at_by_job: impl Fn(JobId) -> Option<u64>) -> Option<SubmittedJobDeadline> {
+    pub fn next_deadline(
+        &self,
+        started_at_by_job: impl Fn(JobId) -> Option<u64>,
+    ) -> Option<SubmittedJobDeadline> {
         self.entries
             .values()
             .flat_map(|entry| entry_deadlines(entry, started_at_by_job(entry.job_id)))
@@ -239,7 +242,11 @@ impl SubmittedJobStore {
         self.entries.remove(&id)
     }
 
-    pub fn filtered_ids(&self, filter: &SubmittedJobListFilter, state_of: impl Fn(&SubmittedJobEntry) -> JobState) -> Vec<JobId> {
+    pub fn filtered_ids(
+        &self,
+        filter: &SubmittedJobListFilter,
+        state_of: impl Fn(&SubmittedJobEntry) -> JobState,
+    ) -> Vec<JobId> {
         self.entries
             .values()
             .filter(|entry| {
@@ -261,13 +268,10 @@ impl SubmittedJobStore {
     }
 }
 
-/// The default retention, as a convenience for callers that do not
-/// configure one.
-pub fn default_retention_ns() -> u64 {
-    DEFAULT_SUBMITTED_JOB_RETENTION_NS
-}
-
-fn entry_deadlines(entry: &SubmittedJobEntry, started_at_ns: Option<u64>) -> Vec<SubmittedJobDeadline> {
+fn entry_deadlines(
+    entry: &SubmittedJobEntry,
+    started_at_ns: Option<u64>,
+) -> Vec<SubmittedJobDeadline> {
     let mut deadlines = Vec::new();
     if let Some(due_at_ns) = entry.cgroup_cleanup_due_at_ns {
         deadlines.push(SubmittedJobDeadline {
@@ -298,8 +302,7 @@ fn entry_deadlines(entry: &SubmittedJobEntry, started_at_ns: Option<u64>) -> Vec
         deadlines.push(SubmittedJobDeadline {
             job_id: entry.job_id,
             kind: SubmittedJobDeadlineKind::Timeout,
-            due_at_ns: started_at_ns
-                .saturating_add(entry.definition.timeout_secs * NANOS_PER_SEC),
+            due_at_ns: started_at_ns.saturating_add(entry.definition.timeout_secs * NANOS_PER_SEC),
         });
     }
     if entry.definition.readiness == JobReadiness::Notify && entry.ready == Some(false) {

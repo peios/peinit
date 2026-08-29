@@ -1,5 +1,5 @@
 use crate::boundary::{Clock, ProcessController, RealtimeClock, RegistryClient};
-use crate::control::connection::ControlOperationWait;
+use crate::control::connection::ControlPendingWait;
 use crate::control::service_security::ServiceAccessChecker;
 use crate::control::service_security::ServiceAccessDenied;
 use crate::control::system::{ControlPeer, ControlSecurityDescriptor, SystemAccessChecker};
@@ -14,7 +14,7 @@ pub struct SupervisorControlFrameContext<'a, 'r, C, P, A>
 where
     C: Clock + RealtimeClock + ?Sized,
     P: ProcessController + ?Sized,
-    A: SystemAccessChecker + ServiceAccessChecker + ?Sized,
+    A: SystemAccessChecker + ServiceAccessChecker + crate::submitted::JobAccessChecker + ?Sized,
 {
     pub peer: &'a ControlPeer,
     pub control_security: &'a ControlSecurityDescriptor,
@@ -69,8 +69,9 @@ pub enum SupervisorControlFrameTurn {
     CommandAccepted {
         response_line: Option<Vec<u8>>,
         dispatch: Option<Box<SupervisorControlCommandDispatch>>,
-        wait: Option<ControlOperationWait>,
+        wait: Option<ControlPendingWait>,
         access_denials: Vec<ServiceAccessDenied>,
+        job_access_denials: Vec<crate::submitted::JobAccessDenied>,
         remaining_bytes: usize,
     },
     CommandRejected {
@@ -92,7 +93,7 @@ impl SupervisorControlFrameTurn {
         }
     }
 
-    pub fn wait(&self) -> Option<&ControlOperationWait> {
+    pub fn wait(&self) -> Option<&ControlPendingWait> {
         match self {
             Self::CommandAccepted { wait, .. } => wait.as_ref(),
             Self::Incomplete { .. }

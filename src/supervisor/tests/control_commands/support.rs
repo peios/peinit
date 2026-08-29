@@ -183,3 +183,35 @@ impl ControlConnectionIo for FakeConnectionIo {
         }
     }
 }
+
+impl crate::submitted::JobAccessChecker for TestAccessChecker {
+    fn check_job_access(
+        &mut self,
+        request: crate::submitted::JobAccessCheckRequest<'_>,
+    ) -> Result<crate::submitted::JobAccessDecision, crate::submitted::JobAccessCheckError> {
+        Ok(crate::submitted::JobAccessDecision {
+            allowed: true,
+            granted_access_bits: request.desired_access.bits(),
+        })
+    }
+}
+
+impl crate::submitted::JobDescriptorFactory for TestAccessChecker {
+    fn default_job_descriptor(
+        &mut self,
+        submitter_sid: &str,
+    ) -> Result<crate::submitted::JobSecurityDescriptor, crate::submitted::JobDescriptorError> {
+        Ok(crate::submitted::JobSecurityDescriptor {
+            bytes: submitter_sid.as_bytes().to_vec(),
+        })
+    }
+
+    fn job_descriptor_from_sddl(
+        &mut self,
+        sddl: &str,
+    ) -> Result<crate::submitted::JobSecurityDescriptor, crate::submitted::JobDescriptorError> {
+        Ok(crate::submitted::JobSecurityDescriptor {
+            bytes: sddl.as_bytes().to_vec(),
+        })
+    }
+}

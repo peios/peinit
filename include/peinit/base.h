@@ -34,6 +34,7 @@ extern "C" {
 #define PEINIT_ERR_INTERNAL -6
 
 typedef void peinit_client_t;
+typedef void peinit_jobs_t;
 typedef void peinit_response_t;
 typedef void peinit_error_t;
 

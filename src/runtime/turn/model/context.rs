@@ -1,8 +1,10 @@
 use crate::boundary::{
-    BootAttemptCounter, Clock, ProcessController, ProcessLauncher, RealtimeClock, ShutdownFinalizer,
+    BootAttemptCounter, Clock, JobIdentityProvider, ProcessController, ProcessLauncher,
+    RealtimeClock, ShutdownFinalizer,
 };
 use crate::control::service_security::ServiceAccessChecker;
 use crate::control::system::{ControlSecurityDescriptor, SystemAccessChecker};
+use crate::jobs::socket::JobsSocketLimits;
 use crate::runtime::RuntimeControlLimits;
 
 use super::registration::RuntimeEventRegistrar;
@@ -12,7 +14,11 @@ where
     C: Clock + RealtimeClock + ?Sized,
     P: ProcessController + ?Sized,
     F: ShutdownFinalizer,
-    A: SystemAccessChecker + ServiceAccessChecker + ?Sized,
+    A: SystemAccessChecker
+        + ServiceAccessChecker
+        + crate::submitted::JobAccessChecker
+        + crate::submitted::JobDescriptorFactory
+        + ?Sized,
     R: RuntimeEventRegistrar + ?Sized,
 {
     pub clock: &'a mut C,
@@ -24,4 +30,6 @@ where
     pub boot_attempt_counter: &'a mut dyn BootAttemptCounter,
     pub control_security: &'a ControlSecurityDescriptor,
     pub control_limits: RuntimeControlLimits,
+    pub job_identity_provider: &'a mut dyn JobIdentityProvider,
+    pub jobs_limits: JobsSocketLimits,
 }

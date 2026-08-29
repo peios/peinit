@@ -15,6 +15,7 @@ pub struct SupervisorOperationMaintenanceTurn {
     pub start_dispatches: Vec<StartExecutionDispatch>,
     pub restart_window_resets: Vec<RestartWindowResetDeadline>,
     pub purged_operations: Vec<OperationId>,
+    pub purged_jobs: Vec<crate::ids::JobId>,
 }
 
 pub(in crate::supervisor::operation_maintenance) struct PendingOperationTimeout {

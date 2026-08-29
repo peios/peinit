@@ -1,6 +1,6 @@
 use crate::control::connection::{
     ControlConnectionAdmission, ControlConnectionAdmissionDecision, ControlConnectionRecord,
-    ControlConnectionTable, ControlConnectionTableError, ControlOperationWait,
+    ControlConnectionTable, ControlConnectionTableError, ControlOperationWait, ControlPendingWait,
     control_connection_admission_decision,
 };
 use crate::control::system::ControlPeer;
@@ -98,10 +98,10 @@ fn idle_deadlines_ignore_pending_waits_and_pending_writes() {
         .get_mut(11)
         .expect("waiting connection")
         .state_mut()
-        .set_pending_wait(ControlOperationWait {
+        .set_pending_wait(ControlPendingWait::Operation(ControlOperationWait {
             operation_id,
             service: "app".to_string(),
-        });
+        }));
     table
         .get_mut(12)
         .expect("writing connection")

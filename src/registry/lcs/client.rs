@@ -130,6 +130,13 @@ impl RegistryClient for LcsRegistryClient {
             .map_err(|error| BoundaryError::Registry(format!("{error:?}")))
     }
 
+    fn read_jobs_socket_limits(
+        &mut self,
+    ) -> Result<crate::jobs::socket::JobsSocketLimits, BoundaryError> {
+        super::init::read_lcs_jobs_socket_limits()
+            .map_err(|error| BoundaryError::Registry(format!("{error:?}")))
+    }
+
     fn read_timer_last_run(
         &mut self,
         service: &str,

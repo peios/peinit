@@ -5,6 +5,7 @@ use crate::shutdown::{ShutdownError, ShutdownFinalizationState, ShutdownRuntime}
 use super::dispatch::SupervisorShutdownStopDispatch;
 use super::shutdown_wave::begin_stop_wave;
 use super::state::SupervisorError;
+use super::submitted::live_submitted_jobs_remain;
 use super::work::SupervisorWork;
 
 pub(super) fn ensure_shutdown(work: &SupervisorWork) -> Result<(), SupervisorError> {
@@ -13,7 +14,7 @@ pub(super) fn ensure_shutdown(work: &SupervisorWork) -> Result<(), SupervisorErr
         .map_err(SupervisorError::Shutdown)
 }
 
-pub(super) fn advance_shutdown_progress<P>(
+pub(in crate::supervisor) fn advance_shutdown_progress<P>(
     work: &mut SupervisorWork,
     controller: &mut P,
     now_ns: u64,
@@ -33,7 +34,10 @@ where
         }
         let next_wave = shutdown.current_wave.saturating_add(1);
         if next_wave >= shutdown.plan.stop_waves.len() {
-            if shutdown.stop_deadlines.is_empty() && shutdown.post_kill_deadlines.is_empty() {
+            if shutdown.stop_deadlines.is_empty()
+                && shutdown.post_kill_deadlines.is_empty()
+                && !live_submitted_jobs_remain(work)
+            {
                 shutdown.finalization = ShutdownFinalizationState::Ready;
             }
             break;
@@ -66,7 +70,9 @@ fn current_wave_complete(work: &SupervisorWork, shutdown: &ShutdownRuntime) -> b
 
 fn wave_complete(work: &SupervisorWork, shutdown: &ShutdownRuntime, wave_index: usize) -> bool {
     let Some(wave) = shutdown.plan.stop_waves.get(wave_index) else {
-        return shutdown.stop_deadlines.is_empty() && shutdown.post_kill_deadlines.is_empty();
+        return shutdown.stop_deadlines.is_empty()
+            && shutdown.post_kill_deadlines.is_empty()
+            && !live_submitted_jobs_remain(work);
     };
     wave.services.iter().all(|participant| {
         work.services

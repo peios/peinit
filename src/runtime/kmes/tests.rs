@@ -76,6 +76,7 @@ fn runtime_loop_collector_preserves_phase_order_for_maintenance_events_and_calen
         read: LinuxTimerFdRead::Expired { expirations: 1 },
         drive: Some(Box::new(SupervisorShutdownDriveDispatch {
             timeout: Some(SupervisorShutdownTimeoutDispatch {
+                submitted: Vec::new(),
                 global_timeout: false,
                 cgroup_kills: Vec::new(),
                 job_events: Vec::new(),

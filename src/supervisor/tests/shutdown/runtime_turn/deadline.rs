@@ -41,6 +41,7 @@ fn runtime_shutdown_deadline_timer_event_drives_due_shutdown_work_and_rearms() {
         .expect("begin shutdown");
     controller.cgroup_kills.clear();
 
+    let mut jobs_channel = crate::runtime::NoJobsChannel;
     let turn = process_runtime_shutdown_event(
         &mut supervisor,
         RuntimeEventSource::ShutdownDeadlineTimer,
@@ -55,6 +56,7 @@ fn runtime_shutdown_deadline_timer_event_drives_due_shutdown_work_and_rearms() {
             power_button_source: &mut power_button,
             filesystem_check_reader: &mut filesystem_check_reader,
             log_pipes: &mut log_pipes,
+            jobs_channel: &mut jobs_channel,
         },
         context(
             &mut clock,
@@ -118,6 +120,7 @@ fn runtime_deadline_timer_event_can_finalize_without_rebooting_host() {
     let mut boot_attempt_counter = FakeBootAttemptCounter::default();
     drive_shutdown_to_ready(&mut supervisor, ShutdownKind::Poweroff, &mut controller);
 
+    let mut jobs_channel = crate::runtime::NoJobsChannel;
     let turn = process_runtime_shutdown_event(
         &mut supervisor,
         RuntimeEventSource::ShutdownDeadlineTimer,
@@ -132,6 +135,7 @@ fn runtime_deadline_timer_event_can_finalize_without_rebooting_host() {
             power_button_source: &mut power_button,
             filesystem_check_reader: &mut filesystem_check_reader,
             log_pipes: &mut log_pipes,
+            jobs_channel: &mut jobs_channel,
         },
         context(
             &mut clock,

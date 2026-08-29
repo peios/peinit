@@ -19,6 +19,6 @@ pub use turn::{
     SupervisorShutdownControlConnectionTurnContext, SupervisorShutdownControlConnectionTurnError,
 };
 pub use wait::{
-    SupervisorControlWaitFlush, SupervisorControlWaitFlushError, SupervisorControlWaitFlushTurn,
-    SupervisorControlWaitResponseError,
+    SupervisorControlWaitCompletion, SupervisorControlWaitFlush, SupervisorControlWaitFlushError,
+    SupervisorControlWaitFlushTurn, SupervisorControlWaitResponseError,
 };

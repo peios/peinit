@@ -67,6 +67,7 @@ pub(in crate::supervisor::tests::shutdown::runtime_turn) fn process_expired_life
         ..FakeBootAttemptCounter::default()
     };
 
+    let mut jobs_channel = crate::runtime::NoJobsChannel;
     let turn = process_runtime_shutdown_event(
         supervisor,
         RuntimeEventSource::LifecycleDeadlineTimer,
@@ -81,6 +82,7 @@ pub(in crate::supervisor::tests::shutdown::runtime_turn) fn process_expired_life
             power_button_source: &mut power_button,
             filesystem_check_reader: &mut filesystem_check_reader,
             log_pipes: &mut log_pipes,
+            jobs_channel: &mut jobs_channel,
         },
         context(
             &mut clock,

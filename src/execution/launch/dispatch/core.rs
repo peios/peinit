@@ -7,7 +7,7 @@ use crate::service::ServiceEnvironmentVariable;
 use crate::execution::launch::environment::build_launch_environment_with_inherited_fds;
 use crate::execution::launch::model::{
     LaunchCreatedJobDispatch, LaunchCreatedJobError, LaunchCreatedJobRequest,
-    LaunchCreatedJobResult, PendingLaunchSetup,
+    LaunchCreatedJobResult, LaunchTokenSource, PendingLaunchSetup,
 };
 use crate::execution::launch::target::LaunchTarget;
 
@@ -23,9 +23,13 @@ pub(super) fn launch_created_job_result(
     let job = get_job(jobs, request.job_id)?;
     target.validate(&job, request.launched_at_ns)?;
 
-    let token = token_provider
-        .materialize_service_token(&job)
-        .map_err(LaunchCreatedJobError::Boundary)?;
+    let token = match request.token_source {
+        LaunchTokenSource::ServiceIdentity => token_provider.materialize_service_token(&job),
+        LaunchTokenSource::Prepared { token_fd } => {
+            token_provider.materialize_prepared_token(&job, token_fd)
+        }
+    }
+    .map_err(LaunchCreatedJobError::Boundary)?;
     let token_summary = token.summary.clone();
     let process = target
         .launch(

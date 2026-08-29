@@ -59,7 +59,12 @@ where
     })?;
     let supervisor_turn =
         match supervisor.apply_notify_datagram(datagram, observed_at_ns, controller) {
-            Ok(dispatch) => RuntimeNotifySupervisorTurn::Applied(Box::new(dispatch)),
+            Ok(crate::supervisor::SupervisorNotifyOutcome::Service(dispatch)) => {
+                RuntimeNotifySupervisorTurn::Applied(dispatch)
+            }
+            Ok(crate::supervisor::SupervisorNotifyOutcome::SubmittedJob(dispatch)) => {
+                RuntimeNotifySupervisorTurn::AppliedToJob(Box::new(dispatch))
+            }
             Err(SupervisorError::NotifyParse(error)) => {
                 let attribution = supervisor
                     .authenticate_notify_datagram_sender(sender_pid, controller)

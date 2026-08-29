@@ -128,6 +128,7 @@ fn launch_request(job_id: JobId) -> LaunchCreatedJobRequest {
         notify_socket_path: TEST_NOTIFY_SOCKET.to_string(),
         setup_timeout_secs: SETUP_TIMEOUT_SECS,
         output_pipe_buffer_bytes: DEFAULT_MAX_LOG_BUFFER_PER_SERVICE_BYTES,
+        token_source: crate::execution::launch::LaunchTokenSource::ServiceIdentity,
     }
 }
 

@@ -5,9 +5,7 @@ use crate::boundary::{
 };
 use crate::provisioning::{ProvisionedPath, ProvisionedPathApplyReport};
 use crate::registry::LcsRegistryClient;
-use crate::runtime::{
-    LinuxRuntimeConfig, LinuxRuntimeSetupError, LinuxShutdownRuntime,
-};
+use crate::runtime::{LinuxRuntimeConfig, LinuxRuntimeSetupError, LinuxShutdownRuntime};
 use crate::supervisor::Supervisor;
 
 use super::{

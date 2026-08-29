@@ -92,5 +92,7 @@ fn apply_notify_with_controller(
     observed_at_ns: u64,
     controller: &mut TestProcessController,
 ) -> Result<SupervisorNotifyDispatch, SupervisorError> {
-    supervisor.apply_notify_datagram(datagram, observed_at_ns, controller)
+    supervisor
+        .apply_notify_datagram(datagram, observed_at_ns, controller)
+        .map(|outcome| outcome.into_service().expect("service notify outcome"))
 }

@@ -16,6 +16,8 @@ pub struct SupervisorShutdownDispatch {
     pub first_wave: Vec<SupervisorShutdownStopDispatch>,
     pub startup_operation_events: Vec<OperationEvent>,
     pub startup_job_events: Vec<JobEvent>,
+    /// Every live submitted job, signalled to stop at once (PSPU §7.10).
+    pub submitted_stops: Vec<super::submitted::SupervisorSubmittedStopDispatch>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -57,6 +59,7 @@ pub struct SupervisorShutdownTimeoutDispatch {
     pub abandoned: Vec<SupervisorShutdownAbandonedDispatch>,
     pub next_wave: Vec<SupervisorShutdownStopDispatch>,
     pub finalization: ShutdownFinalizationState,
+    pub submitted: Vec<super::submitted::SupervisorSubmittedDeadlineDispatch>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

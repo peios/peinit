@@ -112,6 +112,11 @@ where
         SupervisorProcessSetupDispatch::HealthCheckLaunched(dispatch) => {
             log_pipes.register_completed_launch(&dispatch.launch, registrar)
         }
+        SupervisorProcessSetupDispatch::SubmittedLaunched(dispatch) => {
+            let mut registrations = Vec::new();
+            log_pipes.register_submitted_launch(dispatch, registrar, &mut registrations)?;
+            Ok(registrations)
+        }
         _ => Ok(Vec::new()),
     }
 }

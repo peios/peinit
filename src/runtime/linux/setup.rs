@@ -1,17 +1,20 @@
 use crate::boundary::{
     LinuxBootAttemptCounter, LinuxChildReaper, LinuxConsoleSink, LinuxEpoll,
-    LinuxFilesystemCheckHelper, LinuxMonotonicClock, LinuxPid1SignalFd, LinuxProcessController,
-    LinuxProcessLauncher, LinuxSystemTokenProvider, LinuxTimerFd,
+    LinuxFilesystemCheckHelper, LinuxJobIdentityProvider, LinuxMonotonicClock, LinuxPid1SignalFd,
+    LinuxProcessController, LinuxProcessLauncher, LinuxSystemTokenProvider, LinuxTimerFd,
 };
 use crate::control::connection::{ControlConnectionRecord, ControlConnectionTable};
 use crate::control::socket::{LinuxControlConnection, LinuxControlSocket};
 use crate::control::system::PeiosSystemAccessChecker;
+use crate::jobs::socket::LinuxJobsSocket;
 use crate::notify::NotifySocket;
 #[cfg(feature = "peios-registry")]
 use crate::registry::LcsRegistryClient;
 #[cfg(feature = "peios-registry")]
 use crate::registry::{LcsRegistryWatch, LcsRegistryWatches};
-use crate::runtime::{RuntimeEventRegistrar, RuntimeEventSource, RuntimeServiceLogPipes};
+use crate::runtime::{
+    RuntimeEventRegistrar, RuntimeEventSource, RuntimeJobsChannelTable, RuntimeServiceLogPipes,
+};
 use crate::shutdown::LinuxShutdownFinalizer;
 
 use super::{LinuxRuntimeConfig, LinuxRuntimeSetupError, LinuxShutdownRuntime};
@@ -20,7 +23,9 @@ impl LinuxShutdownRuntime {
     pub fn setup(config: LinuxRuntimeConfig) -> Result<Self, LinuxRuntimeSetupError> {
         let control_listener = LinuxControlSocket::bind(&config.control_socket_path)
             .map_err(LinuxRuntimeSetupError::ControlSocket)?;
-        Self::setup_with_control_listener(config, control_listener)
+        let jobs_listener = LinuxJobsSocket::bind(&config.jobs_socket_path)
+            .map_err(LinuxRuntimeSetupError::JobsSocket)?;
+        Self::setup_with_listeners(config, control_listener, jobs_listener)
     }
 
     pub fn setup_with_infrastructure(
@@ -30,12 +35,16 @@ impl LinuxShutdownRuntime {
         let control_listener = infrastructure
             .take_control_socket()
             .ok_or(LinuxRuntimeSetupError::MissingControlSocket)?;
-        Self::setup_with_control_listener(config, control_listener)
+        let jobs_listener = infrastructure
+            .take_jobs_socket()
+            .ok_or(LinuxRuntimeSetupError::MissingJobsSocket)?;
+        Self::setup_with_listeners(config, control_listener, jobs_listener)
     }
 
-    fn setup_with_control_listener(
+    fn setup_with_listeners(
         config: LinuxRuntimeConfig,
         control_listener: LinuxControlSocket,
+        jobs_listener: LinuxJobsSocket,
     ) -> Result<Self, LinuxRuntimeSetupError> {
         let mut epoll = LinuxEpoll::create().map_err(LinuxRuntimeSetupError::Epoll)?;
         let signal =
@@ -51,6 +60,9 @@ impl LinuxShutdownRuntime {
             .map_err(LinuxRuntimeSetupError::Register)?;
         epoll
             .register_source(notify_socket.as_raw_fd(), RuntimeEventSource::NotifySocket)
+            .map_err(LinuxRuntimeSetupError::Register)?;
+        epoll
+            .register_source(jobs_listener.as_raw_fd(), RuntimeEventSource::JobsListener)
             .map_err(LinuxRuntimeSetupError::Register)?;
         let deadline_timer =
             LinuxTimerFd::create_monotonic().map_err(LinuxRuntimeSetupError::Timer)?;
@@ -89,6 +101,9 @@ impl LinuxShutdownRuntime {
             quiet: config.quiet,
             quiet_policy: crate::runtime::console::QuietPolicy::new(config.quiet, false),
             log_pipes: RuntimeServiceLogPipes::default(),
+            jobs_channel: RuntimeJobsChannelTable::new(jobs_listener, config.max_jobs_connections),
+            jobs_connection_timeout_secs: crate::jobs::socket::DEFAULT_JOBS_CONNECTION_TIMEOUT_SECS,
+            job_identity_provider: LinuxJobIdentityProvider::new(),
             power_buttons,
             clock: LinuxMonotonicClock::new(),
             controller: LinuxProcessController::new(),

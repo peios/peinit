@@ -13,6 +13,7 @@ use crate::ids::IdAllocationError;
 use crate::job::JobStoreError;
 use crate::notify::NotifyParseError;
 use crate::shutdown::ShutdownError;
+use crate::submitted::{JobAccessCheckError, JobDescriptorError, SubmittedJobStoreError};
 use crate::supervisor::health::HealthCheckError;
 use crate::supervisor::notify::timeout_extension::TimeoutExtensionError;
 use crate::supervisor::watchdog::WatchdogError;
@@ -42,4 +43,8 @@ pub enum SupervisorError {
     Shutdown(ShutdownError),
     Timer(BoundaryError),
     FilesystemCheck(BoundaryError),
+    Submitted(SubmittedJobStoreError),
+    JobIdentity(crate::boundary::JobIdentityError),
+    JobDescriptor(JobDescriptorError),
+    JobAccess(JobAccessCheckError),
 }

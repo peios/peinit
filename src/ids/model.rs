@@ -33,6 +33,12 @@ impl JobId {
     pub fn to_canonical_string(self) -> String {
         self.0.to_canonical_string()
     }
+
+    pub fn parse_canonical_str(value: &str) -> Result<Self, JobIdParseError> {
+        parse_uuid_v7_canonical(value)
+            .map(Self)
+            .map_err(JobIdParseError::Uuid)
+    }
 }
 
 impl fmt::Display for OperationId {
@@ -54,6 +60,19 @@ pub enum OperationIdParseError {
 
 impl FromStr for OperationId {
     type Err = OperationIdParseError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        Self::parse_canonical_str(value)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum JobIdParseError {
+    Uuid(UuidV7ParseError),
+}
+
+impl FromStr for JobId {
+    type Err = JobIdParseError;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         Self::parse_canonical_str(value)

@@ -17,6 +17,7 @@ use crate::supervisor::launch::{
 };
 use crate::supervisor::post_start_hooks::apply_post_start_hook_launch_failure;
 use crate::supervisor::state::{Supervisor, SupervisorError};
+use crate::supervisor::submitted::{apply_started_submitted_launch, apply_submitted_setup_failure};
 use crate::supervisor::work::SupervisorWork;
 
 impl Supervisor {
@@ -166,9 +167,9 @@ fn complete_started_launch(
         JobType::HealthCheck => Ok(SupervisorProcessSetupDispatch::HealthCheckLaunched(
             apply_started_health_check_launch(work, launch, launched_at_ns)?,
         )),
-        JobType::Submitted => Err(SupervisorError::Launch(LaunchCreatedJobError::Boundary(
-            BoundaryError::Process("ad-hoc pending process setup is unsupported".to_string()),
-        ))),
+        JobType::Submitted => Ok(SupervisorProcessSetupDispatch::SubmittedLaunched(
+            apply_started_submitted_launch(work, launch)?,
+        )),
     }
 }
 
@@ -249,7 +250,18 @@ where
                 SupervisorHealthCheckLaunchFailureDispatch { terminal },
             )))
         }
-        JobType::ReloadHook | JobType::Submitted => Err(SupervisorError::Launch(failed.error)),
+        JobType::Submitted => Ok(SupervisorProcessSetupDispatch::SubmittedFailed(
+            apply_submitted_setup_failure(
+                work,
+                controller,
+                failed.job_id,
+                failed.failed_at_ns,
+                crate::submitted::SubmittedJobCause::PreExecFailure,
+                format!("PreExecFailure: {:?}", failed.error),
+                failed.post_kill_timeout_secs,
+            )?,
+        )),
+        JobType::ReloadHook => Err(SupervisorError::Launch(failed.error)),
     }
 }
 

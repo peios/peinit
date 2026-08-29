@@ -97,7 +97,11 @@ where
     C: Clock + RealtimeClock + ?Sized,
     P: ProcessController + ?Sized,
     F: ShutdownFinalizer,
-    A: SystemAccessChecker + ServiceAccessChecker + ?Sized,
+    A: SystemAccessChecker
+        + ServiceAccessChecker
+        + crate::submitted::JobAccessChecker
+        + crate::submitted::JobDescriptorFactory
+        + ?Sized,
     R: RuntimeEventRegistrar + ?Sized,
     T: TokenProvider + ?Sized,
     L: ProcessLauncher,
@@ -116,6 +120,8 @@ where
     pub max_events: usize,
     pub control_limits: RuntimeControlLimits,
     pub work_pump: RuntimeWorkPumpConfig,
+    pub job_identity_provider: &'a mut dyn crate::boundary::JobIdentityProvider,
+    pub jobs_limits: crate::jobs::socket::JobsSocketLimits,
 }
 
 impl<'a, C, P, F, A, R, T, L, B> RuntimeShutdownLoopContext<'a, C, P, F, A, R, T, L, B>
@@ -123,7 +129,11 @@ where
     C: Clock + RealtimeClock + ?Sized,
     P: ProcessController + ?Sized,
     F: ShutdownFinalizer,
-    A: SystemAccessChecker + ServiceAccessChecker + ?Sized,
+    A: SystemAccessChecker
+        + ServiceAccessChecker
+        + crate::submitted::JobAccessChecker
+        + crate::submitted::JobDescriptorFactory
+        + ?Sized,
     R: RuntimeEventRegistrar + ?Sized,
     T: TokenProvider + ?Sized,
     L: ProcessLauncher,
@@ -143,6 +153,8 @@ where
             boot_attempt_counter: &mut *self.boot_attempt_counter,
             control_security: self.control_security,
             control_limits: self.control_limits,
+            job_identity_provider: &mut *self.job_identity_provider,
+            jobs_limits: self.jobs_limits,
         }
     }
 
@@ -181,6 +193,7 @@ pub enum RuntimeShutdownLoopError {
     CalendarTimerReconfigure(String),
     OperationMaintenance(crate::supervisor::SupervisorError),
     ControlWait(crate::supervisor::SupervisorControlWaitFlushError),
+    JobsWait(crate::runtime::RuntimeJobsChannelError),
     Event {
         source: RuntimeEventSource,
         error: RuntimeShutdownEventTurnError,

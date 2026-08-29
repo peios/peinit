@@ -91,7 +91,8 @@ fn collect_control_command_dispatch_console_messages(
         SupervisorControlCommandDispatch::Lifecycle(dispatch) => {
             collect_lifecycle_dispatch_console_messages(dispatch, out);
         }
-        SupervisorControlCommandDispatch::ReloadConfig(_) => {}
+        SupervisorControlCommandDispatch::ReloadConfig(_)
+        | SupervisorControlCommandDispatch::Job(_) => {}
     }
 }
 

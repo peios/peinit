@@ -40,6 +40,7 @@ impl Supervisor {
             self.boot_settle
                 .next_deadline(&self.services)
                 .map(SupervisorLifecycleDeadline::from),
+            self.next_submitted_job_deadline(),
         ]
         .into_iter()
         .flatten()

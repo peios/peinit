@@ -24,7 +24,7 @@ impl Supervisor {
         I: ControlConnectionIo,
         C: Clock + RealtimeClock + ?Sized,
         P: ProcessController + ?Sized,
-        A: SystemAccessChecker + ServiceAccessChecker + ?Sized,
+        A: SystemAccessChecker + ServiceAccessChecker + crate::submitted::JobAccessChecker + ?Sized,
     {
         let SupervisorControlConnectionTurnContext {
             control_security,

@@ -1,7 +1,7 @@
-
 use crate::boot::phase2::Phase2BootSettings;
 use crate::boundary::{BoundaryError, RegistryClient};
 use crate::control::socket::LinuxControlSocket;
+use crate::jobs::socket::LinuxJobsSocket;
 use crate::provisioning::{ProvisionedPath, ProvisionedPathApplyReport};
 use crate::supervisor::{Supervisor, SupervisorError};
 
@@ -223,6 +223,7 @@ pub trait InitRuntime {
 #[derive(Debug, Default)]
 pub struct Phase1Infrastructure {
     control_socket: Option<LinuxControlSocket>,
+    jobs_socket: Option<LinuxJobsSocket>,
     warnings: Vec<Phase1InfrastructureWarning>,
 }
 
@@ -237,6 +238,19 @@ impl Phase1Infrastructure {
 
     pub fn set_control_socket(&mut self, control_socket: LinuxControlSocket) {
         self.control_socket = Some(control_socket);
+    }
+
+    pub fn jobs_socket(&self) -> Option<&LinuxJobsSocket> {
+        self.jobs_socket.as_ref()
+    }
+
+    pub fn set_jobs_socket(&mut self, jobs_socket: LinuxJobsSocket) {
+        self.jobs_socket = Some(jobs_socket);
+    }
+
+    #[cfg_attr(not(feature = "peios-boundary"), allow(dead_code))]
+    pub(crate) fn take_jobs_socket(&mut self) -> Option<LinuxJobsSocket> {
+        self.jobs_socket.take()
     }
 
     pub fn warnings(&self) -> &[Phase1InfrastructureWarning] {

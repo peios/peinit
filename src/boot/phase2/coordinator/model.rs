@@ -43,6 +43,7 @@ pub struct Phase2BootRun {
     pub shutdown_settings: ShutdownSettings,
     pub control_security: ControlSecurityDescriptor,
     pub control_limits: ControlSocketLimits,
+    pub jobs_limits: crate::jobs::socket::JobsSocketLimits,
     pub log_config: RuntimeLogConfig,
     pub service_table: ServiceTable,
     pub global_environment: Vec<ServiceEnvironmentVariable>,

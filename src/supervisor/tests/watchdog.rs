@@ -42,7 +42,9 @@ fn watchdog_keepalive_rearms_current_generation() {
             keepalive_at_ns,
             &mut controller,
         )
-        .expect("watchdog keepalive");
+        .expect("watchdog keepalive")
+        .into_service()
+        .expect("service notify outcome");
 
     assert_eq!(dispatch.watchdog_notifications.len(), 1);
     assert_eq!(
@@ -72,7 +74,9 @@ fn watchdog_usec_runtime_update_rearms_and_zero_disables() {
             update_at_ns,
             &mut controller,
         )
-        .expect("watchdog update");
+        .expect("watchdog update")
+        .into_service()
+        .expect("service notify outcome");
 
     assert_eq!(
         update.watchdog_notifications[0].outcome,
@@ -94,7 +98,9 @@ fn watchdog_usec_runtime_update_rearms_and_zero_disables() {
             update_at_ns + 1_000,
             &mut controller,
         )
-        .expect("watchdog disable");
+        .expect("watchdog disable")
+        .into_service()
+        .expect("service notify outcome");
 
     assert_eq!(
         disable.watchdog_notifications[0].outcome,
@@ -191,7 +197,9 @@ fn runtime_watchdog_update_does_not_persist_across_restart() {
             update_at_ns,
             &mut controller,
         )
-        .expect("watchdog update");
+        .expect("watchdog update")
+        .into_service()
+        .expect("service notify outcome");
     supervisor
         .process_due_watchdog_timeouts(&mut controller, update_at_ns + 2_000_000)
         .expect("watchdog timeout");

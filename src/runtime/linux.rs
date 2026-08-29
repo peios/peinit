@@ -9,17 +9,18 @@ use std::path::Path;
 
 use crate::boundary::{
     LinuxBootAttemptCounter, LinuxChildReaper, LinuxConsoleSink, LinuxEpoll,
-    LinuxFilesystemCheckHelper, LinuxKmesEventSink, LinuxMonotonicClock, LinuxPid1SignalFd,
-    LinuxPowerButtonDevices, LinuxProcessController, LinuxProcessLauncher,
+    LinuxFilesystemCheckHelper, LinuxJobIdentityProvider, LinuxKmesEventSink, LinuxMonotonicClock,
+    LinuxPid1SignalFd, LinuxPowerButtonDevices, LinuxProcessController, LinuxProcessLauncher,
     LinuxSystemTokenProvider, LinuxTimerFd,
 };
 use crate::control::connection::{ControlConnectionRecord, ControlConnectionTable};
 use crate::control::socket::{LinuxControlConnection, LinuxControlSocket};
 use crate::control::system::PeiosSystemAccessChecker;
+use crate::jobs::socket::LinuxJobsSocket;
 use crate::notify::NotifySocket;
 #[cfg(feature = "peios-registry")]
 use crate::registry::{LcsRegistryClient, LcsRegistryWatches};
-use crate::runtime::RuntimeServiceLogPipes;
+use crate::runtime::{RuntimeJobsChannelTable, RuntimeServiceLogPipes};
 use crate::shutdown::LinuxShutdownFinalizer;
 
 #[derive(Debug)]
@@ -42,6 +43,10 @@ pub struct LinuxShutdownRuntime {
     /// which that happens.
     quiet_policy: crate::runtime::console::QuietPolicy,
     log_pipes: RuntimeServiceLogPipes,
+    jobs_channel: RuntimeJobsChannelTable<LinuxJobsSocket>,
+    /// Refreshed from the supervisor every turn, like the control limits.
+    jobs_connection_timeout_secs: u64,
+    job_identity_provider: LinuxJobIdentityProvider,
     power_buttons: LinuxPowerButtonDevices,
     clock: LinuxMonotonicClock,
     controller: LinuxProcessController,
@@ -70,6 +75,14 @@ impl LinuxShutdownRuntime {
 
     pub fn notify_socket_path(&self) -> &Path {
         self.notify_socket.path()
+    }
+
+    pub fn jobs_socket_path(&self) -> &Path {
+        self.jobs_channel.listener().path()
+    }
+
+    pub fn active_jobs_connections(&self) -> usize {
+        self.jobs_channel.active_connections()
     }
 }
 

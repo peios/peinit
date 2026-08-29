@@ -6,6 +6,7 @@ mod lifecycle;
 mod relationship;
 mod shutdown;
 mod start;
+mod submitted;
 mod terminal;
 mod timer;
 mod watchdog;
@@ -55,6 +56,13 @@ pub use start::{
     SupervisorPostStartHookTerminalDispatch, SupervisorPostStartHookTimeoutDispatch,
     SupervisorPreStartHookTerminalDispatch, SupervisorPreStartHookTimeoutDispatch,
     SupervisorReadinessTimeoutDispatch,
+};
+pub use submitted::{
+    SupervisedSubmittedTerminalDispatch, SupervisorJobAccessDeniedDispatch,
+    SupervisorJobSubmitDispatch, SupervisorJobsCommandDispatch,
+    SupervisorSubmittedDeadlineDispatch, SupervisorSubmittedLaunchDispatch,
+    SupervisorSubmittedLaunchFailureDispatch, SupervisorSubmittedLaunchResult,
+    SupervisorSubmittedNotifyDispatch, SupervisorSubmittedStopDispatch,
 };
 pub use terminal::{SupervisorRestartBackoffDispatch, SupervisorTerminalDispatch};
 pub use timer::{SupervisorTimerAction, SupervisorTimerDispatch};

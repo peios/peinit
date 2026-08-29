@@ -56,6 +56,8 @@ pub enum NotifyAppliedField {
     Reloading,
     Stopping,
     Status { text: String },
+    Progress { value: String },
+    ProgressUnit { value: String },
     Errno { value: String },
     ExitStatus { value: String },
     Watchdog,

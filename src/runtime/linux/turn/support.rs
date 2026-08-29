@@ -54,12 +54,13 @@ pub(in crate::runtime::linux::turn) fn flush_operation_waits_at<I>(
     supervisor: &Supervisor,
     control_connections: &mut ControlConnectionTable<ControlConnectionRecord<I>>,
     now_ns: u64,
+    realtime_now_ns: u64,
 ) -> Result<(), RuntimeShutdownLoopError>
 where
     I: ControlConnectionIo,
 {
     supervisor
-        .flush_terminal_control_waits(control_connections, now_ns)
+        .flush_terminal_control_waits(control_connections, now_ns, realtime_now_ns)
         .map(|_| ())
         .map_err(RuntimeShutdownLoopError::ControlWait)
 }
@@ -73,6 +74,28 @@ pub(in crate::runtime::linux::turn) fn prepend_idle_closure_turn(
             0,
             RuntimeShutdownEventTurn::IdleControlConnectionsClosed { fds },
         );
+    }
+}
+
+pub(in crate::runtime::linux::turn) fn prepend_idle_jobs_closure_turn(
+    turn: &mut RuntimeShutdownLoopTurn,
+    fds: Vec<i32>,
+) {
+    if !fds.is_empty() {
+        turn.turns.insert(
+            0,
+            RuntimeShutdownEventTurn::IdleJobsConnectionsClosed { fds },
+        );
+    }
+}
+
+pub(in crate::runtime::linux::turn) fn append_idle_jobs_closure_turn(
+    turn: &mut RuntimeShutdownLoopTurn,
+    fds: Vec<i32>,
+) {
+    if !fds.is_empty() {
+        turn.turns
+            .push(RuntimeShutdownEventTurn::IdleJobsConnectionsClosed { fds });
     }
 }
 

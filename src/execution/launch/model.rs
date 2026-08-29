@@ -10,6 +10,18 @@ pub struct LaunchCreatedJobRequest {
     pub notify_socket_path: String,
     pub setup_timeout_secs: u64,
     pub output_pipe_buffer_bytes: usize,
+    pub token_source: LaunchTokenSource,
+}
+
+/// Where the token a launch installs comes from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LaunchTokenSource {
+    /// Materialised from the job's service identity (§4.1).
+    #[default]
+    ServiceIdentity,
+    /// A primary token the submission path already prepared; the launch
+    /// takes a copy and the caller closes the original afterwards.
+    Prepared { token_fd: i32 },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -59,6 +71,10 @@ pub enum LaunchCreatedJobError {
         job_type: crate::job::JobType,
     },
     NotHealthCheckJob {
+        job_id: JobId,
+        job_type: crate::job::JobType,
+    },
+    NotSubmittedJob {
         job_id: JobId,
         job_type: crate::job::JobType,
     },

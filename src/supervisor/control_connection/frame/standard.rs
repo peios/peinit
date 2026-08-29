@@ -21,7 +21,7 @@ impl Supervisor {
     where
         C: Clock + RealtimeClock + ?Sized,
         P: ProcessController + ?Sized,
-        A: SystemAccessChecker + ServiceAccessChecker + ?Sized,
+        A: SystemAccessChecker + ServiceAccessChecker + crate::submitted::JobAccessChecker + ?Sized,
     {
         let frame = self.process_next_control_frame(connection.read_buffer_mut(), context)?;
         if let Some(response_line) = frame.response_line() {
@@ -45,7 +45,7 @@ impl Supervisor {
     where
         C: Clock + RealtimeClock + ?Sized,
         P: ProcessController + ?Sized,
-        A: SystemAccessChecker + ServiceAccessChecker + ?Sized,
+        A: SystemAccessChecker + ServiceAccessChecker + crate::submitted::JobAccessChecker + ?Sized,
     {
         let SupervisorControlFrameContext {
             peer,
@@ -94,11 +94,13 @@ impl Supervisor {
                         dispatch,
                         wait,
                         access_denials,
+                        job_access_denials,
                     } => SupervisorControlFrameTurn::CommandAccepted {
                         response_line,
                         dispatch,
                         wait,
                         access_denials,
+                        job_access_denials,
                         remaining_bytes: buffer.len(),
                     },
                     crate::supervisor::SupervisorControlCommandBodyResponse::Rejected {

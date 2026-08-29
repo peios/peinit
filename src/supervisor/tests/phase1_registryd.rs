@@ -71,7 +71,9 @@ fn phase1_registryd_activation_is_retained_through_phase2_boot() {
     let mut controller = TestProcessController::default();
     supervisor
         .apply_notify_datagram(datagram(7000, b"READY=1"), BOOT_NS + 2_000, &mut controller)
-        .expect("apply registryd ready notification");
+        .expect("apply registryd ready notification")
+        .into_service()
+        .expect("service notify outcome");
     assert_eq!(
         supervisor
             .service_status(ServiceDefinition::REGISTRYD_NAME)

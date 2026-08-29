@@ -18,6 +18,7 @@ use crate::boundary::{Clock, ProcessController, RealtimeClock};
 use crate::control::service_security::ServiceAccessChecker;
 use crate::control::system::SystemAccessChecker;
 use crate::control::wire::{ControlCommand, control_error_response_line, parse_control_request};
+use crate::submitted::JobAccessChecker;
 
 use super::state::Supervisor;
 use lifecycle::ControlLifecycleCommandContext;
@@ -31,7 +32,7 @@ impl Supervisor {
     where
         C: Clock + RealtimeClock + ?Sized,
         P: ProcessController + ?Sized,
-        A: SystemAccessChecker + ServiceAccessChecker + ?Sized,
+        A: SystemAccessChecker + ServiceAccessChecker + JobAccessChecker + ?Sized,
     {
         let result = self.run_checked_control_body(body, context);
         Ok(match result {
@@ -54,7 +55,7 @@ impl Supervisor {
     where
         C: Clock + RealtimeClock + ?Sized,
         P: ProcessController + ?Sized,
-        A: SystemAccessChecker + ServiceAccessChecker + ?Sized,
+        A: SystemAccessChecker + ServiceAccessChecker + JobAccessChecker + ?Sized,
     {
         let SupervisorControlCommandBodyContext {
             peer,
@@ -111,6 +112,15 @@ impl Supervisor {
                 access_checker,
                 registry,
             ),
+            ControlCommand::JobStatus => {
+                self.run_control_job_status(&parsed, peer, access_checker, clock)
+            }
+            ControlCommand::JobList => {
+                self.run_control_job_list(&parsed, peer, access_checker, clock)
+            }
+            ControlCommand::JobStop => {
+                self.run_control_job_stop(&parsed, peer, access_checker, controller, clock)
+            }
         }
     }
 }

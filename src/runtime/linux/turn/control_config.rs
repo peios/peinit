@@ -1,3 +1,4 @@
+use crate::runtime::RuntimeJobsChannel;
 use crate::runtime::{RuntimeControlLimits, RuntimeEventRegistrar};
 use crate::supervisor::Supervisor;
 
@@ -15,6 +16,11 @@ impl LinuxShutdownRuntime {
         self.config.control_security = supervisor.control_security().clone();
         self.log_pipes
             .update_config(supervisor.log_config().clone());
+        let jobs_limits = supervisor.jobs_limits();
+        self.jobs_channel
+            .set_max_jobs_connections(jobs_limits.max_connections);
+        self.config.max_jobs_connections = jobs_limits.max_connections;
+        self.jobs_connection_timeout_secs = jobs_limits.connection_timeout_secs;
     }
 
     pub(super) fn runtime_control_limits(&self, supervisor: &Supervisor) -> RuntimeControlLimits {
@@ -35,10 +41,18 @@ impl LinuxShutdownRuntime {
         fds
     }
 
+    pub(super) fn close_idle_jobs_connections(&mut self, now_ns: u64) -> Vec<i32> {
+        let timeout_secs = self.jobs_connection_timeout_secs;
+        self.jobs_channel
+            .close_idle_jobs_connections(&mut self.epoll, now_ns, timeout_secs)
+    }
+
     pub(super) fn runtime_wait_timeout_ms(&self, supervisor: &Supervisor, now_ns: u64) -> i32 {
         deadline_wait_timeout_ms(
             [
                 self.next_control_idle_deadline_ns(),
+                self.jobs_channel
+                    .next_jobs_idle_deadline_ns(self.jobs_connection_timeout_secs),
                 supervisor.next_operation_maintenance_deadline_ns(),
             ]
             .into_iter()

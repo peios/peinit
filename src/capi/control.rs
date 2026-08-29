@@ -1,4 +1,5 @@
 use std::ffi::CString;
+use std::os::fd::{IntoRawFd, OwnedFd};
 
 use libc::{c_char, c_int};
 use serde_json::{Value, json};
@@ -12,11 +13,14 @@ use super::types::{
     peinit_error_t, peinit_response_t,
 };
 
-struct ResponseObject {
+pub(super) struct ResponseObject {
     raw_json: CString,
     status: CString,
     error_code: Option<CString>,
     error_message: Option<CString>,
+    /// The job's process handle, when a jobs-socket `submit` carried one.
+    /// Taken at most once by `peinit_response_take_pidfd`.
+    pidfd: Option<OwnedFd>,
 }
 
 #[unsafe(no_mangle)]
@@ -178,6 +182,86 @@ pub unsafe extern "C" fn peinit_operation_status(
 }
 
 #[unsafe(no_mangle)]
+pub unsafe extern "C" fn peinit_job_status(
+    client: *mut peinit_client_t,
+    job_id: *const c_char,
+    response_out: *mut *mut peinit_response_t,
+    error_out: *mut *mut peinit_error_t,
+) -> c_int {
+    ffi_status(error_out, || {
+        clear_response_out(response_out)?;
+        let job_id = utf8_arg(job_id, "job_id")?;
+        send_request(
+            client,
+            json!({
+                "command": "job-status",
+                "job_id": job_id,
+            }),
+            response_out,
+        )
+    })
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn peinit_job_list(
+    client: *mut peinit_client_t,
+    filter_json: *const c_char,
+    response_out: *mut *mut peinit_response_t,
+    error_out: *mut *mut peinit_error_t,
+) -> c_int {
+    ffi_status(error_out, || {
+        clear_response_out(response_out)?;
+        let mut request = json!({ "command": "job-list" });
+        if !filter_json.is_null() {
+            let filter_json = utf8_arg(filter_json, "filter_json")?;
+            let filter: Value = serde_json::from_str(filter_json)
+                .map_err(|_| ErrorDetail::invalid_argument("filter_json is not valid JSON"))?;
+            let Value::Object(filter) = filter else {
+                return Err(ErrorDetail::invalid_argument(
+                    "filter_json must be a JSON object",
+                ));
+            };
+            for (key, value) in filter {
+                match key.as_str() {
+                    "submitter" | "identity" | "logon_session" | "state" => {
+                        request[key] = value;
+                    }
+                    _ => {
+                        return Err(ErrorDetail::invalid_argument(format!(
+                            "filter_json field {key:?} is not a job-list filter"
+                        )));
+                    }
+                }
+            }
+        }
+        send_request(client, request, response_out)
+    })
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn peinit_job_stop(
+    client: *mut peinit_client_t,
+    job_id: *const c_char,
+    wait: bool,
+    response_out: *mut *mut peinit_response_t,
+    error_out: *mut *mut peinit_error_t,
+) -> c_int {
+    ffi_status(error_out, || {
+        clear_response_out(response_out)?;
+        let job_id = utf8_arg(job_id, "job_id")?;
+        send_request(
+            client,
+            json!({
+                "command": "job-stop",
+                "job_id": job_id,
+                "wait": wait,
+            }),
+            response_out,
+        )
+    })
+}
+
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_reload_config(
     client: *mut peinit_client_t,
     response_out: *mut *mut peinit_response_t,
@@ -253,27 +337,50 @@ fn send_request(
 }
 
 fn response_from_control(response: ControlResponse) -> Result<ResponseObject, ErrorDetail> {
-    let raw_json = CString::new(response.raw_json())
-        .map_err(|_| ErrorDetail::protocol("control response contains an interior NUL byte"))?;
-    let status = CString::new(response.status().as_str())
-        .map_err(|_| ErrorDetail::protocol("invalid response status"))?;
-    let error_code = response
-        .error_code()
-        .map(CString::new)
-        .transpose()
-        .map_err(|_| ErrorDetail::protocol("invalid response error code"))?;
-    let error_message = response
-        .error_message()
-        .map(CString::new)
-        .transpose()
-        .map_err(|_| ErrorDetail::protocol("invalid response error message"))?;
+    ResponseObject::new(
+        response.raw_json(),
+        response.status().as_str(),
+        response.error_code(),
+        response.error_message(),
+        None,
+    )
+}
 
-    Ok(ResponseObject {
-        raw_json,
-        status,
-        error_code,
-        error_message,
-    })
+impl ResponseObject {
+    pub(super) fn new(
+        raw_json: &str,
+        status: &str,
+        error_code: Option<&str>,
+        error_message: Option<&str>,
+        pidfd: Option<OwnedFd>,
+    ) -> Result<Self, ErrorDetail> {
+        let raw_json = CString::new(raw_json)
+            .map_err(|_| ErrorDetail::protocol("response contains an interior NUL byte"))?;
+        let status =
+            CString::new(status).map_err(|_| ErrorDetail::protocol("invalid response status"))?;
+        let error_code = error_code
+            .map(CString::new)
+            .transpose()
+            .map_err(|_| ErrorDetail::protocol("invalid response error code"))?;
+        let error_message = error_message
+            .map(CString::new)
+            .transpose()
+            .map_err(|_| ErrorDetail::protocol("invalid response error message"))?;
+        Ok(Self {
+            raw_json,
+            status,
+            error_code,
+            error_message,
+            pidfd,
+        })
+    }
+
+    /// Hand a response object to the caller through `out`.
+    pub(super) fn store(self, out: *mut *mut peinit_response_t) {
+        unsafe {
+            *out = Box::into_raw(Box::new(self)).cast::<peinit_response_t>();
+        }
+    }
 }
 
 fn clear_client_out(out: *mut *mut peinit_client_t) -> Result<(), ErrorDetail> {
@@ -288,7 +395,7 @@ fn clear_client_out(out: *mut *mut peinit_client_t) -> Result<(), ErrorDetail> {
     Ok(())
 }
 
-fn clear_response_out(out: *mut *mut peinit_response_t) -> Result<(), ErrorDetail> {
+pub(super) fn clear_response_out(out: *mut *mut peinit_response_t) -> Result<(), ErrorDetail> {
     if out.is_null() {
         return Err(ErrorDetail::invalid_argument(
             "response out parameter is NULL",
@@ -361,6 +468,18 @@ pub unsafe extern "C" fn peinit_response_error_code(
             .map_or(std::ptr::null(), |value| value.as_ptr()),
         Err(_) => std::ptr::null(),
     }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn peinit_response_take_pidfd(response: *mut peinit_response_t) -> c_int {
+    if response.is_null() {
+        return -1;
+    }
+    let response = unsafe { &mut *response.cast::<ResponseObject>() };
+    response
+        .pidfd
+        .take()
+        .map_or(-1, |pidfd| pidfd.into_raw_fd())
 }
 
 #[unsafe(no_mangle)]

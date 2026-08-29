@@ -13,6 +13,7 @@ mod relationships;
 mod restart;
 mod shutdown;
 mod start_hooks;
+mod submitted;
 mod terminal_release;
 mod timer;
 mod watchdog;

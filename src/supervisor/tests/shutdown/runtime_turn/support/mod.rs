@@ -62,7 +62,13 @@ pub(super) fn context<'a>(
     AllowAccessChecker,
     FakeRegistrar,
 > {
+    // The context borrows its provider for 'a; a leaked unit struct is the
+    // simplest owner that outlives every caller in this harness.
+    let job_identity_provider: &'a mut crate::runtime::NoJobIdentityProvider =
+        Box::leak(Box::new(crate::runtime::NoJobIdentityProvider));
     RuntimeShutdownEventContext {
+        job_identity_provider,
+        jobs_limits: crate::jobs::socket::JobsSocketLimits::default(),
         clock,
         controller,
         process_launcher: None,

@@ -1,6 +1,7 @@
 #[cfg(any(test, feature = "peios-boundary"))]
 mod console;
 mod event_loop;
+mod jobs;
 #[cfg(feature = "peios-boundary")]
 mod kmes;
 #[cfg(feature = "peios-boundary")]
@@ -25,6 +26,11 @@ pub use event_loop::{
     RuntimeEventWaiter, RuntimeShutdownLoopContext, RuntimeShutdownLoopError,
     RuntimeShutdownLoopTurn, process_runtime_shutdown_loop_turn,
 };
+pub use jobs::{
+    JobSecurityBoundary, NoJobIdentityProvider, NoJobsChannel, RuntimeClock, RuntimeJobsChannel,
+    RuntimeJobsChannelError, RuntimeJobsChannelTable, RuntimeJobsConnectionTurn,
+    RuntimeJobsContext,
+};
 #[cfg(feature = "peios-boundary")]
 pub use linux::{
     DEFAULT_MAX_RUNTIME_EVENTS, LinuxRuntimeConfig, LinuxRuntimeSetupError, LinuxShutdownRuntime,
@@ -40,12 +46,12 @@ pub(crate) use turn::{
 };
 pub use turn::{
     RuntimeCalendarTimerTurn, RuntimeEventRegistrar, RuntimeEventRegistrationError,
-    RuntimeFilesystemCheckHelperTurn, RuntimeLifecycleDeadlineTimer,
-    RuntimeNotifyDatagram, RuntimeNotifyRead, RuntimeNotifyRejection, RuntimeNotifySource,
-    RuntimeNotifySupervisorTurn, RuntimePid1SignalSource, RuntimePowerButtonSource,
-    RuntimePowerButtonTurn, RuntimeProcessSetupTurn, RuntimeRegistryWatchTurn,
-    RuntimeShutdownDeadlineTimer, RuntimeShutdownEventContext, RuntimeShutdownEventSources,
-    RuntimeShutdownEventTurn, RuntimeShutdownEventTurnError, process_runtime_shutdown_event,
+    RuntimeFilesystemCheckHelperTurn, RuntimeLifecycleDeadlineTimer, RuntimeNotifyDatagram,
+    RuntimeNotifyRead, RuntimeNotifyRejection, RuntimeNotifySource, RuntimeNotifySupervisorTurn,
+    RuntimePid1SignalSource, RuntimePowerButtonSource, RuntimePowerButtonTurn,
+    RuntimeProcessSetupTurn, RuntimeRegistryWatchTurn, RuntimeShutdownDeadlineTimer,
+    RuntimeShutdownEventContext, RuntimeShutdownEventSources, RuntimeShutdownEventTurn,
+    RuntimeShutdownEventTurnError, process_runtime_shutdown_event,
 };
 pub use work_pump::{
     RuntimeWorkPumpConfig, RuntimeWorkPumpContext, RuntimeWorkPumpError, RuntimeWorkPumpTurn,

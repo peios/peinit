@@ -22,11 +22,14 @@ pub enum SupervisorControlCommandBodyError {
     OperationIdParse(OperationIdParseError),
     UnknownService { service: String },
     UnknownOperation { operation_id: OperationId },
+    UnknownJob { job_id: crate::ids::JobId },
     Query(QueryError),
     SystemAuthorization(SystemAccessCheckError),
     ServiceAuthorization(ServiceAccessCheckError),
     SystemAccessDenied(Box<SystemAccessDenied>),
     ServiceAccessDenied(Box<ServiceAccessDenied>),
+    JobAuthorization(crate::submitted::JobAccessCheckError),
+    JobAccessDenied(Box<crate::submitted::JobAccessDenied>),
     Supervisor(Box<SupervisorError>),
     ReloadConfig(Box<ReloadConfigError>),
     RegistryUnavailable,
@@ -35,11 +38,11 @@ pub enum SupervisorControlCommandBodyError {
 }
 
 impl SupervisorControlCommandBodyError {
-    pub(super) fn serialize(error: serde_json::Error) -> Self {
+    pub(in crate::supervisor) fn serialize(error: serde_json::Error) -> Self {
         Self::ResponseSerialize(error.to_string())
     }
 
-    pub(super) fn supervisor(error: SupervisorError) -> Self {
+    pub(in crate::supervisor) fn supervisor(error: SupervisorError) -> Self {
         Self::Supervisor(Box::new(error))
     }
 
@@ -66,6 +69,19 @@ impl SupervisorControlCommandBodyError {
             Self::UnknownOperation { operation_id } => (
                 ControlErrorCode::UnknownOperation,
                 Cow::Owned(format!("unknown operation {operation_id}")),
+            ),
+            Self::UnknownJob { job_id } => (
+                ControlErrorCode::UnknownJob,
+                Cow::Owned(format!("unknown job {job_id}")),
+            ),
+            Self::JobAuthorization(_) => internal_control_error(),
+            Self::JobAccessDenied(error) => (
+                ControlErrorCode::AccessDenied,
+                Cow::Owned(format!(
+                    "caller lacks {} on job {}",
+                    error.desired_access.label(),
+                    error.job_id,
+                )),
             ),
             Self::Query(QueryError::UnknownService { service }) => (
                 ControlErrorCode::UnknownService,

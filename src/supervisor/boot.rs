@@ -26,6 +26,7 @@ impl Supervisor {
             shutdown_settings,
             control_security,
             control_limits,
+            jobs_limits,
             log_config,
             service_table,
             global_environment,
@@ -76,6 +77,7 @@ impl Supervisor {
         work.eventd_log_socket_path = eventd_log_socket_path;
         work.control_security = control_security;
         work.control_limits = control_limits;
+        work.jobs_limits = jobs_limits;
         work.log_config = log_config;
         let context_id = work
             .graph

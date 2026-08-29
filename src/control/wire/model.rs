@@ -7,6 +7,10 @@ pub struct ParsedControlRequest {
     pub wait: bool,
     pub shutdown_kind: Option<ShutdownKind>,
     pub operation_id: Option<String>,
+    /// `job_id` for `job-status` and `job-stop`.
+    pub job_id: Option<String>,
+    /// The `job-list` filters.
+    pub job_filter: Option<crate::submitted::SubmittedJobListFilter>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -21,6 +25,9 @@ pub enum ControlCommand {
     Shutdown,
     ReloadConfig,
     OperationStatus,
+    JobList,
+    JobStatus,
+    JobStop,
 }
 
 impl ControlCommand {
@@ -36,6 +43,9 @@ impl ControlCommand {
             "shutdown" => Some(Self::Shutdown),
             "reload-config" => Some(Self::ReloadConfig),
             "operation-status" => Some(Self::OperationStatus),
+            "job-list" => Some(Self::JobList),
+            "job-status" => Some(Self::JobStatus),
+            "job-stop" => Some(Self::JobStop),
             _ => None,
         }
     }
@@ -52,11 +62,17 @@ impl ControlCommand {
             Self::Shutdown => "shutdown",
             Self::ReloadConfig => "reload-config",
             Self::OperationStatus => "operation-status",
+            Self::JobList => "job-list",
+            Self::JobStatus => "job-status",
+            Self::JobStop => "job-stop",
         }
     }
 
     pub fn default_wait(self) -> bool {
-        matches!(self, Self::Start | Self::Stop | Self::Restart)
+        matches!(
+            self,
+            Self::Start | Self::Stop | Self::Restart | Self::JobStop
+        )
     }
 }
 
@@ -72,6 +88,7 @@ pub enum ControlErrorCode {
     AccessDenied,
     UnknownService,
     UnknownOperation,
+    UnknownJob,
     MalformedRequest,
     RequestTooLarge,
     InvalidCommand,
@@ -87,6 +104,7 @@ impl ControlErrorCode {
             "ACCESS_DENIED" => Some(Self::AccessDenied),
             "UNKNOWN_SERVICE" => Some(Self::UnknownService),
             "UNKNOWN_OPERATION" => Some(Self::UnknownOperation),
+            "UNKNOWN_JOB" => Some(Self::UnknownJob),
             "MALFORMED_REQUEST" => Some(Self::MalformedRequest),
             "REQUEST_TOO_LARGE" => Some(Self::RequestTooLarge),
             "INVALID_COMMAND" => Some(Self::InvalidCommand),
@@ -103,6 +121,7 @@ impl ControlErrorCode {
             Self::AccessDenied => "ACCESS_DENIED",
             Self::UnknownService => "UNKNOWN_SERVICE",
             Self::UnknownOperation => "UNKNOWN_OPERATION",
+            Self::UnknownJob => "UNKNOWN_JOB",
             Self::MalformedRequest => "MALFORMED_REQUEST",
             Self::RequestTooLarge => "REQUEST_TOO_LARGE",
             Self::InvalidCommand => "INVALID_COMMAND",

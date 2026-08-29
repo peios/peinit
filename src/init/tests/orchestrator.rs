@@ -685,12 +685,10 @@ fn phase1_infrastructure_warnings_are_logged_and_do_not_block_runtime() {
     assert!(runtime.entered);
     assert_eq!(
         platform.warning_logs,
-        vec![
-            Phase1InfrastructureWarning::LoopbackBringUp {
-                interface: "lo".to_string(),
-                message: "netlink failed".to_string(),
-            },
-        ],
+        vec![Phase1InfrastructureWarning::LoopbackBringUp {
+            interface: "lo".to_string(),
+            message: "netlink failed".to_string(),
+        },],
     );
 }
 

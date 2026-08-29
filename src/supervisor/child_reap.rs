@@ -5,10 +5,10 @@ mod signal;
 pub use model::{SupervisorChildReapDispatch, SupervisorChildReapTurn};
 
 use crate::boundary::{ChildExitStatus, ChildReap, ProcessController, ShutdownFinalizer};
-use crate::job::JobExit;
+use crate::job::{JobExit, JobType};
 
 use super::state::{Supervisor, SupervisorError};
-use signal::signal_failure_cause;
+pub(in crate::supervisor) use signal::signal_failure_cause;
 
 impl Supervisor {
     pub fn apply_reaped_child<P, F>(
@@ -32,7 +32,14 @@ impl Supervisor {
             .ok_or(crate::job::JobStoreError::UnknownJob { id: job_id })
             .map_err(SupervisorError::JobStore)?;
 
-        let dispatch = if self.shutdown.is_some() {
+        let dispatch = if job_type == JobType::Submitted {
+            let terminal =
+                self.apply_submitted_reap(job_id, child.status, ended_at_ns, controller)?;
+            if self.shutdown.is_some() {
+                self.advance_shutdown_after_submitted_job(controller, ended_at_ns)?;
+            }
+            SupervisorChildReapDispatch::Submitted(Box::new(terminal))
+        } else if self.shutdown.is_some() {
             SupervisorChildReapDispatch::Shutdown(Box::new(match child.status {
                 ChildExitStatus::Exited { code } => {
                     self.complete_shutdown_job(job_id, ended_at_ns, code, controller)?

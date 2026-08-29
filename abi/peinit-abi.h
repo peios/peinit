@@ -33,6 +33,8 @@ typedef void peinit_error_t;
 
 typedef void peinit_response_t;
 
+typedef void peinit_jobs_t;
+
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
@@ -52,11 +54,73 @@ int peinit_control_raw_json(peinit_client_t *client,
 
 const char *peinit_default_control_socket_path(void);
 
+const char *peinit_default_jobs_socket_path(void);
+
 int peinit_error_code(const peinit_error_t *error);
 
 void peinit_error_free(peinit_error_t *error);
 
 const char *peinit_error_message(const peinit_error_t *error);
+
+int peinit_job_list(peinit_client_t *client,
+                    const char *filter_json,
+                    peinit_response_t **response_out,
+                    peinit_error_t **error_out);
+
+int peinit_job_status(peinit_client_t *client,
+                      const char *job_id,
+                      peinit_response_t **response_out,
+                      peinit_error_t **error_out);
+
+int peinit_job_stop(peinit_client_t *client,
+                    const char *job_id,
+                    bool wait,
+                    peinit_response_t **response_out,
+                    peinit_error_t **error_out);
+
+int peinit_job_submit(peinit_jobs_t *jobs,
+                      const char *definition_json,
+                      int token_fd,
+                      const int *fds,
+                      size_t fd_count,
+                      peinit_response_t **response_out,
+                      peinit_error_t **error_out);
+
+int peinit_jobs_connect_default(peinit_jobs_t **out, peinit_error_t **error_out);
+
+int peinit_jobs_connect_path(const char *path, peinit_jobs_t **out, peinit_error_t **error_out);
+
+int peinit_jobs_fd(const peinit_jobs_t *jobs);
+
+void peinit_jobs_free(peinit_jobs_t *jobs);
+
+int peinit_jobs_raw_json(peinit_jobs_t *jobs,
+                         const char *request_json,
+                         peinit_response_t **response_out,
+                         peinit_error_t **error_out);
+
+int peinit_jobs_signal(peinit_jobs_t *jobs,
+                       const char *job_id,
+                       int signal,
+                       peinit_response_t **response_out,
+                       peinit_error_t **error_out);
+
+int peinit_jobs_status(peinit_jobs_t *jobs,
+                       const char *job_id,
+                       peinit_response_t **response_out,
+                       peinit_error_t **error_out);
+
+int peinit_jobs_stop(peinit_jobs_t *jobs,
+                     const char *job_id,
+                     bool wait,
+                     peinit_response_t **response_out,
+                     peinit_error_t **error_out);
+
+int peinit_jobs_wait(peinit_jobs_t *jobs,
+                     const char *job_id,
+                     bool for_ready,
+                     peinit_response_t **response_out,
+                     peinit_error_t **error_out);
 
 const char *peinit_library_version(void);
 
@@ -98,6 +162,8 @@ int peinit_response_is_ok(const peinit_response_t *response);
 const char *peinit_response_json(const peinit_response_t *response);
 
 const char *peinit_response_status(const peinit_response_t *response);
+
+int peinit_response_take_pidfd(peinit_response_t *response);
 
 int peinit_service_list(peinit_client_t *client,
                         peinit_response_t **response_out,

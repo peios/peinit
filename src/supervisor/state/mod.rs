@@ -18,10 +18,12 @@ use crate::execution::start::StartExecutionStore;
 use crate::fd_store::FdStoreTable;
 use crate::ids::{JobId, JobIdAllocator, OperationIdAllocator};
 use crate::job::JobStore;
+use crate::jobs::socket::JobsSocketLimits;
 use crate::logging::RuntimeLogConfig;
 use crate::operation::store::OperationStore;
 use crate::service::{ServiceEnvironmentVariable, ServiceTable};
 use crate::shutdown::{ShutdownRuntime, ShutdownSignalTracker};
+use crate::submitted::SubmittedJobStore;
 
 use super::boot_settle::BootSettleTracker;
 use super::boot_success::BootSuccessTracker;
@@ -45,6 +47,7 @@ pub struct Supervisor {
     pub(super) watchdog: WatchdogStore,
     pub(super) control_security: ControlSecurityDescriptor,
     pub(super) control_limits: ControlSocketLimits,
+    pub(super) jobs_limits: JobsSocketLimits,
     pub(super) log_config: RuntimeLogConfig,
     pub(super) global_environment: Vec<ServiceEnvironmentVariable>,
     pub(super) eventd_log_socket_path: Option<String>,
@@ -57,6 +60,8 @@ pub struct Supervisor {
     pub(super) pending_post_hook_launches: VecDeque<JobId>,
     pub(super) pending_control_launches: VecDeque<JobId>,
     pub(super) pending_health_launches: VecDeque<JobId>,
+    pub(super) submitted: SubmittedJobStore,
+    pub(super) pending_submitted_launches: VecDeque<JobId>,
     pub(super) pending_process_setups: BTreeMap<i32, PendingLaunchSetup>,
     pub(super) pending_control_operations: VecDeque<PendingControlOperation>,
     pub(super) retained_service_launches: Vec<LaunchCreatedJobDispatch>,
@@ -81,6 +86,7 @@ impl Supervisor {
             watchdog: WatchdogStore::new(),
             control_security: ControlSecurityDescriptor::Default,
             control_limits: ControlSocketLimits::default(),
+            jobs_limits: JobsSocketLimits::default(),
             log_config: RuntimeLogConfig::default(),
             global_environment: Vec::new(),
             eventd_log_socket_path: None,
@@ -93,6 +99,8 @@ impl Supervisor {
             pending_post_hook_launches: VecDeque::new(),
             pending_control_launches: VecDeque::new(),
             pending_health_launches: VecDeque::new(),
+            submitted: SubmittedJobStore::new(),
+            pending_submitted_launches: VecDeque::new(),
             pending_process_setups: BTreeMap::new(),
             pending_control_operations: VecDeque::new(),
             retained_service_launches: Vec::new(),

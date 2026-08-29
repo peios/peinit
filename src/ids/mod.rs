@@ -6,4 +6,4 @@ mod uuid_v7;
 mod tests;
 
 pub use allocator::{IdAllocationError, JobIdAllocator, OperationIdAllocator};
-pub use model::{JobId, OperationId, OperationIdParseError};
+pub use model::{JobId, JobIdParseError, OperationId, OperationIdParseError};

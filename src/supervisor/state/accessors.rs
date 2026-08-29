@@ -45,6 +45,18 @@ impl Supervisor {
         self.control_limits
     }
 
+    pub fn jobs_limits(&self) -> crate::jobs::socket::JobsSocketLimits {
+        self.jobs_limits
+    }
+
+    pub fn submitted_jobs(&self) -> &crate::submitted::SubmittedJobStore {
+        &self.submitted
+    }
+
+    pub fn pending_submitted_launch_jobs(&self) -> Vec<JobId> {
+        self.pending_submitted_launches.iter().copied().collect()
+    }
+
     pub fn log_config(&self) -> &RuntimeLogConfig {
         &self.log_config
     }

@@ -1,6 +1,7 @@
 use crate::boundary::BoundaryError;
 use crate::control::socket::ControlSocketLimits;
 use crate::control::system::ControlSecurityDescriptor;
+use crate::jobs::socket::JobsSocketLimits;
 use crate::logging::RuntimeLogConfig;
 use crate::registry::RegistryConfigWarning;
 use crate::service::{
@@ -16,6 +17,7 @@ pub struct ReloadConfigOutcome {
     pub config_warnings: Vec<RegistryConfigWarning>,
     pub control_security: ControlSecurityDescriptor,
     pub control_limits: ControlSocketLimits,
+    pub jobs_limits: JobsSocketLimits,
     pub log_config: RuntimeLogConfig,
     pub shutdown_settings: ShutdownSettings,
     pub global_environment: Vec<ServiceEnvironmentVariable>,

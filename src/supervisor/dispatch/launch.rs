@@ -30,6 +30,8 @@ pub enum SupervisorProcessSetupDispatch {
     ControlTimeout(Box<SupervisorReloadCommandTimeoutDispatch>),
     HealthCheckLaunched(SupervisorHealthCheckLaunchDispatch),
     HealthCheckFailed(Box<SupervisorHealthCheckLaunchFailureDispatch>),
+    SubmittedLaunched(super::submitted::SupervisorSubmittedLaunchDispatch),
+    SubmittedFailed(super::submitted::SupervisorSubmittedLaunchFailureDispatch),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

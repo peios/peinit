@@ -4,13 +4,13 @@ use crate::ids::JobIdAllocator;
 use crate::job::{JobEvent, JobRecord, JobState, SubmittedJobSpec};
 use crate::security::TokenSummary;
 
+use super::security::JobSecurityDescriptor;
 use super::{
-    JobIdentity, JobProgress, JobProgressUnit, JobReadiness, ProgressParseError,
-    SubmittedJobCause, SubmittedJobDeadlineKind, SubmittedJobDefinitionError, SubmittedJobEntry,
+    JobIdentity, JobProgress, JobProgressUnit, JobReadiness, ProgressParseError, SubmittedJobCause,
+    SubmittedJobDeadlineKind, SubmittedJobDefinitionError, SubmittedJobEntry,
     SubmittedJobListFilter, SubmittedJobStore, job_view, parse_progress, parse_progress_unit,
     parse_submitted_job_definition,
 };
-use super::security::JobSecurityDescriptor;
 
 const CREATED_NS: u64 = 1_000_000_000;
 
@@ -20,9 +20,8 @@ fn object(value: serde_json::Value) -> serde_json::Map<String, serde_json::Value
 
 #[test]
 fn definition_defaults_are_the_specified_ones() {
-    let definition =
-        parse_submitted_job_definition(&object(json!({"image_path": "/bin/true"})), 0)
-            .expect("definition");
+    let definition = parse_submitted_job_definition(&object(json!({"image_path": "/bin/true"})), 0)
+        .expect("definition");
     assert_eq!(definition.image_path, "/bin/true");
     assert!(definition.arguments.is_empty());
     assert_eq!(definition.working_directory, "/");
@@ -40,7 +39,10 @@ fn definition_rejects_relative_and_nul_paths() {
         .expect_err("relative");
     assert!(matches!(
         err,
-        SubmittedJobDefinitionError::InvalidField { field: "image_path", .. }
+        SubmittedJobDefinitionError::InvalidField {
+            field: "image_path",
+            ..
+        }
     ));
     let err = parse_submitted_job_definition(
         &object(json!({"image_path": "/bin/true", "working_directory": "/tmp\u{0}x"})),
@@ -49,7 +51,10 @@ fn definition_rejects_relative_and_nul_paths() {
     .expect_err("nul");
     assert!(matches!(
         err,
-        SubmittedJobDefinitionError::InvalidField { field: "working_directory", .. }
+        SubmittedJobDefinitionError::InvalidField {
+            field: "working_directory",
+            ..
+        }
     ));
 }
 
@@ -62,7 +67,10 @@ fn definition_rejects_environment_names_with_equals() {
     .expect_err("equals");
     assert!(matches!(
         err,
-        SubmittedJobDefinitionError::InvalidField { field: "environment", .. }
+        SubmittedJobDefinitionError::InvalidField {
+            field: "environment",
+            ..
+        }
     ));
 }
 
@@ -75,7 +83,10 @@ fn definition_rejects_zero_stop_timeout_and_unknown_readiness() {
     .expect_err("stop_timeout");
     assert!(matches!(
         err,
-        SubmittedJobDefinitionError::InvalidField { field: "stop_timeout", .. }
+        SubmittedJobDefinitionError::InvalidField {
+            field: "stop_timeout",
+            ..
+        }
     ));
     let err = parse_submitted_job_definition(
         &object(json!({"image_path": "/bin/true", "readiness": "alive"})),
@@ -84,7 +95,10 @@ fn definition_rejects_zero_stop_timeout_and_unknown_readiness() {
     .expect_err("readiness");
     assert!(matches!(
         err,
-        SubmittedJobDefinitionError::InvalidField { field: "readiness", .. }
+        SubmittedJobDefinitionError::InvalidField {
+            field: "readiness",
+            ..
+        }
     ));
 }
 
@@ -111,7 +125,10 @@ fn definition_rejects_descriptor_names_with_colons() {
     .expect_err("colon");
     assert!(matches!(
         err,
-        SubmittedJobDefinitionError::InvalidField { field: "descriptors", .. }
+        SubmittedJobDefinitionError::InvalidField {
+            field: "descriptors",
+            ..
+        }
     ));
 }
 
@@ -124,7 +141,10 @@ fn definition_rejects_exit_codes_outside_a_byte() {
     .expect_err("range");
     assert!(matches!(
         err,
-        SubmittedJobDefinitionError::InvalidField { field: "success_exit_codes", .. }
+        SubmittedJobDefinitionError::InvalidField {
+            field: "success_exit_codes",
+            ..
+        }
     ));
 }
 
@@ -132,15 +152,27 @@ fn definition_rejects_exit_codes_outside_a_byte() {
 fn progress_grammar_has_three_forms() {
     assert_eq!(
         parse_progress("7").expect("count"),
-        JobProgress { current: 7, total: None, bounded: false }
+        JobProgress {
+            current: 7,
+            total: None,
+            bounded: false
+        }
     );
     assert_eq!(
         parse_progress("7/").expect("pending total"),
-        JobProgress { current: 7, total: None, bounded: true }
+        JobProgress {
+            current: 7,
+            total: None,
+            bounded: true
+        }
     );
     assert_eq!(
         parse_progress("7/10").expect("bounded"),
-        JobProgress { current: 7, total: Some(10), bounded: true }
+        JobProgress {
+            current: 7,
+            total: Some(10),
+            bounded: true
+        }
     );
 }
 
@@ -159,7 +191,11 @@ fn progress_grammar_rejects_what_the_spec_rejects() {
     assert_eq!(parse_progress_unit("furlongs"), None);
 }
 
-fn entry(store: &mut SubmittedJobStore, timeout_secs: u64, readiness: JobReadiness) -> SubmittedJobEntry {
+fn entry(
+    store: &mut SubmittedJobStore,
+    timeout_secs: u64,
+    readiness: JobReadiness,
+) -> SubmittedJobEntry {
     let mut ids = JobIdAllocator::new();
     let job_id = ids.allocate_batch(1, CREATED_NS).expect("id")[0];
     let mut definition = parse_submitted_job_definition(
@@ -186,6 +222,7 @@ fn entry(store: &mut SubmittedJobStore, timeout_secs: u64, readiness: JobReadine
         progress: None,
         progress_unit: None,
         last_status_event_ns: None,
+        stopping_acknowledged: false,
         cause: None,
         stop: None,
         outcome: None,
@@ -216,7 +253,11 @@ fn record(entry: &SubmittedJobEntry) -> JobRecord {
 fn timeout_and_readiness_deadlines_count_from_the_start() {
     let mut store = SubmittedJobStore::new();
     let entry = entry(&mut store, 5, JobReadiness::Notify);
-    assert_eq!(store.next_deadline(|_| None), None, "no deadline before exec");
+    assert_eq!(
+        store.next_deadline(|_| None),
+        None,
+        "no deadline before exec"
+    );
     let started = CREATED_NS + 1;
     let next = store.next_deadline(|_| Some(started)).expect("deadline");
     assert_eq!(next.kind, SubmittedJobDeadlineKind::Timeout);
@@ -235,15 +276,19 @@ fn a_stop_replaces_the_other_deadlines_and_is_not_restarted() {
     let mut store = SubmittedJobStore::new();
     let entry = entry(&mut store, 5, JobReadiness::None);
     let started = CREATED_NS + 1;
-    assert!(store
-        .begin_stop(entry.job_id, SubmittedJobCause::ExplicitStop, started + 10)
-        .expect("stop"));
+    assert!(
+        store
+            .begin_stop(entry.job_id, SubmittedJobCause::ExplicitStop, started + 10)
+            .expect("stop")
+    );
     let next = store.next_deadline(|_| Some(started)).expect("deadline");
     assert_eq!(next.kind, SubmittedJobDeadlineKind::StopKill);
     assert_eq!(next.due_at_ns, started + 10 + 10_000_000_000);
-    assert!(!store
-        .begin_stop(entry.job_id, SubmittedJobCause::Timeout, started + 20)
-        .expect("second stop"));
+    assert!(
+        !store
+            .begin_stop(entry.job_id, SubmittedJobCause::Timeout, started + 20)
+            .expect("second stop")
+    );
     assert_eq!(
         store.get(entry.job_id).expect("entry").cause,
         Some(SubmittedJobCause::ExplicitStop),
@@ -263,19 +308,31 @@ fn the_outcome_is_retained_then_purged() {
     let entry = entry(&mut store, 0, JobReadiness::None);
     let mut record = record(&entry);
     record
-        .start(crate::job::ProcessHandle { pid: 42, pidfd: 9 }, CREATED_NS + 1)
+        .start(
+            crate::job::ProcessHandle { pid: 42, pidfd: 9 },
+            CREATED_NS + 1,
+        )
         .expect("start");
     record.complete(CREATED_NS + 2, 0).expect("complete");
     let event = JobEvent::ended(&record).expect("event");
-    let retained = store.record_terminal(&event, 60_000_000_000).expect("terminal");
-    assert_eq!(retained.outcome.as_ref().expect("outcome").state, JobState::Completed);
+    let retained = store
+        .record_terminal(&event, 60_000_000_000)
+        .expect("terminal");
+    assert_eq!(
+        retained.outcome.as_ref().expect("outcome").state,
+        JobState::Completed
+    );
     assert!(!retained.is_live());
     assert_eq!(store.live_count_for_submitter("S-1-5-80-1"), 0);
     assert_eq!(
         store.next_retention_deadline_ns(),
         Some(CREATED_NS + 2 + 60_000_000_000)
     );
-    assert!(store.purge_retained_until(CREATED_NS + 2 + 59_000_000_000).is_empty());
+    assert!(
+        store
+            .purge_retained_until(CREATED_NS + 2 + 59_000_000_000)
+            .is_empty()
+    );
     assert_eq!(
         store.purge_retained_until(CREATED_NS + 2 + 60_000_000_000),
         vec![entry.job_id]
@@ -306,7 +363,10 @@ fn the_view_of_a_live_job_comes_from_its_record() {
     let entry = entry(&mut store, 0, JobReadiness::None);
     let mut record = record(&entry);
     record
-        .start(crate::job::ProcessHandle { pid: 42, pidfd: 9 }, CREATED_NS + 1)
+        .start(
+            crate::job::ProcessHandle { pid: 42, pidfd: 9 },
+            CREATED_NS + 1,
+        )
         .expect("start");
     let view = job_view(&entry, Some(&record)).expect("view");
     assert_eq!(view.state.state, JobState::Running);
@@ -321,12 +381,19 @@ fn list_filters_all_hold_together() {
     let mut store = SubmittedJobStore::new();
     let entry = entry(&mut store, 0, JobReadiness::None);
     let all = SubmittedJobListFilter::default();
-    assert_eq!(store.filtered_ids(&all, |_| JobState::Running), vec![entry.job_id]);
+    assert_eq!(
+        store.filtered_ids(&all, |_| JobState::Running),
+        vec![entry.job_id]
+    );
     let wrong_session = SubmittedJobListFilter {
         logon_session: Some(7),
         ..SubmittedJobListFilter::default()
     };
-    assert!(store.filtered_ids(&wrong_session, |_| JobState::Running).is_empty());
+    assert!(
+        store
+            .filtered_ids(&wrong_session, |_| JobState::Running)
+            .is_empty()
+    );
     let right_both = SubmittedJobListFilter {
         submitter_sid: Some("S-1-5-80-1".to_string()),
         state: Some(JobState::Running),

@@ -1,5 +1,6 @@
 use crate::control::socket::ControlSocketLimits;
 use crate::control::system::ControlSecurityDescriptor;
+use crate::jobs::socket::JobsSocketLimits;
 use crate::provisioning::ProvisionedPathRegistrySnapshot;
 use crate::registry::SUPPORTED_SERVICES_SCHEMA_VERSION;
 use crate::service::{ServiceDefinition, ServiceEnvironmentVariable};
@@ -155,6 +156,10 @@ pub trait RegistryClient {
 
     fn read_control_socket_limits(&mut self) -> Result<ControlSocketLimits, BoundaryError> {
         Ok(ControlSocketLimits::default())
+    }
+
+    fn read_jobs_socket_limits(&mut self) -> Result<JobsSocketLimits, BoundaryError> {
+        Ok(JobsSocketLimits::default())
     }
 
     fn read_timer_last_run(

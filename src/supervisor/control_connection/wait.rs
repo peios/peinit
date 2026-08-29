@@ -1,10 +1,11 @@
 use crate::control::connection::{
     ControlConnectionIo, ControlConnectionRecord, ControlConnectionTable,
-    ControlConnectionWriteTurn, ControlConnectionWriteTurnError,
+    ControlConnectionWriteTurn, ControlConnectionWriteTurnError, ControlPendingWait,
 };
 use crate::control::query::QueryError;
 use crate::control::wire::{
-    ControlErrorCode, control_error_response_line, control_lifecycle_ack_response_line_with_mode,
+    ControlErrorCode, ControlResponseTimeProjection, control_error_response_line,
+    control_lifecycle_ack_response_line_with_mode,
 };
 use crate::ids::OperationId;
 use crate::operation::{OperationRecord, OperationType, is_operation_timeout};
@@ -15,6 +16,7 @@ impl Supervisor {
         &self,
         connections: &mut ControlConnectionTable<ControlConnectionRecord<I>>,
         observed_at_ns: u64,
+        realtime_now_ns: u64,
     ) -> Result<SupervisorControlWaitFlushTurn, SupervisorControlWaitFlushError>
     where
         I: ControlConnectionIo,
@@ -24,16 +26,44 @@ impl Supervisor {
             let Some(connection) = connections.get_mut(fd) else {
                 continue;
             };
-            let Some(wait) = connection.state().pending_wait().cloned() else {
+            let Some(pending) = connection.state().pending_wait().cloned() else {
                 continue;
             };
-            if !self.wait_is_ready(wait.operation_id, observed_at_ns) {
-                continue;
-            }
-
-            let response_line = self
-                .control_wait_response_line(wait.operation_id, &wait.service, observed_at_ns)
-                .map_err(SupervisorControlWaitFlushError::Response)?;
+            let (response_line, wait) = match pending {
+                ControlPendingWait::Operation(wait) => {
+                    if !self.wait_is_ready(wait.operation_id, observed_at_ns) {
+                        continue;
+                    }
+                    let line = self
+                        .control_wait_response_line(
+                            wait.operation_id,
+                            &wait.service,
+                            observed_at_ns,
+                        )
+                        .map_err(SupervisorControlWaitFlushError::Response)?;
+                    (
+                        line,
+                        SupervisorControlWaitCompletion::Operation(wait.operation_id),
+                    )
+                }
+                ControlPendingWait::Job { job_id } => {
+                    if !self.submitted_job_terminal(job_id) {
+                        continue;
+                    }
+                    let line = self
+                        .control_job_view_line(
+                            job_id,
+                            ControlResponseTimeProjection::new(observed_at_ns, realtime_now_ns),
+                        )
+                        .map_err(|error| {
+                            SupervisorControlWaitFlushError::Response(
+                                SupervisorControlWaitResponseError::Serialize(error.to_string()),
+                            )
+                        })?
+                        .unwrap_or_default();
+                    (line, SupervisorControlWaitCompletion::Job(job_id))
+                }
+            };
             connection.state_mut().clear_pending_wait();
             connection
                 .state_mut()
@@ -50,7 +80,7 @@ impl Supervisor {
             }
             completed.push(SupervisorControlWaitFlush {
                 fd,
-                operation_id: wait.operation_id,
+                completion: wait,
                 write,
             });
         }
@@ -129,8 +159,14 @@ pub struct SupervisorControlWaitFlushTurn {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SupervisorControlWaitFlush {
     pub fd: i32,
-    pub operation_id: OperationId,
+    pub completion: SupervisorControlWaitCompletion,
     pub write: ControlConnectionWriteTurn,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SupervisorControlWaitCompletion {
+    Operation(OperationId),
+    Job(crate::ids::JobId),
 }
 
 #[derive(Debug)]

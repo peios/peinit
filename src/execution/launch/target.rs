@@ -10,6 +10,7 @@ pub(super) enum LaunchTarget {
     PreExecHook,
     PostExecHook,
     HealthCheck,
+    Submitted,
 }
 
 impl LaunchTarget {
@@ -30,9 +31,11 @@ impl LaunchTarget {
     ) -> Result<LaunchedProcess, BoundaryError> {
         match self {
             Self::ServiceMain => launcher.launch_service(spec),
-            Self::ReloadHook | Self::PreExecHook | Self::PostExecHook | Self::HealthCheck => {
-                launcher.launch_job(spec)
-            }
+            Self::ReloadHook
+            | Self::PreExecHook
+            | Self::PostExecHook
+            | Self::HealthCheck
+            | Self::Submitted => launcher.launch_job(spec),
         }
     }
 
@@ -43,6 +46,7 @@ impl LaunchTarget {
             Self::PreExecHook => validate_pre_exec_hook_job(job),
             Self::PostExecHook => validate_post_exec_hook_job(job),
             Self::HealthCheck => validate_health_check_job(job),
+            Self::Submitted => validate_submitted_job(job),
         }
     }
 }
@@ -95,6 +99,17 @@ fn validate_health_check_job(job: &JobRecord) -> Result<(), LaunchCreatedJobErro
         Ok(())
     } else {
         Err(LaunchCreatedJobError::NotHealthCheckJob {
+            job_id: job.id,
+            job_type: job.job_type,
+        })
+    }
+}
+
+fn validate_submitted_job(job: &JobRecord) -> Result<(), LaunchCreatedJobError> {
+    if job.job_type == JobType::Submitted {
+        Ok(())
+    } else {
+        Err(LaunchCreatedJobError::NotSubmittedJob {
             job_id: job.id,
             job_type: job.job_type,
         })

@@ -26,7 +26,9 @@ impl LinuxJobsConnection {
     {
         use std::os::fd::AsFd;
 
-        use crate::control::system::{SystemAccessCheckError, peios_control_peer_from_connected_socket};
+        use crate::control::system::{
+            SystemAccessCheckError, peios_control_peer_from_connected_socket,
+        };
 
         let control = peios_control_peer_from_connected_socket(self.fd.as_fd())?;
         let pidfd = peios::socket::peer_pidfd(self.fd.as_fd())

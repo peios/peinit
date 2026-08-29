@@ -2,9 +2,10 @@ use crate::boundary::ChildReap;
 use crate::ids::JobId;
 
 use super::super::dispatch::{
-    SupervisorHealthCheckTerminalDispatch, SupervisorPostStartHookTerminalDispatch,
-    SupervisorPreStartHookTerminalDispatch, SupervisorReloadCommandTerminalDispatch,
-    SupervisorShutdownTerminalDispatch, SupervisorTerminalDispatch,
+    SupervisedSubmittedTerminalDispatch, SupervisorHealthCheckTerminalDispatch,
+    SupervisorPostStartHookTerminalDispatch, SupervisorPreStartHookTerminalDispatch,
+    SupervisorReloadCommandTerminalDispatch, SupervisorShutdownTerminalDispatch,
+    SupervisorTerminalDispatch,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -27,4 +28,5 @@ pub enum SupervisorChildReapDispatch {
     ReloadCommand(Box<SupervisorReloadCommandTerminalDispatch>),
     HealthCheck(Box<SupervisorHealthCheckTerminalDispatch>),
     Shutdown(Box<SupervisorShutdownTerminalDispatch>),
+    Submitted(Box<SupervisedSubmittedTerminalDispatch>),
 }

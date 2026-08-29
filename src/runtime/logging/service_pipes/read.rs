@@ -36,10 +36,15 @@ impl RuntimeServiceLogPipes {
         };
         let timestamp_ns = clock.realtime_ns().unwrap_or(0);
         let read = pipe.read_available(timestamp_ns, self.config.read_bytes_per_event);
+        let job_id = pipe.job_id();
         self.forward_or_buffer_records(&read.records, sink);
+        let output_dropped = job_id.and_then(|job_id| self.tee_to_sink(job_id, &read.records));
         if read.closed {
             let _ = registrar.unregister_source(fd);
             self.pipes.remove(&fd);
+            if let Some(job_id) = job_id {
+                self.release_sink_pipe(job_id);
+            }
         }
         RuntimeLogPipeTurn::Read {
             fd,
@@ -47,6 +52,51 @@ impl RuntimeServiceLogPipes {
             closed: read.closed,
             would_block: read.would_block,
             buffered_records: self.pre_eventd.records().len(),
+            output_dropped,
+        }
+    }
+
+    /// Write each line to the job's sink, dropping for the sink alone when it
+    /// would block. Returns the job whose sink dropped for the first time.
+    fn tee_to_sink(
+        &mut self,
+        job_id: crate::ids::JobId,
+        records: &[ServiceLogRecord],
+    ) -> Option<crate::ids::JobId> {
+        let sink = self.sinks.get_mut(&job_id)?;
+        let mut first_drop = false;
+        for record in records {
+            let mut line = record.message.clone().into_bytes();
+            line.push(b'\n');
+            match write_whole(&sink.fd, &line) {
+                SinkWrite::Written => {}
+                SinkWrite::WouldBlock => {
+                    sink.dropped += 1;
+                    if !sink.drop_reported {
+                        sink.drop_reported = true;
+                        first_drop = true;
+                    }
+                }
+                SinkWrite::Failed => {
+                    // Anything but would-block: the sink is gone.
+                    self.sinks.remove(&job_id);
+                    return first_drop.then_some(job_id);
+                }
+            }
+        }
+        first_drop.then_some(job_id)
+    }
+
+    fn release_sink_pipe(&mut self, job_id: crate::ids::JobId) {
+        let close = match self.sinks.get_mut(&job_id) {
+            Some(sink) => {
+                sink.open_pipes = sink.open_pipes.saturating_sub(1);
+                sink.open_pipes == 0
+            }
+            None => false,
+        };
+        if close {
+            self.sinks.remove(&job_id);
         }
     }
 
@@ -72,4 +122,39 @@ impl RuntimeServiceLogPipes {
             break;
         }
     }
+}
+
+enum SinkWrite {
+    Written,
+    WouldBlock,
+    Failed,
+}
+
+/// A whole-line write on a non-blocking descriptor: all of it, or none of
+/// it counted, so a partial line never reaches the submitter.
+fn write_whole(fd: &std::os::fd::OwnedFd, line: &[u8]) -> SinkWrite {
+    use std::os::fd::AsRawFd;
+
+    let mut written = 0usize;
+    while written < line.len() {
+        let rc = unsafe {
+            libc::write(
+                fd.as_raw_fd(),
+                line[written..].as_ptr().cast(),
+                line.len() - written,
+            )
+        };
+        if rc < 0 {
+            let error = std::io::Error::last_os_error();
+            if error.kind() == std::io::ErrorKind::Interrupted {
+                continue;
+            }
+            if error.raw_os_error() == Some(libc::EAGAIN) {
+                return SinkWrite::WouldBlock;
+            }
+            return SinkWrite::Failed;
+        }
+        written += rc as usize;
+    }
+    SinkWrite::Written
 }

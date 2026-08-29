@@ -78,9 +78,8 @@ impl JobsClient {
             peios::socket::send_message(self.socket.as_fd(), &bytes, token, fds, 0)
                 .map_err(|error| JobsClientError::Io(format!("send jobs request: {error}")))?;
             let mut buffer = vec![0_u8; MAX_JOBS_RESPONSE_BYTES];
-            let received =
-                peios::socket::recv_message(self.socket.as_fd(), &mut buffer, 1, 0)
-                    .map_err(|error| JobsClientError::Io(format!("receive jobs response: {error}")))?;
+            let received = peios::socket::recv_message(self.socket.as_fd(), &mut buffer, 1, 0)
+                .map_err(|error| JobsClientError::Io(format!("receive jobs response: {error}")))?;
             if received.len == 0 {
                 return Err(JobsClientError::Io("jobs socket closed".to_string()));
             }
@@ -96,7 +95,7 @@ impl JobsClient {
         }
         #[cfg(not(feature = "peios-boundary"))]
         {
-            let _ = (token, fds, MAX_JOBS_MESSAGE_DESCRIPTORS);
+            let _ = (bytes, token, fds, MAX_JOBS_MESSAGE_DESCRIPTORS);
             Err(JobsClientError::Io(
                 "jobs client requires the peios boundary".to_string(),
             ))

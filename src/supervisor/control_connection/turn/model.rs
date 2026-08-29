@@ -12,7 +12,7 @@ pub struct SupervisorControlConnectionTurnContext<'a, 'r, C, P, A>
 where
     C: Clock + RealtimeClock + ?Sized,
     P: ProcessController + ?Sized,
-    A: SystemAccessChecker + ServiceAccessChecker + ?Sized,
+    A: SystemAccessChecker + ServiceAccessChecker + crate::submitted::JobAccessChecker + ?Sized,
 {
     pub control_security: &'a ControlSecurityDescriptor,
     pub access_checker: &'a mut A,

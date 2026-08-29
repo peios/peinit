@@ -23,3 +23,15 @@ pub enum ChildExitStatus {
 pub trait ChildReaper {
     fn reap_children(&mut self) -> Result<Vec<ChildReap>, BoundaryError>;
 }
+
+impl<T: Clock + ?Sized> Clock for &mut T {
+    fn monotonic_ns(&mut self) -> Result<u64, BoundaryError> {
+        (**self).monotonic_ns()
+    }
+}
+
+impl<T: RealtimeClock + ?Sized> RealtimeClock for &mut T {
+    fn realtime_ns(&mut self) -> Result<u64, BoundaryError> {
+        (**self).realtime_ns()
+    }
+}

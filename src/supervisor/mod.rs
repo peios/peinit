@@ -41,6 +41,7 @@ mod shutdown_timeout_actions;
 mod shutdown_wave;
 mod start_hooks;
 mod state;
+mod submitted;
 mod system_shutdown;
 mod terminal;
 mod timer;
@@ -61,8 +62,8 @@ pub use control_connection::{
     SupervisorControlConnectionFrameTurn, SupervisorControlConnectionTableTurn,
     SupervisorControlConnectionTableTurnError, SupervisorControlConnectionTurn,
     SupervisorControlConnectionTurnContext, SupervisorControlConnectionTurnError,
-    SupervisorControlFrameTurn, SupervisorControlFrameTurnError, SupervisorControlWaitFlush,
-    SupervisorControlWaitFlushError, SupervisorControlWaitFlushTurn,
+    SupervisorControlFrameTurn, SupervisorControlFrameTurnError, SupervisorControlWaitCompletion,
+    SupervisorControlWaitFlush, SupervisorControlWaitFlushError, SupervisorControlWaitFlushTurn,
     SupervisorControlWaitResponseError, SupervisorShutdownControlConnectionTableTurn,
     SupervisorShutdownControlConnectionTableTurnError, SupervisorShutdownControlConnectionTurn,
     SupervisorShutdownControlConnectionTurnContext, SupervisorShutdownControlConnectionTurnError,
@@ -71,8 +72,8 @@ pub use control_connection::{
     SupervisorControlFrameContext, SupervisorShutdownControlFrameContext,
 };
 pub use dispatch::{
-    SupervisorBootDispatch, SupervisorBootSuccessDispatch, SupervisorControlDispatch,
-    SupervisorControlLaunchDispatch, SupervisorControlLaunchResult,
+    SupervisedSubmittedTerminalDispatch, SupervisorBootDispatch, SupervisorBootSuccessDispatch,
+    SupervisorControlDispatch, SupervisorControlLaunchDispatch, SupervisorControlLaunchResult,
     SupervisorFdStoreRejectionDispatch, SupervisorFilesystemCheckCompletionDispatch,
     SupervisorFilesystemCheckLaunchDispatch, SupervisorFilesystemCheckTimeoutDispatch,
     SupervisorHealthCheckIntervalAction, SupervisorHealthCheckIntervalDispatch,
@@ -80,6 +81,7 @@ pub use dispatch::{
     SupervisorHealthCheckLaunchFailureDispatch, SupervisorHealthCheckLaunchResult,
     SupervisorHealthCheckOutcome, SupervisorHealthCheckTerminalDispatch,
     SupervisorHealthCheckTimeoutDispatch, SupervisorImmediateShutdownDispatch,
+    SupervisorJobAccessDeniedDispatch, SupervisorJobSubmitDispatch, SupervisorJobsCommandDispatch,
     SupervisorLaunchDispatch, SupervisorLaunchFailureDispatch, SupervisorLifecycleDispatch,
     SupervisorNotifyDispatch, SupervisorOnFailureLoopSuppressedDispatch,
     SupervisorOnFailureLoopSuppressionReason, SupervisorPendingProcessSetupDispatch,
@@ -98,7 +100,10 @@ pub use dispatch::{
     SupervisorShutdownStopDispatch, SupervisorShutdownTerminalDispatch,
     SupervisorShutdownTimeoutDispatch, SupervisorStartHookLaunchDispatch,
     SupervisorStartHookLaunchFailureDispatch, SupervisorStartHookLaunchResult,
-    SupervisorStopEscalationDispatch, SupervisorSystemShutdownDispatch, SupervisorTerminalDispatch,
+    SupervisorStopEscalationDispatch, SupervisorSubmittedDeadlineDispatch,
+    SupervisorSubmittedLaunchDispatch, SupervisorSubmittedLaunchFailureDispatch,
+    SupervisorSubmittedLaunchResult, SupervisorSubmittedNotifyDispatch,
+    SupervisorSubmittedStopDispatch, SupervisorSystemShutdownDispatch, SupervisorTerminalDispatch,
     SupervisorTimerAction, SupervisorTimerDispatch, SupervisorWatchdogNotifyDispatch,
     SupervisorWatchdogNotifyOutcome, SupervisorWatchdogTimeoutDispatch,
     SupervisorWatchdogTimeoutOutcome,
@@ -111,6 +116,13 @@ pub use operation_maintenance::SupervisorOperationMaintenanceTurn;
 pub use shutdown_deadline_timer::SupervisorShutdownDeadlineTimerTurn;
 pub use shutdown_signal::SupervisorPid1SignalFdTurn;
 pub use state::{Supervisor, SupervisorError, SupervisorSettings};
+pub use submitted::{
+    JOB_STATUS_EVENT_INTERVAL_NS, JobsCommandError, JobsResponseFrame,
+    SupervisorJobsConnectionRead, SupervisorJobsConnectionTurn,
+    SupervisorJobsConnectionTurnContext, SupervisorJobsConnectionTurnError,
+    SupervisorJobsMessageContext, SupervisorJobsMessageResponse, SupervisorJobsWaitFlush,
+    SupervisorJobsWaitFlushError, SupervisorJobsWaitFlushTurn, SupervisorNotifyOutcome,
+};
 pub use system_shutdown::{
     SupervisorSystemShutdownControlBodyError, SupervisorSystemShutdownControlBodyResponse,
     system_shutdown_control_response_line,

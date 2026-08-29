@@ -2,15 +2,15 @@ use std::io::{self, Write};
 
 use serde_json::Value;
 
-use crate::control::client::ControlResponse;
 use crate::shutdown::ShutdownKind;
 
 use super::command::{Command, OutputMode, ServiceAction};
+use super::execute::CliResponse;
 
 pub fn write_response(
     out: &mut dyn Write,
     command: &Command,
-    response: &ControlResponse,
+    response: &CliResponse,
     output: OutputMode,
 ) -> io::Result<()> {
     match output {
@@ -21,7 +21,7 @@ pub fn write_response(
 
 pub fn write_server_error(
     err: &mut dyn Write,
-    response: &ControlResponse,
+    response: &CliResponse,
     output: OutputMode,
 ) -> io::Result<()> {
     if output == OutputMode::Json {
@@ -44,7 +44,101 @@ fn write_human_response(out: &mut dyn Write, command: &Command, value: &Value) -
             service,
             wait,
         } => write_service_ack(out, *action, service, *wait, value),
+        Command::JobList { .. } => write_job_list(out, value),
+        Command::JobStatus { .. }
+        | Command::JobStop { .. }
+        | Command::JobSubmit { .. }
+        | Command::JobWait { .. }
+        | Command::JobSignal { .. } => write_job_view(out, value.get("job").unwrap_or(value)),
     }
+}
+
+fn write_job_list(out: &mut dyn Write, value: &Value) -> io::Result<()> {
+    let jobs = value
+        .get("jobs")
+        .and_then(Value::as_array)
+        .map(Vec::as_slice)
+        .unwrap_or(&[]);
+    let mut rows = Vec::with_capacity(jobs.len() + 1);
+    rows.push(vec![
+        "JOB".to_string(),
+        "STATE".to_string(),
+        "SUBMITTER".to_string(),
+        "IDENTITY".to_string(),
+        "PROGRESS".to_string(),
+        "DESCRIPTION".to_string(),
+    ]);
+    for job in jobs {
+        rows.push(vec![
+            str_field(job, "id").unwrap_or("").to_string(),
+            str_field(job, "state").unwrap_or("").to_string(),
+            str_field(job, "submitter").unwrap_or("").to_string(),
+            str_field(job, "identity").unwrap_or("").to_string(),
+            progress_text(job.get("progress")).unwrap_or_else(|| "-".to_string()),
+            str_field(job, "description").unwrap_or("").to_string(),
+        ]);
+    }
+    write_table(out, &rows)
+}
+
+/// The job view (PSPU §7.7), one field per line.
+fn write_job_view(out: &mut dyn Write, job: &Value) -> io::Result<()> {
+    let id = str_field(job, "id").unwrap_or("unknown");
+    let state = str_field(job, "state").unwrap_or("unknown");
+    writeln!(out, "job {id}: {state}")?;
+    write_optional_line(out, "cause", str_field(job, "cause"))?;
+    write_optional_line(
+        out,
+        "description",
+        str_field(job, "description").filter(|text| !text.is_empty()),
+    )?;
+    write_optional_line(out, "image", str_field(job, "image_path"))?;
+    if let Some(pid) = job.get("pid").and_then(Value::as_i64) {
+        writeln!(out, "pid: {pid}")?;
+    }
+    write_optional_line(out, "submitter", str_field(job, "submitter"))?;
+    write_optional_line(out, "identity", str_field(job, "identity"))?;
+    if let Some(session) = job.get("logon_session").and_then(Value::as_u64) {
+        writeln!(out, "logon session: {session:#x}")?;
+    }
+    if let Some(ready) = job.get("ready").and_then(Value::as_bool) {
+        writeln!(out, "ready: {}", if ready { "yes" } else { "no" })?;
+    }
+    write_optional_line(out, "status", str_field(job, "status_text"))?;
+    write_optional_line(
+        out,
+        "progress",
+        progress_text(job.get("progress")).as_deref(),
+    )?;
+    if let Some(code) = job.get("exit_code").and_then(Value::as_i64) {
+        writeln!(out, "exit code: {code}")?;
+    }
+    if let Some(signal) = job.get("exit_signal").and_then(Value::as_i64) {
+        writeln!(out, "exit signal: {signal}")?;
+    }
+    write_optional_line(out, "created", str_field(job, "created_at"))?;
+    write_optional_line(out, "started", str_field(job, "started_at"))?;
+    write_optional_line(out, "ended", str_field(job, "ended_at"))
+}
+
+/// `N`, `N/?`, or `N/T`, with the unit when one was given.
+fn progress_text(value: Option<&Value>) -> Option<String> {
+    let progress = value.filter(|value| !value.is_null())?;
+    let current = progress.get("current").and_then(Value::as_u64)?;
+    let bounded = progress
+        .get("bounded")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let mut text = match (bounded, progress.get("total").and_then(Value::as_u64)) {
+        (true, Some(total)) => format!("{current}/{total}"),
+        (true, None) => format!("{current}/?"),
+        (false, _) => current.to_string(),
+    };
+    if let Some(unit) = str_field(progress, "unit") {
+        text.push(' ');
+        text.push_str(unit);
+    }
+    Some(text)
 }
 
 fn write_service_ack(

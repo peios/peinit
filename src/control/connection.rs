@@ -11,7 +11,7 @@ pub use accept::{
 };
 pub use io::{ControlConnectionIo, flush_control_connection, read_control_connection};
 pub use record::ControlConnectionRecord;
-pub use state::{ControlConnectionState, ControlOperationWait};
+pub use state::{ControlConnectionState, ControlOperationWait, ControlPendingWait};
 pub use table::{
     ControlConnectionAdmission, ControlConnectionAdmissionDecision, ControlConnectionTable,
     ControlConnectionTableError, control_connection_admission_decision,

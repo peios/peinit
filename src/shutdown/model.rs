@@ -140,6 +140,7 @@ pub enum ShutdownDeadlineKind {
     StopTimeout { service: String },
     PostKillTimeout { service: String },
     FinalActionRetry,
+    SubmittedJob { job_id: crate::ids::JobId },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

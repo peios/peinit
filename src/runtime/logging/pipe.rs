@@ -30,6 +30,10 @@ impl ServiceLogPipe {
         }
     }
 
+    pub(super) fn job_id(&self) -> Option<JobId> {
+        self.job_id
+    }
+
     pub(super) fn read_available(&mut self, timestamp_ns: u64, budget_bytes: usize) -> LogPipeRead {
         let mut records = Vec::new();
         let mut total_read = 0;

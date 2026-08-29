@@ -37,7 +37,8 @@ pub(super) fn collect_child_reap_turn_console_messages(
         SupervisorChildReapDispatch::Shutdown(dispatch) => {
             shutdown::collect_shutdown_terminal_dispatch_console_messages(dispatch, out);
         }
-        SupervisorChildReapDispatch::ReloadCommand(_) => {}
+        SupervisorChildReapDispatch::ReloadCommand(_)
+        | SupervisorChildReapDispatch::Submitted(_) => {}
     }
 }
 

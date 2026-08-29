@@ -26,6 +26,9 @@ where
     let control_limits = registry
         .read_control_socket_limits()
         .map_err(ReloadConfigError::Registry)?;
+    let jobs_limits = registry
+        .read_jobs_socket_limits()
+        .map_err(ReloadConfigError::Registry)?;
     let (log_config, log_config_warnings) = read_log_config(registry)?;
     let shutdown_settings = read_shutdown_settings(registry)?;
     let global_environment = registry
@@ -48,6 +51,7 @@ where
             .collect(),
         control_security,
         control_limits,
+        jobs_limits,
         log_config,
         shutdown_settings,
         global_environment,

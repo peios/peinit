@@ -7,6 +7,15 @@ pub(super) fn signal_number(signal: &ProcessSignal) -> Result<libc::c_int, Bound
         ProcessSignal::Sighup => Ok(libc::SIGHUP),
         ProcessSignal::Named(name) => named_signal_number(name)
             .ok_or_else(|| BoundaryError::Process(format!("unsupported signal name: {name}"))),
+        ProcessSignal::Number(number) => {
+            if (1..libc::SIGRTMAX()).contains(number) {
+                Ok(*number)
+            } else {
+                Err(BoundaryError::Process(format!(
+                    "unsupported signal number: {number}"
+                )))
+            }
+        }
     }
 }
 

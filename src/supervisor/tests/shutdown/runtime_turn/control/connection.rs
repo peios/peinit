@@ -53,6 +53,7 @@ fn runtime_control_connection_event_accepts_shutdown_request_and_arms_deadline_t
     let mut registrar = FakeRegistrar::default();
     let mut boot_attempt_counter = FakeBootAttemptCounter::default();
 
+    let mut jobs_channel = crate::runtime::NoJobsChannel;
     let turn = process_runtime_shutdown_event(
         &mut supervisor,
         RuntimeEventSource::ControlConnection { fd: 46 },
@@ -67,6 +68,7 @@ fn runtime_control_connection_event_accepts_shutdown_request_and_arms_deadline_t
             power_button_source: &mut power_button,
             filesystem_check_reader: &mut filesystem_check_reader,
             log_pipes: &mut log_pipes,
+            jobs_channel: &mut jobs_channel,
         },
         context(
             &mut clock,
@@ -125,6 +127,7 @@ fn runtime_control_connection_event_ignores_stale_removed_fd() {
     let mut registrar = FakeRegistrar::default();
     let mut boot_attempt_counter = FakeBootAttemptCounter::default();
 
+    let mut jobs_channel = crate::runtime::NoJobsChannel;
     let turn = process_runtime_shutdown_event(
         &mut supervisor,
         RuntimeEventSource::ControlConnection { fd: 99 },
@@ -139,6 +142,7 @@ fn runtime_control_connection_event_ignores_stale_removed_fd() {
             power_button_source: &mut power_button,
             filesystem_check_reader: &mut filesystem_check_reader,
             log_pipes: &mut log_pipes,
+            jobs_channel: &mut jobs_channel,
         },
         context(
             &mut clock,

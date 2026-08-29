@@ -42,6 +42,7 @@ impl Supervisor {
             ))),
             wait: None,
             access_denials: Vec::new(),
+            job_access_denials: Vec::new(),
         })
     }
 }

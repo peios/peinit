@@ -88,7 +88,7 @@ fn failed_reload_wait_response_includes_failed_mode() {
         .expect("fail reload hook");
 
     let flush = supervisor
-        .flush_terminal_control_waits(&mut connections, LIFECYCLE_COMMAND_NS + 3)
+        .flush_terminal_control_waits(&mut connections, LIFECYCLE_COMMAND_NS + 3, 0)
         .expect("flush waits");
 
     assert_eq!(flush.completed.len(), 1);
@@ -100,7 +100,10 @@ fn failed_reload_wait_response_includes_failed_mode() {
     assert_eq!(json["status"], "ok");
     assert_eq!(
         json["operation_id"],
-        wait.operation_id.to_canonical_string()
+        wait.operation()
+            .expect("operation wait")
+            .operation_id
+            .to_canonical_string()
     );
     assert_eq!(json["service"], "app");
     assert_eq!(json["state"], "active");

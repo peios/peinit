@@ -146,6 +146,8 @@ pub(super) fn run_loop(supervisor: &mut Supervisor, script: LoopScript) -> LoopR
             .result_fd(script.filesystem_result_fd);
     let mut boot_attempt_counter = FakeBootAttemptCounter::default();
 
+    let mut jobs_channel = crate::runtime::NoJobsChannel;
+    let mut job_identity_provider = crate::runtime::NoJobIdentityProvider;
     let turn = process_runtime_shutdown_loop_turn(
         supervisor,
         &mut waiter,
@@ -160,6 +162,7 @@ pub(super) fn run_loop(supervisor: &mut Supervisor, script: LoopScript) -> LoopR
             power_button_source: &mut power_button,
             filesystem_check_reader: &mut filesystem_check_reader,
             log_pipes: &mut log_pipes,
+            jobs_channel: &mut jobs_channel,
         },
         RuntimeShutdownLoopContext {
             clock: &mut clock,
@@ -179,6 +182,8 @@ pub(super) fn run_loop(supervisor: &mut Supervisor, script: LoopScript) -> LoopR
                 crate::control::socket::DEFAULT_CONNECTION_TIMEOUT_SECS,
             ),
             work_pump: RuntimeWorkPumpConfig::default(),
+            job_identity_provider: &mut job_identity_provider,
+            jobs_limits: crate::jobs::socket::JobsSocketLimits::default(),
         },
     )
     .expect("runtime loop turn");

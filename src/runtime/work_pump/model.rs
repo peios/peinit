@@ -8,7 +8,8 @@ use crate::supervisor::{
     SupervisorLaunchDispatch, SupervisorLaunchFailureDispatch,
     SupervisorPendingProcessSetupDispatch, SupervisorPostStartHookLaunchDispatch,
     SupervisorPostStartHookLaunchFailureDispatch, SupervisorStartHookLaunchDispatch,
-    SupervisorStartHookLaunchFailureDispatch,
+    SupervisorStartHookLaunchFailureDispatch, SupervisorSubmittedLaunchDispatch,
+    SupervisorSubmittedLaunchFailureDispatch,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -44,6 +45,8 @@ pub struct RuntimeWorkPumpTurn {
     pub health_check_launch_cancellations: Vec<SupervisorHealthCheckLaunchCancelledDispatch>,
     pub service_launches: Vec<SupervisorLaunchDispatch>,
     pub service_launch_failures: Vec<SupervisorLaunchFailureDispatch>,
+    pub submitted_launches: Vec<SupervisorSubmittedLaunchDispatch>,
+    pub submitted_launch_failures: Vec<SupervisorSubmittedLaunchFailureDispatch>,
     pub stale_control_operations: usize,
 }
 
@@ -63,6 +66,8 @@ impl RuntimeWorkPumpTurn {
             && self.health_check_launch_cancellations.is_empty()
             && self.service_launches.is_empty()
             && self.service_launch_failures.is_empty()
+            && self.submitted_launches.is_empty()
+            && self.submitted_launch_failures.is_empty()
             && self.stale_control_operations == 0
     }
 
@@ -88,6 +93,9 @@ impl RuntimeWorkPumpTurn {
         self.service_launches.extend(step.service_launch);
         self.service_launch_failures
             .extend(step.service_launch_failure);
+        self.submitted_launches.extend(step.submitted_launch);
+        self.submitted_launch_failures
+            .extend(step.submitted_launch_failure);
         self.stale_control_operations += step.stale_control_operations;
     }
 }
@@ -107,6 +115,8 @@ pub(super) struct RuntimeWorkPumpStep {
     pub health_check_launch_cancellation: Option<SupervisorHealthCheckLaunchCancelledDispatch>,
     pub service_launch: Option<SupervisorLaunchDispatch>,
     pub service_launch_failure: Option<SupervisorLaunchFailureDispatch>,
+    pub submitted_launch: Option<SupervisorSubmittedLaunchDispatch>,
+    pub submitted_launch_failure: Option<SupervisorSubmittedLaunchFailureDispatch>,
     pub stale_control_operations: usize,
 }
 
@@ -125,6 +135,8 @@ impl RuntimeWorkPumpStep {
             || self.health_check_launch_cancellation.is_some()
             || self.service_launch.is_some()
             || self.service_launch_failure.is_some()
+            || self.submitted_launch.is_some()
+            || self.submitted_launch_failure.is_some()
             || self.stale_control_operations > 0
     }
 }
@@ -141,6 +153,7 @@ pub enum RuntimeWorkPumpError {
         pending_control_launches: usize,
         pending_health_check_launches: usize,
         pending_service_launches: usize,
+        pending_submitted_launches: usize,
     },
 }
 
