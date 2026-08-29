@@ -7,12 +7,12 @@ use std::path::Path;
 use super::{ControlSocketBindError, ControlSocketPathError};
 
 #[derive(Debug, Clone, Copy)]
-pub(super) struct UnixSocketAddress {
-    pub(super) addr: libc::sockaddr_un,
-    pub(super) len: libc::socklen_t,
+pub(crate) struct UnixSocketAddress {
+    pub(crate) addr: libc::sockaddr_un,
+    pub(crate) len: libc::socklen_t,
 }
 
-pub(super) fn unix_socket_address(
+pub(crate) fn unix_socket_address(
     path: &Path,
 ) -> Result<UnixSocketAddress, ControlSocketPathError> {
     let path_bytes = path.as_os_str().as_bytes();
@@ -42,7 +42,7 @@ pub(super) fn unix_socket_address(
     })
 }
 
-pub(super) fn unlink_stale_path(path: &Path) -> Result<(), ControlSocketBindError> {
+pub(crate) fn unlink_stale_path(path: &Path) -> Result<(), ControlSocketBindError> {
     match unlink_path(path) {
         Ok(()) => Ok(()),
         Err(error) if error.raw_os_error() == Some(libc::ENOENT) => Ok(()),
@@ -53,7 +53,7 @@ pub(super) fn unlink_stale_path(path: &Path) -> Result<(), ControlSocketBindErro
     }
 }
 
-pub(super) fn unlink_path(path: &Path) -> io::Result<()> {
+pub(crate) fn unlink_path(path: &Path) -> io::Result<()> {
     let c_path = CString::new(path.as_os_str().as_bytes()).map_err(|error| {
         io::Error::new(
             io::ErrorKind::InvalidInput,

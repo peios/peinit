@@ -21,7 +21,7 @@ impl Supervisor {
         F: ShutdownFinalizer,
     {
         match job_type {
-            JobType::ServiceMain | JobType::AdHoc => Ok(SupervisorChildReapDispatch::Runtime(
+            JobType::ServiceMain | JobType::Submitted => Ok(SupervisorChildReapDispatch::Runtime(
                 Box::new(self.apply_service_main_reap(
                     job_id,
                     status,

@@ -64,7 +64,7 @@ pub(super) fn job_type_wire(job_type: JobType) -> &'static str {
         JobType::PostExecHook => "post_exec_hook",
         JobType::ReloadHook => "reload_hook",
         JobType::HealthCheck => "health_check",
-        JobType::AdHoc => "ad_hoc",
+        JobType::Submitted => "submitted",
     }
 }
 

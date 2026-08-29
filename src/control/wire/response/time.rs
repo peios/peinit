@@ -12,7 +12,7 @@ impl ControlResponseTimeProjection {
         }
     }
 
-    pub(super) fn realtime_timestamp(self, monotonic_event_ns: u64) -> String {
+    pub fn realtime_timestamp(self, monotonic_event_ns: u64) -> String {
         rfc3339_from_unix_ns(self.project_unix_ns(monotonic_event_ns))
     }
 

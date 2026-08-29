@@ -12,7 +12,7 @@ pub(super) fn create_job_cgroups(job: &JobRecord) -> Result<(), BoundaryError> {
         JobType::PreExecHook | JobType::PostExecHook | JobType::ReloadHook => {
             create_cgroup(&job.cgroup_id)
         }
-        JobType::HealthCheck | JobType::AdHoc => create_cgroup(&job.cgroup_id),
+        JobType::HealthCheck | JobType::Submitted => create_cgroup(&job.cgroup_id),
     }
 }
 

@@ -9,7 +9,9 @@ pub enum JobType {
     PostExecHook,
     ReloadHook,
     HealthCheck,
-    AdHoc,
+    /// A job submitted on the jobs socket (PSPU §7): it has a submitter
+    /// rather than a service, and no operation or activation generation.
+    Submitted,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -20,6 +20,8 @@ mod linux_timer;
 mod model;
 
 #[cfg(feature = "peios-boundary")]
+mod linux_jobs;
+#[cfg(feature = "peios-boundary")]
 mod linux_launch;
 #[cfg(feature = "peios-boundary")]
 mod linux_process;
@@ -47,6 +49,8 @@ pub use linux_epoll::{
 pub(crate) use linux_io::{read_fd_to_string, set_cloexec, write_all_fd};
 #[cfg(feature = "peios-boundary")]
 pub use linux_kmes::LinuxKmesEventSink;
+#[cfg(feature = "peios-boundary")]
+pub use linux_jobs::LinuxJobIdentityProvider;
 #[cfg(feature = "peios-boundary")]
 pub use linux_launch::{LinuxProcessLauncher, LinuxSystemTokenProvider};
 pub use linux_machine_id::{

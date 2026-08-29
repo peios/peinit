@@ -34,10 +34,12 @@ impl Supervisor {
             JobType::ServiceMain
             | JobType::PreExecHook
             | JobType::PostExecHook
-            | JobType::ReloadHook
-            | JobType::AdHoc => definition
+            | JobType::ReloadHook => definition
                 .map(|definition| definition.start_timeout_secs)
                 .unwrap_or(ServiceDefinition::DEFAULT_START_TIMEOUT_SECS),
+            // Exec confirmation is bounded by the service default: a submitted
+            // job's own timeouts start once the process is running.
+            JobType::Submitted => ServiceDefinition::DEFAULT_START_TIMEOUT_SECS,
         }
     }
 }

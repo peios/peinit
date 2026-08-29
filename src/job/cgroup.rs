@@ -50,8 +50,11 @@ pub fn service_job_cgroup_path(service: &str, generation: u64, kind: ServiceCgro
     )
 }
 
-pub fn ad_hoc_cgroup_path(job_id: JobId) -> String {
-    format!("{PEINIT_CGROUP_ROOT}/{}", job_id.to_canonical_string())
+/// Every submitted job gets one cgroup of its own under `jobs/`, named by
+/// its identifier rather than by anything a submitter chose: two submitters
+/// naming the same description must never share a tree.
+pub fn submitted_job_cgroup_path(job_id: JobId) -> String {
+    format!("{PEINIT_CGROUP_ROOT}/jobs/{}", job_id.to_canonical_string())
 }
 
 fn is_cgroup_safe(byte: u8) -> bool {
