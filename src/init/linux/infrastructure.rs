@@ -51,8 +51,17 @@ const CONTROL_SOCKET_SDDL: &str = "O:SYG:SYD:(A;;GA;;;SY)(A;;GA;;;BA)";
 /// Services get **traverse only** (`GX`). Reaching the directory is not
 /// permission to write the socket in it; that is decided by the socket's own
 /// descriptor.
+///
+/// `S-1-5-6` is written out rather than as its `SU` alias, deliberately. The
+/// alias is newer than some libpeios this image may carry, and the alias table
+/// lives in a separately versioned package that nothing here declares a
+/// minimum version of -- so an image pairing this peinit with an older
+/// libpeios parses the descriptor, fails, and takes PID 1 into recovery before
+/// a console exists. That is exactly what happened the first time this was
+/// written with `SU`. A literal SID has been understood by every version there
+/// has ever been.
 pub(super) const SERVICES_RUNTIME_DIR_SDDL: &str =
-    "O:SYG:SYD:(A;;GA;;;SY)(A;;GA;;;BA)(A;;GX;;;SU)";
+    "O:SYG:SYD:(A;;GA;;;SY)(A;;GA;;;BA)(A;;GX;;;S-1-5-6)";
 
 /// The jobs socket admits every authenticated principal (PSPU §7.A).
 ///
