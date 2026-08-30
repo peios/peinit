@@ -15,11 +15,12 @@ pub(super) const DEFAULT_MOUNTINFO_PATH: &str = "/proc/self/mountinfo";
 /// inheritance then derives child SDs. Requires SeRestorePrivilege in our
 /// token to replace the MISSING SD — held by the boot SYSTEM token.
 ///
-/// Allow SYSTEM GenericAll, Allow BUILTIN\Administrators GenericAll, and
-/// Allow Everyone read+execute, all OI|CI. Because everything created beneath
-/// these roots inherits from this one descriptor, it is the access policy of
-/// `/run`, `/dev/shm` and the cgroup tree in their entirety; an ACE missing
-/// here is missing from every per-service directory under `/run/services`.
+/// Allow SYSTEM GenericAll and Allow BUILTIN\Administrators GenericAll, both
+/// OI|CI, plus Allow Everyone read+execute, CI only. Because everything created
+/// beneath these roots inherits from this one descriptor, it is the access
+/// policy of `/run`, `/dev/shm` and the cgroup tree in their entirety; an ACE
+/// missing here is missing from every per-service directory under
+/// `/run/services`.
 ///
 /// Administrators is present so that an administrator can enumerate those
 /// trees at all — nothing bypasses `FILE_LIST_DIRECTORY`, so a SYSTEM-only
@@ -32,14 +33,24 @@ pub(super) const DEFAULT_MOUNTINFO_PATH: &str = "/proc/self/mountinfo";
 /// bypass, so read without execute would let a service list a directory and
 /// still fail to enter it (PEI-546).
 ///
+/// That ACE is `CI` and not `OI|CI`, which is the one place this descriptor
+/// deliberately differs from the root's. What a service needs here is to walk
+/// to its own directory, and container inheritance alone gives it that. Object
+/// inheritance would additionally put Everyone-read on every *file* anything
+/// creates under `/run` and `/dev/shm` — a service's runtime state, and shared
+/// memory segments, world-readable by inheritance. The root needs `OI` because
+/// a service has to read and execute the binaries beneath it; nothing here is
+/// a binary.
+///
 /// SYSTEM and Administrators keep `GenericAll` rather than read/write/execute
 /// because `GA` carries `WRITE_DAC`, `WRITE_OWNER` and `DELETE`, and peinit
 /// re-stamps descriptors throughout `/run` — `bind_secured` and
 /// `ensure_directory` both depend on it.
 ///
-/// This MUST stay identical to the descriptor the live root's mount hook
-/// stamps (`pkgs/live-boot/src/mount-root.sh`) and to peios-install's
-/// `ROOT_SDDL`. Note what it is no longer tied to: `build_seed_sd` in
+/// This MUST stay in step with the descriptor the live root's mount hook
+/// stamps (`pkgs/live-boot/src/mount-root.sh`) and with peios-install's
+/// `ROOT_SDDL` — identical but for the Everyone ACE's inheritance flags, for
+/// the reason given above. Note what it is no longer tied to: `build_seed_sd` in
 /// prelude's `seed-sd`, which stays narrower on purpose. That is the
 /// *bootstrap* descriptor, and it is also what stamps `/dev`, where every ACE
 /// is inherited by the next hot-plugged block device — a read ACE for
@@ -53,7 +64,7 @@ pub(super) const DEFAULT_MOUNTINFO_PATH: &str = "/proc/self/mountinfo";
 /// cgroup tree are created at runtime and belong to no package, so this stays
 /// their policy.
 const PHASE1_SEED_SDDL: &str =
-    "O:SYG:SYD:(A;OICI;GA;;;SY)(A;OICI;GA;;;BA)(A;OICI;GRGX;;;WD)";
+    "O:SYG:SYD:(A;OICI;GA;;;SY)(A;OICI;GA;;;BA)(A;CI;GRGX;;;WD)";
 
 /// The synthesised descriptor for devpts inodes. devpts cannot store SDs
 /// and its slave nodes are materialised by the kernel when a terminal opens
