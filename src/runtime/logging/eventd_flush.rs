@@ -44,7 +44,7 @@ impl RuntimeServiceLogPipes {
         let flush = self.flush_to_eventd(socket_path, sink);
         if flush.error.is_some() {
             self.eventd_socket_path = None;
-        } else {
+        } else if self.eventd_socket_path.as_deref() != Some(socket_path) {
             self.eventd_socket_path = Some(socket_path.to_string());
         }
         flush
