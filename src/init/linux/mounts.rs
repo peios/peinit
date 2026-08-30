@@ -30,6 +30,19 @@ pub(super) const DEFAULT_MOUNTINFO_PATH: &str = "/proc/self/mountinfo";
 /// there and not here, and the drift went unnoticed for four days.
 const PHASE1_SEED_SDDL: &str = "O:SYG:SYD:(A;OICI;GA;;;SY)(A;OICI;GA;;;BA)";
 
+/// The synthesised descriptor for devpts inodes. devpts cannot store SDs
+/// and its slave nodes are materialised by the kernel when a terminal opens
+/// `/dev/ptmx` — never through a create path that could stamp or inherit
+/// one — so under DENY_MISSING every pseudo-terminal on the machine is
+/// unopenable (PEI-523 found it: Atrium's terminal died instantly). The
+/// mount instead carries SYNTHESIZE_EPHEMERAL with this template.
+///
+/// Authenticated Users get read, write and traverse: enough to use a pty.
+/// The template applies to every SD-less inode of the mount alike, so any
+/// authenticated principal may open any slave — per-owner slave SDs need
+/// kernel support for stamping the opener at materialisation; future work.
+const DEVPTS_SYNTH_SDDL: &str = "O:SYG:SYD:(A;;GA;;;SY)(A;;GA;;;BA)(A;;FRFWFX;;;AU)";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct Phase1VirtualMount {
     pub mount_point: &'static str,
@@ -41,6 +54,10 @@ pub(super) struct Phase1VirtualMount {
     /// (tmpfs + cgroup2 — all DENY_MISSING); NOT for proc/sysfs (UNMANAGED, no
     /// SD) or initramfs-provided mounts (already up and seeded).
     seed_after_mount: bool,
+    /// Set this KACS mount policy template (SYNTHESIZE_EPHEMERAL) on the
+    /// mount after a successful mount — for filesystems that cannot store
+    /// SDs and whose inodes appear outside any create path (devpts).
+    synth_template: Option<&'static str>,
 }
 
 const PHASE1_VIRTUAL_MOUNTS: [Phase1VirtualMount; 7] = [
@@ -50,6 +67,7 @@ const PHASE1_VIRTUAL_MOUNTS: [Phase1VirtualMount; 7] = [
         flags: libc::MS_NOSUID | libc::MS_NODEV | libc::MS_NOEXEC,
         initramfs_provided: true,
         seed_after_mount: false,
+        synth_template: None,
     },
     Phase1VirtualMount {
         mount_point: "/sys",
@@ -57,6 +75,7 @@ const PHASE1_VIRTUAL_MOUNTS: [Phase1VirtualMount; 7] = [
         flags: libc::MS_NOSUID | libc::MS_NODEV | libc::MS_NOEXEC,
         initramfs_provided: true,
         seed_after_mount: false,
+        synth_template: None,
     },
     Phase1VirtualMount {
         mount_point: "/dev",
@@ -64,6 +83,7 @@ const PHASE1_VIRTUAL_MOUNTS: [Phase1VirtualMount; 7] = [
         flags: libc::MS_NOSUID,
         initramfs_provided: true,
         seed_after_mount: false,
+        synth_template: None,
     },
     Phase1VirtualMount {
         mount_point: "/dev/pts",
@@ -71,6 +91,7 @@ const PHASE1_VIRTUAL_MOUNTS: [Phase1VirtualMount; 7] = [
         flags: libc::MS_NOSUID | libc::MS_NOEXEC,
         initramfs_provided: false,
         seed_after_mount: false,
+        synth_template: Some(DEVPTS_SYNTH_SDDL),
     },
     Phase1VirtualMount {
         mount_point: "/dev/shm",
@@ -78,6 +99,7 @@ const PHASE1_VIRTUAL_MOUNTS: [Phase1VirtualMount; 7] = [
         flags: libc::MS_NOSUID | libc::MS_NODEV,
         initramfs_provided: false,
         seed_after_mount: true,
+        synth_template: None,
     },
     Phase1VirtualMount {
         mount_point: "/run",
@@ -85,6 +107,7 @@ const PHASE1_VIRTUAL_MOUNTS: [Phase1VirtualMount; 7] = [
         flags: libc::MS_NOSUID | libc::MS_NODEV,
         initramfs_provided: false,
         seed_after_mount: true,
+        synth_template: None,
     },
     Phase1VirtualMount {
         mount_point: "/sys/fs/cgroup",
@@ -98,6 +121,7 @@ const PHASE1_VIRTUAL_MOUNTS: [Phase1VirtualMount; 7] = [
         // `/sys/fs/cgroup` open is DENY_MISSING-locked (EACCES). cgroupfs
         // (kernfs) stores the SD in a security xattr.
         seed_after_mount: true,
+        synth_template: None,
     },
 ];
 
@@ -128,6 +152,16 @@ where
             syscalls.seed_sd(spec.mount_point).map_err(|error| {
                 BoundaryError::Recovery(format!("seed SD on {} failed: {error}", spec.mount_point))
             })?;
+        }
+        if let Some(template) = spec.synth_template {
+            syscalls
+                .set_synth_policy(spec.mount_point, template)
+                .map_err(|error| {
+                    BoundaryError::Recovery(format!(
+                        "set mount policy on {} failed: {error}",
+                        spec.mount_point
+                    ))
+                })?;
         }
     }
 
@@ -189,6 +223,9 @@ pub(super) trait Phase1MountSyscalls {
     /// Stamp [`PHASE1_SEED_SDDL`] (owner + group + DACL) onto a freshly mounted
     /// filesystem root so KACS stops DENY_MISSING-locking its inodes.
     fn seed_sd(&mut self, mount_point: &str) -> io::Result<()>;
+    /// Set a SYNTHESIZE_EPHEMERAL KACS mount policy with `template_sddl` on
+    /// the mounted filesystem — for mounts that cannot hold SDs at all.
+    fn set_synth_policy(&mut self, mount_point: &str, template_sddl: &str) -> io::Result<()>;
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -216,6 +253,29 @@ impl Phase1MountSyscalls for LinuxPhase1MountSyscalls {
         let sd = peios::security::sddl::parse(PHASE1_SEED_SDDL).map_err(io::Error::from)?;
         let info = SecInfo::OWNER | SecInfo::GROUP | SecInfo::DACL;
         peios::file::set_sd(None, Path::new(mount_point), info, &sd, 0).map_err(io::Error::from)
+    }
+
+    fn set_synth_policy(&mut self, mount_point: &str, template_sddl: &str) -> io::Result<()> {
+        use std::os::fd::{FromRawFd, OwnedFd};
+        let sd = peios::security::sddl::parse(template_sddl).map_err(io::Error::from)?;
+        // O_PATH: kacs_set_mount_policy resolves the superblock via
+        // fget_raw, and an O_PATH open performs no KACS access check — the
+        // mount is DENY_MISSING until this very call takes effect.
+        let path = c_string(mount_point)?;
+        // SAFETY: plain open(2); the fd is owned below.
+        let fd = unsafe { libc::open(path.as_ptr(), libc::O_PATH | libc::O_DIRECTORY | libc::O_CLOEXEC) };
+        if fd < 0 {
+            return Err(io::Error::last_os_error());
+        }
+        // SAFETY: fresh fd from open.
+        let file = peios::file::File::from(unsafe { OwnedFd::from_raw_fd(fd) });
+        let policy = peios::file::MountPolicy {
+            kind: peios::file::MountPolicyKind::SYNTHESIZE_EPHEMERAL,
+            flags: 0,
+            generation: 0,
+            template_sd: Some(sd),
+        };
+        file.mount_set_policy(&policy).map_err(io::Error::from)
     }
 }
 
