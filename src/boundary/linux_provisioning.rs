@@ -1,5 +1,5 @@
 use std::io;
-use std::os::fd::{AsRawFd, BorrowedFd};
+use std::os::fd::AsRawFd;
 use std::path::{Path, PathBuf};
 
 #[cfg(feature = "peios-boundary")]
@@ -164,25 +164,6 @@ fn service_runtime_directory_security_for_sid(sid: &str) -> io::Result<ResolvedS
 #[cfg(not(feature = "peios-boundary"))]
 fn service_runtime_directory_security_for_sid(_sid: &str) -> io::Result<ResolvedSecurity> {
     Ok(ResolvedSecurity::Noop)
-}
-
-#[cfg(all(feature = "peios-boundary", feature = "peios-registry"))]
-/// Stamp a descriptor onto a live fd the caller keeps, by SDDL.
-///
-/// The counterpart to [`set_path_security`], and the right one for a socket.
-/// `ensure_directory` already stamps by fd, because opening a directory yields
-/// a `peios::file::File` and `File` owns its descriptor; a bound socket does
-/// not, and handing its fd to a `File` would close the socket when the `File`
-/// dropped. `peios::file::fd_set_sd` borrows instead.
-///
-/// This is what lets a caller stamp *before* the socket is reachable rather
-/// than after. A pathname socket is published by `bind`, and a datagram socket
-/// has no `listen` to hold it back, so the path form necessarily addresses it
-/// only once it is already there under whatever descriptor it inherited.
-pub(crate) fn set_fd_security(fd: BorrowedFd<'_>, sddl: &str) -> io::Result<()> {
-    let ResolvedSecurity::Descriptor(sd) = security_from_sddl(sddl)?;
-    peios::file::fd_set_sd(fd, SecInfo::OWNER | SecInfo::GROUP | SecInfo::DACL, &sd)
-        .map_err(io::Error::from)
 }
 
 #[cfg(all(feature = "peios-boundary", feature = "peios-registry"))]
