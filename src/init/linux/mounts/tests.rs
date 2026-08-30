@@ -15,6 +15,7 @@ enum MountCall {
         flags: libc::c_ulong,
     },
     Seed(String),
+    SynthPolicy(String, String),
 }
 
 #[derive(Debug)]
@@ -24,6 +25,7 @@ struct FakeMountSyscalls {
     calls: Vec<MountCall>,
     mount_failures: BTreeMap<String, i32>,
     seed_failures: BTreeMap<String, i32>,
+    policy_failures: BTreeMap<String, i32>,
 }
 
 impl FakeMountSyscalls {
@@ -34,6 +36,7 @@ impl FakeMountSyscalls {
             calls: Vec::new(),
             mount_failures: BTreeMap::new(),
             seed_failures: BTreeMap::new(),
+            policy_failures: BTreeMap::new(),
         }
     }
 
@@ -49,6 +52,11 @@ impl FakeMountSyscalls {
 
     fn fail_seed(mut self, mount_point: &str, errno: i32) -> Self {
         self.seed_failures.insert(mount_point.to_string(), errno);
+        self
+    }
+
+    fn fail_policy(mut self, mount_point: &str, errno: i32) -> Self {
+        self.policy_failures.insert(mount_point.to_string(), errno);
         self
     }
 }
@@ -83,6 +91,18 @@ impl Phase1MountSyscalls for FakeMountSyscalls {
     fn seed_sd(&mut self, mount_point: &str) -> std::io::Result<()> {
         self.calls.push(MountCall::Seed(mount_point.to_string()));
         if let Some(errno) = self.seed_failures.get(mount_point) {
+            Err(std::io::Error::from_raw_os_error(*errno))
+        } else {
+            Ok(())
+        }
+    }
+
+    fn set_synth_policy(&mut self, mount_point: &str, template_sddl: &str) -> std::io::Result<()> {
+        self.calls.push(MountCall::SynthPolicy(
+            mount_point.to_string(),
+            template_sddl.to_string(),
+        ));
+        if let Some(errno) = self.policy_failures.get(mount_point) {
             Err(std::io::Error::from_raw_os_error(*errno))
         } else {
             Ok(())
@@ -151,6 +171,12 @@ fn expected_calls_for_spec(spec: &Phase1VirtualMount) -> Vec<MountCall> {
     if spec.seed_after_mount {
         calls.push(MountCall::Seed(spec.mount_point.to_string()));
     }
+    if let Some(template) = spec.synth_template {
+        calls.push(MountCall::SynthPolicy(
+            spec.mount_point.to_string(),
+            template.to_string(),
+        ));
+    }
     calls
 }
 
@@ -210,6 +236,36 @@ fn seeds_fresh_managed_roots_after_mounting_them() {
             .calls
             .contains(&MountCall::Seed("/dev/pts".to_string()))
     );
+}
+
+#[test]
+fn sets_the_synth_policy_on_devpts_alone() {
+    let mut syscalls = FakeMountSyscalls::with_mountinfo("");
+    mount_phase1_virtual_filesystems(Path::new(DEFAULT_MOUNTINFO_PATH), &mut syscalls)
+        .expect("mounts");
+    let policies: Vec<_> = syscalls
+        .calls
+        .iter()
+        .filter(|c| matches!(c, MountCall::SynthPolicy(..)))
+        .collect();
+    assert_eq!(policies.len(), 1);
+    let MountCall::SynthPolicy(mount_point, template) = policies[0] else {
+        unreachable!()
+    };
+    assert_eq!(mount_point, "/dev/pts");
+    // Authenticated Users must be able to use a pty; SYSTEM and
+    // Administrators keep full control.
+    assert!(template.contains(";;;AU)"), "{template}");
+    assert!(template.contains("(A;;GA;;;SY)"), "{template}");
+}
+
+#[test]
+fn surfaces_policy_failure_as_recovery_error() {
+    let mut syscalls =
+        FakeMountSyscalls::with_mountinfo("").fail_policy("/dev/pts", libc::EACCES);
+    let error = mount_phase1_virtual_filesystems(Path::new(DEFAULT_MOUNTINFO_PATH), &mut syscalls)
+        .expect_err("policy failure");
+    assert!(format!("{error:?}").contains("set mount policy on /dev/pts"));
 }
 
 #[test]
