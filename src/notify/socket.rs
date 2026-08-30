@@ -5,7 +5,7 @@ mod tests;
 
 use std::io;
 use std::mem::size_of;
-use std::os::fd::{AsRawFd, OwnedFd, RawFd};
+use std::os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd, RawFd};
 use std::os::unix::net::UnixDatagram;
 use std::path::{Path, PathBuf};
 
@@ -37,6 +37,12 @@ pub enum NotifySocketBindError {
     Bind { path: PathBuf, source: io::Error },
     SetPassCred(io::Error),
     SetNonblocking(io::Error),
+    /// The socket bound but its security descriptor could not be installed.
+    ///
+    /// Fatal rather than a warning: the socket exists at that point, reachable
+    /// under whatever it inherited, and continuing would serve it under a
+    /// descriptor nobody chose.
+    Secure(io::Error),
 }
 
 #[derive(Debug)]
@@ -57,12 +63,31 @@ pub enum NotifySocketReadError {
 
 impl NotifySocket {
     pub fn bind(path: impl AsRef<Path>) -> Result<Self, NotifySocketBindError> {
+        Self::bind_secured(path, |_| Ok(()))
+    }
+
+    /// Bind, and stamp a security descriptor onto the socket before it is used.
+    ///
+    /// `secure` runs between `bind` and everything else, which is the point.
+    /// `bind` publishes a pathname socket under whatever descriptor it inherits
+    /// from the parent directory, and a datagram socket has no `listen` to hold
+    /// it back — so a caller stamping afterwards, by path, leaves a window in
+    /// which the socket is reachable under the wrong descriptor. Passing the
+    /// stamp in closes it.
+    ///
+    /// The fd is borrowed rather than handed over: this socket is about to
+    /// serve, and `peios::file::File` would close it on drop.
+    pub fn bind_secured(
+        path: impl AsRef<Path>,
+        secure: impl FnOnce(BorrowedFd<'_>) -> io::Result<()>,
+    ) -> Result<Self, NotifySocketBindError> {
         let path = path.as_ref().to_path_buf();
         unlink_stale_path(&path)?;
         let socket = UnixDatagram::bind(&path).map_err(|source| NotifySocketBindError::Bind {
             path: path.clone(),
             source,
         })?;
+        secure(socket.as_fd()).map_err(NotifySocketBindError::Secure)?;
         set_passcred(socket.as_raw_fd()).map_err(NotifySocketBindError::SetPassCred)?;
         socket
             .set_nonblocking(true)

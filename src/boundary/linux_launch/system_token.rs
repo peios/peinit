@@ -114,7 +114,27 @@ fn build_system_token(
         builder.add_group(sid, *attrs);
     }
     builder.add_group(&service, group_attrs.bits());
+    // S-1-5-6, the Service group. Every token the authority mints for a service
+    // logon carries it, derived from the logon type; a SYSTEM service minted
+    // here is no less a service, and one that did not carry it would differ
+    // from its neighbours in a way nothing intends.
+    //
+    // Load-bearing rather than tidy: it is the grantee on anything reachable by
+    // services as a class -- peinit's own notify socket first among them -- so
+    // omitting it here means every SYSTEM service silently losing the ability
+    // to report itself ready.
+    builder.add_group(&service_group()?, group_attrs.bits());
     Ok(builder)
+}
+
+/// `S-1-5-6` — the group naming a process running under a service logon.
+///
+/// Built rather than named: `WellKnown` has no `Service` variant, because the
+/// enum mirrors a C ABI constant table and adding one is an ABI change. The
+/// authority derives the same SID the same way, from its logon-type table.
+fn service_group() -> Result<Sid, BoundaryError> {
+    Sid::build(5, &[6])
+        .map_err(|error| BoundaryError::Token(format!("build the Service SID failed: {error}")))
 }
 
 #[cfg(test)]

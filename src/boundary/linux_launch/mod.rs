@@ -19,7 +19,7 @@ use crate::service::ServiceDefinition;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct LinuxSystemTokenProvider {
-    authd: authd::HardcodedAuthdTokenClient,
+    authd: authd::SocketAuthdTokenClient,
 }
 
 impl LinuxSystemTokenProvider {

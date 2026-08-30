@@ -14,11 +14,20 @@ crate-type = ["rlib", "cdylib"]
 [dependencies]
 jiff = "0.2.29"
 libc = "0.2"
+# The PGSS Logon codec, for asking the authority to mint a service token
+# (§2.19). A sibling path dep like `peios`, and dependency-free apart from
+# libc, so it adds nothing to PID 1's dependency tree.
+#
+# Speaking the protocol through its own definition rather than hand-rolling the
+# message: a second implementation of a security-critical wire format is the
+# hazard authd's own service_sid module documents at length, and this is the
+# message that mints identity.
+libauthd = { path = "../authd/libauthd", optional = true }
 peios = { path = "../peios-rs/peios", optional = true }
 serde_json = "1"
 sha1 = "0.10"
 
 [features]
 default = []
-peios-boundary = ["dep:peios"]
+peios-boundary = ["dep:peios", "dep:libauthd"]
 peios-registry = ["dep:peios"]
