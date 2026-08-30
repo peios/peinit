@@ -64,7 +64,7 @@ pub use linux_pre_start_check::LinuxFilesystemCheckHelper;
 #[cfg(feature = "peios-boundary")]
 pub use linux_process::LinuxProcessController;
 #[cfg(all(feature = "peios-boundary", feature = "peios-registry"))]
-pub(crate) use linux_provisioning::{ensure_runtime_directory, set_fd_security, set_path_security};
+pub(crate) use linux_provisioning::{ensure_runtime_directory, set_path_security};
 pub use linux_provisioning::{
     provision_linux_boot_paths, provision_linux_service_runtime_directories,
 };

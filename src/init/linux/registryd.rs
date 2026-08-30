@@ -22,13 +22,14 @@ pub(super) fn start_linux_phase1_registryd(
     ensure_notify_socket_parent(supervisor.settings().notify_socket_path.as_str())?;
     let notify_socket = NotifySocket::bind_secured(
         &supervisor.settings().notify_socket_path,
-        // Stamped between bind and first use, so the socket is never reachable
-        // under the descriptor it inherited. Every service writes its readiness
-        // notification here, so the grantee is the Service group rather than a
-        // list of principals: membership follows from having been started as a
-        // service, which is exactly the population that has something to say on
-        // this socket, and which an ordinary user process cannot join.
-        |fd| crate::boundary::set_fd_security(fd, NOTIFY_SOCKET_SDDL),
+        // Stamped as early as bind allows -- by path, because the fd form
+        // answers EOPNOTSUPP for a socket; see `bind_secured`. Every service
+        // writes its readiness notification here, so the grantee is the
+        // Service group rather than a list of principals: membership follows
+        // from having been started as a service, which is exactly the
+        // population with something to say on this socket, and one an ordinary
+        // user process cannot join.
+        |path| crate::boundary::set_path_security(path, NOTIFY_SOCKET_SDDL),
     )
     .map_err(|error| {
         BoundaryError::Recovery(format!("bind registryd notify socket failed: {error:?}"))

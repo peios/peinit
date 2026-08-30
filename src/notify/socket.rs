@@ -5,7 +5,7 @@ mod tests;
 
 use std::io;
 use std::mem::size_of;
-use std::os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd, RawFd};
+use std::os::fd::{AsRawFd, OwnedFd, RawFd};
 use std::os::unix::net::UnixDatagram;
 use std::path::{Path, PathBuf};
 
@@ -68,18 +68,28 @@ impl NotifySocket {
 
     /// Bind, and stamp a security descriptor onto the socket before it is used.
     ///
-    /// `secure` runs between `bind` and everything else, which is the point.
-    /// `bind` publishes a pathname socket under whatever descriptor it inherits
-    /// from the parent directory, and a datagram socket has no `listen` to hold
-    /// it back — so a caller stamping afterwards, by path, leaves a window in
-    /// which the socket is reachable under the wrong descriptor. Passing the
-    /// stamp in closes it.
+    /// `secure` runs immediately after `bind`, before the socket is made
+    /// non-blocking or given `SO_PASSCRED` and before the caller can poll it.
+    /// That is as early as it can run: `bind` is what publishes a pathname
+    /// socket, and a datagram socket has no `listen` to hold it back.
     ///
-    /// The fd is borrowed rather than handed over: this socket is about to
-    /// serve, and `peios::file::File` would close it on drop.
+    /// # Why the descriptor is installed by path
+    ///
+    /// It addresses the socket by path rather than by descriptor because **the
+    /// fd form does not work on a socket**. `peios::file::fd_set_sd` is the
+    /// path syscall with the target as `dirfd`, an empty path and
+    /// `AT_EMPTY_PATH`, and the kernel answers `EOPNOTSUPP` for a socket fd.
+    /// Tried, and it took PID 1 into recovery.
+    ///
+    /// So a window does exist, between `bind` and this call, in which the
+    /// socket carries what it inherited. It is safe here for the same reason
+    /// it is on the control socket: the parent directory grants services
+    /// traverse and nothing else, and carries no inheritable ACE, so what the
+    /// socket inherits is narrower than what is installed. The failure
+    /// direction is refusal, not exposure.
     pub fn bind_secured(
         path: impl AsRef<Path>,
-        secure: impl FnOnce(BorrowedFd<'_>) -> io::Result<()>,
+        secure: impl FnOnce(&Path) -> io::Result<()>,
     ) -> Result<Self, NotifySocketBindError> {
         let path = path.as_ref().to_path_buf();
         unlink_stale_path(&path)?;
@@ -87,7 +97,7 @@ impl NotifySocket {
             path: path.clone(),
             source,
         })?;
-        secure(socket.as_fd()).map_err(NotifySocketBindError::Secure)?;
+        secure(&path).map_err(NotifySocketBindError::Secure)?;
         set_passcred(socket.as_raw_fd()).map_err(NotifySocketBindError::SetPassCred)?;
         socket
             .set_nonblocking(true)
