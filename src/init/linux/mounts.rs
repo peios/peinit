@@ -47,6 +47,17 @@ pub(super) const DEFAULT_MOUNTINFO_PATH: &str = "/proc/self/mountinfo";
 /// re-stamps descriptors throughout `/run` — `bind_secured` and
 /// `ensure_directory` both depend on it.
 ///
+/// The `CREATOR OWNER` ACE (`S-1-3-0`, inherit-only) is what makes the `CI`
+/// above survivable. A file created here inherits the SYSTEM and
+/// Administrators ACEs and nothing else, and that is a *non-empty* DACL, so
+/// `build_created_file_sd_bytes` never reaches the token's default DACL — a
+/// service would create runtime state it could not read back. Resolved per
+/// created object, and carried onward down each container, so a service owns
+/// what it makes without anything else gaining a right to it.
+///
+/// Written as the literal SID because neither SDDL vocabulary has a `CO`
+/// alias — the same reason `S-1-5-6` is spelled out on the boot path.
+///
 /// This MUST stay in step with the descriptor the live root's mount hook
 /// stamps (`pkgs/live-boot/src/mount-root.sh`) and with peios-install's
 /// `ROOT_SDDL` — identical but for the Everyone ACE's inheritance flags, for
@@ -63,8 +74,10 @@ pub(super) const DEFAULT_MOUNTINFO_PATH: &str = "/proc/self/mountinfo";
 /// package-shipped descriptors (PSPU §5.20): `/run`, `/dev/shm` and the
 /// cgroup tree are created at runtime and belong to no package, so this stays
 /// their policy.
-const PHASE1_SEED_SDDL: &str =
-    "O:SYG:SYD:(A;OICI;GA;;;SY)(A;OICI;GA;;;BA)(A;CI;GRGX;;;WD)";
+const PHASE1_SEED_SDDL: &str = concat!(
+    "O:SYG:SYD:(A;OICI;GA;;;SY)(A;OICI;GA;;;BA)",
+    "(A;CI;GRGX;;;WD)(A;OICIIO;GA;;;S-1-3-0)"
+);
 
 /// The synthesised descriptor for devpts inodes. devpts cannot store SDs
 /// and its slave nodes are materialised by the kernel when a terminal opens
