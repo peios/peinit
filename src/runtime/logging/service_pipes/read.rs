@@ -1,5 +1,5 @@
-use crate::boundary::{EventdLogSink, LinuxEventdLogSink, RealtimeClock};
-use crate::logging::ServiceLogRecord;
+use crate::boundary::{EventdLogSink, RealtimeClock};
+use crate::logging::{ServiceLogRecord, eventd_log_batch_prefix_len};
 use crate::runtime::{RuntimeEventRegistrar, RuntimeLogPipeTurn};
 
 use super::RuntimeServiceLogPipes;
@@ -15,8 +15,10 @@ impl RuntimeServiceLogPipes {
         C: RealtimeClock + ?Sized,
         R: RuntimeEventRegistrar + ?Sized,
     {
-        let mut sink = LinuxEventdLogSink::new();
-        self.process_pipe_event_with_sink(fd, clock, registrar, &mut sink)
+        let mut sink = std::mem::take(&mut self.eventd_sink);
+        let turn = self.process_pipe_event_with_sink(fd, clock, registrar, &mut sink);
+        self.eventd_sink = sink;
+        turn
     }
 
     pub(in crate::runtime::logging) fn process_pipe_event_with_sink<C, R, S>(
@@ -104,23 +106,32 @@ impl RuntimeServiceLogPipes {
     where
         S: EventdLogSink + ?Sized,
     {
-        let Some(socket_path) = self.eventd_socket_path.clone() else {
+        let Some(socket_path) = self.eventd_socket_path.take() else {
             for record in records {
                 self.pre_eventd.push(record.clone());
             }
             return;
         };
 
-        for (index, record) in records.iter().enumerate() {
-            if sink.send_eventd_log_record(&socket_path, record).is_ok() {
-                continue;
+        let mut index = 0usize;
+        while index < records.len() {
+            let batch_len = eventd_log_batch_prefix_len(
+                records[index..].iter(),
+                self.config.eventd_log_datagram_bytes,
+            );
+            if batch_len == 0
+                || sink
+                    .send_eventd_log_records(&socket_path, &records[index..index + batch_len])
+                    .is_err()
+            {
+                for unsent in &records[index..] {
+                    self.pre_eventd.push(unsent.clone());
+                }
+                return;
             }
-            self.eventd_socket_path = None;
-            for unsent in &records[index..] {
-                self.pre_eventd.push(unsent.clone());
-            }
-            break;
+            index += batch_len;
         }
+        self.eventd_socket_path = Some(socket_path);
     }
 }
 
