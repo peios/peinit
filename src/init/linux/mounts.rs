@@ -15,20 +15,45 @@ pub(super) const DEFAULT_MOUNTINFO_PATH: &str = "/proc/self/mountinfo";
 /// inheritance then derives child SDs. Requires SeRestorePrivilege in our
 /// token to replace the MISSING SD — held by the boot SYSTEM token.
 ///
-/// Allow SYSTEM GenericAll and Allow BUILTIN\Administrators GenericAll, both
-/// OI|CI. Because everything created beneath these roots inherits from this
-/// one descriptor, it is the access policy of `/run`, `/dev/shm` and the
-/// cgroup tree in their entirety; an ACE missing here is missing from every
-/// per-service directory under `/run/services`. Administrators is present so
-/// that an administrator can enumerate those trees at all — nothing bypasses
-/// `FILE_LIST_DIRECTORY`, so a SYSTEM-only seed makes them invisible to any
-/// signed-on principal (PEI-223).
+/// Allow SYSTEM GenericAll, Allow BUILTIN\Administrators GenericAll, and
+/// Allow Everyone read+execute, all OI|CI. Because everything created beneath
+/// these roots inherits from this one descriptor, it is the access policy of
+/// `/run`, `/dev/shm` and the cgroup tree in their entirety; an ACE missing
+/// here is missing from every per-service directory under `/run/services`.
 ///
-/// This MUST stay identical to `build_seed_sd` in prelude's `seed-sd`, which
-/// stamps the same descriptor on the root the rest of the tree hangs off. The
-/// two are hand-copied; the last time they drifted, Administrators was added
-/// there and not here, and the drift went unnoticed for four days.
-const PHASE1_SEED_SDDL: &str = "O:SYG:SYD:(A;OICI;GA;;;SY)(A;OICI;GA;;;BA)";
+/// Administrators is present so that an administrator can enumerate those
+/// trees at all — nothing bypasses `FILE_LIST_DIRECTORY`, so a SYSTEM-only
+/// seed makes them invisible to any signed-on principal (PEI-223).
+///
+/// Everyone is present for the same reason one rung down: a service that is
+/// not SYSTEM has to reach `/run` to find its own runtime directory. Execute
+/// is the traverse bit (`KACS_FILE_TRAVERSE == KACS_FILE_EXECUTE`), and an
+/// explicit `chdir` does not get the `SeChangeNotifyPrivilege` traverse
+/// bypass, so read without execute would let a service list a directory and
+/// still fail to enter it (PEI-546).
+///
+/// SYSTEM and Administrators keep `GenericAll` rather than read/write/execute
+/// because `GA` carries `WRITE_DAC`, `WRITE_OWNER` and `DELETE`, and peinit
+/// re-stamps descriptors throughout `/run` — `bind_secured` and
+/// `ensure_directory` both depend on it.
+///
+/// This MUST stay identical to the descriptor the live root's mount hook
+/// stamps (`pkgs/live-boot/src/mount-root.sh`) and to peios-install's
+/// `ROOT_SDDL`. Note what it is no longer tied to: `build_seed_sd` in
+/// prelude's `seed-sd`, which stays narrower on purpose. That is the
+/// *bootstrap* descriptor, and it is also what stamps `/dev`, where every ACE
+/// is inherited by the next hot-plugged block device — a read ACE for
+/// Everyone there is every filesystem ACL on the machine bypassed by opening
+/// the raw disk. The three copies here are hand-copied; the last time they
+/// drifted, Administrators was added in one and not the other, and the drift
+/// went unnoticed for four days (PEI-223).
+///
+/// Unlike the live root's copy, this one is not a stopgap awaiting
+/// package-shipped descriptors (PSPU §5.20): `/run`, `/dev/shm` and the
+/// cgroup tree are created at runtime and belong to no package, so this stays
+/// their policy.
+const PHASE1_SEED_SDDL: &str =
+    "O:SYG:SYD:(A;OICI;GA;;;SY)(A;OICI;GA;;;BA)(A;OICI;GRGX;;;WD)";
 
 /// The synthesised descriptor for devpts inodes. devpts cannot store SDs
 /// and its slave nodes are materialised by the kernel when a terminal opens
