@@ -61,6 +61,30 @@ pub enum NotifySocketReadError {
     },
 }
 
+/// The descriptor every peinit notification socket carries.
+///
+/// `S-1-5-6` is the Service group, which every token minted for a service logon
+/// carries. It is the right grantee because it *is* the population with
+/// something to say here: membership follows from having been started as a
+/// service rather than from which account a process runs under, so an ordinary
+/// user process cannot acquire it however it was launched.
+///
+/// `FW` is the file-write generic right, which is what a write to a pathname
+/// socket needs — the same reasoning as the jobs socket. Administrators are
+/// deliberately absent, unlike the control socket: an administrator has no
+/// business asserting that a service is ready.
+///
+/// The SID is written out rather than as its `SU` alias, because this is on the
+/// boot path and the alias table lives in a separately versioned libpeios that
+/// nothing here declares a minimum version of.
+///
+/// **One constant, and it lives here rather than at a call site**, because
+/// peinit binds this socket twice: once in Phase 1 for registryd, and again
+/// when the main runtime starts. `bind` unlinks a stale path, so the second
+/// bind replaces the first — and a descriptor applied at only one of them is a
+/// descriptor the running system does not have.
+pub const NOTIFY_SOCKET_SDDL: &str = "O:SYG:SYD:(A;;GA;;;SY)(A;;FW;;;S-1-5-6)";
+
 impl NotifySocket {
     pub fn bind(path: impl AsRef<Path>) -> Result<Self, NotifySocketBindError> {
         Self::bind_secured(path, |_| Ok(()))

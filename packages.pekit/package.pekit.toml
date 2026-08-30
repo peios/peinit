@@ -5,6 +5,6 @@
 format = "peipkg"
 
 [package]
-version      = "{{version}}-23"
+version      = "{{version}}-24"
 architecture = "x86_64"
 license      = "MIT"

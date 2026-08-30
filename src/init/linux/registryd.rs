@@ -29,7 +29,7 @@ pub(super) fn start_linux_phase1_registryd(
         // from having been started as a service, which is exactly the
         // population with something to say on this socket, and one an ordinary
         // user process cannot join.
-        |path| crate::boundary::set_path_security(path, NOTIFY_SOCKET_SDDL),
+        |path| crate::boundary::set_path_security(path, crate::notify::NOTIFY_SOCKET_SDDL),
     )
     .map_err(|error| {
         BoundaryError::Recovery(format!("bind registryd notify socket failed: {error:?}"))
@@ -239,20 +239,6 @@ fn poll_fd_readable(fd: i32, remaining_ns: u64) -> Result<(), BoundaryError> {
     }
 }
 
-/// Who may write a readiness notification.
-///
-/// `FW` rather than `GW`, following the jobs socket: it is the file-write
-/// generic right, which is what a write to a pathname socket needs.
-///
-/// Administrators are deliberately absent, unlike the control socket. An
-/// administrator has no business asserting that a service is ready, and the two
-/// sockets have different populations however alike their paths look.
-///
-/// `S-1-5-6` written out rather than as `SU`, for the reason given on
-/// [`SERVICES_RUNTIME_DIR_SDDL`](super::infrastructure::SERVICES_RUNTIME_DIR_SDDL):
-/// a boot-path descriptor must not depend on an alias newer than the libpeios
-/// the image happens to ship.
-const NOTIFY_SOCKET_SDDL: &str = "O:SYG:SYD:(A;;GA;;;SY)(A;;FW;;;S-1-5-6)";
 
 fn ensure_notify_socket_parent(path: &str) -> Result<(), BoundaryError> {
     let Some(parent) = Path::new(path).parent() else {
