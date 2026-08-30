@@ -6,6 +6,8 @@ use crate::service::runtime::{ServiceHealthStatus, ServiceState, TransitionCause
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ServiceStatusView {
     pub service: String,
+    pub display_name: Option<String>,
+    pub description: Option<String>,
     pub state: ServiceState,
     pub cause: Option<TransitionCause>,
     pub generation: u64,
@@ -21,6 +23,8 @@ pub struct ServiceStatusView {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ServiceListItem {
     pub service: String,
+    pub display_name: Option<String>,
+    pub description: Option<String>,
     pub state: ServiceState,
     pub cause: Option<TransitionCause>,
     pub health: Option<ServiceHealthStatus>,
