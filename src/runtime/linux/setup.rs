@@ -50,8 +50,16 @@ impl LinuxShutdownRuntime {
         let signal =
             LinuxPid1SignalFd::setup_registered(&epoll, RuntimeEventSource::Pid1Signal.token())
                 .map_err(LinuxRuntimeSetupError::Signal)?;
-        let notify_socket = NotifySocket::bind(&config.notify_socket_path)
-            .map_err(LinuxRuntimeSetupError::NotifySocket)?;
+        // Stamped, like the Phase 1 bind in `init::linux::registryd`. `bind`
+        // unlinks a stale path, so this replaces the socket registryd bound --
+        // and a descriptor applied only there is a descriptor the running
+        // system does not have. That is exactly what the first boot with a
+        // notify descriptor produced: the directory carried it and the socket
+        // did not.
+        let notify_socket = NotifySocket::bind_secured(&config.notify_socket_path, |path| {
+            crate::boundary::set_path_security(path, crate::notify::NOTIFY_SOCKET_SDDL)
+        })
+        .map_err(LinuxRuntimeSetupError::NotifySocket)?;
         epoll
             .register_source(
                 control_listener.as_raw_fd(),
