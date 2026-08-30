@@ -246,7 +246,12 @@ fn poll_fd_readable(fd: i32, remaining_ns: u64) -> Result<(), BoundaryError> {
 /// Administrators are deliberately absent, unlike the control socket. An
 /// administrator has no business asserting that a service is ready, and the two
 /// sockets have different populations however alike their paths look.
-const NOTIFY_SOCKET_SDDL: &str = "O:SYG:SYD:(A;;GA;;;SY)(A;;FW;;;SU)";
+///
+/// `S-1-5-6` written out rather than as `SU`, for the reason given on
+/// [`SERVICES_RUNTIME_DIR_SDDL`](super::infrastructure::SERVICES_RUNTIME_DIR_SDDL):
+/// a boot-path descriptor must not depend on an alias newer than the libpeios
+/// the image happens to ship.
+const NOTIFY_SOCKET_SDDL: &str = "O:SYG:SYD:(A;;GA;;;SY)(A;;FW;;;S-1-5-6)";
 
 fn ensure_notify_socket_parent(path: &str) -> Result<(), BoundaryError> {
     let Some(parent) = Path::new(path).parent() else {
