@@ -318,6 +318,30 @@ fn eventd_forwarding_replays_buffer_oldest_first_when_active() {
     assert!(pipes.eventd_forwarding_enabled());
 }
 
+#[test]
+fn repeated_eventd_sync_reuses_the_configured_path_allocation() {
+    let mut pipes = RuntimeServiceLogPipes::default();
+    let mut sink = FakeEventdSink::default();
+    let path = "/run/services/eventd/eventd-log.sock";
+
+    pipes.sync_eventd_forwarding_with_sink(true, Some(path), &mut sink);
+    let first_path = pipes
+        .eventd_socket_path
+        .as_ref()
+        .expect("forwarding path");
+    let first_ptr = first_path.as_ptr();
+    let first_capacity = first_path.capacity();
+
+    pipes.sync_eventd_forwarding_with_sink(true, Some(path), &mut sink);
+
+    let second_path = pipes
+        .eventd_socket_path
+        .as_ref()
+        .expect("forwarding path");
+    assert_eq!(second_path.as_ptr(), first_ptr);
+    assert_eq!(second_path.capacity(), first_capacity);
+}
+
 /// `Machine\System\Init\PreEventdBuffer` reaches the buffer only through
 /// `update_config`: the Linux runtime constructs its pipes with `Default`
 /// before Phase 2 has read the registry, then syncs the effective config on
