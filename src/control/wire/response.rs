@@ -43,6 +43,8 @@ pub fn control_status_response_line(
     let response = json!({
         "status": ControlResponseStatus::Ok.as_str(),
         "service": view.service.as_str(),
+        "display_name": view.display_name.as_deref(),
+        "description": view.description.as_deref(),
         "state": service_state_wire(view.state),
         "cause": view.cause.map(transition_cause_wire),
         "status_text": view.status_text.as_deref(),
@@ -98,6 +100,8 @@ pub fn control_list_response_line(
         .map(|item| {
             json!({
                 "service": item.service.as_str(),
+                "display_name": item.display_name.as_deref(),
+                "description": item.description.as_deref(),
                 "state": service_state_wire(item.state),
                 "cause": item.cause.map(transition_cause_wire),
                 "health": item.health.map(service_health_wire),

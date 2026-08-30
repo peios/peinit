@@ -81,10 +81,9 @@ fn default_service_security_descriptor() -> peios::Result<peios::security::Secur
 
     let system = Sid::well_known(WellKnown::System);
     let administrators = Sid::well_known(WellKnown::Administrators);
-    let admin_access = ServiceAccess::QUERY_STATUS.union(ServiceAccess::STOP);
     let dacl = AclBuilder::new()
         .allow(&system, ServiceAccess::ALL.bits(), AceFlags::empty())
-        .allow(&administrators, admin_access.bits(), AceFlags::empty())
+        .allow(&administrators, ServiceAccess::ALL.bits(), AceFlags::empty())
         .build()?;
     SdBuilder::new()
         .owner(&system)

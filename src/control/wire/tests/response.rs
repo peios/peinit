@@ -28,6 +28,8 @@ fn serializes_status_response_shape_with_structured_warnings_and_timestamps() {
     let operation_id = operation_id(2);
     let view = ServiceStatusView {
         service: "app".to_string(),
+        display_name: Some("Application".to_string()),
+        description: Some("An example application".to_string()),
         state: ServiceState::Active,
         cause: Some(TransitionCause::ExplicitStart),
         generation: 99,
@@ -65,6 +67,8 @@ fn serializes_status_response_shape_with_structured_warnings_and_timestamps() {
             "current_job",
             "current_operation",
             "definition_removed",
+            "description",
+            "display_name",
             "health",
             "service",
             "state",
@@ -75,6 +79,8 @@ fn serializes_status_response_shape_with_structured_warnings_and_timestamps() {
         ],
     );
     assert_eq!(response["status"], "ok");
+    assert_eq!(response["display_name"], "Application");
+    assert_eq!(response["description"], "An example application");
     assert_eq!(response["state"], "active");
     assert_eq!(response["cause"], "explicit_start");
     assert_eq!(response["definition_removed"], true);
@@ -107,6 +113,8 @@ fn serializes_status_response_shape_with_structured_warnings_and_timestamps() {
 fn serializes_list_response_as_compact_query_authorized_summaries() {
     let services = vec![ServiceListItem {
         service: "app".to_string(),
+        display_name: Some("Application".to_string()),
+        description: None,
         state: ServiceState::Active,
         cause: Some(TransitionCause::ExplicitStart),
         health: None,
@@ -119,9 +127,11 @@ fn serializes_list_response_as_compact_query_authorized_summaries() {
     assert_eq!(sorted_keys(&response), ["services", "status"]);
     assert_eq!(
         sorted_keys(&response["services"][0]),
-        ["cause", "health", "service", "state"],
+        ["cause", "description", "display_name", "health", "service", "state"],
     );
     assert_eq!(response["services"][0]["service"], "app");
+    assert_eq!(response["services"][0]["display_name"], "Application");
+    assert!(response["services"][0]["description"].is_null());
     assert_eq!(response["services"][0]["state"], "active");
     assert_eq!(response["services"][0]["cause"], "explicit_start");
     assert!(response["services"][0]["health"].is_null());

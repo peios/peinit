@@ -31,6 +31,8 @@ pub fn list_services(services: &ServiceTable) -> Vec<ServiceListItem> {
         .filter_map(|service| {
             services.get(service).map(|entry| ServiceListItem {
                 service: service.to_string(),
+                display_name: entry.definition.display_name.clone(),
+                description: entry.definition.description.clone(),
                 state: entry.runtime.state,
                 cause: entry.runtime.cause,
                 health: entry
@@ -64,6 +66,8 @@ fn status_from_entry(
     let lifecycle_warnings = lifecycle_warning_messages(&warnings);
     Ok(ServiceStatusView {
         service: service.to_string(),
+        display_name: entry.definition.display_name.clone(),
+        description: entry.definition.description.clone(),
         state: entry.runtime.state,
         cause: entry.runtime.cause,
         generation: entry.runtime.generation,

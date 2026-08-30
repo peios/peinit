@@ -172,6 +172,8 @@ fn write_status(out: &mut dyn Write, value: &Value) -> io::Result<()> {
     let service = str_field(value, "service").unwrap_or("unknown");
     let state = str_field(value, "state").unwrap_or("unknown");
     writeln!(out, "{service}: {state}")?;
+    write_optional_line(out, "display name", str_field(value, "display_name"))?;
+    write_optional_line(out, "description", str_field(value, "description"))?;
     write_optional_line(out, "cause", str_field(value, "cause"))?;
     write_optional_line(out, "health", str_field(value, "health"))?;
     write_optional_line(out, "status", str_field(value, "status_text"))?;
