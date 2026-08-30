@@ -30,6 +30,7 @@ fn drains_complete_lines_into_pre_eventd_buffer() {
         read_bytes_per_event: 1024,
         pre_eventd_buffer_bytes: 4096,
         max_buffer_per_service_bytes: DEFAULT_MAX_LOG_BUFFER_PER_SERVICE_BYTES,
+        eventd_log_datagram_bytes: crate::logging::DEFAULT_EVENTD_LOG_DATAGRAM_BYTES,
     });
     let mut registrar = TestRegistrar::default();
     let event = job_event(JobType::ServiceMain);
@@ -71,6 +72,7 @@ fn process_pipe_event_respects_per_turn_read_budget() {
         read_bytes_per_event: 4,
         pre_eventd_buffer_bytes: 4096,
         max_buffer_per_service_bytes: DEFAULT_MAX_LOG_BUFFER_PER_SERVICE_BYTES,
+        eventd_log_datagram_bytes: crate::logging::DEFAULT_EVENTD_LOG_DATAGRAM_BYTES,
     });
     let mut registrar = TestRegistrar::default();
     let event = job_event(JobType::ServiceMain);
@@ -165,6 +167,7 @@ fn work_pump_registration_includes_post_start_hook_launches() {
         read_bytes_per_event: 1024,
         pre_eventd_buffer_bytes: 4096,
         max_buffer_per_service_bytes: DEFAULT_MAX_LOG_BUFFER_PER_SERVICE_BYTES,
+        eventd_log_datagram_bytes: crate::logging::DEFAULT_EVENTD_LOG_DATAGRAM_BYTES,
     });
     let mut registrar = TestRegistrar::default();
 
@@ -231,6 +234,7 @@ fn successful_eventd_flush_drains_buffer_in_order() {
     assert_eq!(flush.sent_records, 2);
     assert_eq!(flush.buffered_records, 0);
     assert!(flush.error.is_none());
+    assert_eq!(sink.batch_sizes, vec![2]);
     assert_eq!(
         sink.sent
             .iter()
@@ -247,6 +251,7 @@ fn failed_eventd_flush_keeps_unsent_records_buffered() {
     pipes.pre_eventd.push(service_record("one"));
     pipes.pre_eventd.push(service_record("two"));
     pipes.pre_eventd.push(service_record("three"));
+    force_single_record_datagrams(&mut pipes);
     let mut sink = FakeEventdSink::fail_on_call(2);
 
     let flush = pipes.flush_to_eventd("/run/services/eventd/eventd-log.sock", &mut sink);
@@ -377,7 +382,7 @@ fn eventd_forwarding_keeps_buffered_records_when_active_send_fails() {
     );
 
     assert!(flush.eventd_active);
-    assert_eq!(flush.attempted_records, 1);
+    assert_eq!(flush.attempted_records, 2);
     assert_eq!(flush.sent_records, 0);
     assert_eq!(flush.buffered_records, 2);
     assert!(flush.error.is_some());
@@ -484,6 +489,11 @@ fn live_eventd_send_failure_buffers_unsent_records_and_disables_forwarding() {
         &mut setup_sink,
     );
     let mut sink = FakeEventdSink::fail_on_call(2);
+    pipes.config.eventd_log_datagram_bytes = 1 + [service_record("one"), service_record("two")]
+        .iter()
+        .map(crate::logging::encoded_eventd_log_record_len)
+        .max()
+        .expect("records");
 
     pipes.process_pipe_event_with_sink(fd, &mut ClockAt(20), &mut registrar, &mut sink);
 
@@ -548,6 +558,7 @@ fn pipe_pair() -> (File, File) {
 #[derive(Default)]
 struct FakeEventdSink {
     sent: Vec<(String, ServiceLogRecord)>,
+    batch_sizes: Vec<usize>,
     fail_on_call: Option<usize>,
     calls: usize,
 }
@@ -562,18 +573,33 @@ impl FakeEventdSink {
 }
 
 impl EventdLogSink for FakeEventdSink {
-    fn send_eventd_log_record(
+    fn send_eventd_log_records(
         &mut self,
         socket_path: &str,
-        record: &ServiceLogRecord,
+        records: &[ServiceLogRecord],
     ) -> Result<(), BoundaryError> {
         self.calls += 1;
         if self.fail_on_call == Some(self.calls) {
             return Err(BoundaryError::EventdLog("eventd unavailable".to_string()));
         }
-        self.sent.push((socket_path.to_string(), record.clone()));
+        self.batch_sizes.push(records.len());
+        self.sent.extend(
+            records
+                .iter()
+                .cloned()
+                .map(|record| (socket_path.to_string(), record)),
+        );
         Ok(())
     }
+}
+
+fn force_single_record_datagrams(pipes: &mut RuntimeServiceLogPipes) {
+    pipes.config.eventd_log_datagram_bytes = 1 + pipes
+        .pre_eventd
+        .iter()
+        .map(crate::logging::encoded_eventd_log_record_len)
+        .max()
+        .expect("buffered records");
 }
 
 fn job_event(job_type: JobType) -> JobEvent {

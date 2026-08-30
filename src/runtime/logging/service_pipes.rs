@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::os::fd::OwnedFd;
 
+use crate::boundary::LinuxEventdLogSink;
 use crate::ids::JobId;
 use crate::logging::{PreEventdLogBuffer, RuntimeLogConfig, ServiceLogRecord};
 
@@ -27,6 +28,7 @@ pub struct RuntimeServiceLogPipes {
     pub(in crate::runtime::logging) pipes: BTreeMap<i32, ServiceLogPipe>,
     pub(in crate::runtime::logging) pre_eventd: PreEventdLogBuffer,
     pub(in crate::runtime::logging) eventd_socket_path: Option<String>,
+    pub(in crate::runtime::logging) eventd_sink: LinuxEventdLogSink,
     pub(in crate::runtime::logging) sinks: BTreeMap<JobId, OutputSink>,
 }
 
@@ -35,6 +37,7 @@ impl RuntimeServiceLogPipes {
         Self {
             pre_eventd: PreEventdLogBuffer::new(config.pre_eventd_buffer_bytes),
             eventd_socket_path: None,
+            eventd_sink: LinuxEventdLogSink::new(),
             config,
             pipes: BTreeMap::new(),
             sinks: BTreeMap::new(),

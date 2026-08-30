@@ -14,6 +14,7 @@ pub use config::{
     RegistryConfigWarning, SUPPORTED_SERVICES_SCHEMA_VERSION,
     build_boot_success_grace_from_registry_values, build_control_security_from_registry_values,
     build_control_socket_limits_from_registry_values,
+    build_eventd_log_datagram_bytes_from_registry_values,
     build_eventd_log_socket_path_from_registry_values,
     build_global_environment_from_registry_values, build_jobs_socket_limits_from_registry_values,
     build_log_read_bytes_per_event_from_registry_values,

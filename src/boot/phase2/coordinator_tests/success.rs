@@ -109,7 +109,8 @@ fn registry_boot_settings_override_phase2_defaults() {
         .with_shutdown_timeout_secs(Ok(Some(17)))
         .with_post_kill_timeout_secs(Ok(Some(9)))
         .with_log_read_bytes_per_event(Ok(Some(4_096)))
-        .with_pre_eventd_buffer_bytes(Ok(Some(2_097_152)));
+        .with_pre_eventd_buffer_bytes(Ok(Some(2_097_152)))
+        .with_eventd_log_datagram_bytes(Ok(Some(524_288)));
     let mut clock = FixedClock::at(OBSERVED_AT_NS);
     let mut operation_ids = OperationIdAllocator::new();
     let mut job_ids = JobIdAllocator::new();
@@ -134,6 +135,7 @@ fn registry_boot_settings_override_phase2_defaults() {
     assert_eq!(run.shutdown_settings.post_kill_timeout_secs, 9);
     assert_eq!(run.log_config.read_bytes_per_event, 4_096);
     assert_eq!(run.log_config.pre_eventd_buffer_bytes, 2_097_152);
+    assert_eq!(run.log_config.eventd_log_datagram_bytes, 524_288);
 }
 
 /// Each of these is a field whose struct siblings were already registry-backed
@@ -170,6 +172,10 @@ fn newly_configurable_settings_fall_back_to_their_defaults() {
     assert_eq!(
         run.log_config.pre_eventd_buffer_bytes,
         log_defaults.pre_eventd_buffer_bytes,
+    );
+    assert_eq!(
+        run.log_config.eventd_log_datagram_bytes,
+        log_defaults.eventd_log_datagram_bytes,
     );
 }
 

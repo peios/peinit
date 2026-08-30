@@ -122,7 +122,8 @@ fn reload_reads_every_log_knob_not_just_the_two_it_used_to() {
         .with_max_log_line_length(Some(12_000))
         .with_max_log_buffer_per_service(Some(128_000))
         .with_log_read_bytes_per_event(Some(4_096))
-        .with_pre_eventd_buffer_bytes(Some(2_097_152));
+        .with_pre_eventd_buffer_bytes(Some(2_097_152))
+        .with_eventd_log_datagram_bytes(Some(524_288));
     let mut services = ServiceTable::default();
 
     let outcome = reload_config(&mut registry, &mut services).expect("reload");
@@ -131,6 +132,7 @@ fn reload_reads_every_log_knob_not_just_the_two_it_used_to() {
     assert_eq!(outcome.log_config.max_buffer_per_service_bytes, 128_000);
     assert_eq!(outcome.log_config.read_bytes_per_event, 4_096);
     assert_eq!(outcome.log_config.pre_eventd_buffer_bytes, 2_097_152);
+    assert_eq!(outcome.log_config.eventd_log_datagram_bytes, 524_288);
     assert!(
         outcome.config_warnings.is_empty(),
         "{:?}",

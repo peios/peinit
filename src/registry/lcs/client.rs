@@ -12,7 +12,7 @@ use super::boot::{
     read_lcs_boot_success_grace_secs, read_lcs_max_parallel_starts,
     read_lcs_post_kill_timeout_secs, read_lcs_settle_timeout_secs, read_lcs_shutdown_timeout_secs,
 };
-use super::eventd::read_lcs_eventd_log_socket_path;
+use super::eventd::{read_lcs_eventd_log_datagram_bytes, read_lcs_eventd_log_socket_path};
 use super::global_env::read_lcs_global_environment;
 use super::init::{
     read_lcs_control_security, read_lcs_control_socket_limits, read_lcs_log_read_bytes_per_event,
@@ -113,6 +113,11 @@ impl RegistryClient for LcsRegistryClient {
 
     fn read_eventd_log_socket_path(&mut self) -> Result<Option<String>, BoundaryError> {
         read_lcs_eventd_log_socket_path()
+            .map_err(|error| BoundaryError::Registry(format!("{error:?}")))
+    }
+
+    fn read_eventd_log_datagram_bytes(&mut self) -> Result<Option<u32>, BoundaryError> {
+        read_lcs_eventd_log_datagram_bytes()
             .map_err(|error| BoundaryError::Registry(format!("{error:?}")))
     }
 

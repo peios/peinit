@@ -75,6 +75,22 @@ impl PreEventdLogBuffer {
             .collect()
     }
 
+    pub fn iter(&self) -> impl Iterator<Item = &ServiceLogRecord> {
+        self.records.iter().map(|entry| &entry.record)
+    }
+
+    pub fn len(&self) -> usize {
+        self.records.len()
+    }
+
+    pub fn discard_front(&mut self, count: usize) {
+        for _ in 0..count {
+            if self.pop_front().is_none() {
+                break;
+            }
+        }
+    }
+
     pub fn front(&self) -> Option<&ServiceLogRecord> {
         self.records.front().map(|entry| &entry.record)
     }

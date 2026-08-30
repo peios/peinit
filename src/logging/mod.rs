@@ -6,9 +6,12 @@ mod msgpack;
 
 pub use buffer::{DEFAULT_PRE_EVENTD_BUFFER_BYTES, PreEventdLogBuffer};
 pub use config::{
-    DEFAULT_LOG_READ_BYTES_PER_EVENT, DEFAULT_MAX_LOG_BUFFER_PER_SERVICE_BYTES,
-    DEFAULT_MAX_LOG_LINE_BYTES, RuntimeLogConfig,
+    DEFAULT_EVENTD_LOG_DATAGRAM_BYTES, DEFAULT_LOG_READ_BYTES_PER_EVENT,
+    DEFAULT_MAX_LOG_BUFFER_PER_SERVICE_BYTES, DEFAULT_MAX_LOG_LINE_BYTES, RuntimeLogConfig,
 };
 pub use line::LogLineAssembler;
 pub use model::{LogStream, ServiceLogRecord};
-pub use msgpack::encode_eventd_log_record;
+pub use msgpack::{
+    encode_eventd_log_record, encode_eventd_log_records_into, encoded_eventd_log_record_len,
+    eventd_log_batch_prefix_len,
+};
