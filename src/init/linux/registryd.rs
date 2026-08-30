@@ -263,13 +263,62 @@ fn ensure_notify_socket_parent(path: &str) -> Result<(), BoundaryError> {
     // create_dir_all leaves the directory inheriting the Phase 1 /run seed,
     // which is SYSTEM-only, so no service could traverse to the socket however
     // the socket itself was stamped.
-    crate::boundary::ensure_runtime_directory(parent, super::infrastructure::SERVICES_RUNTIME_DIR_SDDL)
+    //
+    // **Each level explicitly.** `ensure_runtime_directory` creates one
+    // directory and requires its parent to already exist -- peinit does not
+    // create ancestors, deliberately, because a directory nobody named is a
+    // directory whose descriptor nobody chose. `create_dir_all` used to hide
+    // that here: at this point in Phase 1 only `/run` exists, and swapping in
+    // the descriptor-aware call without walking the chain took PID 1 into
+    // recovery on `/run/services`.
+    for level in ancestors_under_run(parent) {
+        crate::boundary::ensure_runtime_directory(
+            &level,
+            super::infrastructure::SERVICES_RUNTIME_DIR_SDDL,
+        )
         .map_err(|error| {
             BoundaryError::Recovery(format!(
                 "create notify socket directory {} failed: {error}",
-                parent.display()
+                level.display()
             ))
-        })
+        })?;
+    }
+    Ok(())
+}
+
+/// Every directory from `/run` down to `path`, `/run` itself excluded.
+///
+/// `/run` is seeded in Phase 1 before this runs (§2.1) and is not ours to
+/// re-describe; everything below it is.
+fn ancestors_under_run(path: &Path) -> Vec<std::path::PathBuf> {
+    let mut levels: Vec<std::path::PathBuf> = path
+        .ancestors()
+        .take_while(|p| p.as_os_str() != "/run" && p.as_os_str() != "/" && !p.as_os_str().is_empty())
+        .map(std::path::Path::to_path_buf)
+        .collect();
+    levels.reverse();
+    levels
+}
+
+#[cfg(test)]
+mod parent_tests {
+    use super::ancestors_under_run;
+    use std::path::Path;
+
+    /// The bug this exists for: `/run/services` did not exist at Phase 1, and
+    /// creating only the leaf took PID 1 into recovery.
+    #[test]
+    fn every_level_below_run_is_created_outermost_first() {
+        let levels = ancestors_under_run(Path::new("/run/services/peinit"));
+        let names: Vec<&str> = levels.iter().map(|p| p.to_str().unwrap()).collect();
+        assert_eq!(names, vec!["/run/services", "/run/services/peinit"]);
+    }
+
+    /// `/run` is Phase 1's, seeded before this runs, and not ours to restamp.
+    #[test]
+    fn run_itself_is_left_alone() {
+        assert!(ancestors_under_run(Path::new("/run")).is_empty());
+    }
 }
 
 fn supervisor_error(error: SupervisorError) -> BoundaryError {
