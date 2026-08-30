@@ -2,7 +2,7 @@ use peios::security::Privileges;
 use peios::token::{PrivilegeAdjustment, Token};
 
 use crate::boundary::BoundaryError;
-use crate::security::TokenSummary;
+use crate::security::{TokenSummary, identity_user_sid};
 
 /// Resolve `RequiredPrivileges` names to the mask they describe.
 ///
@@ -49,6 +49,25 @@ pub(super) fn apply_required_privileges(
     Ok(())
 }
 
+/// Describe a token, refusing to describe it as an identity it does not carry.
+///
+/// `identity` is what the service *declared*; `user_sid` is what the token
+/// actually holds. Those two disagreeing used to be the normal case rather than
+/// an error: peinit's authd client was a stub that returned a SYSTEM token for
+/// every identity, so a service declaring `LocalService` ran as `S-1-5-18` and
+/// this function reported `LocalService` beside it. `svctl status` therefore
+/// described a fully privileged SYSTEM process as `LocalService`, which is what
+/// kept the bug invisible from outside for as long as it lasted.
+///
+/// With a real authority the two can no longer legitimately differ, so a
+/// mismatch is a defect somewhere — and failing the launch is the right answer,
+/// because the alternative is running a process as a principal nobody asked
+/// for while reporting the one they did.
+///
+/// Only checked where the declared identity *predicts* a SID.
+/// [`identity_user_sid`] answers `None` for a principal name, which the
+/// authority resolves and this crate cannot; there is nothing to compare
+/// against, and inventing a comparison would refuse every such service.
 pub(super) fn summarize_token(
     identity: &str,
     token: &Token,
@@ -57,6 +76,14 @@ pub(super) fn summarize_token(
         .user()
         .map_err(|error| BoundaryError::Token(format!("query token user SID failed: {error}")))?
         .to_string();
+
+    if let Some(expected) = identity_user_sid(identity)
+        && expected != user_sid
+    {
+        return Err(BoundaryError::Token(format!(
+            "the token issued for identity '{identity}' carries {user_sid}, not {expected}"
+        )));
+    }
     let group_sids = token
         .groups()
         .map_err(|error| BoundaryError::Token(format!("query token groups failed: {error}")))?

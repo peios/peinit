@@ -37,6 +37,23 @@ pub(super) fn setup_linux_phase1_infrastructure() -> Result<Phase1Infrastructure
 /// decided by ControlSecurity and ServiceSecurity, as it always was.
 const CONTROL_SOCKET_SDDL: &str = "O:SYG:SYD:(A;;GA;;;SY)(A;;GA;;;BA)";
 
+/// The descriptor on `/run/services/peinit`, which is the parent of *both*
+/// peinit sockets.
+///
+/// One constant rather than one per socket, and that is load-bearing:
+/// `ensure_directory` re-stamps a directory that already exists, so two call
+/// sites installing different descriptors on the same path would silently
+/// leave whichever ran last. Registryd binds the notify socket in Phase 1,
+/// before this file's control socket exists, so the last writer would be the
+/// control socket and services would quietly lose the traverse they need to
+/// reach `notify.sock`.
+///
+/// Services get **traverse only** (`GX`). Reaching the directory is not
+/// permission to write the socket in it; that is decided by the socket's own
+/// descriptor.
+pub(super) const SERVICES_RUNTIME_DIR_SDDL: &str =
+    "O:SYG:SYD:(A;;GA;;;SY)(A;;GA;;;BA)(A;;GX;;;SU)";
+
 /// The jobs socket admits every authenticated principal (PSPU §7.A).
 ///
 /// Being able to connect *is* the permission to submit: the kernel checks
@@ -64,7 +81,7 @@ fn bind_jobs_socket(path: &Path) -> Result<LinuxJobsSocket, BoundaryError> {
 
 fn bind_control_socket(path: &Path) -> Result<LinuxControlSocket, BoundaryError> {
     if let Some(parent) = path.parent() {
-        crate::boundary::ensure_runtime_directory(parent, CONTROL_SOCKET_SDDL).map_err(
+        crate::boundary::ensure_runtime_directory(parent, SERVICES_RUNTIME_DIR_SDDL).map_err(
             |error| {
                 BoundaryError::Recovery(format!(
                     "create control socket dir {} failed: {error}",

@@ -20,10 +20,19 @@ pub(super) fn start_linux_phase1_registryd(
     observed_at_ns: u64,
 ) -> Result<(), BoundaryError> {
     ensure_notify_socket_parent(supervisor.settings().notify_socket_path.as_str())?;
-    let notify_socket =
-        NotifySocket::bind(&supervisor.settings().notify_socket_path).map_err(|error| {
-            BoundaryError::Recovery(format!("bind registryd notify socket failed: {error:?}"))
-        })?;
+    let notify_socket = NotifySocket::bind_secured(
+        &supervisor.settings().notify_socket_path,
+        // Stamped between bind and first use, so the socket is never reachable
+        // under the descriptor it inherited. Every service writes its readiness
+        // notification here, so the grantee is the Service group rather than a
+        // list of principals: membership follows from having been started as a
+        // service, which is exactly the population that has something to say on
+        // this socket, and which an ordinary user process cannot join.
+        |fd| crate::boundary::set_fd_security(fd, NOTIFY_SOCKET_SDDL),
+    )
+    .map_err(|error| {
+        BoundaryError::Recovery(format!("bind registryd notify socket failed: {error:?}"))
+    })?;
     let mut token_provider = LinuxSystemTokenProvider::new();
     let mut process_launcher = LinuxProcessLauncher::new();
     let mut launch_clock = FixedClock(observed_at_ns);
@@ -229,16 +238,33 @@ fn poll_fd_readable(fd: i32, remaining_ns: u64) -> Result<(), BoundaryError> {
     }
 }
 
+/// Who may write a readiness notification.
+///
+/// `FW` rather than `GW`, following the jobs socket: it is the file-write
+/// generic right, which is what a write to a pathname socket needs.
+///
+/// Administrators are deliberately absent, unlike the control socket. An
+/// administrator has no business asserting that a service is ready, and the two
+/// sockets have different populations however alike their paths look.
+const NOTIFY_SOCKET_SDDL: &str = "O:SYG:SYD:(A;;GA;;;SY)(A;;FW;;;SU)";
+
 fn ensure_notify_socket_parent(path: &str) -> Result<(), BoundaryError> {
     let Some(parent) = Path::new(path).parent() else {
         return Ok(());
     };
-    std::fs::create_dir_all(parent).map_err(|error| {
-        BoundaryError::Recovery(format!(
-            "create notify socket directory {} failed: {error}",
-            parent.display()
-        ))
-    })
+    // Through `ensure_runtime_directory` rather than `create_dir_all`, and with
+    // the descriptor shared with the control socket that lands in the same
+    // directory later in boot -- see SERVICES_RUNTIME_DIR_SDDL. A bare
+    // create_dir_all leaves the directory inheriting the Phase 1 /run seed,
+    // which is SYSTEM-only, so no service could traverse to the socket however
+    // the socket itself was stamped.
+    crate::boundary::ensure_runtime_directory(parent, super::infrastructure::SERVICES_RUNTIME_DIR_SDDL)
+        .map_err(|error| {
+            BoundaryError::Recovery(format!(
+                "create notify socket directory {} failed: {error}",
+                parent.display()
+            ))
+        })
 }
 
 fn supervisor_error(error: SupervisorError) -> BoundaryError {

@@ -219,6 +219,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "libauthd"
+version = "0.0.1"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.186"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -267,6 +274,7 @@ name = "peinit2"
 version = "0.0.1"
 dependencies = [
  "jiff",
+ "libauthd",
  "libc",
  "peios",
  "serde_json",
