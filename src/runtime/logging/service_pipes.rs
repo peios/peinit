@@ -28,6 +28,11 @@ pub struct RuntimeServiceLogPipes {
     pub(in crate::runtime::logging) pipes: BTreeMap<i32, ServiceLogPipe>,
     pub(in crate::runtime::logging) pre_eventd: PreEventdLogBuffer,
     pub(in crate::runtime::logging) eventd_socket_path: Option<String>,
+    /// Records the kernel discarded because eventd could not keep up. Counted
+    /// rather than retried: §12.1 makes log ingestion deliberately lossy so it
+    /// cannot exert backpressure on senders, and the count is the only trace a
+    /// dropped datagram leaves.
+    pub(in crate::runtime::logging) eventd_dropped_records: usize,
     pub(in crate::runtime::logging) eventd_sink: LinuxEventdLogSink,
     pub(in crate::runtime::logging) sinks: BTreeMap<JobId, OutputSink>,
 }
@@ -37,11 +42,17 @@ impl RuntimeServiceLogPipes {
         Self {
             pre_eventd: PreEventdLogBuffer::new(config.pre_eventd_buffer_bytes),
             eventd_socket_path: None,
+            eventd_dropped_records: 0,
             eventd_sink: LinuxEventdLogSink::new(),
             config,
             pipes: BTreeMap::new(),
             sinks: BTreeMap::new(),
         }
+    }
+
+    /// How many records eventd's receive buffer has discarded since boot.
+    pub fn eventd_dropped_records(&self) -> usize {
+        self.eventd_dropped_records
     }
 
     pub fn active_sink_count(&self) -> usize {

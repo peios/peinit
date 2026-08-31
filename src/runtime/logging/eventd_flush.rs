@@ -84,9 +84,24 @@ impl RuntimeServiceLogPipes {
                 .collect::<Vec<_>>();
             attempted_records += batch_len;
             match sink.send_eventd_log_records(socket_path, &batch) {
-                Ok(()) => {
+                Ok(crate::boundary::EventdSendOutcome::Sent) => {
                     sent_records += batch_len;
                     self.pre_eventd.discard_front(batch_len);
+                }
+                // Replay is the one place where waiting beats dropping: these
+                // records are already buffered, the buffer is bounded, and the
+                // next turn will try again. Crucially this is not an error, so
+                // the socket path is not cleared and forwarding stays on
+                // (PEI-357).
+                Ok(crate::boundary::EventdSendOutcome::Dropped) => {
+                    return RuntimeEventdLogFlush {
+                        eventd_active: true,
+                        socket_path_configured: true,
+                        attempted_records,
+                        sent_records,
+                        buffered_records: self.pre_eventd.len(),
+                        error: None,
+                    };
                 }
                 Err(error) => {
                     return RuntimeEventdLogFlush {
