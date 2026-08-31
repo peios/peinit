@@ -19,8 +19,8 @@ mod event_time;
 
 use cleanup::{
     NoReloadCleanupController, ReloadCleanupController, cancel_reload_after_main_exit,
-    clear_fd_store_after_explicit_stop, remove_satisfied_readiness_deadlines,
-    remove_satisfied_stop_deadlines,
+    clear_fd_store_after_definition_discard, clear_fd_store_after_explicit_stop,
+    remove_satisfied_readiness_deadlines, remove_satisfied_stop_deadlines,
 };
 use critical::critical_reboot_due;
 use event_time::terminal_event_time;
@@ -208,6 +208,7 @@ impl Supervisor {
         remove_satisfied_readiness_deadlines(&mut work, &terminal);
         remove_satisfied_stop_deadlines(&mut work, &terminal);
         clear_fd_store_after_explicit_stop(&mut work, &terminal);
+        clear_fd_store_after_definition_discard(&mut work, &terminal);
         let critical_reboot_due = critical_reboot_due(&work, &terminal);
         if critical_reboot_due {
             work.commit(self);

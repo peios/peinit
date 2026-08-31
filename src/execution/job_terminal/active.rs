@@ -72,6 +72,31 @@ fn apply_restart_evaluation(
     ended: EndedJob,
     cause: TransitionCause,
 ) -> Result<ServiceMainJobTerminalDispatch, ServiceMainJobTerminalError> {
+    // §3.5: a service whose definition has been withdrawn is not restarted
+    // when its instance exits. `RestartPolicy` is moot — there is no
+    // definition left to restart it from — so the evaluation is skipped
+    // entirely rather than allowed to reach a state it could never leave.
+    //
+    // Backoff was the state it could never leave, and the two halves of that
+    // deadlock are in different files. `restart_backoff_deadlines` skips
+    // definition-removed entries, so nothing moved it out; Backoff is one of
+    // the states that keeps an entry alive after removal, so nothing discarded
+    // it either. The entry stayed in `status` describing a restart that would
+    // never happen, went on refusing every lifecycle command with
+    // UNKNOWN_SERVICE, and held its stored descriptors open in PID 1 for the
+    // life of the process (PEI-346).
+    if definition_removed(services, service) {
+        let (state, cause) = match cause {
+            // A Simple service exiting zero under `RestartPolicy=Always` is a
+            // clean exit that policy would have restarted. Without a policy to
+            // apply it is simply a clean exit.
+            TransitionCause::CleanExitRestart => {
+                (ServiceState::Inactive, TransitionCause::CleanExit)
+            }
+            cause => (ServiceState::Failed, cause),
+        };
+        return apply_active_transition(services, service, job_event, state, cause);
+    }
     let consecutive_failures = services
         .runtime(service)
         .ok_or_else(|| unknown_service(service))?
@@ -141,6 +166,14 @@ fn apply_active_transition(
         post_start_hook: None,
         late_exit: None,
     })
+}
+
+/// The definition behind this service has been withdrawn from the registry
+/// and the entry is being kept alive only until its instance drains.
+fn definition_removed(services: &ServiceTable, service: &str) -> bool {
+    services
+        .get(service)
+        .is_some_and(|entry| entry.definition_removed)
 }
 
 fn backoff_until(ended: &EndedJob, delay_secs: u64) -> u64 {
