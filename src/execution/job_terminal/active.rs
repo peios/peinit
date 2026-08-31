@@ -115,6 +115,7 @@ fn apply_restart_backoff(
         service_transitions: vec![transition],
         graph_events: Vec::new(),
         post_start_hook: None,
+        late_exit: None,
     })
 }
 
@@ -138,6 +139,7 @@ fn apply_active_transition(
         service_transitions: vec![transition],
         graph_events: Vec::new(),
         post_start_hook: None,
+        late_exit: None,
     })
 }
 

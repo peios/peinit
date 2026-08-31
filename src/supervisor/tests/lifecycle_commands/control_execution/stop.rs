@@ -182,3 +182,65 @@ fn post_kill_stop_cleanup_populated_cgroup_marks_abandoned_and_fails_stop() {
     );
     assert!(controller.cgroup_removes.is_empty());
 }
+
+// PEI-531. Post-kill cleanup abandons a service whose cgroup is still
+// populated, and deliberately leaves the main job open: the process is still
+// there, so there is nothing to reap yet. When it finally does die — the
+// uninterruptible sleep it was stuck in completes — its exit arrives for a
+// service already in `Abandoned`.
+//
+// That used to be `UnsupportedServiceState`, which the runtime loop reports as
+// a loop failure, and PID 1 answers a loop failure by dropping the machine into
+// Recovery: every session killed, for one service that had already been written
+// off.
+#[test]
+fn an_abandoned_services_late_exit_is_not_a_runtime_failure() {
+    let mut supervisor = active_app_supervisor();
+    let operation_id = stop_app(&mut supervisor);
+    let mut controller = TestProcessController::default();
+    let mut clock = ScriptedClock::new([CONTROL_NS]);
+    supervisor
+        .execute_next_pending_control_operation(&mut controller, &mut clock)
+        .expect("execute stop")
+        .expect("stop dispatch");
+    let due_at_ns = supervisor
+        .next_stop_timeout_deadline()
+        .expect("deadline")
+        .due_at_ns;
+    supervisor
+        .process_next_due_stop_timeout(&mut controller, due_at_ns)
+        .expect("process timeout")
+        .expect("escalation");
+    supervisor
+        .process_due_cgroup_cleanups(&mut controller, due_at_ns + 5_000_000_000)
+        .expect("cleanup")
+        .expect("a cleanup deadline was due");
+    assert_eq!(
+        supervisor.service_status("app").expect("app").state,
+        ServiceState::Abandoned,
+    );
+    // Reading it here rather than earlier is part of the assertion: giving up
+    // on the process leaves its job open, which is why the exit can arrive.
+    let job = current_app_job(&supervisor);
+
+    let terminal = supervisor
+        .complete_job(job, EXIT_NS, 0)
+        .expect("a late exit is not a runtime failure");
+
+    assert_eq!(terminal.terminal.late_exit, Some(ServiceState::Abandoned));
+    assert!(terminal.terminal.service_transitions.is_empty());
+    assert!(terminal.start_dispatches.is_empty());
+    assert!(terminal.restart_start_dispatches.is_empty());
+    // The service keeps the state that giving up put it in, and the stop stays
+    // failed: the exit is news about the process, not a retroactive success.
+    let status = supervisor.service_status("app").expect("app");
+    assert_eq!(status.state, ServiceState::Abandoned);
+    assert_eq!(status.cause, Some(TransitionCause::ProcessUnkillable));
+    assert_eq!(
+        supervisor
+            .operation_status(operation_id)
+            .expect("stop operation")
+            .state,
+        OperationState::Failed,
+    );
+}

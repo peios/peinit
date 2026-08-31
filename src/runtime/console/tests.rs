@@ -212,6 +212,7 @@ fn critical_service_failure_emits_failure_and_critical_messages() {
                     )],
                     graph_events: Vec::new(),
                     post_start_hook: None,
+                    late_exit: None,
                 },
                 cleanup_job_events: Vec::new(),
                 start_dispatches: Vec::new(),
@@ -235,6 +236,59 @@ fn critical_service_failure_emits_failure_and_critical_messages() {
             "peinit: service database failed: ProcessCrash\n",
             "peinit: critical service database failed: service main exited\n",
         ],
+    );
+}
+
+// PEI-531. A late exit produces no service transition — that is the whole
+// point of it — so without a message of its own it leaves no trace at all, and
+// a service sitting in a stale state becomes a silent mystery. Every route to
+// one is something having gone wrong earlier, so it is an error rather than
+// status and survives a requested blackout.
+#[test]
+fn a_late_service_exit_is_reported_to_the_console() {
+    let service = "atriumd";
+    let job_id = job_id(3);
+    let turn = RuntimeShutdownEventTurn::Pid1Signal {
+        read: LinuxSignalFdRead::Other {
+            signal: libc::SIGCHLD,
+        },
+        supervisor: SupervisorPid1SignalFdTurn::Other {
+            signal: libc::SIGCHLD,
+        },
+        child_reaps: vec![SupervisorChildReapTurn::Tracked {
+            child: ChildReap {
+                pid: 801,
+                status: ChildExitStatus::Exited { code: 0 },
+            },
+            job_id,
+            dispatch: SupervisorChildReapDispatch::Runtime(Box::new(SupervisorTerminalDispatch {
+                terminal: ServiceMainJobTerminalDispatch {
+                    job_event: failed_job(service, job_id),
+                    operation_events: Vec::new(),
+                    service_transitions: Vec::new(),
+                    graph_events: Vec::new(),
+                    post_start_hook: None,
+                    late_exit: Some(ServiceState::Backoff),
+                },
+                cleanup_job_events: Vec::new(),
+                start_dispatches: Vec::new(),
+                restart_start_dispatches: Vec::new(),
+                critical_reboot: None,
+            })),
+        }],
+        drive: None,
+        deadline_timer: None,
+    };
+
+    let messages = collect_messages(
+        &RuntimeWorkPumpTurn::default(),
+        &[turn],
+        &RuntimeWorkPumpTurn::default(),
+    );
+
+    assert_eq!(
+        messages,
+        vec!["peinit: service atriumd main process exited in state Backoff; no action taken\n"],
     );
 }
 
