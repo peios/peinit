@@ -1,7 +1,6 @@
 use crate::execution::start::StartExecutionDispatch;
-use crate::service::ErrorControl;
 use crate::service::ServiceTableTransition;
-use crate::service::runtime::{ServiceState, TransitionCause};
+use crate::service::runtime::ServiceState;
 use crate::supervisor::dispatch::SupervisorOnFailureLoopSuppressedDispatch;
 use crate::supervisor::state::SupervisorError;
 use crate::supervisor::work::SupervisorWork;
@@ -21,7 +20,7 @@ pub(super) fn apply_on_failure_starts(
         if event.to != ServiceState::Failed || !event.cause.triggers_on_failure() {
             continue;
         }
-        if critical_budget_reboot_suppresses_on_failure(work, &event.service, event.cause) {
+        if critical_budget_reboot_suppresses_on_failure(work, &event.service) {
             continue;
         }
         let Some(target) = on_failure_target(work, &event.service) else {
@@ -84,15 +83,15 @@ fn on_failure_target(work: &SupervisorWork, service: &str) -> Option<String> {
         .and_then(|definition| definition.on_failure.clone())
 }
 
-fn critical_budget_reboot_suppresses_on_failure(
-    work: &SupervisorWork,
-    service: &str,
-    cause: TransitionCause,
-) -> bool {
-    if cause != TransitionCause::RestartBudgetExhausted {
-        return false;
-    }
-    work.services
-        .definition(service)
-        .is_some_and(|definition| definition.error_control == ErrorControl::Critical)
+/// The immediate reboot owed to a Critical service takes precedence over
+/// `OnFailure`, so the handler must not be started as well (§5.2, §5.3).
+///
+/// The question is deliberately delegated rather than restated here. This used
+/// to key on the cause and `ErrorControl` alone, which is the *inputs* to the
+/// reboot decision rather than the decision — so on every path that failed to
+/// raise the reboot, the handler was suppressed on the strength of an
+/// escalation that never happened, and a Critical service got neither. Asking
+/// the one predicate means the two cannot disagree again.
+fn critical_budget_reboot_suppresses_on_failure(work: &SupervisorWork, service: &str) -> bool {
+    crate::supervisor::critical_budget::critical_budget_reboot_owed(&work.services, service)
 }

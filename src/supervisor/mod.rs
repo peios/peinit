@@ -9,6 +9,7 @@ mod control;
 mod control_boundary;
 mod control_command;
 mod control_connection;
+mod critical_budget;
 mod dispatch;
 mod fd_store_lifecycle;
 mod health;
@@ -52,6 +53,7 @@ mod work;
 mod tests;
 
 pub use cgroup_cleanup::SupervisorLeakedCgroupDispatch;
+pub use critical_budget::SupervisorCriticalBudgetRebootDispatch;
 pub use child_reap::{SupervisorChildReapDispatch, SupervisorChildReapTurn};
 pub use control_boundary::{PendingControlOperation, PendingControlRequirement};
 pub use control_command::{

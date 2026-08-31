@@ -338,3 +338,211 @@ impl ShutdownFinalizer for CriticalFinalizer {
         Ok(())
     }
 }
+
+// PEI-341. Two rules that are individually right combining into a state
+// neither intended.
+//
+// §5.3: a Critical service that exhausts its restart budget syncs and reboots,
+// and the reboot takes precedence over `OnFailure`. §5.2: peinit must not
+// start the `OnFailure` service in that case. Both assume the reboot happens.
+//
+// The reboot was raised only from the paths that observe a terminal outcome
+// for a *running* service — the main job ending, health checks, the watchdog.
+// A budget exhausted by startup failures (repeated ReadinessTimeout,
+// PreHookFailure, ParentSetupFailure) reached none of them, while the
+// suppression keyed on the cause and ErrorControl alone and fired anyway. So a
+// Critical service that could never get as far as running settled quietly in
+// Failed with no reboot and no handler — the case that most needs one of the
+// two escalations got neither.
+#[test]
+fn a_critical_budget_exhausted_by_a_startup_failure_still_reboots() {
+    // Notify readiness, so failing to signal ready is the failure. Budget of
+    // zero: the first failure exhausts it.
+    let mut app = crate::service::ServiceDefinition::simple_system_boot("app", "/sbin/app");
+    app.error_control = ErrorControl::Critical;
+    app.restart_max_retries = 0;
+    app.on_failure = Some("fallback".to_string());
+    let mut fallback = alive_service("fallback");
+    fallback.triggers.clear();
+
+    let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
+    let mut registry = StaticRegistry::services(vec![app, fallback]);
+    let mut clock = ScriptedClock::new([BOOT_NS, APP_LAUNCH_NS]);
+    supervisor
+        .run_phase2_boot(&mut registry, &mut clock)
+        .expect("boot supervisor");
+    let mut tokens = TestTokenProvider::default();
+    let mut launcher = TestProcessLauncher::new(vec![process(5000, 20)]);
+    supervisor
+        .launch_next_pending_job(&mut tokens, &mut launcher, &mut clock)
+        .expect("launch app")
+        .expect("app launch dispatch");
+
+    let due_at_ns = supervisor
+        .next_readiness_timeout()
+        .expect("readiness timeout")
+        .due_at_ns;
+    let mut controller = super::TestProcessController::default();
+    let mut counter = NoBootAttemptCounter;
+    let mut finalizer = CriticalFinalizer::default();
+    let drive = supervisor
+        .process_due_lifecycle_deadlines_with_finalizer(
+            &mut controller,
+            &mut counter,
+            Some(&mut finalizer),
+            due_at_ns,
+        )
+        .expect("lifecycle deadlines")
+        .expect("a readiness timeout was due");
+
+    let status = supervisor.service_status("app").expect("app");
+    assert_eq!(status.state, ServiceState::Failed);
+    assert_eq!(status.cause, Some(TransitionCause::RestartBudgetExhausted));
+
+    // One escalation or the other must happen. Before the fix neither did:
+    // the reboot was raised only by the paths that watch a running service,
+    // and the handler was suppressed on the strength of it anyway.
+    let handler_started = supervisor
+        .service_status("fallback")
+        .expect("fallback")
+        .current_operation
+        .is_some();
+    assert!(
+        handler_started || supervisor.shutdown().is_some(),
+        "a Critical service exhausted its budget and got neither the reboot \
+         nor its OnFailure handler",
+    );
+
+    let reboot = drive
+        .critical_budget_reboot
+        .expect("a Critical service exhausted its budget");
+    assert_eq!(reboot.service, "app");
+    assert_eq!(
+        reboot.finalization.finalization,
+        ShutdownFinalizationState::Completed,
+    );
+    assert_eq!(
+        finalizer.calls,
+        vec![CriticalCall::Sync, CriticalCall::Reboot],
+    );
+    // The reboot takes precedence over OnFailure, so the handler stays
+    // suppressed — correctly, now that the reboot actually happens.
+    assert!(!handler_started);
+}
+
+// The other half of the pairing, and the reason the suppression must ask about
+// the reboot rather than about ErrorControl: a Normal service gets no reboot,
+// so its OnFailure handler must run.
+#[test]
+fn a_normal_services_exhausted_budget_starts_its_on_failure_handler() {
+    let mut app = crate::service::ServiceDefinition::simple_system_boot("app", "/sbin/app");
+    app.restart_max_retries = 0;
+    app.on_failure = Some("fallback".to_string());
+    let mut fallback = alive_service("fallback");
+    fallback.triggers.clear();
+
+    let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
+    let mut registry = StaticRegistry::services(vec![app, fallback]);
+    let mut clock = ScriptedClock::new([BOOT_NS, APP_LAUNCH_NS]);
+    supervisor
+        .run_phase2_boot(&mut registry, &mut clock)
+        .expect("boot supervisor");
+    let mut tokens = TestTokenProvider::default();
+    let mut launcher = TestProcessLauncher::new(vec![process(5000, 20)]);
+    supervisor
+        .launch_next_pending_job(&mut tokens, &mut launcher, &mut clock)
+        .expect("launch app")
+        .expect("app launch dispatch");
+
+    let due_at_ns = supervisor
+        .next_readiness_timeout()
+        .expect("readiness timeout")
+        .due_at_ns;
+    let mut controller = super::TestProcessController::default();
+    let mut counter = NoBootAttemptCounter;
+    let mut finalizer = CriticalFinalizer::default();
+    let drive = supervisor
+        .process_due_lifecycle_deadlines_with_finalizer(
+            &mut controller,
+            &mut counter,
+            Some(&mut finalizer),
+            due_at_ns,
+        )
+        .expect("lifecycle deadlines")
+        .expect("a readiness timeout was due");
+
+    assert_eq!(
+        supervisor.service_status("app").expect("app").cause,
+        Some(TransitionCause::RestartBudgetExhausted),
+    );
+    assert_eq!(
+        supervisor
+            .service_status("fallback")
+            .expect("fallback")
+            .current_operation
+            .expect("fallback operation source")
+            .source,
+        OperationSource::OnFailure,
+    );
+    assert!(drive.critical_budget_reboot.is_none());
+    assert!(
+        finalizer.calls.is_empty(),
+        "a Normal service must not reboot the machine",
+    );
+}
+
+// The reconciliation pass must not fire a second time for a service the
+// terminal path already rebooted for — it runs every turn, and the reboot is
+// not an idempotent thing to repeat.
+#[test]
+fn the_reconciliation_pass_does_not_repeat_an_inline_critical_reboot() {
+    let mut app = alive_service("app");
+    app.error_control = ErrorControl::Critical;
+    app.restart_max_retries = 0;
+    let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
+    let mut registry = StaticRegistry::services(vec![app]);
+    let mut clock = ScriptedClock::new([BOOT_NS, APP_LAUNCH_NS]);
+    supervisor
+        .run_phase2_boot(&mut registry, &mut clock)
+        .expect("boot supervisor");
+    let mut tokens = TestTokenProvider::default();
+    let mut launcher = TestProcessLauncher::new(vec![process(5000, 20)]);
+    supervisor
+        .launch_next_pending_job(&mut tokens, &mut launcher, &mut clock)
+        .expect("launch app")
+        .expect("app launch dispatch");
+    let job_id = supervisor
+        .service_status("app")
+        .expect("active app")
+        .current_job
+        .expect("app job")
+        .id;
+    let mut finalizer = CriticalFinalizer::default();
+    supervisor
+        .complete_job_with_shutdown_finalizer(job_id, APP_CRASH_NS, 1, &mut finalizer)
+        .expect("critical crash");
+    assert_eq!(
+        finalizer.calls,
+        vec![CriticalCall::Sync, CriticalCall::Reboot],
+    );
+
+    let mut second = CriticalFinalizer::default();
+    assert!(
+        supervisor
+            .process_due_critical_budget_reboot(&mut second, APP_CRASH_NS + 1)
+            .expect("critical budget reboot")
+            .is_none(),
+    );
+    assert!(second.calls.is_empty());
+}
+
+/// The boot-attempt counter is not what these tests are about. The deadline
+/// turn resets it when the boot succeeds, which is orthogonal to the restart
+/// budget, so this accepts the reset and records nothing.
+struct NoBootAttemptCounter;
+
+impl crate::boundary::BootAttemptCounter for NoBootAttemptCounter {
+    fn reset_boot_attempt_counter(&mut self) -> Result<(), BoundaryError> {
+        Ok(())
+    }
+}

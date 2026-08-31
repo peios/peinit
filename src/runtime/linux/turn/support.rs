@@ -8,7 +8,9 @@ use crate::runtime::{
     RuntimeCalendarTimerTurn, RuntimeShutdownEventTurn, RuntimeShutdownLoopError,
     RuntimeShutdownLoopTurn, RuntimeWorkPumpTurn, collect_runtime_loop_kmes_events,
 };
-use crate::supervisor::{Supervisor, SupervisorOperationMaintenanceTurn};
+use crate::supervisor::{
+    Supervisor, SupervisorCriticalBudgetRebootDispatch, SupervisorOperationMaintenanceTurn,
+};
 #[cfg(feature = "peios-registry")]
 use crate::supervisor::{SupervisorControlCommandDispatch, SupervisorControlFrameTurn};
 
@@ -48,6 +50,22 @@ pub(in crate::runtime::linux::turn) fn process_due_operation_maintenance_at(
             .map_err(RuntimeShutdownLoopError::OperationMaintenance);
     }
     Ok(SupervisorOperationMaintenanceTurn::default())
+}
+
+/// Reboot if a Critical service has run out of restart budget.
+///
+/// Once per turn, after the turn's events have been applied. The paths that
+/// raise the reboot inline have already set the shutdown state by then, so
+/// this is a no-op for them; it is here for the paths that do not, which is
+/// every way a service can exhaust its budget without ever running.
+pub(in crate::runtime::linux::turn) fn process_due_critical_budget_reboot_at(
+    supervisor: &mut Supervisor,
+    finalizer: &mut dyn crate::boundary::ShutdownFinalizer,
+    now_ns: u64,
+) -> Result<Option<SupervisorCriticalBudgetRebootDispatch>, RuntimeShutdownLoopError> {
+    supervisor
+        .process_due_critical_budget_reboot(finalizer, now_ns)
+        .map_err(RuntimeShutdownLoopError::OperationMaintenance)
 }
 
 pub(in crate::runtime::linux::turn) fn flush_operation_waits_at<I>(

@@ -73,6 +73,7 @@ pub(super) fn collect_lifecycle_deadline_dispatch_console_messages(
     for timeout in &dispatch.watchdog_timeouts {
         collect_watchdog_timeout_console_messages(timeout, out);
     }
+    push_critical_budget_reboot(&dispatch.critical_budget_reboot, out);
     // A leak means something underneath the service stopped answering the
     // kernel, and no amount of restarting the service fixes it. The service
     // itself carries on, so without this line nothing on the console says the
@@ -133,6 +134,15 @@ pub(super) fn collect_health_check_terminal_console_messages(
         && let Some(service) = dispatch.job_event.service.as_deref()
     {
         push_critical_service_failure(out, service, "health check failed");
+    }
+}
+
+fn push_critical_budget_reboot(
+    dispatch: &Option<crate::supervisor::SupervisorCriticalBudgetRebootDispatch>,
+    out: &mut Vec<ConsoleMessage>,
+) {
+    if let Some(reboot) = dispatch {
+        crate::runtime::console::push_critical_budget_reboot_message(out, &reboot.service);
     }
 }
 
