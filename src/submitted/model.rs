@@ -114,6 +114,7 @@ pub struct SubmittedJobOutcome {
 pub enum SubmittedNotifyField {
     Ready,
     Status { text: String },
+    Level { value: String },
     Progress { progress: JobProgress },
     ProgressUnit { unit: JobProgressUnit },
 }

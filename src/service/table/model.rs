@@ -11,6 +11,32 @@ pub struct ServiceEntry {
     pub definition_removed: bool,
 }
 
+impl ServiceEntry {
+    /// Does this entry satisfy a dependent asking for `level`?
+    ///
+    /// `None` is the ordinary dependency: the service need only be in a
+    /// state that satisfies dependents. `Some(level)` additionally
+    /// requires that the service has published exactly that level with
+    /// `LEVEL=`, which is what `Requires = ["netd:routed"]` means.
+    ///
+    /// Exact match rather than "at least this level": peinit has no
+    /// ordering over another daemon's vocabulary and must not invent one.
+    /// netd knows that `routed` implies `addressed`; peinit does not, and
+    /// a dependent that wants either should say so with two entries once
+    /// that is expressible. Recorded here because the alternative — a
+    /// central table of level orderings — is exactly the coupling this
+    /// design avoided by namespacing levels per publisher.
+    pub fn satisfies(&self, level: Option<&str>) -> bool {
+        if !self.runtime.state.satisfies_dependents() {
+            return false;
+        }
+        match level {
+            None => true,
+            Some(wanted) => self.runtime.level.as_deref() == Some(wanted),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ServiceActivationSnapshot {
     pub service: String,

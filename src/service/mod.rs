@@ -14,7 +14,7 @@ pub use definition::{
 pub use dependency::{
     ServiceDependency, ServiceDependencyKind, ServiceDependencyOrderCycle,
     all_declared_dependencies, dependency_start_order, existing_start_order_dependency_targets,
-    hard_dependencies, start_order_dependency_targets,
+    hard_dependencies, split_target, start_order_dependency_targets,
 };
 pub use graph::{
     ServiceGraphFinding, ServiceGraphValidation, ServiceGraphValidationFailure,

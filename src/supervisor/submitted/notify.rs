@@ -119,6 +119,13 @@ fn apply_submitted_notify_fields(
                 entry.status_text = Some(text.clone());
                 applied.push(SubmittedNotifyField::Status { text: text.clone() });
             }
+            // A submitted job is not a service and nothing can declare a
+            // dependency on one, so its level is recorded and no more. The
+            // field is accepted rather than refused because a program that
+            // can run as either should not have to know which it is.
+            NotifyField::Level(value) => {
+                applied.push(SubmittedNotifyField::Level { value: value.clone() });
+            }
             NotifyField::Progress(value) => {
                 // An unexpected value is ignored, never repaired (§4.17).
                 if let Ok(progress) = parse_progress(value) {

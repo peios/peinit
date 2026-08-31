@@ -64,10 +64,18 @@ impl<'a> StartClosureCollector<'a> {
         }
 
         for dependency in hard_dependencies(&entry.definition) {
-            self.include_hard_dependency(service, &dependency.target, dependency.kind);
+            self.include_hard_dependency(
+                service,
+                &dependency.target,
+                dependency.level.as_deref(),
+                dependency.kind,
+            );
         }
-        for target in &entry.definition.wants {
-            self.include_wanted_dependency(target);
+        for declared in &entry.definition.wants {
+            // Split, because a `Wants` may name a level too and the table
+            // is keyed by service name.
+            let (target, level) = crate::service::split_target(declared);
+            self.include_wanted_dependency(&target, level.as_deref());
         }
     }
 
@@ -75,9 +83,10 @@ impl<'a> StartClosureCollector<'a> {
         &mut self,
         service: &str,
         target: &str,
+        level: Option<&str>,
         kind: ServiceDependencyKind,
     ) {
-        match dependency_entry(self.services, target) {
+        match dependency_entry(self.services, target, level) {
             DependencyEntry::Startable | DependencyEntry::Disabled => self.include_service(target),
             DependencyEntry::Satisfied => {}
             DependencyEntry::Missing => {
@@ -92,8 +101,8 @@ impl<'a> StartClosureCollector<'a> {
         }
     }
 
-    fn include_wanted_dependency(&mut self, target: &str) {
-        if dependency_entry(self.services, target) == DependencyEntry::Startable {
+    fn include_wanted_dependency(&mut self, target: &str, level: Option<&str>) {
+        if dependency_entry(self.services, target, level) == DependencyEntry::Startable {
             self.include_service(target);
         }
     }
@@ -164,11 +173,15 @@ enum DependencyEntry {
     DefinitionRemoved,
 }
 
-fn dependency_entry(services: &ServiceTable, service: &str) -> DependencyEntry {
+fn dependency_entry(
+    services: &ServiceTable,
+    service: &str,
+    level: Option<&str>,
+) -> DependencyEntry {
     let Some(entry) = services.get(service) else {
         return DependencyEntry::Missing;
     };
-    if entry.runtime.state.satisfies_dependents() {
+    if entry.satisfies(level) {
         DependencyEntry::Satisfied
     } else if entry.definition_removed {
         DependencyEntry::DefinitionRemoved

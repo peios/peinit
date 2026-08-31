@@ -77,7 +77,9 @@ fn include_closure(
             }
         }
     }
-    for target in &definition.wants {
+    for declared in &definition.wants {
+        // A `Wants` may name a level; the graph is keyed by service name.
+        let (target, _level) = crate::service::split_target(declared);
         if let Some(target_definition) = by_name.get(target.as_str()).copied()
             && !target_definition.disabled
             && dependency_eligible(mode, target_definition)

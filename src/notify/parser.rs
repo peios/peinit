@@ -9,6 +9,16 @@ pub enum NotifyField {
     Reloading,
     Stopping,
     Status(String),
+    /// The service's own readiness level, for another service to depend on
+    /// with `Requires = ["<service>:<level>"]`.
+    ///
+    /// Deliberately carried here rather than read from the publisher's own
+    /// observability socket. peinit already owns this socket, already knows
+    /// which service sent each datagram, and must not grow a dependency on
+    /// any daemon's wire crate — PID 1 is the one process that cannot
+    /// afford to fail to start. It also means a level cannot go stale: the
+    /// process that would notice the publisher dying is this one.
+    Level(String),
     Progress(String),
     ProgressUnit(String),
     Errno(String),
@@ -57,6 +67,9 @@ fn supported_field(key: &str, value: &str) -> Option<NotifyField> {
         "RELOADING" if value == "1" => Some(NotifyField::Reloading),
         "STOPPING" if value == "1" => Some(NotifyField::Stopping),
         "STATUS" => Some(NotifyField::Status(value.to_string())),
+        // An empty level is "I have no level", which is how a daemon
+        // retracts one without exiting.
+        "LEVEL" => Some(NotifyField::Level(value.to_string())),
         "PROGRESS" => Some(NotifyField::Progress(value.to_string())),
         "PROGRESS_UNIT" => Some(NotifyField::ProgressUnit(value.to_string())),
         "ERRNO" => Some(NotifyField::Errno(value.to_string())),
