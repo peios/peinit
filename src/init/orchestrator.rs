@@ -33,6 +33,23 @@ where
     // ones to be unconditional.
     log_console(platform, QuietLevel::Verbose, "peinit: phase1 starting\n");
 
+    // Before anything is attempted with them. SeCreateTokenPrivilege used to
+    // surface only as an EPERM from kacs_create_token at the *first* service
+    // start — registryd, in step 6 — so a peinit that could not mint tokens
+    // entered recovery reporting what looked like a registryd problem, and
+    // nothing named the privilege (PEI-365).
+    if let Err(error) = platform.verify_privileges() {
+        log_console_error(
+            platform,
+            &format!("peinit: required privileges are not held: {error:?}\n"),
+        );
+        return enter_recovery(
+            platform,
+            InitRecoveryReason::Privileges(error),
+            RecoveryRegistryd::Start(Box::new(SupervisorSettings::new(config.phase2))),
+        );
+    }
+
     if let Err(error) = platform.verify_root_writable() {
         return enter_recovery(
             platform,

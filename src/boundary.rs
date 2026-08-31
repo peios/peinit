@@ -10,6 +10,8 @@ mod linux_io;
 #[cfg(feature = "peios-boundary")]
 mod linux_kmes;
 mod linux_machine_id;
+#[cfg(feature = "peios-boundary")]
+mod linux_privileges;
 mod linux_power;
 #[cfg(feature = "peios-boundary")]
 mod linux_pre_start_check;
@@ -26,6 +28,8 @@ mod linux_launch;
 #[cfg(feature = "peios-boundary")]
 mod linux_process;
 
+#[cfg(feature = "peios-boundary")]
+pub use linux_privileges::verify_peinit_privileges;
 pub use eventd::{
     EventdLogSink, EventdSendOutcome, LinuxEventdLogSink, send_eventd_log_record,
 };

@@ -15,6 +15,7 @@ use crate::supervisor::Supervisor;
 #[derive(Debug)]
 pub(super) struct Platform {
     pid1: Result<(), InitFatalError>,
+    privileges: Result<(), BoundaryError>,
     command_line: Result<KernelCommandLine, BoundaryError>,
     /// The notify socket the supervisor was carrying when registryd was
     /// launched — the observable effect of `peios.notifysocket=`.
@@ -48,6 +49,7 @@ impl Platform {
     pub(super) fn new() -> Self {
         Self {
             pid1: Ok(()),
+            privileges: Ok(()),
             command_line: Ok(KernelCommandLine::default()),
             registryd_notify_socket_path: None,
             boot_attempt_counter: Ok(0),
@@ -74,6 +76,11 @@ impl Platform {
             recovery_reasons: Vec::new(),
             kmes_events: Vec::new(),
         }
+    }
+
+    pub(super) fn missing_privileges(mut self, message: &str) -> Self {
+        self.privileges = Err(BoundaryError::Token(message.to_string()));
+        self
     }
 
     pub(super) fn not_pid1(mut self, pid: u32) -> Self {
@@ -160,6 +167,10 @@ impl Platform {
 impl InitPlatform for Platform {
     fn assert_pid1(&mut self) -> Result<(), InitFatalError> {
         self.pid1.clone()
+    }
+
+    fn verify_privileges(&mut self) -> Result<(), BoundaryError> {
+        self.privileges.clone()
     }
 
     fn read_kernel_command_line(&mut self) -> Result<KernelCommandLine, BoundaryError> {

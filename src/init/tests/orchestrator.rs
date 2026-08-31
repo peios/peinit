@@ -997,3 +997,52 @@ fn an_unpersistable_machine_id_warns_and_boots() {
         platform.console_messages,
     );
 }
+
+// PEI-365. peinit never checked that it held the privileges §13.1 says it
+// requires. SeCreateTokenPrivilege surfaced only as an EPERM from
+// kacs_create_token at the *first* service start — registryd, in Phase 1 step
+// 6 — so a peinit that could not mint tokens entered recovery reporting a
+// token-materialisation failure that read as a registryd problem, with nothing
+// anywhere naming the privilege.
+//
+// PID 1 discovering it cannot mint tokens is worth saying before it tries.
+#[test]
+fn missing_privileges_are_named_before_anything_needs_them() {
+    let mut platform = Platform::new()
+        .missing_privileges("peinit is missing required privilege(s): SeCreateTokenPrivilege");
+    let mut registry = Registry::with_services([service("app")]);
+    let mut clock = ClockAt(10);
+    let mut runtime = Runtime::default();
+
+    let result = run_init(
+        InitConfig::default(),
+        &mut platform,
+        &mut registry,
+        &mut clock,
+        &mut runtime,
+    )
+    .expect("recovery");
+
+    assert!(matches!(
+        result,
+        InitRunResult::RecoveryReturned {
+            reason: InitRecoveryReason::Privileges(_),
+        },
+    ));
+    // Before registryd is attempted, so the operator is not left diagnosing a
+    // registryd that would never have started.
+    assert!(
+        !platform
+            .console_messages
+            .iter()
+            .any(|message| message == "peinit: phase1 starting registryd\n"),
+    );
+    assert!(
+        platform.console_messages.iter().any(|message| {
+            message.contains("required privileges are not held")
+                && message.contains("SeCreateTokenPrivilege")
+        }),
+        "the missing privilege was not named: {:?}",
+        platform.console_messages,
+    );
+}
