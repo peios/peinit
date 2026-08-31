@@ -60,20 +60,33 @@ fn include_closure(
             {
                 include_closure(&target_definition.name, mode, by_name, included, blocked);
             }
+            // Present, enabled, and left out only by the Safe mode
+            // eligibility filter. Safe mode drops the edge rather than
+            // blocking the dependent: excluding a service and then failing
+            // everything that depends on it would leave Safe mode able to
+            // start almost nothing.
+            //
+            // This is the *only* case that drops. A target missing from the
+            // registry or disabled by an administrator is a configuration
+            // error, not a Safe mode exclusion, and blocking on one is what
+            // the dependent's `Requires` asked for. Safe mode used to drop
+            // those too — so the cautious mode was the one that started a
+            // service without the thing it declared it needs, on the very
+            // path a Full boot had already failed.
+            Some(target_definition)
+                if !target_definition.disabled && mode != BootMode::Full => {}
             _ => {
-                if mode == BootMode::Full {
-                    // Through block_service, not or_insert: a service can be
-                    // missing more than one hard dependency, and or_insert kept
-                    // whichever was found first (PSD-007 §6.2 retention).
-                    block_service(
-                        blocked,
-                        &definition.name,
-                        BlockedReason::HardDependencyUnavailable {
-                            target: dependency.target,
-                            kind: dependency.kind,
-                        },
-                    );
-                }
+                // Through block_service, not or_insert: a service can be
+                // missing more than one hard dependency, and or_insert kept
+                // whichever was found first (§6.2 retention).
+                block_service(
+                    blocked,
+                    &definition.name,
+                    BlockedReason::HardDependencyUnavailable {
+                        target: dependency.target,
+                        kind: dependency.kind,
+                    },
+                );
             }
         }
     }

@@ -331,3 +331,113 @@ fn a_dependent_of_an_undecodable_definition_fails_through_dependency_failure() {
     assert!(causes.contains(&("broken", TransitionCause::ValidationError)));
     assert!(causes.contains(&("dependent", TransitionCause::DependencyFailure)));
 }
+
+// PEI-343. Safe mode's own rule is that dependencies on *excluded* services
+// are dropped (§2.3) — otherwise excluding a service would fail everything
+// downstream of it and Safe mode could start almost nothing. The guard
+// implementing that was on the whole unavailable case, so it also dropped
+// hard dependencies on targets that are missing from the registry or disabled
+// by an administrator.
+//
+// Those two are configuration errors, not Safe mode exclusions, and Safe mode
+// exists precisely because the configuration is already known to be broken. So
+// the cautious mode was the one starting a service without the thing its
+// `Requires` — the strongest statement a definition can make about what it
+// needs — says it needs, on the escalation path a Full boot had already failed.
+#[test]
+fn safe_mode_blocks_a_hard_dependency_missing_from_the_registry() {
+    let mut app = ServiceDefinition::simple_system_boot("app", "/sbin/app");
+    app.safe_mode = true;
+    app.requires.push("absent".to_string());
+
+    let mut operations = OperationIdAllocator::new();
+    let mut jobs = JobIdAllocator::new();
+    let boot = prepare_phase2_boot_plan(
+        BootMode::Safe,
+        &[app],
+        10,
+        OBSERVED_AT_NS,
+        &mut operations,
+        &mut jobs,
+    )
+    .expect("safe boot plan");
+
+    assert!(boot.starts.is_empty());
+    assert_eq!(boot.blocked.len(), 1);
+    assert_eq!(boot.blocked[0].service, "app");
+    assert_eq!(
+        boot.blocked[0].reason,
+        crate::boot::phase2::BlockedReason::HardDependencyUnavailable {
+            target: "absent".to_string(),
+            kind: crate::boot::phase2::DependencyKind::Requires,
+        },
+    );
+}
+
+// PEI-343, the disabled half. Full mode has blocked this since it existed
+// (`disabled_services_are_not_auto_started_and_hard_dependents_are_blocked`);
+// Safe mode did not.
+#[test]
+fn safe_mode_blocks_a_disabled_hard_dependency() {
+    let mut app = ServiceDefinition::simple_system_boot("app", "/sbin/app");
+    app.safe_mode = true;
+    app.requires.push("db".to_string());
+    // Eligible in every respect except that an administrator turned it off.
+    let mut db = ServiceDefinition::simple_system_boot("db", "/sbin/db");
+    db.safe_mode = true;
+    db.disabled = true;
+
+    let mut operations = OperationIdAllocator::new();
+    let mut jobs = JobIdAllocator::new();
+    let boot = prepare_phase2_boot_plan(
+        BootMode::Safe,
+        &[app, db],
+        10,
+        OBSERVED_AT_NS,
+        &mut operations,
+        &mut jobs,
+    )
+    .expect("safe boot plan");
+
+    assert!(boot.starts.is_empty());
+    assert_eq!(boot.blocked.len(), 1);
+    assert_eq!(boot.blocked[0].service, "app");
+    assert_eq!(
+        boot.blocked[0].reason,
+        crate::boot::phase2::BlockedReason::HardDependencyUnavailable {
+            target: "db".to_string(),
+            kind: crate::boot::phase2::DependencyKind::Requires,
+        },
+    );
+}
+
+// A `BindsTo` target that is missing is treated as a missing `Requires`
+// (§6.1), so the same rule reaches it.
+#[test]
+fn safe_mode_blocks_a_missing_binds_to_target() {
+    let mut app = ServiceDefinition::simple_system_boot("app", "/sbin/app");
+    app.safe_mode = true;
+    app.binds_to.push("absent".to_string());
+
+    let mut operations = OperationIdAllocator::new();
+    let mut jobs = JobIdAllocator::new();
+    let boot = prepare_phase2_boot_plan(
+        BootMode::Safe,
+        &[app],
+        10,
+        OBSERVED_AT_NS,
+        &mut operations,
+        &mut jobs,
+    )
+    .expect("safe boot plan");
+
+    assert!(boot.starts.is_empty());
+    assert_eq!(boot.blocked.len(), 1);
+    assert_eq!(
+        boot.blocked[0].reason,
+        crate::boot::phase2::BlockedReason::HardDependencyUnavailable {
+            target: "absent".to_string(),
+            kind: crate::boot::phase2::DependencyKind::BindsTo,
+        },
+    );
+}
