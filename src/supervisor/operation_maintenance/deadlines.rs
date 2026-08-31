@@ -16,6 +16,7 @@ impl Supervisor {
             self.next_pending_operation_timeout_deadline_ns(),
             self.next_running_service_main_start_timeout_deadline_ns(),
             self.services.next_restart_window_reset_deadline_ns(),
+            self.next_on_failure_chain_settle_deadline_ns(),
             self.operations
                 .next_terminal_retention_deadline_ns(DEFAULT_TERMINAL_OPERATION_RETENTION_NS),
             self.submitted.next_retention_deadline_ns(),
@@ -49,6 +50,7 @@ impl Supervisor {
                 Vec::new()
             },
             restart_window_resets: self.services.due_restart_window_resets(now_ns),
+            on_failure_chain_settles: self.due_on_failure_chain_settles(now_ns),
         }
     }
 
