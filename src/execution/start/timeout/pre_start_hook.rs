@@ -49,6 +49,7 @@ where
             failed_at_ns: now_ns,
             failure_cause: TransitionCause::PreHookFailure,
             reason: operation_timeout_result("ExecStartPre command timed out"),
+            exit_code: None,
         },
     )
     .map_err(StartExecutionError::StartFailure)?;

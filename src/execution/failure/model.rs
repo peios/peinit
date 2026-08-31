@@ -14,6 +14,19 @@ pub struct StartFailureRequest {
     pub failed_at_ns: u64,
     pub failure_cause: TransitionCause,
     pub reason: String,
+    /// The process's exit code, where the failure was a process exiting.
+    ///
+    /// `RestartPolicy=OnFailure` treats an exit whose code is in
+    /// `SuccessExitCodes` as a success and does not restart. That test could
+    /// never fire on this path, because the code was available at the call
+    /// site and dropped here — so a Simple service exiting *before* readiness
+    /// was always restarted, including on a code its own definition lists as
+    /// success, and `SuccessExitCodes` quietly meant one thing after readiness
+    /// and another before it (PEI-361).
+    ///
+    /// `None` for a failure with no process exit behind it: a hook that never
+    /// ran, a dependency that failed, a readiness deadline.
+    pub exit_code: Option<i32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -68,6 +68,7 @@ where
             failed_at_ns,
             failure_cause: TransitionCause::PreHookFailure,
             reason: reason(&job_event)?,
+            exit_code: None,
         },
     )
     .map_err(StartExecutionError::StartFailure)?;

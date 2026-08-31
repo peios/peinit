@@ -108,5 +108,6 @@ fn failure_request(
         failed_at_ns: FAILED_AT_NS,
         failure_cause,
         reason: "failure".to_string(),
+        exit_code: None,
     }
 }
