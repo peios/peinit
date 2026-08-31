@@ -227,7 +227,7 @@ impl Supervisor {
         }
 
         let mut restart_start_dispatches =
-            begin_restart_start_after_stop(&mut work, &terminal, terminal_event_time)?;
+            begin_restart_start_after_stop(&mut work, &mut terminal, terminal_event_time)?;
         work.queue_restart_start_dispatches(&restart_start_dispatches);
 
         let mut start_dispatches = apply_relationship_reactions_after_transitions(

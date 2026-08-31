@@ -145,9 +145,13 @@ pub(super) fn apply_stop_main_empty(
             }
             Ok(Vec::new())
         }
-        OperationType::Restart => {
-            begin_restart_start_after_post_kill(work, service, operation_id, now_ns)
-        }
+        OperationType::Restart => begin_restart_start_after_post_kill(
+            work,
+            service,
+            operation_id,
+            now_ns,
+            transition.discarded_definition_removed,
+        ),
         _ => Ok(Vec::new()),
     }
 }
@@ -157,8 +161,26 @@ fn begin_restart_start_after_post_kill(
     service: &str,
     operation_id: OperationId,
     now_ns: u64,
+    definition_removed: bool,
 ) -> Result<Vec<crate::execution::start::RestartStartExecutionDispatch>, SupervisorError> {
     if work.control.take_restart_stop_leg(operation_id).is_none() {
+        return Ok(Vec::new());
+    }
+    // §8.1, the same rule the terminal-exit route applies: the stop leg drained
+    // the instance, the definition went away while it did, and the start leg
+    // must not begin (PEI-345).
+    if definition_removed {
+        work.operations
+            .abort_operation(
+                operation_id,
+                now_ns,
+                crate::supervisor::restart::RESTART_DEFINITION_REMOVED,
+            )
+            .map_err(|error| {
+                SupervisorError::Control(
+                    crate::execution::control::ControlExecutionError::OperationStore(error),
+                )
+            })?;
         return Ok(Vec::new());
     }
     let definition = work.services.definition(service).ok_or_else(|| {

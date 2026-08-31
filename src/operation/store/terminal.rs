@@ -80,6 +80,34 @@ impl OperationStore {
         Ok(event)
     }
 
+    /// End a Running operation because the ground it stood on went away.
+    ///
+    /// `Aborted` is a terminal state of its own in §8.1 and is not the same
+    /// answer as `Failed`: nothing about the operation went wrong, its subject
+    /// stopped existing. Until this existed the only route to it was conflict
+    /// supersession, so the one case §8.1 spells out — a definition withdrawn
+    /// during a Restart's stop leg — had nowhere to go and came out as an
+    /// internal error instead (PEI-345).
+    pub fn abort_operation(
+        &mut self,
+        id: OperationId,
+        completed_at_ns: u64,
+        reason: impl Into<String>,
+    ) -> Result<OperationEvent, OperationStoreError> {
+        let event = {
+            let record = self
+                .records
+                .get_mut(&id)
+                .ok_or(OperationStoreError::UnknownOperation { id })?;
+            record
+                .abort(completed_at_ns, reason)
+                .map_err(OperationStoreError::Transition)?;
+            OperationEvent::aborted(record)?
+        };
+        self.remove_active(&event.service, id);
+        Ok(event)
+    }
+
     pub fn purge_terminal_completed_at_or_before(&mut self, cutoff_ns: u64) -> Vec<OperationId> {
         let purged = self
             .records
