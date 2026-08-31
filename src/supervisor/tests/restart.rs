@@ -546,3 +546,98 @@ impl crate::boundary::BootAttemptCounter for NoBootAttemptCounter {
         Ok(())
     }
 }
+
+// PEI-361. §5.3's evaluate_restart: under `RestartPolicy=OnFailure`, an exit
+// whose code is in `SuccessExitCodes` is not a failure and is not restarted.
+// The branch was implemented exactly; the exit code just never reached it on
+// the pre-readiness path, because `StartFailureRequest` had no field for one
+// and the call site passed None with `ended.exit_code` in hand.
+//
+// So `SuccessExitCodes` quietly meant one thing after readiness and another
+// before it, and a Simple service that legitimately concludes "nothing to do"
+// during startup — a migration runner, a conditional setup task — restart-
+// looped until its budget was exhausted, then landed in Failed with
+// RestartBudgetExhausted, describing a service that had succeeded every time.
+#[test]
+fn a_success_exit_code_before_readiness_is_not_restarted_under_on_failure() {
+    // Notify readiness, so exiting at all is a pre-readiness exit.
+    let mut app = crate::service::ServiceDefinition::simple_system_boot("app", "/sbin/app");
+    app.restart_policy = crate::service::RestartPolicy::OnFailure;
+    app.success_exit_codes = vec![0, 7];
+    let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
+    let mut registry = StaticRegistry::services(vec![app]);
+    let mut clock = ScriptedClock::new([BOOT_NS, APP_LAUNCH_NS]);
+    supervisor
+        .run_phase2_boot(&mut registry, &mut clock)
+        .expect("boot supervisor");
+    let mut tokens = TestTokenProvider::default();
+    let mut launcher = TestProcessLauncher::new(vec![process(5000, 20)]);
+    supervisor
+        .launch_next_pending_job(&mut tokens, &mut launcher, &mut clock)
+        .expect("launch app")
+        .expect("app launch dispatch");
+    let job_id = supervisor
+        .service_status("app")
+        .expect("starting app")
+        .current_job
+        .expect("app job")
+        .id;
+
+    // 7 is listed as success. It exits before ever signalling READY=1.
+    supervisor
+        .complete_job(job_id, APP_CRASH_NS, 7)
+        .expect("app exits with a success code");
+
+    let status = supervisor.service_status("app").expect("app");
+    assert_eq!(
+        status.state,
+        ServiceState::Failed,
+        "a success exit before readiness must not be restarted",
+    );
+    assert!(supervisor.next_restart_backoff_deadline().is_none());
+    assert_eq!(
+        supervisor
+            .services()
+            .runtime("app")
+            .expect("runtime")
+            .consecutive_restart_failures,
+        0,
+        "a success exit must not consume restart budget",
+    );
+}
+
+// The control: a code that is *not* listed still restarts. The fix must not
+// turn every pre-readiness exit into a terminal failure.
+#[test]
+fn a_failure_exit_code_before_readiness_still_restarts_under_on_failure() {
+    let mut app = crate::service::ServiceDefinition::simple_system_boot("app", "/sbin/app");
+    app.restart_policy = crate::service::RestartPolicy::OnFailure;
+    app.success_exit_codes = vec![0, 7];
+    let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
+    let mut registry = StaticRegistry::services(vec![app]);
+    let mut clock = ScriptedClock::new([BOOT_NS, APP_LAUNCH_NS]);
+    supervisor
+        .run_phase2_boot(&mut registry, &mut clock)
+        .expect("boot supervisor");
+    let mut tokens = TestTokenProvider::default();
+    let mut launcher = TestProcessLauncher::new(vec![process(5000, 20)]);
+    supervisor
+        .launch_next_pending_job(&mut tokens, &mut launcher, &mut clock)
+        .expect("launch app")
+        .expect("app launch dispatch");
+    let job_id = supervisor
+        .service_status("app")
+        .expect("starting app")
+        .current_job
+        .expect("app job")
+        .id;
+
+    supervisor
+        .complete_job(job_id, APP_CRASH_NS, 1)
+        .expect("app crashes");
+
+    assert_eq!(
+        supervisor.service_status("app").expect("app").state,
+        ServiceState::Backoff,
+    );
+}

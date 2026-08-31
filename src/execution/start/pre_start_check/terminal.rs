@@ -119,6 +119,7 @@ pub(super) fn apply_assertion_failed(
             failed_at_ns: pending.started_at_ns,
             failure_cause: TransitionCause::AssertionError,
             reason,
+            exit_code: None,
         },
     )
     .map_err(StartExecutionError::StartFailure)?;

@@ -60,6 +60,12 @@ pub(super) fn apply_start_process_failure(
             failed_at_ns: ended.ended_at_ns,
             failure_cause: TransitionCause::ProcessCrash,
             reason: ended.failure_reason(),
+            // The one path that has a code to carry. A Simple service exiting
+            // before readiness is a ProcessCrash from Starting, which is
+            // restart-eligible — and under `RestartPolicy=OnFailure` an exit
+            // whose code is in `SuccessExitCodes` is not a failure to restart
+            // from (PEI-361).
+            exit_code: ended.exit_code,
         },
     )
     .map_err(ServiceMainJobTerminalError::StartFailure)?;

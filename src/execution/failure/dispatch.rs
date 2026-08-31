@@ -33,9 +33,20 @@ pub fn apply_start_failure(
     let mut operation_events = Vec::with_capacity(terminal_operations.len());
 
     for terminal in terminal_operations {
-        let transition =
-            transition_after_start_failure(&mut next_services, &terminal, request.failed_at_ns)
-                .map_err(StartFailureError::ServiceTable)?;
+        // The exit code belongs to the service that actually exited. A
+        // dependent cancelled by its failure did not exit at all, so passing
+        // the code on would let one service's success code excuse another's
+        // dependency failure.
+        let exit_code = (terminal.service == request.service)
+            .then_some(request.exit_code)
+            .flatten();
+        let transition = transition_after_start_failure(
+            &mut next_services,
+            &terminal,
+            request.failed_at_ns,
+            exit_code,
+        )
+        .map_err(StartFailureError::ServiceTable)?;
         let operation_event = next_operations
             .fail_operation(terminal.operation_id, request.failed_at_ns, terminal.reason)
             .map_err(StartFailureError::OperationStore)?;
@@ -117,6 +128,7 @@ fn transition_after_start_failure(
     services: &mut ServiceTable,
     terminal: &TerminalOperation,
     failed_at_ns: u64,
+    exit_code: Option<i32>,
 ) -> Result<crate::service::ServiceTableTransition, ServiceTableError> {
     let definition = services.definition(&terminal.service).ok_or_else(|| {
         ServiceTableError::UnknownService {
@@ -130,7 +142,7 @@ fn transition_after_start_failure(
         })?
         .consecutive_restart_failures;
     let evaluation =
-        evaluate_restart_after_failure(definition, terminal.cause, None, consecutive_failures);
+        evaluate_restart_after_failure(definition, terminal.cause, exit_code, consecutive_failures);
 
     match evaluation.action {
         RestartEvaluationAction::Backoff {

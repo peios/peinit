@@ -65,6 +65,7 @@ where
             failed_at_ns: now_ns,
             failure_cause: TransitionCause::ReadinessTimeout,
             reason: operation_timeout_result("start operation timed out"),
+            exit_code: None,
         },
     )
     .map_err(StartExecutionError::StartFailure)?;

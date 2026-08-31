@@ -118,6 +118,7 @@ pub fn begin_ready_start(
                     failed_at_ns: request.started_at_ns,
                     failure_cause: TransitionCause::AssertionError,
                     reason: format!("AssertionError: {} not satisfied", format_check(&check)),
+                    exit_code: None,
                 },
             )
             .map_err(StartExecutionError::StartFailure)?;

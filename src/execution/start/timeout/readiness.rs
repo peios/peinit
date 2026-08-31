@@ -34,6 +34,7 @@ where
             failed_at_ns: now_ns,
             failure_cause: TransitionCause::ReadinessTimeout,
             reason: operation_timeout_result("start timed out waiting for READY=1"),
+            exit_code: None,
         },
     )
     .map_err(StartExecutionError::StartFailure)?;

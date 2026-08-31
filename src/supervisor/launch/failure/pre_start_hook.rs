@@ -70,6 +70,7 @@ where
             failed_at_ns,
             failure_cause: TransitionCause::PreHookFailure,
             reason,
+            exit_code: None,
         },
     )
     .map_err(|error| SupervisorError::Start(StartExecutionError::StartFailure(error)))?;

@@ -57,6 +57,7 @@ pub(in crate::supervisor) fn apply_service_launch_failure(
             failed_at_ns,
             failure_cause,
             reason: classification.reason,
+            exit_code: None,
         },
     )
     .map_err(|error| SupervisorError::Start(StartExecutionError::StartFailure(error)))?;
