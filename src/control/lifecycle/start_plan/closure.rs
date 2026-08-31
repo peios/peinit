@@ -87,8 +87,23 @@ impl<'a> StartClosureCollector<'a> {
         kind: ServiceDependencyKind,
     ) {
         match dependency_entry(self.services, target, level) {
-            DependencyEntry::Startable | DependencyEntry::Disabled => self.include_service(target),
+            DependencyEntry::Startable => self.include_service(target),
             DependencyEntry::Satisfied => {}
+            // §3.1's `Disabled` suppresses automatic activation, and the
+            // service "MAY still be started explicitly via the control
+            // interface" — but nobody started *this* one explicitly. Something
+            // that requires it did, and its administrator took it out of
+            // service deliberately.
+            //
+            // Starting it here was the outcome `Disabled` exists to prevent,
+            // arrived at by a route the flag's description does not consider:
+            // disable a service to stop it running, and it runs anyway the
+            // next time anyone starts something that depends on it. Boot has
+            // always blocked the dependent instead; the two paths now agree
+            // (PEI-366).
+            DependencyEntry::Disabled => {
+                self.block_unavailable(service, target, kind, DependencyAvailability::Disabled)
+            }
             DependencyEntry::Missing => {
                 self.block_unavailable(service, target, kind, DependencyAvailability::Missing)
             }
