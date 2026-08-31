@@ -61,21 +61,67 @@ pub(in crate::boundary::linux_launch::process) fn clone_process_into_cgroup(
         )));
     }
     if pid == 0 {
-        Ok(CloneProcessResult::Child)
-    } else if pidfd < 0 {
-        Err(BoundaryError::Process(format!(
+        return Ok(CloneProcessResult::Child);
+    }
+    // From here the child exists and is already running in the service's
+    // cgroup with the service's token. Every failure below is a failure to
+    // take a handle on it, so each one kills the cgroup before returning:
+    // returning an error and walking away leaves a process peinit cannot
+    // supervise, cannot stop, and has no record of.
+    //
+    // The zero-delay ServiceTree cleanup that follows a ParentSetupFailure
+    // makes that worse rather than better. It runs immediately, before the
+    // child could plausibly have exec'd or exited, so it is near-certain to
+    // find the cgroup populated and take the *leak* branch — recording the
+    // tree as unreclaimable and bumping the generation, so the next start
+    // builds a fresh tree beside the orphan and leaves it running until
+    // reboot (PEI-354).
+    if pidfd < 0 {
+        kill_cloned_cgroup(cgroup_fd);
+        return Err(BoundaryError::Process(format!(
             "clone3 returned pid {pid} without pidfd",
-        )))
-    } else {
-        set_fd_cloexec(pidfd).map_err(|error| {
-            BoundaryError::Process(format!(
-                "set clone3 pidfd close-on-exec for pid {pid} failed: {error}",
-            ))
-        })?;
-        Ok(CloneProcessResult::Parent(ClonedProcess {
-            pid: pid as libc::pid_t,
-            pidfd: unsafe { OwnedFd::from_raw_fd(pidfd) },
-        }))
+        )));
+    }
+    if let Err(error) = set_fd_cloexec(pidfd) {
+        kill_cloned_cgroup(cgroup_fd);
+        // The descriptor was never wrapped in an OwnedFd, so nothing else will
+        // close it.
+        unsafe { libc::close(pidfd) };
+        return Err(BoundaryError::Process(format!(
+            "set clone3 pidfd close-on-exec for pid {pid} failed: {error}",
+        )));
+    }
+    Ok(CloneProcessResult::Parent(ClonedProcess {
+        pid: pid as libc::pid_t,
+        pidfd: unsafe { OwnedFd::from_raw_fd(pidfd) },
+    }))
+}
+
+/// Kill everything in the cgroup the child was cloned into.
+///
+/// Best-effort by construction. This runs on a path that is already returning
+/// an error, and a failure to kill is less useful to the caller than the
+/// failure that brought us here — but leaving the process alive is not an
+/// option, so it is attempted unconditionally.
+///
+/// `openat` relative to the cgroup directory fd rather than by path: the fd is
+/// the one the clone itself used, so there is no window in which the tree
+/// could have been replaced underneath us, and no path to reconstruct.
+pub(super) fn kill_cloned_cgroup(cgroup_fd: i32) {
+    const CGROUP_KILL: &[u8] = b"cgroup.kill\0";
+    let file = unsafe {
+        libc::openat(
+            cgroup_fd,
+            CGROUP_KILL.as_ptr().cast(),
+            libc::O_WRONLY | libc::O_CLOEXEC,
+        )
+    };
+    if file < 0 {
+        return;
+    }
+    unsafe {
+        libc::write(file, b"1".as_ptr().cast(), 1);
+        libc::close(file);
     }
 }
 
