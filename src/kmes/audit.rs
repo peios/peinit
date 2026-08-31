@@ -3,6 +3,7 @@ mod cgroup;
 mod graph;
 mod on_failure;
 mod recovery;
+mod reload;
 mod shutdown;
 
 pub use access::{encode_service_access_denied_event, encode_system_access_denied_event};
@@ -13,4 +14,5 @@ pub use graph::{
 };
 pub use on_failure::encode_on_failure_loop_suppressed_event;
 pub use recovery::encode_init_recovery_events;
+pub use reload::encode_reload_unconfirmed_event;
 pub use shutdown::{encode_critical_failure_event, encode_shutdown_abandoned_event};

@@ -64,6 +64,9 @@ pub(super) fn collect_lifecycle_deadline_dispatch_console_messages(
     for timeout in &dispatch.readiness_timeouts {
         collect_readiness_timeout_dispatch_console_messages(timeout, out);
     }
+    for detection in &dispatch.reload_detections {
+        collect_reload_detection_console_messages(detection, out);
+    }
     for timeout in &dispatch.reload_command_timeouts {
         collect_reload_command_timeout_dispatch_console_messages(timeout, out);
     }
@@ -152,6 +155,28 @@ fn collect_readiness_timeout_dispatch_console_messages(
 ) {
     collect_service_transitions_console_messages(&dispatch.timeout.service_transitions, out);
     collect_start_dispatches_console_messages(&dispatch.start_dispatches, out);
+}
+
+/// A reload that was announced and never completed.
+///
+/// Only the `ExtendedWait` phase. A detection window expiring is the ordinary
+/// outcome for a service that does not implement the handshake and says
+/// nothing about whether the reload worked; `RELOADING=1` followed by silence
+/// is a service that started a reload and did not finish it (PEI-359).
+fn collect_reload_detection_console_messages(
+    dispatch: &crate::supervisor::SupervisorReloadDetectionDispatch,
+    out: &mut Vec<ConsoleMessage>,
+) {
+    if dispatch.completion.phase != crate::execution::control::ReloadDetectionPhase::ExtendedWait {
+        return;
+    }
+    push_error(
+        out,
+        format!(
+            "peinit: service {} signalled RELOADING=1 but never completed reload\n",
+            dispatch.completion.operation_event.service,
+        ),
+    );
 }
 
 fn collect_reload_command_timeout_dispatch_console_messages(

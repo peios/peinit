@@ -93,6 +93,92 @@ fn a_reset_that_leaves_the_abandoned_cgroup_leaked_warns_on_the_console() {
     );
 }
 
+// PEI-359. §5.3 asks for a warning when a service announces RELOADING=1 and
+// never completes the reload. That string existed only as an *operation
+// result*, returned to a `wait=true` caller — and `reload` defaults to
+// `wait=false`, so the default way to issue one produced no record anywhere.
+// The console handled `reload_command_timeouts` and never `reload_detections`.
+#[test]
+fn an_unconfirmed_reload_is_reported_on_the_console() {
+    let turn = reload_detection_turn(
+        crate::execution::control::ReloadDetectionPhase::ExtendedWait,
+    );
+
+    let mut messages = Vec::new();
+    collect_runtime_loop_console_messages(
+        &RuntimeWorkPumpTurn::default(),
+        &[turn],
+        &RuntimeWorkPumpTurn::default(),
+        &[],
+        &mut messages,
+    );
+
+    assert_eq!(
+        messages,
+        vec![crate::runtime::console::ConsoleMessage::error(
+            "peinit: service app signalled RELOADING=1 but never completed reload\n"
+        )],
+    );
+}
+
+// The ordinary outcome stays quiet. A service that never implements the
+// handshake lets its detection window expire on every single reload; reporting
+// that would make the line above worthless.
+#[test]
+fn an_expired_reload_detection_window_says_nothing() {
+    let turn = reload_detection_turn(
+        crate::execution::control::ReloadDetectionPhase::DetectionWindow,
+    );
+
+    let mut messages = Vec::new();
+    collect_runtime_loop_console_messages(
+        &RuntimeWorkPumpTurn::default(),
+        &[turn],
+        &RuntimeWorkPumpTurn::default(),
+        &[],
+        &mut messages,
+    );
+
+    assert!(messages.is_empty());
+}
+
+fn reload_detection_turn(
+    phase: crate::execution::control::ReloadDetectionPhase,
+) -> RuntimeShutdownEventTurn {
+    RuntimeShutdownEventTurn::LifecycleDeadlineTimer {
+        read: crate::boundary::LinuxTimerFdRead::Expired { expirations: 1 },
+        drive: Some(Box::new(
+            crate::supervisor::SupervisorLifecycleDeadlineDispatch {
+                reload_detections: vec![crate::supervisor::SupervisorReloadDetectionDispatch {
+                    completion: crate::execution::control::ReloadDetectionCompletion {
+                        operation_event: crate::operation::store::OperationEvent {
+                            operation_id: operation_id(),
+                            operation_type: crate::operation::OperationType::Reload,
+                            service: "app".to_string(),
+                            source: crate::operation::OperationSource::Admin,
+                            caller: None,
+                            state: crate::operation::OperationState::Completed,
+                            detail: crate::operation::store::OperationEventDetail::Completed {
+                                duration_ns: 1_000,
+                                result: "reload signal advisory".to_string(),
+                            },
+                        },
+                        service_transition: transition(
+                            "app",
+                            ServiceState::Reloading,
+                            ServiceState::Active,
+                            TransitionCause::ExplicitReload,
+                        ),
+                        phase,
+                    },
+                }],
+                ..crate::supervisor::SupervisorLifecycleDeadlineDispatch::default()
+            },
+        )),
+        deadline_timer: crate::supervisor::SupervisorLifecycleDeadlineTimerTurn::Disarmed,
+    }
+}
+
 #[test]
 fn a_leaked_cgroup_is_announced_on_the_console() {
     let turn = RuntimeShutdownEventTurn::LifecycleDeadlineTimer {
@@ -528,6 +614,12 @@ fn finalization_dispatch() -> SupervisorShutdownFinalizationDispatch {
         },
         finalization: ShutdownFinalizationState::Completed,
     }
+}
+
+fn operation_id() -> crate::ids::OperationId {
+    crate::ids::OperationIdAllocator::new()
+        .allocate_batch(1, 1_717_171_717_123_456_789)
+        .expect("operation id")[0]
 }
 
 fn job_id(sequence: u64) -> JobId {

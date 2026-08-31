@@ -23,7 +23,7 @@ where
 {
     match reload_action(&target.service, definition)? {
         ReloadAction::Signal(signal) => {
-            begin_signal_reload(context, request, target, signal, definition)
+            begin_signal_reload(context, request, target, signal)
         }
         ReloadAction::Command(argv) => {
             begin_command_reload(context, request, target, definition, argv)
@@ -67,6 +67,7 @@ pub fn complete_reload_detection_window(
     Ok(ReloadDetectionCompletion {
         operation_event,
         service_transition,
+        phase: deadline.phase,
     })
 }
 
