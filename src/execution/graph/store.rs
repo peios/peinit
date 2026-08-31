@@ -46,6 +46,19 @@ impl GraphExecutionStore {
         self.contexts.get(&context_id)
     }
 
+    /// How many contexts the store is holding.
+    ///
+    /// Exists so the retention behaviour can be asserted: contexts are
+    /// internal, but "how many are there" is the whole question in PEI-364.
+    pub fn context_count(&self) -> usize {
+        self.contexts.len()
+    }
+
+    /// How many operations still point at a context.
+    pub fn association_count(&self) -> usize {
+        self.associations.len()
+    }
+
     /// Contexts that are not drained and carry a level edge on `service` —
     /// the ones a `LEVEL=` arrival (or the publisher stopping) can unblock.
     ///
@@ -76,6 +89,50 @@ impl GraphExecutionStore {
 
     fn pending_context_id(&self) -> GraphContextId {
         GraphContextId(self.next_context_id)
+    }
+
+    /// Drop every context whose members have all reached a terminal status,
+    /// and the operation associations that pointed at them.
+    ///
+    /// A drained context can never dispatch another graph event, so it is
+    /// bookkeeping with no reader. Nothing used to remove one, and the cost
+    /// was two-sided: every boot and every explicit start leaked a context and
+    /// a set of associations for the life of the process, and
+    /// `apply_operation_terminal` walks *every* associated context — so on a
+    /// machine up for months, where an operator or a script starts services
+    /// regularly, the terminal path got steadily slower in PID 1's single
+    /// thread (PEI-364).
+    ///
+    /// Retirement is a turn boundary rather than something
+    /// `apply_operation_terminal` does inline. A context becomes drained the
+    /// moment its last member goes terminal, but the callers of that method
+    /// then walk the graph events it returned and call `release_ready` on the
+    /// contexts they name — so dropping it there pulls the context out from
+    /// under the rest of the same turn's work.
+    ///
+    /// Returns the retired ids, so a caller can say what it dropped.
+    pub fn retire_drained_contexts(&mut self) -> Vec<GraphContextId> {
+        let retired = self
+            .contexts
+            .values()
+            .filter(|context| context.is_drained())
+            .map(|context| context.id)
+            .collect::<Vec<_>>();
+        if retired.is_empty() {
+            return retired;
+        }
+        for context_id in &retired {
+            self.contexts.remove(context_id);
+        }
+        // An operation can be associated with more than one context — an
+        // explicit start merging into an already-starting one is associated
+        // with both — so an association is only gone once every context it
+        // names has been retired.
+        self.associations.retain(|_, contexts| {
+            contexts.retain(|context_id| !retired.contains(context_id));
+            !contexts.is_empty()
+        });
+        retired
     }
 
     fn insert_context(&mut self, context: GraphExecutionContext) {

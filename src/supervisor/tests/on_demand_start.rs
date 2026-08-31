@@ -116,3 +116,54 @@ fn admin_start_launches_dependency_then_requested_service() {
         OperationState::Completed,
     );
 }
+
+// PEI-364. `GraphExecutionContext::is_drained()` existed and nothing removed a
+// context or its operation associations, so every boot and every explicit
+// start leaked both for the life of the process.
+//
+// The memory was the smaller half. `apply_operation_terminal` walks *every*
+// context associated with an operation, and associations were never dropped —
+// so on a machine up for months, where an operator or a script starts services
+// regularly, the terminal path got steadily slower, in PID 1's single thread.
+#[test]
+fn a_drained_graph_context_is_retired_with_its_associations() {
+    let mut app = alive_service("app");
+    app.triggers.clear();
+    let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
+    let mut registry = StaticRegistry::services(vec![app]);
+    let mut clock = ScriptedClock::new([BOOT_NS, ADMIN_START_NS, ON_DEMAND_APP_LAUNCH_NS]);
+    supervisor
+        .run_phase2_boot(&mut registry, &mut clock)
+        .expect("boot supervisor");
+    supervisor
+        .start_service("app", None, &mut clock)
+        .expect("start app");
+    let mut tokens = TestTokenProvider::default();
+    let mut launcher = TestProcessLauncher::new(vec![process(9000, 90)]);
+    supervisor
+        .launch_next_pending_job(&mut tokens, &mut launcher, &mut clock)
+        .expect("launch app")
+        .expect("app launch dispatch");
+    assert_eq!(
+        supervisor.service_status("app").expect("app").state,
+        ServiceState::Active,
+    );
+    // The boot context plus the on-demand one.
+    assert_eq!(supervisor.graph().context_count(), 2);
+
+    let maintenance = supervisor
+        .process_due_operation_maintenance(ON_DEMAND_APP_LAUNCH_NS + 1)
+        .expect("maintenance");
+
+    assert_eq!(maintenance.retired_graph_contexts.len(), 2);
+    assert_eq!(
+        supervisor.graph().context_count(),
+        0,
+        "a drained context can dispatch no further event and was still held",
+    );
+    assert_eq!(
+        supervisor.graph().association_count(),
+        0,
+        "apply_operation_terminal still has associations to walk",
+    );
+}

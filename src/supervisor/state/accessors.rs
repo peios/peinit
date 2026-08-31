@@ -29,6 +29,10 @@ impl Supervisor {
         &self.jobs
     }
 
+    pub fn graph(&self) -> &crate::execution::graph::GraphExecutionStore {
+        &self.graph
+    }
+
     pub fn fd_store(&self) -> &FdStoreTable {
         &self.fd_store
     }
