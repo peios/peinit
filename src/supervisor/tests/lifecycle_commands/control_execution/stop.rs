@@ -244,3 +244,63 @@ fn an_abandoned_services_late_exit_is_not_a_runtime_failure() {
         OperationState::Failed,
     );
 }
+
+// PEI-353. §4.1 names `rmdir` failing EBUSY as *the* trigger for a new cgroup
+// generation. peinit triggered on `cgroup.events` reporting `populated == 1`
+// instead, and the two are not the same question — `populated` counts live
+// processes, EBUSY also covers a tree unremovable for any other reason.
+//
+// The EBUSY answer was computed (`CgroupRemoveOutcome::Busy`) and carried all
+// the way to the caller in `CgroupCleanupReport.busy`, which then discarded
+// it. So in exactly the case the two diverge — unpopulated but not removable —
+// the generation did not advance, and the next start built its tree at a path
+// that already existed and was not empty, joining the service's processes to
+// whatever was still in it.
+#[test]
+fn a_cgroup_that_is_unpopulated_but_busy_still_leaks_and_advances_the_generation() {
+    let mut supervisor = active_app_supervisor();
+    stop_app(&mut supervisor);
+    let mut controller = TestProcessController::default();
+    let mut clock = ScriptedClock::new([CONTROL_NS]);
+    supervisor
+        .execute_next_pending_control_operation(&mut controller, &mut clock)
+        .expect("execute stop")
+        .expect("stop dispatch");
+    let due_at_ns = supervisor
+        .next_stop_timeout_deadline()
+        .expect("deadline")
+        .due_at_ns;
+    supervisor
+        .process_next_due_stop_timeout(&mut controller, due_at_ns)
+        .expect("process timeout")
+        .expect("escalation");
+    // No live process — so the populated check says the tree has drained ...
+    controller.set_cgroup_populated("/sys/fs/cgroup/peinit/app/main", false);
+    // ... and rmdir refuses it anyway. This is the divergence.
+    controller.set_cgroup_remove_result(
+        "/sys/fs/cgroup/peinit/app",
+        crate::boundary::CgroupRemoveOutcome::Busy,
+    );
+
+    let leaks = supervisor
+        .process_due_cgroup_cleanups(&mut controller, due_at_ns + 5_000_000_000)
+        .expect("cleanup")
+        .expect("a cleanup deadline was due");
+
+    assert_eq!(leaks.len(), 1);
+    assert_eq!(leaks[0].service, "app");
+    assert_eq!(leaks[0].path, "/sys/fs/cgroup/peinit/app");
+    assert_eq!(
+        leaks[0].kind,
+        crate::service::runtime::LeakedCgroupKind::ServiceTree,
+    );
+    // The next start must not reuse the tree rmdir would not give up.
+    assert_eq!(
+        supervisor
+            .services()
+            .runtime("app")
+            .expect("runtime")
+            .cgroup_generation,
+        1,
+    );
+}
