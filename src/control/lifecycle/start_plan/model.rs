@@ -43,6 +43,8 @@ pub enum StartBlockReason {
 pub enum DependencyAvailability {
     Missing,
     DefinitionRemoved,
+    /// An administrator has taken the target out of service.
+    Disabled,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
