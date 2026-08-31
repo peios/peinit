@@ -64,6 +64,7 @@ fn encode_phase2_plan_graph_error_event(
 fn recovery_reason_label(reason: &InitRecoveryReason) -> &'static str {
     match reason {
         InitRecoveryReason::KernelCommandLine(_) => "kernel_command_line",
+        InitRecoveryReason::Privileges(_) => "privileges",
         InitRecoveryReason::BootAttemptCounter(_) => "boot_attempt_counter",
         InitRecoveryReason::ForcedByKernelCommandLine => "forced_by_kernel_command_line",
         InitRecoveryReason::BootAttemptThresholdReached { .. } => "boot_attempt_threshold_reached",

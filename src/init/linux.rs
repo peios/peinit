@@ -62,6 +62,10 @@ impl InitPlatform for LinuxInitPlatform {
         }
     }
 
+    fn verify_privileges(&mut self) -> Result<(), BoundaryError> {
+        crate::boundary::verify_peinit_privileges()
+    }
+
     fn read_kernel_command_line(&mut self) -> Result<KernelCommandLine, BoundaryError> {
         self.files.read_kernel_command_line()
     }

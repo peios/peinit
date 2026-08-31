@@ -150,6 +150,14 @@ impl KernelCommandLine {
 
 pub trait InitPlatform {
     fn assert_pid1(&mut self) -> Result<(), InitFatalError>;
+    /// Check peinit holds the privileges it is going to need (§13.1).
+    ///
+    /// Default `Ok` so non-Linux platforms and test doubles need no
+    /// implementation — the check is a property of the real token, and there
+    /// is nothing to assert without one.
+    fn verify_privileges(&mut self) -> Result<(), BoundaryError> {
+        Ok(())
+    }
     fn read_kernel_command_line(&mut self) -> Result<KernelCommandLine, BoundaryError>;
     fn read_boot_attempt_counter(&mut self) -> Result<u32, BoundaryError>;
     fn verify_root_writable(&mut self) -> Result<(), BoundaryError>;
@@ -293,6 +301,7 @@ pub enum InitFatalError {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InitRecoveryReason {
     KernelCommandLine(BoundaryError),
+    Privileges(BoundaryError),
     BootAttemptCounter(BoundaryError),
     ForcedByKernelCommandLine,
     BootAttemptThresholdReached { counter: u32, threshold: u32 },
