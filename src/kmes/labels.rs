@@ -124,3 +124,10 @@ pub(super) fn transition_cause_label(value: TransitionCause) -> &'static str {
         TransitionCause::ProcessUnkillable => "process_unkillable",
     }
 }
+
+pub(super) fn service_type_label(value: crate::service::ServiceType) -> &'static str {
+    match value {
+        crate::service::ServiceType::Simple => "simple",
+        crate::service::ServiceType::Oneshot => "oneshot",
+    }
+}

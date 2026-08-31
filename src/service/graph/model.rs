@@ -42,6 +42,17 @@ pub enum ServiceGraphFinding {
         schedule: String,
         message: String,
     },
+    /// A `HealthCheck` on a service that will never run one — health checks
+    /// are scheduled for `ServiceType::Simple` alone.
+    ///
+    /// Said directly rather than via the flap constraint's timing arithmetic,
+    /// which is what used to reject these definitions: the operator adjusted
+    /// `RestartWindow`, the definition validated, and the check still did
+    /// nothing (PEI-367).
+    UnschedulableHealthCheck {
+        service: String,
+        service_type: crate::service::ServiceType,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -86,10 +86,32 @@ fn block_invalid_health_checks(
         let Some(definition) = by_name.get(service.as_str()).copied() else {
             continue;
         };
-        if definition.health_check.is_some()
-            && u64::from(definition.health_check_retries)
-                .saturating_mul(definition.health_check_interval_secs)
-                >= definition.restart_window_secs
+        if definition.health_check.is_none() {
+            continue;
+        }
+        // Health checks are scheduled for Simple services only, so a Oneshot
+        // carrying one has a definition mistake to report — but not this one.
+        // Blocking it over the flap constraint's timing arithmetic described
+        // the interaction of two settings neither of which would ever be
+        // consulted: the operator adjusted RestartWindow, the definition
+        // validated, and the HealthCheck still did nothing (PEI-367).
+        if definition.service_type != crate::service::ServiceType::Simple {
+            block_service(
+                blocked,
+                service,
+                BlockedReason::ValidationError {
+                    message: format!(
+                        "HealthCheck declared on a {:?} service; health checks are \
+                         scheduled for Simple services only",
+                        definition.service_type
+                    ),
+                },
+            );
+            continue;
+        }
+        if u64::from(definition.health_check_retries)
+            .saturating_mul(definition.health_check_interval_secs)
+            >= definition.restart_window_secs
         {
             block_service(
                 blocked,

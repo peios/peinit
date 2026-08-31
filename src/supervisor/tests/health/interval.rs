@@ -2,7 +2,7 @@ use crate::boundary::BoundaryError;
 use crate::job::{JobEventDetail, JobType};
 use crate::service::runtime::{ServiceHealthStatus, ServiceState};
 use crate::supervisor::tests::{
-    ScriptedClock, TestProcessController, TestProcessLauncher, TestTokenProvider, process,
+    ScriptedClock, TestProcessLauncher, TestTokenProvider, process,
 };
 use crate::supervisor::{
     SupervisorHealthCheckIntervalAction, SupervisorHealthCheckLaunchResult,
@@ -61,13 +61,11 @@ fn health_check_launch_uses_health_timeout_for_setup_handshake() {
     let mut tokens = TestTokenProvider::default();
     let mut launcher = TestProcessLauncher::new(vec![process(9000, 70)]);
     let mut clock = ScriptedClock::new([first_due + 10_000]);
-    let mut controller = TestProcessController::default();
     supervisor
         .launch_next_pending_health_check_job(
             &mut tokens,
             &mut launcher,
             &mut clock,
-            &mut controller,
         )
         .expect("launch health")
         .expect("health launch result");
@@ -76,7 +74,15 @@ fn health_check_launch_uses_health_timeout_for_setup_handshake() {
 }
 
 #[test]
-fn health_check_launch_failure_at_retry_limit_kills_service_main() {
+// PEI-367. A launch failure was counted as a health check failure and
+// escalated immediately. With HealthCheckRetries=1 — a reasonable setting for
+// a probe an operator trusts — one transient authd unavailability was enough
+// to restart the service.
+//
+// The distinction being collapsed is between "the probe ran and said the
+// service is unhealthy" and "the probe could not be run". Only the first is
+// evidence about the service.
+fn a_health_check_that_cannot_be_launched_does_not_count_against_the_service() {
     let (mut supervisor, first_due) = active_health_supervisor(1);
     supervisor
         .process_due_health_check_intervals(first_due)
@@ -86,15 +92,9 @@ fn health_check_launch_failure_at_retry_limit_kills_service_main() {
         "clone3 EAGAIN".to_string(),
     ))]);
     let mut clock = ScriptedClock::new([first_due + 10_000]);
-    let mut controller = TestProcessController::default();
 
     let result = supervisor
-        .launch_next_pending_health_check_job(
-            &mut tokens,
-            &mut launcher,
-            &mut clock,
-            &mut controller,
-        )
+        .launch_next_pending_health_check_job(&mut tokens, &mut launcher, &mut clock)
         .expect("launch health")
         .expect("health launch result");
     let SupervisorHealthCheckLaunchResult::Failed(dispatch) = result else {
@@ -103,21 +103,16 @@ fn health_check_launch_failure_at_retry_limit_kills_service_main() {
 
     assert_eq!(
         dispatch.terminal.outcome,
-        SupervisorHealthCheckOutcome::RestartScheduled {
-            consecutive_failures: 1,
-            retries: 1,
-        },
+        SupervisorHealthCheckOutcome::NotLaunched,
     );
-    assert!(dispatch.terminal.service_job_event.is_some());
-    assert_eq!(
-        controller.cgroup_kills,
-        vec!["/sys/fs/cgroup/peinit/app".to_string()],
-    );
+    // The service is untouched: still running, still Active, no restart.
+    assert!(dispatch.terminal.service_job_event.is_none());
+    assert!(dispatch.terminal.service_transitions.is_empty());
     assert_eq!(
         supervisor.service_status("app").expect("status").state,
-        ServiceState::Backoff,
+        ServiceState::Active,
     );
-    assert!(supervisor.jobs().current_service_main_job("app").is_none());
+    assert!(supervisor.jobs().current_service_main_job("app").is_some());
 }
 
 #[test]

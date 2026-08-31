@@ -1,7 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::service::{
-    Readiness, ServiceDefinition, ServiceTrigger, hard_dependencies, is_valid_service_name,
+    Readiness, ServiceDefinition, ServiceTrigger, ServiceType, hard_dependencies,
+    is_valid_service_name,
 };
 use crate::timer::calendar::CalendarSchedule;
 
@@ -19,6 +20,7 @@ pub fn validate_service_graph(
     findings.extend(missing_hard_dependencies(definitions, &index.by_name));
     findings.extend(conflicting_boot_services(&index.by_name));
     findings.extend(health_check_restart_window_findings(definitions));
+    findings.extend(unschedulable_health_check_findings(definitions));
     findings.extend(invalid_timer_schedule_findings(definitions));
     findings.extend(cycle_findings(&index.by_name));
 
@@ -118,12 +120,26 @@ fn conflicting_boot_services(
         .collect()
 }
 
+/// The flap constraint, `HealthCheckRetries * HealthCheckInterval <
+/// RestartWindow`, applies only where a health check will actually run.
+///
+/// Health checks are scheduled for `ServiceType::Simple` alone, so a Oneshot
+/// carrying one was being blocked at boot — or rejecting a whole reload — over
+/// the interaction of two settings neither of which would ever be consulted.
+/// The check could not run, so it could not flap, so it could not produce the
+/// failure the constraint exists to prevent. The operator adjusted
+/// `RestartWindow`, the definition validated, and the `HealthCheck` still did
+/// nothing (PEI-367).
+///
+/// A non-Simple service declaring a `HealthCheck` is still a mistake, and
+/// [`unschedulable_health_check_findings`] says so directly — which is the
+/// thing actually wrong with that definition.
 fn health_check_restart_window_findings(
     definitions: &[ServiceDefinition],
 ) -> Vec<ServiceGraphFinding> {
     definitions
         .iter()
-        .filter(|definition| definition.health_check.is_some())
+        .filter(|definition| health_check_is_scheduled(definition))
         .filter(|definition| {
             health_check_failure_window_secs(definition) >= definition.restart_window_secs
         })
@@ -136,6 +152,29 @@ fn health_check_restart_window_findings(
             },
         )
         .collect()
+}
+
+/// A `HealthCheck` on a service that will never run one.
+fn unschedulable_health_check_findings(
+    definitions: &[ServiceDefinition],
+) -> Vec<ServiceGraphFinding> {
+    definitions
+        .iter()
+        .filter(|definition| {
+            definition.health_check.is_some() && !health_check_is_scheduled(definition)
+        })
+        .map(
+            |definition| ServiceGraphFinding::UnschedulableHealthCheck {
+                service: definition.name.clone(),
+                service_type: definition.service_type,
+            },
+        )
+        .collect()
+}
+
+/// Health checks are scheduled for Simple services only.
+fn health_check_is_scheduled(definition: &ServiceDefinition) -> bool {
+    definition.health_check.is_some() && definition.service_type == ServiceType::Simple
 }
 
 fn health_check_failure_window_secs(definition: &ServiceDefinition) -> u64 {

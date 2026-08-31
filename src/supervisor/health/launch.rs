@@ -1,4 +1,4 @@
-use crate::boundary::{Clock, ProcessController, ProcessLauncher, TokenProvider};
+use crate::boundary::{Clock, ProcessLauncher, TokenProvider};
 use crate::execution::launch::{
     LaunchCreatedJobDispatch, LaunchCreatedJobResult,
     launch_created_health_check_job_with_environment,
@@ -13,22 +13,23 @@ use crate::supervisor::state::{Supervisor, SupervisorError};
 use crate::supervisor::work::SupervisorWork;
 
 use super::{
-    HealthCheckError, fail_created_health_check_in_work, terminate_service_after_health_escalation,
+    HealthCheckError, fail_launched_health_check_in_work,
 };
 
 impl Supervisor {
-    pub fn launch_next_pending_health_check_job<T, P, C, R>(
+    /// The controller a health-check launch used to need is gone: the only
+    /// thing it did was kill the service's cgroup when a launch failure
+    /// escalated, and a probe that never ran no longer escalates (PEI-367).
+    pub fn launch_next_pending_health_check_job<T, P, C>(
         &mut self,
         token_provider: &mut T,
         process_launcher: &mut P,
         clock: &mut C,
-        controller: &mut R,
     ) -> Result<Option<SupervisorHealthCheckLaunchResult>, SupervisorError>
     where
         T: TokenProvider + ?Sized,
         P: ProcessLauncher + ?Sized,
         C: Clock + ?Sized,
-        R: ProcessController + ?Sized,
     {
         let Some(job_id) = self.pending_health_launches.front().copied() else {
             return Ok(None);
@@ -70,29 +71,17 @@ impl Supervisor {
                 )));
             }
             Err(error) => {
-                let job = work
-                    .jobs
-                    .get(job_id)
-                    .cloned()
-                    .ok_or(JobStoreError::UnknownJob { id: job_id })
-                    .map_err(|error| SupervisorError::Health(HealthCheckError::JobStore(error)))?;
-                let mut terminal = fail_created_health_check_in_work(
+                // A probe that could not be launched says nothing about the
+                // service, so it is recorded and left there: no health
+                // failure counted, no escalation, and the next interval
+                // schedules normally. Escalating here meant a transient authd
+                // unavailability could kill a service outright (PEI-367).
+                let terminal = fail_launched_health_check_in_work(
                     &mut work,
                     job_id,
                     launched_at_ns,
                     format!("health check launch failed: {error:?}"),
                 )?;
-                if let Some(service) = job.service.as_deref() {
-                    terminate_service_after_health_escalation(
-                        &mut work,
-                        &mut terminal,
-                        service,
-                        job.cgroup_generation,
-                        controller,
-                        launched_at_ns,
-                        self.settings.shutdown.post_kill_timeout_secs,
-                    )?;
-                }
                 work.commit(self);
                 return Ok(Some(SupervisorHealthCheckLaunchResult::Failed(Box::new(
                     SupervisorHealthCheckLaunchFailureDispatch { terminal },

@@ -114,6 +114,30 @@ pub fn encode_graph_validation_error_event(
             );
             finish_event("graph.validation_error", writer)
         }
+        ServiceGraphFinding::UnschedulableHealthCheck {
+            service,
+            service_type,
+        } => {
+            let mut writer = Writer::new();
+            writer.write_map(5);
+            write_str_field(&mut writer, "phase", phase);
+            write_str_field(&mut writer, "finding", "unschedulable_health_check");
+            write_str_field(&mut writer, "service", service);
+            write_str_field(
+                &mut writer,
+                "service_type",
+                super::super::labels::service_type_label(*service_type),
+            );
+            write_str_field(
+                &mut writer,
+                "message",
+                &format!(
+                    "service {service} declares a HealthCheck, which is scheduled \
+                     for Simple services only"
+                ),
+            );
+            finish_event("graph.validation_error", writer)
+        }
         ServiceGraphFinding::InvalidTimerSchedule {
             service,
             schedule,

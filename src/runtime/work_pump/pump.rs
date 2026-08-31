@@ -147,7 +147,6 @@ where
             context.token_provider,
             context.process_launcher,
             context.clock,
-            context.controller,
         )
         .map_err(RuntimeWorkPumpError::Supervisor)?;
     let (
