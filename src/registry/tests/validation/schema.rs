@@ -79,11 +79,16 @@ fn duplicate_known_fields_are_rejected_case_insensitively() {
 
 #[test]
 fn service_reference_fields_reject_invalid_names() {
+    // This used to use "bad:name", on the reasoning that a colon is not
+    // legal in a service name. It now is legal in a *dependency*, where it
+    // separates the service from a readiness level — "bad:name" is a
+    // dependency on service `bad` at level `name`. A space is still
+    // nothing.
     let err = build_service_definition_from_registry_values(
         "app",
         &[
             sz("ImagePath", "/bin/app"),
-            multi_sz("Requires", &["valid", "bad:name"]),
+            multi_sz("Requires", &["valid", "bad name"]),
         ],
     )
     .expect_err("invalid dependency name");
@@ -92,7 +97,7 @@ fn service_reference_fields_reject_invalid_names() {
         err,
         ServiceRegistryDecodeError::InvalidServiceReference {
             field: "Requires",
-            value: "bad:name".to_string(),
+            value: "bad name".to_string(),
         }
     );
 }
