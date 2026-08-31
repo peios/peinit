@@ -1,6 +1,7 @@
 mod calendar_timer;
 mod model;
 mod setup;
+mod timer_last_run;
 mod turn;
 
 pub use model::{DEFAULT_MAX_RUNTIME_EVENTS, LinuxRuntimeConfig, LinuxRuntimeSetupError};
@@ -54,6 +55,9 @@ pub struct LinuxShutdownRuntime {
     token_provider: LinuxSystemTokenProvider,
     process_launcher: LinuxProcessLauncher,
     filesystem_check_launcher: LinuxFilesystemCheckHelper,
+    /// Outstanding forked timer last-run writes, so a failed one is reported
+    /// rather than discarded with the child (PEI-369).
+    timer_last_run_writes: timer_last_run::TimerLastRunWrites,
     filesystem_check_reader: LinuxFilesystemCheckHelper,
     finalizer: LinuxShutdownFinalizer,
     access_checker: PeiosSystemAccessChecker,

@@ -67,7 +67,7 @@ fn boot_persistent_catch_up_returns_timer_turn_and_keeps_last_run_write_best_eff
     let (_, turn) = &registration.catch_up_turns[0];
     let RuntimeCalendarTimerTurn::Read {
         supervisor: Some(dispatch),
-        last_run_write: Some(Ok(TimerLastRunWriteOutcome::Queued)),
+        last_run_write: Some(Ok(TimerLastRunWriteOutcome::Queued { pid: 4242 })),
         next_scheduled_ns: Some(_),
         ..
     } = turn
@@ -149,7 +149,7 @@ impl TimerLastRunWriter for TimerWriteRecorder {
         self.writes.push(TimerWrite {
             timestamp_realtime_ns: request.timestamp_realtime_ns,
         });
-        Ok(TimerLastRunWriteOutcome::Queued)
+        Ok(TimerLastRunWriteOutcome::Queued { pid: 4242 })
     }
 }
 

@@ -181,12 +181,20 @@ pub(super) fn write_timer_last_run(
         })
 }
 
+/// Perform the last-run write in a forked child, returning its pid.
+///
+/// §9.1 requires this to be asynchronous — peinit's event loop cannot wait on
+/// registryd, which is a service it supervises — and a fork is how peinit gets
+/// that today. The pid is returned rather than discarded so the caller can
+/// match the child's exit status back to this write; before that, a failed
+/// write existed only as an exit status the generic reaper threw away as an
+/// untracked child (PEI-369).
 pub(super) fn queue_timer_last_run_write(
     service: String,
     schedule: String,
     storage: TimerLastRunStorage,
     timestamp_realtime_ns: u64,
-) -> Result<(), LcsTimerLastRunError> {
+) -> Result<u32, LcsTimerLastRunError> {
     match unsafe { libc::fork() } {
         -1 => Err(LcsTimerLastRunError::Queue {
             source: io::Error::last_os_error(),
@@ -206,7 +214,7 @@ pub(super) fn queue_timer_last_run_write(
             };
             unsafe { libc::_exit(exit_code) }
         }
-        _ => Ok(()),
+        pid => Ok(pid as u32),
     }
 }
 
