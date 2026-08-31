@@ -99,6 +99,12 @@ impl Supervisor {
         }
 
         turn.relationship_audit_events = self.relationships.drain_audit_events();
+        // With the turn's work done, every graph context whose members have
+        // all reached a terminal status is bookkeeping no reader can reach.
+        // Reclaimed here alongside the other retention sweeps, and at a turn
+        // boundary rather than inline, so nothing that was still walking the
+        // events of this turn loses its context (PEI-364).
+        turn.retired_graph_contexts = self.graph.retire_drained_contexts();
         turn.purged_operations = self.purge_retained_terminal_operations(now_ns);
         turn.purged_jobs = self.submitted.purge_retained_until(now_ns);
         Ok(turn)

@@ -17,6 +17,9 @@ pub struct SupervisorOperationMaintenanceTurn {
     /// `OnFailure` chains retired because their handler has held a window of
     /// health (§5.2, see `on_failure_chain`).
     pub on_failure_chain_settles: Vec<super::SupervisorOnFailureChainSettledDispatch>,
+    /// Graph execution contexts reclaimed because every member reached a
+    /// terminal status.
+    pub retired_graph_contexts: Vec<crate::execution::graph::GraphContextId>,
     pub purged_operations: Vec<OperationId>,
     pub purged_jobs: Vec<crate::ids::JobId>,
 }
