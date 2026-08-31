@@ -11,7 +11,7 @@ mod recovery;
 #[cfg(test)]
 mod tests;
 
-use recovery::{RecoveryEnvironment, enter_recovery, log_console, log_console_error};
+use recovery::{RecoveryRegistryd, enter_recovery, log_console, log_console_error};
 
 pub fn run_init<P, R, C, T>(
     config: InitConfig,
@@ -37,7 +37,7 @@ where
         return enter_recovery(
             platform,
             InitRecoveryReason::RootWritable(error),
-            RecoveryEnvironment::Skip,
+            RecoveryRegistryd::Start(Box::new(SupervisorSettings::new(config.phase2))),
         );
     }
 
@@ -50,7 +50,7 @@ where
         return enter_recovery(
             platform,
             InitRecoveryReason::VirtualFilesystems(error),
-            RecoveryEnvironment::Skip,
+            RecoveryRegistryd::Start(Box::new(SupervisorSettings::new(config.phase2))),
         );
     }
     log_console(
@@ -124,7 +124,7 @@ where
             return enter_recovery(
                 platform,
                 InitRecoveryReason::MachineId(error),
-                RecoveryEnvironment::Ensure,
+                RecoveryRegistryd::Start(Box::new(SupervisorSettings::new(config.phase2))),
             );
         }
     }
@@ -135,11 +135,26 @@ where
             return enter_recovery(
                 platform,
                 InitRecoveryReason::KernelCommandLine(error),
-                RecoveryEnvironment::Ensure,
+                RecoveryRegistryd::Start(Box::new(SupervisorSettings::new(config.phase2))),
             );
         }
     };
     let quiet = command_line.quiet;
+    // Settled here rather than after the boot-attempt checks, so that a
+    // recovery entered from one of them starts its registryd with the settings
+    // this boot asked for. The socket in particular has to be settled before
+    // any registryd is launched, because binding it is the first thing a launch
+    // does.
+    let mut settings = SupervisorSettings::new(config.phase2);
+    if command_line.safe_mode {
+        settings.phase2.mode = BootMode::Safe;
+    }
+    if let Some(path) = &command_line.notify_socket_path {
+        settings.notify_socket_path = path.clone();
+    }
+    // Carried on the supervisor because the runtime is entered with a
+    // supervisor and nothing else — the same reason the notify socket is.
+    settings.quiet = quiet;
     let counter = if command_line.recovery {
         None
     } else {
@@ -149,7 +164,7 @@ where
                 return enter_recovery(
                     platform,
                     InitRecoveryReason::BootAttemptCounter(error),
-                    RecoveryEnvironment::Ensure,
+                    RecoveryRegistryd::Start(Box::new(settings.clone())),
                 );
             }
         }
@@ -164,7 +179,7 @@ where
         return enter_recovery(
             platform,
             InitRecoveryReason::ForcedByKernelCommandLine,
-            RecoveryEnvironment::Ensure,
+            RecoveryRegistryd::Start(Box::new(settings.clone())),
         );
     }
     let threshold = command_line
@@ -180,30 +195,17 @@ where
         return enter_recovery(
             platform,
             InitRecoveryReason::BootAttemptThresholdReached { counter, threshold },
-            RecoveryEnvironment::Ensure,
+            RecoveryRegistryd::Start(Box::new(settings.clone())),
         );
     }
 
-    let mut settings = SupervisorSettings::new(config.phase2);
-    if command_line.safe_mode {
-        settings.phase2.mode = BootMode::Safe;
-    }
-    // Phase-1 command-line overrides. The socket has to be settled before
-    // registryd is launched below, because binding it is the first thing that
-    // launch does.
-    if let Some(path) = &command_line.notify_socket_path {
-        settings.notify_socket_path = path.clone();
-    }
-    // Carried on the supervisor because the runtime is entered with a
-    // supervisor and nothing else — the same reason the notify socket is.
-    settings.quiet = quiet;
-    let mut supervisor = Supervisor::new(settings);
+    let mut supervisor = Supervisor::new(settings.clone());
 
     if let Err(error) = platform.set_clock_from_rtc() {
         return enter_recovery(
             platform,
             InitRecoveryReason::RtcClock(error),
-            RecoveryEnvironment::Skip,
+            RecoveryRegistryd::Start(Box::new(settings.clone())),
         );
     }
     let registryd_started_at_ns = match clock.monotonic_ns() {
@@ -212,7 +214,7 @@ where
             return enter_recovery(
                 platform,
                 InitRecoveryReason::Registryd(error),
-                RecoveryEnvironment::Skip,
+                RecoveryRegistryd::Start(Box::new(settings.clone())),
             );
         }
     };
@@ -222,7 +224,7 @@ where
         return enter_recovery(
             platform,
             InitRecoveryReason::Registryd(error),
-            RecoveryEnvironment::Skip,
+            RecoveryRegistryd::AlreadyAttempted,
         );
     }
     log_console(platform, quiet, "peinit: phase1 registryd started\n");
@@ -239,7 +241,7 @@ where
             return enter_recovery(
                 platform,
                 InitRecoveryReason::Provisioning(error),
-                RecoveryEnvironment::Ensure,
+                RecoveryRegistryd::AlreadyAttempted,
             );
         }
     };
@@ -258,7 +260,7 @@ where
             return enter_recovery(
                 platform,
                 InitRecoveryReason::Provisioning(error),
-                RecoveryEnvironment::Ensure,
+                RecoveryRegistryd::AlreadyAttempted,
             );
         }
     };
@@ -287,7 +289,7 @@ where
                 "{} required provisioned path(s) failed",
                 provisioning_report.required_failures.len()
             ))),
-            RecoveryEnvironment::Ensure,
+            RecoveryRegistryd::AlreadyAttempted,
         );
     }
     let infrastructure = match platform.setup_infrastructure() {
@@ -296,7 +298,7 @@ where
             return enter_recovery(
                 platform,
                 InitRecoveryReason::Infrastructure(error),
-                RecoveryEnvironment::Skip,
+                RecoveryRegistryd::AlreadyAttempted,
             );
         }
     };
@@ -311,7 +313,7 @@ where
             return enter_recovery(
                 platform,
                 InitRecoveryReason::Phase2(error),
-                RecoveryEnvironment::Ensure,
+                RecoveryRegistryd::AlreadyAttempted,
             );
         }
     };
@@ -324,7 +326,7 @@ where
         Err(error) => enter_recovery(
             platform,
             InitRecoveryReason::Runtime(error),
-            RecoveryEnvironment::Ensure,
+            RecoveryRegistryd::AlreadyAttempted,
         ),
     }
 }

@@ -830,3 +830,133 @@ fn noncritical_phase2_cycle_enters_runtime_with_failed_services() {
             .contains(&"peinit: service b failed: CycleDetected\n".to_string())
     );
 }
+
+// PEI-337. Recovery entered from a Phase 1 failure used to skip the Phase 1
+// catch-up entirely, so a `/dev/shm` or `/sys/fs/cgroup` mount failure handed
+// the operator a shell with the random seed unrestored, no machine ID, **the
+// clock unset** — every timestamp in the session wrong — and no registryd, so
+// every `reg`-family tool failed.
+//
+// The steps are individually idempotent, so "complete Phase 1 steps 1-5 if not
+// already done" is served by running them and ignoring the failures.
+#[test]
+fn recovery_from_a_phase1_failure_completes_phase1_and_starts_registryd() {
+    let mut platform = Platform::new().mount_error("no /sys/fs/cgroup");
+    let mut registry = Registry::with_services([service("app")]);
+    let mut clock = ClockAt(10);
+    let mut runtime = Runtime::default();
+
+    let result = run_init(
+        InitConfig::default(),
+        &mut platform,
+        &mut registry,
+        &mut clock,
+        &mut runtime,
+    )
+    .expect("recovery");
+
+    assert!(matches!(
+        result,
+        InitRunResult::RecoveryReturned {
+            reason: InitRecoveryReason::VirtualFilesystems(_),
+        },
+    ));
+    // The mount is retried — it is the step that failed, and by the time the
+    // operator has a shell it may well succeed.
+    assert_eq!(platform.mount_calls, 2);
+    assert_eq!(platform.random_seed_calls, 1);
+    assert_eq!(platform.machine_id_calls, 1);
+    assert_eq!(platform.rtc_calls, 1);
+    assert_eq!(platform.registryd_starts, 1);
+}
+
+// PEI-337. The starkest case: nothing about registryd has failed, and the
+// operator still used to get no registry.
+#[test]
+fn recovery_from_an_rtc_failure_still_starts_registryd() {
+    let mut platform = Platform::new().rtc_error("no rtc");
+    let mut registry = Registry::with_services([service("app")]);
+    let mut clock = ClockAt(10);
+    let mut runtime = Runtime::default();
+
+    let result = run_init(
+        InitConfig::default(),
+        &mut platform,
+        &mut registry,
+        &mut clock,
+        &mut runtime,
+    )
+    .expect("recovery");
+
+    assert!(matches!(
+        result,
+        InitRunResult::RecoveryReturned {
+            reason: InitRecoveryReason::RtcClock(_),
+        },
+    ));
+    assert_eq!(platform.registryd_starts, 1);
+}
+
+// PEI-338. The counterpart: where the failure paths did too little, the
+// success-adjacent ones did too much. Recovery entered after Phase 1 had
+// already started registryd built a fresh supervisor and started a second one.
+// `NotifySocket::bind` unlinks the socket path before binding, so the second
+// bind succeeds rather than reporting EADDRINUSE, and a second `/sbin/registryd`
+// forks against the same loregd hive files — while an operator is trying to work
+// out what went wrong.
+#[test]
+fn recovery_after_registryd_started_does_not_fork_a_second_one() {
+    let mut platform = Platform::new();
+    let mut registry = Registry::with_services([service("app")]);
+    let mut clock = ClockAt(10);
+    let mut runtime = Runtime::default().fail_runtime();
+
+    let result = run_init(
+        InitConfig::default(),
+        &mut platform,
+        &mut registry,
+        &mut clock,
+        &mut runtime,
+    )
+    .expect("recovery");
+
+    assert!(matches!(
+        result,
+        InitRunResult::RecoveryReturned {
+            reason: InitRecoveryReason::Runtime(_),
+        },
+    ));
+    assert_eq!(platform.registryd_starts, 1);
+}
+
+// PEI-338, the second half. The recovery supervisor was built from
+// `SupervisorSettings::default()`, discarding the parsed command line, so a
+// machine booted with `peios.notifysocket=` got a recovery registryd pointed at
+// the default path.
+#[test]
+fn a_recovery_registryd_uses_the_parsed_notify_socket_path() {
+    let mut platform = Platform::new()
+        .command_line(KernelCommandLine {
+            notify_socket_path: Some("/run/alt/notify.sock".to_string()),
+            ..KernelCommandLine::default()
+        })
+        .rtc_error("no rtc");
+    let mut registry = Registry::with_services([service("app")]);
+    let mut clock = ClockAt(10);
+    let mut runtime = Runtime::default();
+
+    run_init(
+        InitConfig::default(),
+        &mut platform,
+        &mut registry,
+        &mut clock,
+        &mut runtime,
+    )
+    .expect("recovery");
+
+    assert_eq!(platform.registryd_starts, 1);
+    assert_eq!(
+        platform.registryd_notify_socket_path.as_deref(),
+        Some("/run/alt/notify.sock"),
+    );
+}
