@@ -26,12 +26,20 @@ pub(super) fn context_dependencies<'a>(
             }
         })?;
         for dependency in all_declared_dependencies(definition) {
-            if !members.contains_key(&dependency.target) {
+            // A level-less edge to a non-member is meaningless: the target
+            // was either already satisfying dependents at plan time or is
+            // outside this context, and there is no further condition to
+            // wait for. A *level* edge is kept regardless of membership —
+            // "netd is active" and "netd has published routed" are
+            // different facts, and the second one has not been checked by
+            // anything yet when the first was true at plan time.
+            if !members.contains_key(&dependency.target) && dependency.level.is_none() {
                 continue;
             }
             let dependency = GraphDependency {
                 dependent: service.clone(),
                 target: dependency.target,
+                level: dependency.level,
                 kind: dependency.kind,
             };
             if !dependencies.contains(&dependency) {

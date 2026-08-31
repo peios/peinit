@@ -46,6 +46,27 @@ impl GraphExecutionStore {
         self.contexts.get(&context_id)
     }
 
+    /// Contexts that are not drained and carry a level edge on `service` —
+    /// the ones a `LEVEL=` arrival (or the publisher stopping) can unblock.
+    ///
+    /// A coarse filter, deliberately: `release_ready` re-derives the exact
+    /// answer, so releasing a context whose edge turns out unsettled is a
+    /// no-op, and this only has to avoid scanning every context on every
+    /// datagram from a service nothing waits on.
+    pub fn contexts_with_level_dependency_on(&self, service: &str) -> Vec<GraphContextId> {
+        self.contexts
+            .values()
+            .filter(|context| !context.is_drained())
+            .filter(|context| {
+                context
+                    .dependencies
+                    .iter()
+                    .any(|dependency| dependency.target == service && dependency.level.is_some())
+            })
+            .map(|context| context.id)
+            .collect()
+    }
+
     pub fn associated_contexts(&self, operation_id: OperationId) -> Vec<GraphContextId> {
         self.associations
             .get(&operation_id)

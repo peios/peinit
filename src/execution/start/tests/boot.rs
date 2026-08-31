@@ -40,7 +40,9 @@ fn boot_ready_start_uses_reserved_job_id_and_begins_runtime_records() {
         .create_boot_context(&plan, &[definition])
         .expect("graph context");
     let ready = graph
-        .release_ready(context_id, 10)
+        .release_ready(context_id, 10, &|_, _| {
+            crate::execution::graph::LevelProbe::Absent
+        })
         .expect("ready starts")
         .remove(0);
 

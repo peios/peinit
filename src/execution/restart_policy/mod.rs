@@ -73,7 +73,9 @@ pub fn begin_due_restart_policy_relaunch(
     let mut context_ids = VecDeque::from([context_id]);
     while let Some(context_id) = context_ids.pop_front() {
         let ready = next_graph
-            .release_ready(context_id, request.max_parallel_starts)
+            .release_ready(context_id, request.max_parallel_starts, &|target, level| {
+                crate::execution::graph::probe_level(&next_services, target, level)
+            })
             .map_err(RestartPolicyRelaunchError::GraphExecution)?;
 
         for ready in ready {

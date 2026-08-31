@@ -25,7 +25,9 @@ fn failing_registry_condition_skips_service_and_satisfies_graph() {
         .create_on_demand_context(&on_demand_dispatch("app", request_outcome), &services)
         .expect("graph context");
     let ready = graph
-        .release_ready(context_id, 10)
+        .release_ready(context_id, 10, &|_, _| {
+            crate::execution::graph::LevelProbe::Absent
+        })
         .expect("ready start")
         .remove(0);
     let mut jobs = JobStore::new();
@@ -85,7 +87,9 @@ fn failing_registry_assert_fails_service_and_graph() {
         .create_on_demand_context(&on_demand_dispatch("app", request_outcome), &services)
         .expect("graph context");
     let ready = graph
-        .release_ready(context_id, 10)
+        .release_ready(context_id, 10, &|_, _| {
+            crate::execution::graph::LevelProbe::Absent
+        })
         .expect("ready start")
         .remove(0);
     let mut jobs = JobStore::new();

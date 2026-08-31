@@ -1,8 +1,8 @@
 use crate::service::ServiceDependencyKind;
 
 use super::model::{
-    GraphContextId, GraphExecutionContext, GraphExecutionError, GraphMemberStatus,
-    ReadyGraphOperation, ReadyGraphOperationAction,
+    GraphContextId, GraphDependency, GraphExecutionContext, GraphExecutionError, GraphMemberStatus,
+    LevelProbe, ReadyGraphOperation, ReadyGraphOperationAction,
 };
 use super::store::GraphExecutionStore;
 
@@ -11,12 +11,13 @@ impl GraphExecutionStore {
         &mut self,
         context_id: GraphContextId,
         max_parallel_starts: u32,
+        probe: &dyn Fn(&str, &str) -> LevelProbe,
     ) -> Result<Vec<ReadyGraphOperation>, GraphExecutionError> {
         if max_parallel_starts == 0 {
             return Err(GraphExecutionError::InvalidMaxParallelStarts);
         }
         let available_slots = self.available_slots(context_id, max_parallel_starts)?;
-        let ready = self.ready_members(context_id, available_slots)?;
+        let ready = self.ready_members(context_id, available_slots, probe)?;
         let context = self
             .contexts
             .get_mut(&context_id)
@@ -75,6 +76,7 @@ impl GraphExecutionStore {
         &self,
         context_id: GraphContextId,
         limit: usize,
+        probe: &dyn Fn(&str, &str) -> LevelProbe,
     ) -> Result<Vec<(String, ReadyGraphOperationAction)>, GraphExecutionError> {
         if limit == 0 {
             return Ok(Vec::new());
@@ -90,7 +92,7 @@ impl GraphExecutionStore {
                     Some(ReadyGraphOperationAction::PreStartCheck)
                 }
                 GraphMemberStatus::WaitingForDependencies
-                    if dependencies_settled(context, &member.service)? =>
+                    if dependencies_settled(context, &member.service, probe)? =>
                 {
                     Some(ReadyGraphOperationAction::Start)
                 }
@@ -112,6 +114,7 @@ impl GraphExecutionStore {
 fn dependencies_settled(
     context: &GraphExecutionContext,
     service: &str,
+    probe: &dyn Fn(&str, &str) -> LevelProbe,
 ) -> Result<bool, GraphExecutionError> {
     context
         .dependencies
@@ -121,17 +124,55 @@ fn dependencies_settled(
             if !settled {
                 return Ok(false);
             }
-            let target = context.members.get(&dependency.target).ok_or_else(|| {
-                GraphExecutionError::MissingMember {
-                    context_id: context.id,
-                    service: dependency.target.clone(),
-                }
-            })?;
-            Ok(match dependency.kind {
-                ServiceDependencyKind::Requires | ServiceDependencyKind::BindsTo => {
-                    target.status == GraphMemberStatus::Satisfied
-                }
-                ServiceDependencyKind::Wants => target.status.is_terminal(),
-            })
+            dependency_settled(context, dependency, probe)
         })
+}
+
+/// Is this one edge settled, so the dependent may proceed past it?
+///
+/// A level edge is settled by a *live* fact, not a recorded one: the level
+/// can arrive after the target's start operation completed (netd reaches
+/// Active well before DHCP finishes) and can be retracted while a dependent
+/// is still waiting. Member completion alone therefore answers only the
+/// level-less edges.
+fn dependency_settled(
+    context: &GraphExecutionContext,
+    dependency: &GraphDependency,
+    probe: &dyn Fn(&str, &str) -> LevelProbe,
+) -> Result<bool, GraphExecutionError> {
+    let member = context.members.get(&dependency.target);
+    let Some(level) = dependency.level.as_deref() else {
+        // A level-less edge always has a member target; the build never
+        // emits one otherwise.
+        let target = member.ok_or_else(|| GraphExecutionError::MissingMember {
+            context_id: context.id,
+            service: dependency.target.clone(),
+        })?;
+        return Ok(match dependency.kind {
+            ServiceDependencyKind::Requires | ServiceDependencyKind::BindsTo => {
+                target.status == GraphMemberStatus::Satisfied
+            }
+            ServiceDependencyKind::Wants => target.status.is_terminal(),
+        });
+    };
+
+    let probed = probe(&dependency.target, level);
+    Ok(match dependency.kind {
+        // The hard gate: nothing but the level itself opens it. A target
+        // that is a member must additionally have finished its own start —
+        // a `LEVEL=` sent while the start operation is still in flight
+        // must not release the dependent ahead of the ordering edge.
+        ServiceDependencyKind::Requires | ServiceDependencyKind::BindsTo => {
+            member.is_none_or(|target| target.status == GraphMemberStatus::Satisfied)
+                && probed == LevelProbe::Satisfied
+        }
+        // The soft gate waits only while someone could still publish the
+        // level: a running target holds it, a dead or absent one does not.
+        // That keeps `Wants` failure-tolerant — the property that defines
+        // it — while still giving "wait for it if it is coming" semantics.
+        ServiceDependencyKind::Wants => {
+            let member_settled = member.is_none_or(|target| target.status.is_terminal());
+            member_settled && probed != LevelProbe::NotYetPublished
+        }
+    })
 }

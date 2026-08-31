@@ -1,4 +1,5 @@
 mod context;
+mod level;
 mod schedule;
 mod terminal;
 
@@ -16,8 +17,15 @@ use crate::service::{ServiceDefinition, ServiceTable};
 
 use super::{
     GraphContextBuildError, GraphContextKind, GraphExecutionError, GraphExecutionStore,
-    GraphMemberStatus, GraphTerminalOutcome, ReadyGraphOperationAction,
+    GraphMemberStatus, GraphTerminalOutcome, LevelProbe, ReadyGraphOperationAction,
 };
+
+/// Probe for tests whose contexts carry no level edges: never consulted,
+/// and answering Absent keeps any accidental level edge visibly held
+/// rather than silently released.
+fn no_levels(_target: &str, _level: &str) -> LevelProbe {
+    LevelProbe::Absent
+}
 
 const OBSERVED_AT_NS: u64 = 1_000_000_000;
 
