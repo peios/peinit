@@ -307,11 +307,16 @@ pub enum InitRecoveryReason {
     Runtime(BoundaryError),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MachineIdStatus {
     Existing,
     Generated,
     ReplacedInvalid,
+    /// The identifier could not be read or persisted; this boot uses one that
+    /// will not survive it. A warning, never a reason to enter recovery
+    /// (§2.1) — the machine ID is a local opaque install identifier, not a
+    /// credential, and failing a boot over it is disproportionate.
+    Ephemeral { reason: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

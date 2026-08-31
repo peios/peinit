@@ -104,6 +104,7 @@ impl InitPlatform for LinuxInitPlatform {
             LinuxMachineIdStatus::Existing => Ok(MachineIdStatus::Existing),
             LinuxMachineIdStatus::Generated => Ok(MachineIdStatus::Generated),
             LinuxMachineIdStatus::ReplacedInvalid => Ok(MachineIdStatus::ReplacedInvalid),
+            LinuxMachineIdStatus::Ephemeral { reason } => Ok(MachineIdStatus::Ephemeral { reason }),
         }
     }
 

@@ -120,6 +120,13 @@ where
         Ok(MachineIdStatus::ReplacedInvalid) => {
             log_console_error(platform, "peinit warning: invalid machine-id replaced\n")
         }
+        Ok(MachineIdStatus::Ephemeral { reason }) => log_console_error(
+            platform,
+            &format!(
+                "peinit warning: machine-id not persisted ({reason}); \
+                 using an identifier for this boot only\n"
+            ),
+        ),
         Err(error) => {
             return enter_recovery(
                 platform,
