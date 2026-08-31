@@ -1,6 +1,5 @@
 use crate::registry::{
-    EVENTD_ROOT_KEY, RawRegistryValue, build_eventd_log_datagram_bytes_from_registry_values,
-    build_eventd_log_socket_path_from_registry_values,
+    EVENTD_ROOT_KEY, RawRegistryValue, build_eventd_log_socket_path_from_registry_values,
 };
 
 use super::error::LcsRegistryReadError;
@@ -8,12 +7,6 @@ use super::value::raw_registry_value_from_peios;
 
 pub(super) fn read_lcs_eventd_log_socket_path() -> Result<Option<String>, LcsRegistryReadError> {
     Ok(build_eventd_log_socket_path_from_registry_values(
-        &read_lcs_eventd_values()?,
-    ))
-}
-
-pub(super) fn read_lcs_eventd_log_datagram_bytes() -> Result<Option<u32>, LcsRegistryReadError> {
-    Ok(build_eventd_log_datagram_bytes_from_registry_values(
         &read_lcs_eventd_values()?,
     ))
 }

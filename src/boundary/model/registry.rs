@@ -139,10 +139,6 @@ pub trait RegistryClient {
         Ok(None)
     }
 
-    fn read_eventd_log_datagram_bytes(&mut self) -> Result<Option<u32>, BoundaryError> {
-        Ok(None)
-    }
-
     fn read_services_schema_version(&mut self) -> Result<u32, BoundaryError> {
         Ok(SUPPORTED_SERVICES_SCHEMA_VERSION)
     }

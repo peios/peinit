@@ -5,9 +5,8 @@ use crate::control::socket::ControlSocketLimits;
 use crate::control::system::ControlSecurityDescriptor;
 use crate::jobs::socket::JobsSocketLimits;
 use crate::logging::{
-    DEFAULT_EVENTD_LOG_DATAGRAM_BYTES, DEFAULT_LOG_READ_BYTES_PER_EVENT,
-    DEFAULT_MAX_LOG_BUFFER_PER_SERVICE_BYTES, DEFAULT_MAX_LOG_LINE_BYTES,
-    DEFAULT_PRE_EVENTD_BUFFER_BYTES, RuntimeLogConfig,
+    DEFAULT_LOG_READ_BYTES_PER_EVENT, DEFAULT_MAX_LOG_BUFFER_PER_SERVICE_BYTES,
+    DEFAULT_MAX_LOG_LINE_BYTES, DEFAULT_PRE_EVENTD_BUFFER_BYTES, RuntimeLogConfig,
 };
 use crate::service::ServiceEnvironmentVariable;
 
@@ -19,7 +18,6 @@ use super::value::{
 pub const SUPPORTED_SERVICES_SCHEMA_VERSION: u32 = 1;
 
 const LOG_SOCKET_PATH_FIELD: &str = "LogSocketPath";
-const MAX_LOG_DATAGRAM_BYTES_FIELD: &str = "MaxLogDatagramBytes";
 const MAX_PARALLEL_STARTS_FIELD: &str = "MaxParallelStarts";
 const BOOT_SUCCESS_GRACE_FIELD: &str = "BootSuccessGrace";
 const SHUTDOWN_TIMEOUT_FIELD: &str = "ShutdownTimeout";
@@ -53,8 +51,6 @@ pub const MIN_MAX_LOG_LINE_BYTES: usize = 256;
 pub const MIN_MAX_LOG_BUFFER_PER_SERVICE_BYTES: usize = 4096;
 pub const MIN_LOG_READ_BYTES_PER_EVENT: usize = 512;
 pub const MIN_PRE_EVENTD_BUFFER_BYTES: usize = 4096;
-pub const MIN_EVENTD_LOG_DATAGRAM_BYTES: usize = 4096;
-pub const MAX_EVENTD_LOG_DATAGRAM_BYTES: usize = 1024 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RegistryConfigWarning {
@@ -74,12 +70,6 @@ pub enum RegistryConfigWarning {
         key: &'static str,
         configured: u32,
         minimum: usize,
-        using: usize,
-    },
-    EventdLogDatagramBytesOutOfRange {
-        configured: u32,
-        minimum: usize,
-        maximum: usize,
         using: usize,
     },
 }
@@ -102,15 +92,6 @@ impl fmt::Display for RegistryConfigWarning {
             } => write!(
                 formatter,
                 "Machine\\System\\Init\\{key} is {configured}, below the minimum {minimum}; using the default {using}",
-            ),
-            Self::EventdLogDatagramBytesOutOfRange {
-                configured,
-                minimum,
-                maximum,
-                using,
-            } => write!(
-                formatter,
-                "Machine\\System\\eventd\\MaxLogDatagramBytes is {configured}, outside {minimum}..={maximum}; using the default {using}",
             ),
         }
     }
@@ -187,20 +168,6 @@ where
         &mut config.pre_eventd_buffer_bytes,
     );
 
-    if let Some(configured) = registry.read_eventd_log_datagram_bytes()? {
-        let configured = configured as usize;
-        if (MIN_EVENTD_LOG_DATAGRAM_BYTES..=MAX_EVENTD_LOG_DATAGRAM_BYTES).contains(&configured) {
-            config.eventd_log_datagram_bytes = configured;
-        } else {
-            warnings.push(RegistryConfigWarning::EventdLogDatagramBytesOutOfRange {
-                configured: configured as u32,
-                minimum: MIN_EVENTD_LOG_DATAGRAM_BYTES,
-                maximum: MAX_EVENTD_LOG_DATAGRAM_BYTES,
-                using: DEFAULT_EVENTD_LOG_DATAGRAM_BYTES,
-            });
-        }
-    }
-
     Ok((config, warnings))
 }
 
@@ -243,15 +210,6 @@ pub fn build_eventd_log_socket_path_from_registry_values(
         .find(|value| value.name == LOG_SOCKET_PATH_FIELD)
         .and_then(|value| decode_sz_field(value, LOG_SOCKET_PATH_FIELD).ok())
         .filter(|path| !path.is_empty())
-}
-
-pub fn build_eventd_log_datagram_bytes_from_registry_values(
-    values: &[RawRegistryValue],
-) -> Option<u32> {
-    values
-        .iter()
-        .find(|value| value.name == MAX_LOG_DATAGRAM_BYTES_FIELD)
-        .and_then(|value| decode_dword_field(value, MAX_LOG_DATAGRAM_BYTES_FIELD).ok())
 }
 
 pub fn build_max_parallel_starts_from_registry_values(

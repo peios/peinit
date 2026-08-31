@@ -21,7 +21,6 @@ struct StaticRegistry {
     post_kill_timeout_secs: Option<Result<Option<u32>, BoundaryError>>,
     log_read_bytes_per_event: Option<Result<Option<u32>, BoundaryError>>,
     pre_eventd_buffer_bytes: Option<Result<Option<u32>, BoundaryError>>,
-    eventd_log_datagram_bytes: Option<Result<Option<u32>, BoundaryError>>,
     reads: usize,
 }
 
@@ -37,7 +36,6 @@ impl StaticRegistry {
             post_kill_timeout_secs: None,
             log_read_bytes_per_event: None,
             pre_eventd_buffer_bytes: None,
-            eventd_log_datagram_bytes: None,
             reads: 0,
         }
     }
@@ -53,7 +51,6 @@ impl StaticRegistry {
             post_kill_timeout_secs: None,
             log_read_bytes_per_event: None,
             pre_eventd_buffer_bytes: None,
-            eventd_log_datagram_bytes: None,
             reads: 0,
         }
     }
@@ -85,11 +82,6 @@ impl StaticRegistry {
 
     fn with_pre_eventd_buffer_bytes(mut self, value: Result<Option<u32>, BoundaryError>) -> Self {
         self.pre_eventd_buffer_bytes = Some(value);
-        self
-    }
-
-    fn with_eventd_log_datagram_bytes(mut self, value: Result<Option<u32>, BoundaryError>) -> Self {
-        self.eventd_log_datagram_bytes = Some(value);
         self
     }
 
@@ -143,10 +135,6 @@ impl RegistryClient for StaticRegistry {
 
     fn read_max_log_buffer_per_service(&mut self) -> Result<Option<u32>, BoundaryError> {
         self.max_log_buffer_per_service.clone().unwrap_or(Ok(None))
-    }
-
-    fn read_eventd_log_datagram_bytes(&mut self) -> Result<Option<u32>, BoundaryError> {
-        self.eventd_log_datagram_bytes.clone().unwrap_or(Ok(None))
     }
 }
 
