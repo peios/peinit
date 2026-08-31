@@ -32,6 +32,11 @@ pub(super) struct Platform {
     device_policy_report: Result<DeviceNodePolicyReport, BoundaryError>,
     pub(super) provisioned_paths_seen: Vec<ProvisionedPath>,
     pub(super) root_verified: bool,
+    pub(super) mount_calls: usize,
+    pub(super) random_seed_calls: usize,
+    pub(super) machine_id_calls: usize,
+    pub(super) rtc_calls: usize,
+    pub(super) registryd_starts: usize,
     pub(super) increment_calls: usize,
     pub(super) warning_logs: Vec<Phase1InfrastructureWarning>,
     pub(super) console_messages: Vec<String>,
@@ -58,6 +63,11 @@ impl Platform {
             device_policy_report: Ok(DeviceNodePolicyReport::default()),
             provisioned_paths_seen: Vec::new(),
             root_verified: false,
+            mount_calls: 0,
+            random_seed_calls: 0,
+            machine_id_calls: 0,
+            rtc_calls: 0,
+            registryd_starts: 0,
             increment_calls: 0,
             warning_logs: Vec::new(),
             console_messages: Vec::new(),
@@ -103,6 +113,16 @@ impl Platform {
 
     pub(super) fn random_seed_restored(mut self) -> Self {
         self.random_seed_result = Ok(true);
+        self
+    }
+
+    pub(super) fn mount_error(mut self, message: &str) -> Self {
+        self.mount_result = Err(BoundaryError::Recovery(message.to_string()));
+        self
+    }
+
+    pub(super) fn rtc_error(mut self, message: &str) -> Self {
+        self.rtc_result = Err(BoundaryError::Recovery(message.to_string()));
         self
     }
 
@@ -161,6 +181,7 @@ impl InitPlatform for Platform {
     }
 
     fn mount_virtual_filesystems(&mut self) -> Result<(), BoundaryError> {
+        self.mount_calls += 1;
         self.mount_result.clone()
     }
 
@@ -169,14 +190,17 @@ impl InitPlatform for Platform {
     }
 
     fn restore_random_seed(&mut self) -> Result<bool, BoundaryError> {
+        self.random_seed_calls += 1;
         self.random_seed_result.clone()
     }
 
     fn ensure_machine_id(&mut self) -> Result<MachineIdStatus, BoundaryError> {
+        self.machine_id_calls += 1;
         self.machine_id_result.clone()
     }
 
     fn set_clock_from_rtc(&mut self) -> Result<(), BoundaryError> {
+        self.rtc_calls += 1;
         self.rtc_result.clone()
     }
 
@@ -186,6 +210,7 @@ impl InitPlatform for Platform {
         _registry: &mut dyn RegistryClient,
         _observed_at_ns: u64,
     ) -> Result<(), BoundaryError> {
+        self.registryd_starts += 1;
         self.registryd_notify_socket_path = Some(supervisor.settings().notify_socket_path.clone());
         self.registryd_result.clone()
     }
