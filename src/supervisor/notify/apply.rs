@@ -1,7 +1,8 @@
 use crate::boundary::ProcessController;
 use crate::execution::notify::{
-    AuthenticatedNotifySender, NotifyApplyContext, NotifyApplyError, NotifyApplyRequest,
-    apply_notify_message, authenticate_notify_sender, service_claims_notify_sender,
+    AuthenticatedNotifySender, NotifyAppliedField, NotifyApplyContext, NotifyApplyError,
+    NotifyApplyRequest, apply_notify_message, authenticate_notify_sender,
+    service_claims_notify_sender,
 };
 use crate::notify::{NotifyDatagram, parse_notify_message};
 
@@ -111,6 +112,20 @@ impl Supervisor {
             self.settings.phase2.max_parallel_starts,
             observed_at_ns,
         )?);
+        // A LEVEL= may be the fact a `Requires = ["<sender>:<level>"]`
+        // dependent is held on; this is the only event that can open that
+        // gate, so it must re-evaluate the waiters here and now.
+        if notify
+            .applied_fields
+            .iter()
+            .any(|field| matches!(field, NotifyAppliedField::Level { .. }))
+        {
+            start_dispatches.extend(work.release_level_waiters_on(
+                &notify.sender.service,
+                self.settings.phase2.max_parallel_starts,
+                observed_at_ns,
+            )?);
+        }
 
         work.commit(self);
 

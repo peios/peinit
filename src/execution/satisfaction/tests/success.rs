@@ -45,7 +45,9 @@ fn simple_service_satisfaction_completes_operation_and_releases_dependents() {
 
     let ready = fixture
         .graph
-        .release_ready(fixture.context_id, 10)
+        .release_ready(fixture.context_id, 10, &|_, _| {
+            crate::execution::graph::LevelProbe::Absent
+        })
         .expect("release dependent");
     assert_eq!(ready.len(), 1);
     assert_eq!(ready[0].service, "app");

@@ -26,7 +26,9 @@ fn on_demand_ready_start_allocates_job_id_atomically() {
         .create_on_demand_context(&on_demand_dispatch("app", request_outcome), &services)
         .expect("graph context");
     let ready = graph
-        .release_ready(context_id, 10)
+        .release_ready(context_id, 10, &|_, _| {
+            crate::execution::graph::LevelProbe::Absent
+        })
         .expect("ready starts")
         .remove(0);
     assert_eq!(ready.reserved_job_id, None);
@@ -69,7 +71,9 @@ fn failed_job_creation_rolls_back_operation_service_and_allocator() {
         .create_on_demand_context(&on_demand_dispatch("app", request_outcome), &services)
         .expect("graph context");
     let ready = graph
-        .release_ready(context_id, 10)
+        .release_ready(context_id, 10, &|_, _| {
+            crate::execution::graph::LevelProbe::Absent
+        })
         .expect("ready starts")
         .remove(0);
     let mut job_ids = JobIdAllocator::new();

@@ -16,7 +16,9 @@ fn boot_context_releases_roots_then_dependents() {
         .create_boot_context(&plan, &[registry, app])
         .expect("boot context");
 
-    let first = store.release_ready(context_id, 10).expect("first release");
+    let first = store
+        .release_ready(context_id, 10, &no_levels)
+        .expect("first release");
     assert_eq!(first.len(), 1);
     assert_eq!(first[0].service, "app");
     assert_eq!(first[0].operation_id, ids[1]);
@@ -26,7 +28,7 @@ fn boot_context_releases_roots_then_dependents() {
         .apply_pre_start_check_passed(ids[1])
         .expect("app precheck passed");
     let dependency_check = store
-        .release_ready(context_id, 10)
+        .release_ready(context_id, 10, &no_levels)
         .expect("dependency precheck release");
     assert_eq!(dependency_check.len(), 1);
     assert_eq!(dependency_check[0].service, "registry");
@@ -36,7 +38,7 @@ fn boot_context_releases_roots_then_dependents() {
     );
 
     let blocked = store
-        .release_ready(context_id, 10)
+        .release_ready(context_id, 10, &no_levels)
         .expect("nothing else ready");
     assert!(blocked.is_empty());
 
@@ -44,7 +46,7 @@ fn boot_context_releases_roots_then_dependents() {
         .apply_pre_start_check_passed(ids[0])
         .expect("registry precheck passed");
     let dependency_start = store
-        .release_ready(context_id, 10)
+        .release_ready(context_id, 10, &no_levels)
         .expect("dependency start release");
     assert_eq!(dependency_start.len(), 1);
     assert_eq!(dependency_start[0].service, "registry");
@@ -54,7 +56,7 @@ fn boot_context_releases_roots_then_dependents() {
         .apply_operation_satisfied(ids[0])
         .expect("registry satisfied");
     let second = store
-        .release_ready(context_id, 10)
+        .release_ready(context_id, 10, &no_levels)
         .expect("dependent release");
     assert_eq!(second.len(), 1);
     assert_eq!(second[0].service, "app");
@@ -74,9 +76,11 @@ fn max_parallel_starts_limits_release_batch() {
         .create_boot_context(&plan, &[service("one"), service("two")])
         .expect("boot context");
 
-    let first = store.release_ready(context_id, 1).expect("first release");
+    let first = store
+        .release_ready(context_id, 1, &no_levels)
+        .expect("first release");
     let second = store
-        .release_ready(context_id, 1)
+        .release_ready(context_id, 1, &no_levels)
         .expect("running member consumes slot");
 
     assert_eq!(first.len(), 1);
@@ -100,7 +104,7 @@ fn zero_parallel_limit_is_rejected() {
         .expect("boot context");
 
     let err = store
-        .release_ready(context_id, 0)
+        .release_ready(context_id, 0, &no_levels)
         .expect_err("zero limit rejected");
 
     assert_eq!(err, GraphExecutionError::InvalidMaxParallelStarts);

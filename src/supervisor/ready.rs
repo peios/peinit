@@ -2,6 +2,7 @@ use std::collections::{BTreeSet, VecDeque};
 
 use crate::execution::graph::{
     GraphContextId, GraphExecutionEvent, ReadyGraphOperation, ReadyGraphOperationAction,
+    probe_level,
 };
 use crate::execution::start::{
     GraphPreStartCheckOutcome, StartExecutionDispatch, StartExecutionRequest,
@@ -23,9 +24,12 @@ impl SupervisorWork {
         let mut dispatches = Vec::new();
 
         while let Some(context_id) = context_ids.pop_front() {
+            let services = &self.services;
             let ready = self
                 .graph
-                .release_ready(context_id, max_parallel_starts)
+                .release_ready(context_id, max_parallel_starts, &|target, level| {
+                    probe_level(services, target, level)
+                })
                 .map_err(SupervisorError::Graph)?;
 
             for ready in ready {
@@ -106,6 +110,22 @@ impl SupervisorWork {
             )?);
         }
         Ok(dispatches)
+    }
+
+    /// Release any context held on `service`'s readiness level.
+    ///
+    /// Called when the answer a level edge would get has changed: the
+    /// service published a `LEVEL=` (possibly the one a dependent wants),
+    /// or it left a dependent-satisfying state (freeing `Wants` waiters,
+    /// whose gate opens when nobody could publish the level any more).
+    pub fn release_level_waiters_on(
+        &mut self,
+        service: &str,
+        max_parallel_starts: u32,
+        observed_at_ns: u64,
+    ) -> Result<Vec<StartExecutionDispatch>, SupervisorError> {
+        let context_ids = self.graph.contexts_with_level_dependency_on(service);
+        self.release_after_graph_context_ids(&context_ids, max_parallel_starts, observed_at_ns)
     }
 
     pub fn release_after_graph_context_ids(

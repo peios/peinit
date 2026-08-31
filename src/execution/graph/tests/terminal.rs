@@ -19,7 +19,9 @@ fn required_dependency_failure_propagates_but_wants_do_not() {
         .create_boot_context(&plan, &[db, api, ui])
         .expect("boot context");
 
-    let root_checks = store.release_ready(context_id, 10).expect("root checks");
+    let root_checks = store
+        .release_ready(context_id, 10, &no_levels)
+        .expect("root checks");
     assert_eq!(
         root_checks
             .iter()
@@ -36,14 +38,18 @@ fn required_dependency_failure_propagates_but_wants_do_not() {
     store
         .apply_pre_start_check_passed(ids[2])
         .expect("ui precheck passed");
-    let db_check = store.release_ready(context_id, 10).expect("db check");
+    let db_check = store
+        .release_ready(context_id, 10, &no_levels)
+        .expect("db check");
     assert_eq!(db_check.len(), 1);
     assert_eq!(db_check[0].service, "db");
     assert_eq!(db_check[0].action, ReadyGraphOperationAction::PreStartCheck);
     store
         .apply_pre_start_check_passed(ids[0])
         .expect("db precheck passed");
-    let db_start = store.release_ready(context_id, 10).expect("db release");
+    let db_start = store
+        .release_ready(context_id, 10, &no_levels)
+        .expect("db release");
     assert_eq!(db_start.len(), 1);
     assert_eq!(db_start[0].service, "db");
     assert_eq!(db_start[0].action, ReadyGraphOperationAction::Start);
@@ -60,7 +66,7 @@ fn required_dependency_failure_propagates_but_wants_do_not() {
         ]
     );
     let ready = store
-        .release_ready(context_id, 10)
+        .release_ready(context_id, 10, &no_levels)
         .expect("wants dependent release");
     assert_eq!(ready.len(), 1);
     assert_eq!(ready[0].service, "ui");

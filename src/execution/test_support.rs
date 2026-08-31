@@ -53,7 +53,11 @@ impl StartedBootGraph {
             .create_boot_context(&plan, &definitions)
             .expect("graph context");
         let ready = loop {
-            let ready = graph.release_ready(context_id, 10).expect("ready start");
+            let ready = graph
+                .release_ready(context_id, 10, &|target, level| {
+                    crate::execution::graph::probe_level(&services, target, level)
+                })
+                .expect("ready start");
             let Some(ready) = ready.into_iter().next() else {
                 panic!("requested ready start");
             };

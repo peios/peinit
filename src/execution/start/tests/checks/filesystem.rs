@@ -32,7 +32,9 @@ fn filesystem_condition_records_pending_graph_check_without_entering_starting() 
         .create_on_demand_context(&on_demand_dispatch("app", request_outcome), &services)
         .expect("graph context");
     let ready = graph
-        .release_ready(context_id, 10)
+        .release_ready(context_id, 10, &|_, _| {
+            crate::execution::graph::LevelProbe::Absent
+        })
         .expect("ready start")
         .remove(0);
     let mut jobs = JobStore::new();
@@ -141,7 +143,9 @@ fn passing_filesystem_condition_continues_graph_start_to_created_job() {
         .create_on_demand_context(&on_demand_dispatch("app", request_outcome), &services)
         .expect("graph context");
     let ready = graph
-        .release_ready(context_id, 10)
+        .release_ready(context_id, 10, &|_, _| {
+            crate::execution::graph::LevelProbe::Absent
+        })
         .expect("ready start")
         .remove(0);
     let mut jobs = JobStore::new();
@@ -207,7 +211,9 @@ fn failing_filesystem_condition_skips_graph_start() {
         .create_on_demand_context(&on_demand_dispatch("app", request_outcome), &services)
         .expect("graph context");
     let ready = graph
-        .release_ready(context_id, 10)
+        .release_ready(context_id, 10, &|_, _| {
+            crate::execution::graph::LevelProbe::Absent
+        })
         .expect("ready start")
         .remove(0);
     let mut jobs = JobStore::new();

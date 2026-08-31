@@ -58,7 +58,33 @@ pub struct GraphMember {
 pub struct GraphDependency {
     pub dependent: String,
     pub target: String,
+    /// The readiness level the target must have published, when the
+    /// declaration named one (`Requires = ["netd:routed"]`).
+    ///
+    /// A level edge is the one kind of edge whose target may not be a
+    /// member of the context: an already-active target is excluded from
+    /// the start plan (there is nothing to start), but the *condition* on
+    /// it still has to be waited for. Level-less edges to non-members stay
+    /// excluded, as they always were.
+    pub level: Option<String>,
     pub kind: ServiceDependencyKind,
+}
+
+/// What a live look at a level dependency's target found.
+///
+/// Levels are claims made by a running process over the notify socket, so
+/// they cannot be settled from the graph's own bookkeeping the way member
+/// completion can: the answer has to come from the service table at the
+/// moment of the check. `release_ready` takes a probe returning this.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LevelProbe {
+    /// Running, and has published exactly the wanted level.
+    Satisfied,
+    /// Running, but its current level is different or not yet published.
+    /// The wanted level may still arrive.
+    NotYetPublished,
+    /// Not running: stopped, disabled, or gone. Nothing is making claims.
+    Absent,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
