@@ -1,4 +1,4 @@
-mod clone;
+pub(super) mod clone;
 mod fd;
 mod setup_status;
 
