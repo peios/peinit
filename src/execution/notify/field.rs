@@ -48,6 +48,12 @@ pub(super) fn apply_notify_field(
             text,
             &mut *context.dispatch,
         )?,
+        NotifyField::Level(value) => apply_level(
+            &mut *context.services,
+            context.sender,
+            value,
+            &mut *context.dispatch,
+        )?,
         NotifyField::Stopping => apply_stopping(
             &mut *context.services,
             context.sender,
@@ -93,6 +99,28 @@ fn apply_status(
     Ok(())
 }
 
+/// Record a level the service published.
+///
+/// Advisory in the sense that nothing fails if no dependent cares — but
+/// stored on the service rather than merely logged, because
+/// `Requires = ["<service>:<level>"]` reads it. An empty value retracts
+/// the level, which is how a daemon says "I am no longer routed" without
+/// exiting.
+fn apply_level(
+    services: &mut ServiceTable,
+    sender: &AuthenticatedNotifySender,
+    value: &str,
+    dispatch: &mut NotifyApplyDispatch,
+) -> Result<(), NotifyApplyError> {
+    services
+        .update_level(&sender.service, value)
+        .map_err(NotifyApplyError::ServiceTable)?;
+    dispatch.applied_fields.push(NotifyAppliedField::Level {
+        value: value.to_string(),
+    });
+    Ok(())
+}
+
 fn apply_stopping(
     services: &mut ServiceTable,
     sender: &AuthenticatedNotifySender,
@@ -107,6 +135,11 @@ fn apply_stopping(
 
 fn record_advisory_field(field: &NotifyField, dispatch: &mut NotifyApplyDispatch) {
     match field {
+        // Handled by apply_notify_field; unreachable here, and recorded
+        // rather than ignored so a future reshuffle cannot lose it.
+        NotifyField::Level(value) => dispatch.applied_fields.push(NotifyAppliedField::Level {
+            value: value.clone(),
+        }),
         NotifyField::Progress(value) => {
             dispatch.applied_fields.push(NotifyAppliedField::Progress {
                 value: value.clone(),

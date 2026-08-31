@@ -56,6 +56,9 @@ pub enum NotifyAppliedField {
     Reloading,
     Stopping,
     Status { text: String },
+    /// A readiness level the service published, for dependents declaring
+    /// `Requires = ["<service>:<level>"]`. An empty value retracts it.
+    Level { value: String },
     Progress { value: String },
     ProgressUnit { value: String },
     Errno { value: String },

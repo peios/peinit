@@ -55,6 +55,11 @@ impl ServiceRuntimeSnapshot {
         self.cause = Some(transition.cause);
         if !self.state.satisfies_dependents() {
             self.dependent_satisfied_since_ns = None;
+            // A level is a claim about a process that is currently making
+            // it. Keeping one across a stop would hold a dependent open on
+            // a promise nobody is keeping — the exact failure the whole
+            // level mechanism exists to avoid.
+            self.level = None;
         }
 
         Ok(ServiceTransitionEvent {

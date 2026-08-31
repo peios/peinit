@@ -199,6 +199,13 @@ pub struct ServiceRuntimeSnapshot {
     pub consecutive_restart_failures: u32,
     pub restart_backoff_until_ns: Option<u64>,
     pub status_text: Option<String>,
+    /// The readiness level this service last published with `LEVEL=`, for
+    /// dependents declaring `Requires = ["<service>:<level>"]`.
+    ///
+    /// Cleared whenever the service leaves the running state, because a
+    /// level is a claim about a process that is currently making it. A
+    /// stale one would hold a dependent open on a promise nobody is keeping.
+    pub level: Option<String>,
     pub stopping_acknowledged: bool,
     pub stopping_timeout: Option<ServiceStoppingTimeoutEvidence>,
     pub pending_timer: bool,
@@ -218,6 +225,7 @@ impl ServiceRuntimeSnapshot {
             consecutive_restart_failures: 0,
             restart_backoff_until_ns: None,
             status_text: None,
+            level: None,
             stopping_acknowledged: false,
             stopping_timeout: None,
             pending_timer: false,
