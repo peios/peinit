@@ -114,7 +114,9 @@ pub use lifecycle_deadline_timer::{
     SupervisorLifecycleDeadline, SupervisorLifecycleDeadlineDispatch,
     SupervisorLifecycleDeadlineKind, SupervisorLifecycleDeadlineTimerTurn,
 };
-pub use operation_maintenance::SupervisorOperationMaintenanceTurn;
+pub use operation_maintenance::{
+    SupervisorOnFailureChainSettledDispatch, SupervisorOperationMaintenanceTurn,
+};
 pub use shutdown_deadline_timer::SupervisorShutdownDeadlineTimerTurn;
 pub use shutdown_signal::SupervisorPid1SignalFdTurn;
 pub use state::{Supervisor, SupervisorError, SupervisorSettings};

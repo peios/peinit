@@ -52,8 +52,18 @@ impl RelationshipStore {
         self.on_failure_chains.remove(service)
     }
 
-    pub(super) fn clear_on_failure_chain(&mut self, service: &str) {
+    pub(in crate::supervisor) fn clear_on_failure_chain(&mut self, service: &str) {
         self.on_failure_chains.remove(service);
+    }
+
+    /// The services currently holding a chain entry.
+    ///
+    /// Needed so the maintenance pass can ask which of them have *arrived* —
+    /// see [`crate::supervisor::operation_maintenance`]. A chain is an
+    /// obligation on the service that was started as a handler, and nothing
+    /// else enumerates them.
+    pub(in crate::supervisor) fn on_failure_chain_services(&self) -> Vec<String> {
+        self.on_failure_chains.keys().cloned().collect()
     }
 
     pub(super) fn record_audit_event(&mut self, event: SupervisorOnFailureLoopSuppressedDispatch) {

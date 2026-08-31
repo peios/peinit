@@ -333,3 +333,88 @@ fn current_job(supervisor: &Supervisor, service: &str) -> crate::ids::JobId {
         .expect("current job")
         .id
 }
+
+// PEI-362. The chain that bounds an OnFailure cascade is recorded against the
+// handler and was only cleared when that handler reached a terminal or
+// inactive state — so a handler that started and *stayed running* held its
+// membership entry and one of the sixteen depth slots for as long as the entry
+// lived. The guard was consumed by exactly the case that worked: a degradation
+// path handing off through several healthy layers exhausted its own depth
+// budget, and a failover ping-pong was refused as a cycle on its second round
+// even when every hop had come up healthy.
+//
+// What retires the entry is deliberately not `Active`. `on_failure_loop_guard_
+// survives_active_fallback_crashes` above pins the other side: a handler that
+// crashes straight after coming up is still caught, and it has to be —
+// `Readiness=Alive` reports Active the instant the process spawns, so clearing
+// there would let two mutually-handling services hand off forever with no
+// delay and no cost, since an OnFailure start is not a restart and spends no
+// budget. That is the crash-loop §5.2 says MUST be bounded.
+//
+// The line between them is peinit's existing notion of a service having
+// *arrived*: dependent-satisfying for `RestartWindow`, the same window that
+// resets a restart budget.
+#[test]
+fn a_handler_that_holds_a_window_of_health_releases_its_chain_slot() {
+    let mut a = alive_service("a");
+    a.on_failure = Some("b".to_string());
+    a.restart_policy = RestartPolicy::Never;
+    let mut b = alive_service("b");
+    b.triggers.clear();
+    b.on_failure = Some("a".to_string());
+    b.restart_policy = RestartPolicy::Never;
+    let window_ns = b.restart_window_secs * 1_000_000_000;
+    let mut supervisor = boot_and_launch(vec![a, b], [BOOT_NS, APP_LAUNCH_NS]);
+
+    // a fails, b takes over and holds up for a full window.
+    let a_job = current_job(&supervisor, "a");
+    supervisor
+        .complete_job(a_job, APP_CRASH_NS, 1)
+        .expect("a failed");
+    launch_one_pending(&mut supervisor, APP_CRASH_NS + 1, 9200, 120);
+    let b_settled_ns = APP_CRASH_NS + 1 + window_ns;
+    supervisor
+        .process_due_operation_maintenance(b_settled_ns)
+        .expect("settle b's chain");
+
+    // b fails much later, a takes over and holds up for a full window too.
+    let b_job = current_job(&supervisor, "b");
+    supervisor
+        .complete_job(b_job, b_settled_ns + 1, 1)
+        .expect("b failed");
+    launch_one_pending(&mut supervisor, b_settled_ns + 2, 9201, 121);
+    let a_settled_ns = b_settled_ns + 2 + window_ns;
+    let maintenance = supervisor
+        .process_due_operation_maintenance(a_settled_ns)
+        .expect("settle a's chain");
+    assert_eq!(
+        maintenance
+            .on_failure_chain_settles
+            .iter()
+            .map(|settle| settle.service.as_str())
+            .collect::<Vec<_>>(),
+        vec!["a"],
+    );
+
+    // The third hop. Each of the two before it arrived, so this is a new
+    // originating failure rather than a continuation, and b must be startable.
+    let a_job = current_job(&supervisor, "a");
+    let third_hop = supervisor
+        .complete_job(a_job, a_settled_ns + 1, 1)
+        .expect("a failed again");
+
+    assert_eq!(
+        third_hop
+            .start_dispatches
+            .iter()
+            .map(|dispatch| dispatch.ready.service.as_str())
+            .collect::<Vec<_>>(),
+        vec!["b"],
+        "a hand-off between two handlers that each held a window of health was \
+         suppressed as a loop",
+    );
+    let audit = supervisor
+        .process_due_operation_maintenance(a_settled_ns + 2)
+        .expect("drain relationship audit events");
+    assert!(audit.relationship_audit_events.is_empty());
+}

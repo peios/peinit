@@ -1,10 +1,12 @@
 mod deadlines;
 mod model;
+mod on_failure_chain;
 mod pending_timeout;
 mod restart_window;
 mod service_main_start_timeout;
 
 pub use model::SupervisorOperationMaintenanceTurn;
+pub use on_failure_chain::SupervisorOnFailureChainSettledDispatch;
 
 use crate::boundary::ProcessController;
 
@@ -12,6 +14,7 @@ use super::cgroup_cleanup::{CgroupCleanupKind, record_cgroup_cleanup};
 use super::state::{Supervisor, SupervisorError};
 use super::work::SupervisorWork;
 use pending_timeout::fail_pending_operation_timeout;
+use on_failure_chain::settle_due_on_failure_chains;
 use restart_window::reset_due_restart_windows;
 use service_main_start_timeout::process_due_service_main_start_timeout;
 
@@ -90,6 +93,8 @@ impl Supervisor {
             }
             turn.restart_window_resets =
                 reset_due_restart_windows(&mut work, due.restart_window_resets, now_ns)?;
+            turn.on_failure_chain_settles =
+                settle_due_on_failure_chains(&mut work, due.on_failure_chain_settles, now_ns)?;
             work.commit(self);
         }
 
