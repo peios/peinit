@@ -190,6 +190,18 @@ pub(super) fn push_critical_service_failure(
     );
 }
 
+/// The machine is rebooting because a Critical service ran out of restart
+/// budget. Critical, and phrased so the reason is on the same line as the
+/// consequence: this is the last thing the operator sees before the reboot.
+pub(crate) fn push_critical_budget_reboot_message(out: &mut Vec<ConsoleMessage>, service: &str) {
+    push_critical(
+        out,
+        format!(
+            "peinit: critical service {service} exhausted its restart budget; rebooting\n"
+        ),
+    );
+}
+
 pub(super) fn collect_shutdown_finalization_state_console_message(
     finalization: &ShutdownFinalizationState,
     out: &mut Vec<ConsoleMessage>,

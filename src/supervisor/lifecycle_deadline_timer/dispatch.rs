@@ -1,3 +1,4 @@
+use crate::supervisor::SupervisorCriticalBudgetRebootDispatch;
 use crate::supervisor::cgroup_cleanup::SupervisorLeakedCgroupDispatch;
 use crate::supervisor::dispatch::{
     SupervisorBootSettleDispatch, SupervisorBootSuccessDispatch,
@@ -26,6 +27,15 @@ pub struct SupervisorLifecycleDeadlineDispatch {
     pub boot_settles: Vec<SupervisorBootSettleDispatch>,
     pub cgroup_leaks: Vec<SupervisorLeakedCgroupDispatch>,
     pub submitted_jobs: Vec<SupervisorSubmittedDeadlineDispatch>,
+    /// The immediate reboot owed to a Critical service that exhausted its
+    /// restart budget during this turn by a route with no reboot check of its
+    /// own — a readiness timeout, a pre-start hook or check timeout.
+    ///
+    /// On the dispatch rather than on one of the lists above because the
+    /// reboot is about the service, not about which deadline happened to
+    /// notice it, and enumerating the deadlines that can cause one is what
+    /// went wrong the first time (PEI-341).
+    pub critical_budget_reboot: Option<SupervisorCriticalBudgetRebootDispatch>,
 }
 
 impl SupervisorLifecycleDeadlineDispatch {
@@ -45,5 +55,6 @@ impl SupervisorLifecycleDeadlineDispatch {
             && self.boot_settles.is_empty()
             && self.cgroup_leaks.is_empty()
             && self.submitted_jobs.is_empty()
+            && self.critical_budget_reboot.is_none()
     }
 }

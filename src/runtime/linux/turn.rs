@@ -9,7 +9,7 @@ use self::support::{
 use self::support::{
     append_idle_closure_turn, append_idle_jobs_closure_turn, emit_runtime_loop_kmes_events,
     flush_operation_waits_at, prepend_idle_closure_turn, prepend_idle_jobs_closure_turn,
-    process_due_operation_maintenance_at,
+    process_due_critical_budget_reboot_at, process_due_operation_maintenance_at,
 };
 use crate::boundary::{Clock, ConsoleSink, RealtimeClock};
 use crate::runtime::{
@@ -188,6 +188,13 @@ impl LinuxShutdownRuntime {
             &mut self.controller,
             after_sources_ns,
         )?;
+        // After the turn's events, so a service that exhausted its budget
+        // anywhere in it is seen however it got there (PEI-341).
+        let critical_budget_reboot = process_due_critical_budget_reboot_at(
+            supervisor,
+            &mut self.finalizer,
+            after_sources_ns,
+        )?;
         flush_operation_waits_at(
             supervisor,
             &mut self.control_connections,
@@ -239,6 +246,12 @@ impl LinuxShutdownRuntime {
             &calendar_turns,
             &mut console_messages,
         );
+        if let Some(reboot) = &critical_budget_reboot {
+            crate::runtime::console::push_critical_budget_reboot_message(
+                &mut console_messages,
+                &reboot.service,
+            );
+        }
         self.write_console_messages(console_messages);
         turn.sources.extend(calendar_sources);
         turn.turns

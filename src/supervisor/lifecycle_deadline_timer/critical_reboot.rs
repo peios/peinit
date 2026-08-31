@@ -22,6 +22,15 @@ where
     } else if let Some(index) = watchdog_timeout_critical_reboot_index(supervisor, dispatch) {
         dispatch.watchdog_timeouts[index].critical_reboot =
             Some(supervisor.critical_reboot(finalizer, now_ns)?);
+    } else {
+        // Every other way a Critical service can have exhausted its budget in
+        // this turn: a readiness timeout, a pre-start hook or check timeout.
+        // Asked as one question about the service rather than list by list —
+        // enumerating the deadlines that can cause a reboot is exactly what
+        // was incomplete before (PEI-341), and a new deadline kind would make
+        // it incomplete again.
+        dispatch.critical_budget_reboot =
+            supervisor.process_due_critical_budget_reboot(finalizer, now_ns)?;
     }
     Ok(())
 }
