@@ -17,6 +17,22 @@ impl Supervisor {
         schedule: &str,
         observed_at_ns: u64,
     ) -> Result<SupervisorTimerDispatch, SupervisorError> {
+        // A shutdown disarms timer triggers. Gating the handler rather than
+        // the timerfd matches how every other event source is handled — the
+        // fd stays armed and re-armed, and the firing is classified as a
+        // no-op — and it is the smaller change.
+        //
+        // This is a returned action, not an error: the calendar timer path
+        // hands its result straight to the runtime loop, which answers an
+        // error by taking PID 1 into recovery. A timer firing at an
+        // inconvenient moment must not do that.
+        if self.shutdown.is_some() {
+            return Ok(SupervisorTimerDispatch {
+                service: service.to_string(),
+                schedule: schedule.to_string(),
+                action: SupervisorTimerAction::ShutdownInProgress,
+            });
+        }
         let definition = self.services.definition(service).ok_or_else(|| {
             SupervisorError::MissingStartCredentials {
                 service: service.to_string(),

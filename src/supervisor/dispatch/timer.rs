@@ -26,4 +26,6 @@ pub enum SupervisorTimerAction {
         state: ServiceState,
     },
     Disabled,
+    /// The firing was ignored because a shutdown is in progress.
+    ShutdownInProgress,
 }
