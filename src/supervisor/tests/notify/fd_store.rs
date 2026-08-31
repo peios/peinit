@@ -353,3 +353,65 @@ fn peer_observes_closed(peer: &mut UnixStream) -> bool {
         Err(error) => panic!("read peer: {error}"),
     }
 }
+
+// PEI-346. §3.5: a service whose definition has been withdrawn is not killed,
+// but "when that instance exits it is NOT restarted (RestartPolicy is moot --
+// the definition is gone), and peinit then discards the entry entirely".
+//
+// The clean-exit path did that. A restart-eligible crash did not: it went to
+// Backoff, which is a state the entry could never leave. Two halves of the
+// deadlock, in different files — `restart_backoff_deadlines` skips
+// definition-removed entries so nothing moved it out, and Backoff keeps an
+// entry alive after removal so nothing discarded it. The entry stayed in
+// `status` describing a restart that would never happen, refused every
+// lifecycle command with UNKNOWN_SERVICE, and held its stored descriptors open
+// in PID 1 for the life of the process.
+#[test]
+fn a_definition_removed_service_that_crashes_is_discarded_with_its_fd_store() {
+    let mut supervisor = fd_store_app_supervisor(2);
+    store_fd(&mut supervisor, "listener", NOTIFY_NS);
+    assert_eq!(
+        supervisor
+            .fd_store()
+            .service("app")
+            .expect("app fd store")
+            .len(),
+        1,
+    );
+
+    // The registry no longer defines it. Active retains the entry until the
+    // instance drains, which is the window this is about.
+    supervisor
+        .services
+        .apply_definition_snapshot(Vec::new())
+        .expect("withdraw the definition");
+    assert!(
+        supervisor
+            .service_status("app")
+            .expect("app")
+            .definition_removed,
+    );
+    let job_id = supervisor
+        .service_status("app")
+        .expect("app")
+        .current_job
+        .expect("app job")
+        .id;
+
+    supervisor
+        .complete_job(job_id, APP_CRASH_NS, 1)
+        .expect("app crashes");
+
+    assert!(
+        supervisor.service_status("app").is_err(),
+        "a definition-removed service that crashed is still in the table",
+    );
+    assert!(
+        supervisor.fd_store().service("app").is_none(),
+        "the discarded service's descriptors are still open in PID 1",
+    );
+    assert!(
+        supervisor.next_restart_backoff_deadline().is_none(),
+        "a restart was scheduled for a service with no definition to restart",
+    );
+}

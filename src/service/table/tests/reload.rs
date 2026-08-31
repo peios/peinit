@@ -303,3 +303,43 @@ fn an_inactive_compiled_in_service_is_not_discarded() {
     assert!(summary.discarded.is_empty());
     assert!(table.get("registryd").is_some());
 }
+
+// PEI-346, the other order. The service is already in Backoff when its
+// definition is withdrawn.
+//
+// Backoff used to retain the entry, and `restart_backoff_deadlines` skips
+// definition-removed entries, so the entry could neither be discarded nor
+// leave the state — a permanent leak by a different route from the crash that
+// enters Backoff. There is no instance to drain here: a service between
+// restart attempts has no process, and no definition left to restart it from.
+#[test]
+fn a_definition_withdrawn_while_a_service_is_in_backoff_discards_the_entry() {
+    let mut table = table(&["app"]);
+    table
+        .transition_service(
+            "app",
+            transition(ServiceState::Starting, TransitionCause::ExplicitStart),
+        )
+        .expect("starting");
+    table
+        .transition_service(
+            "app",
+            transition(ServiceState::Active, TransitionCause::ExplicitStart),
+        )
+        .expect("active");
+    table
+        .transition_service_to_restart_backoff(
+            "app",
+            TransitionCause::ProcessCrash,
+            2_000_000_000,
+        )
+        .expect("backoff");
+
+    let summary = table
+        .apply_definition_snapshot(Vec::new())
+        .expect("withdraw the definition");
+
+    assert_eq!(summary.discarded, vec!["app".to_string()]);
+    assert!(summary.marked_removed.is_empty());
+    assert!(table.get("app").is_none());
+}

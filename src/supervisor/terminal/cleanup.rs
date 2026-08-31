@@ -50,6 +50,24 @@ pub(super) fn clear_fd_store_after_explicit_stop(
     }
 }
 
+/// Release the fd store of a service whose entry has just been discarded.
+///
+/// A crash normally *keeps* the store — restoring those descriptors across a
+/// restart is what it is for. But a definition-removed entry is discarded when
+/// its instance drains, and nothing can ever restart it, so the descriptors it
+/// was holding would stay open in PID 1 for the life of the process with no
+/// service left to hand them back to (PEI-346).
+pub(super) fn clear_fd_store_after_definition_discard(
+    work: &mut SupervisorWork,
+    dispatch: &ServiceMainJobTerminalDispatch,
+) {
+    for transition in &dispatch.service_transitions {
+        if transition.discarded_definition_removed {
+            work.fd_store.clear_service(&transition.event.service);
+        }
+    }
+}
+
 pub(super) fn remove_satisfied_stop_deadlines(
     work: &mut SupervisorWork,
     dispatch: &ServiceMainJobTerminalDispatch,

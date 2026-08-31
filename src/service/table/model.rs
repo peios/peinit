@@ -90,13 +90,27 @@ pub enum ServiceTableError {
     Transition(ServiceTransitionError),
 }
 
+/// The entry is kept alive after its definition is withdrawn, because there is
+/// an instance still to supervise.
+///
+/// That is the whole reason for retention, which is why `Backoff` is not here.
+/// A service between restart attempts has no process — `process_presence` says
+/// so — and nothing left to restart it from, so there is nothing to supervise
+/// and nothing to wait for. Retaining it was a permanent leak: the entry stayed
+/// alive because it was in Backoff, and could never leave Backoff because
+/// `restart_backoff_deadlines` skips definition-removed entries. It sat in
+/// `status` describing a restart that would never happen, refused every
+/// lifecycle command with UNKNOWN_SERVICE, and held its stored descriptors open
+/// in PID 1 for the life of the process (PEI-346).
+///
+/// `Starting` stays: its process is `Optional`, not absent, so there may well
+/// be one to drain.
 pub(super) fn retains_definition_after_removal(state: ServiceState) -> bool {
     matches!(
         state,
         ServiceState::Starting
             | ServiceState::Active
             | ServiceState::Reloading
-            | ServiceState::Backoff
             | ServiceState::Stopping
     )
 }
