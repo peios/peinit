@@ -3,8 +3,8 @@ use crate::service::runtime::{ServiceState, ServiceTransition, TransitionCause};
 use crate::supervisor::{Supervisor, SupervisorSettings, SupervisorTimerAction};
 
 use super::{
-    BOOT_NS, LIFECYCLE_COMMAND_NS, ScriptedClock, StaticRegistry, TestProcessLauncher,
-    TestTokenProvider, alive_service, oneshot_service, process, settings,
+    BOOT_NS, LIFECYCLE_COMMAND_NS, ScriptedClock, StaticRegistry, TestProcessController,
+    TestProcessLauncher, TestTokenProvider, alive_service, oneshot_service, process, settings,
 };
 
 #[test]
@@ -257,4 +257,50 @@ fn pending_oneshot_timer_run_starts_when_current_run_completes() {
     assert_eq!(runtime.state, ServiceState::Starting);
     assert!(!runtime.pending_timer);
     assert_eq!(supervisor.pending_launch_jobs().len(), 1);
+}
+
+// PEI-339. A shutdown disarms timer triggers: "While the flag is set: no new
+// services may be started; timer triggers are disarmed."
+//
+// This one mattered more than the rule reads. The states classify_timer_firing
+// starts from — an idle Oneshot in Inactive, Completed or Failed — are exactly
+// the states shutdown classifies as not participating, so a firing would start
+// a brand-new service *after* the stop waves were frozen. Nothing then stops
+// it: it is in no wave, wave_complete never accounts for it, and
+// remaining_shutdown_services walks only plan.stop_waves, so even the 90-second
+// global timeout sweep does not reach it. It survives to the unmount step
+// holding files open on filesystems peinit is trying to unmount.
+#[test]
+fn a_timer_firing_during_shutdown_starts_nothing() {
+    let mut app = oneshot_service("app");
+    app.triggers = vec![ServiceTrigger::Timer {
+        schedule: "daily UTC".to_string(),
+    }];
+
+    let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
+    let mut registry = StaticRegistry::services(vec![app]);
+    let mut clock = ScriptedClock::new([BOOT_NS]);
+    supervisor
+        .run_phase2_boot(&mut registry, &mut clock)
+        .expect("boot supervisor");
+    let mut controller = TestProcessController::default();
+    supervisor
+        .begin_shutdown(
+            crate::shutdown::ShutdownKind::Poweroff,
+            &mut controller,
+            LIFECYCLE_COMMAND_NS,
+        )
+        .expect("begin shutdown");
+
+    let dispatch = supervisor
+        .handle_timer_firing("app", "daily UTC", LIFECYCLE_COMMAND_NS + 1)
+        .expect("a timer firing during shutdown is not an error");
+
+    assert_eq!(dispatch.action, SupervisorTimerAction::ShutdownInProgress);
+    // Not started, and not queued to start later either: a pending-timer mark
+    // would fire the run at the next terminal event, which is a thing shutdown
+    // produces in quantity.
+    let runtime = supervisor.services().runtime("app").expect("runtime");
+    assert_eq!(runtime.state, ServiceState::Inactive);
+    assert!(!runtime.pending_timer);
 }
