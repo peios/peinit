@@ -192,6 +192,7 @@ fn begin_restart_start_after_post_kill(
     let dispatch = begin_restart_start_leg(
         &mut work.services,
         &mut work.operations,
+        &mut work.graph,
         &mut work.jobs,
         &mut work.job_ids,
         &mut work.start,

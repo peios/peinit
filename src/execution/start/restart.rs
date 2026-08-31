@@ -7,6 +7,8 @@ use crate::operation::{
 use crate::service::ServiceTable;
 use crate::service::runtime::{ServiceState, ServiceTransition, TransitionCause};
 
+use crate::execution::failure::{StartFailureRequest, apply_start_failure};
+
 use super::checks::{PreStartCheckDecision, evaluate_cacheable_pre_start_checks, format_check};
 use super::deadline::start_operation_deadline_ns;
 use super::initial::{InitialStartJobRequest, create_initial_start_job};
@@ -20,6 +22,7 @@ use super::store::{PendingPreStartCheck, PendingPreStartCheckStart, StartExecuti
 pub fn begin_restart_start_leg(
     services: &mut ServiceTable,
     operations: &mut OperationStore,
+    graph: &mut crate::execution::graph::GraphExecutionStore,
     jobs: &mut JobStore,
     job_ids: &mut JobIdAllocator,
     start_store: &mut StartExecutionStore,
@@ -29,6 +32,7 @@ pub fn begin_restart_start_leg(
 
     let mut next_services = services.clone();
     let mut next_operations = operations.clone();
+    let mut next_graph = graph.clone();
     let mut next_jobs = jobs.clone();
     let mut next_job_ids = job_ids.clone();
     let mut next_start_store = start_store.clone();
@@ -95,30 +99,38 @@ pub fn begin_restart_start_leg(
                     },
                     operation_events: vec![completed],
                     service_transitions: vec![service_transition, skipped],
+                    graph_events: Vec::new(),
                 },
             ));
         }
         PreStartCheckDecision::AssertionFailed(check) => {
-            let failed = next_services
-                .transition_service(
-                    &request.service,
-                    ServiceTransition {
-                        to: ServiceState::Failed,
-                        cause: TransitionCause::AssertionError,
-                    },
-                )
-                .map_err(StartExecutionError::ServiceTable)?;
-            let operation_event = next_operations
-                .fail_operation(
-                    request.operation_id,
-                    request.started_at_ns,
-                    format!("AssertionError: {} not satisfied", format_check(&check)),
-                )
-                .map_err(StartExecutionError::OperationStore)?;
+            // Through apply_start_failure, as every other assert path is. The
+            // restart leg used to transition and fail the operation itself, so
+            // graph.apply_operation_failed never ran and the failure did not
+            // propagate — the one assert path that skipped propagation, and
+            // the one where the dependency is most permanently gone, since an
+            // AssertionError is never restarted (PEI-370).
+            let failure = apply_start_failure(
+                &mut next_services,
+                &mut next_operations,
+                &mut next_graph,
+                StartFailureRequest {
+                    service: request.service.clone(),
+                    operation_id: request.operation_id,
+                    failed_at_ns: request.started_at_ns,
+                    failure_cause: TransitionCause::AssertionError,
+                    reason: format!("AssertionError: {} not satisfied", format_check(&check)),
+                    exit_code: None,
+                },
+            )
+            .map_err(StartExecutionError::StartFailure)?;
 
             *services = next_services;
             *operations = next_operations;
+            *graph = next_graph;
 
+            let mut service_transitions = vec![service_transition];
+            service_transitions.extend(failure.service_transitions);
             return Ok(RestartStartExecutionOutcome::Terminal(
                 RestartStartExecutionTerminalDispatch {
                     service: request.service,
@@ -126,8 +138,9 @@ pub fn begin_restart_start_leg(
                     outcome: StartPreCheckTerminalOutcome::AssertionFailed {
                         check: format_check(&check),
                     },
-                    operation_events: vec![operation_event],
-                    service_transitions: vec![service_transition, failed],
+                    operation_events: failure.operation_events,
+                    service_transitions,
+                    graph_events: failure.graph_events,
                 },
             ));
         }

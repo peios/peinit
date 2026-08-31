@@ -551,3 +551,66 @@ fn encodes_boot_blocked_service_payloads() {
         "health check interval exceeds the restart window"
     );
 }
+
+// PEI-368. §10.1: peinit MUST "acknowledge the notification by logging it".
+// STOPPING=1 changed peinit's behaviour — it suppresses the SIGTERM — and left
+// no trace that it did.
+//
+// The absence of an action is the one kind of effect that cannot be inferred
+// from what happened afterwards. Without a record, a service that was stopping
+// and correctly received no SIGTERM looks exactly like a service that should
+// have received one and did not: the first is right, the second is a bug in
+// peinit, and an operator looking at a service that ran out its StopTimeout
+// and got SIGKILLed could not tell them apart.
+#[test]
+fn a_stopping_notification_is_acknowledged_as_an_event() {
+    let sender = AuthenticatedNotifySender {
+        service: "app".to_string(),
+        job_id: job_id(),
+        operation_id: Some(operation_id()),
+        generation: 3,
+        job_created_at_ns: 1_000,
+        cgroup_generation: 7,
+    };
+
+    let events =
+        encode_notify_applied_field_events(&sender, &[NotifyAppliedField::Stopping])
+            .expect("notify events");
+
+    assert_eq!(
+        events
+            .iter()
+            .map(|event| event.event_type.as_str())
+            .collect::<Vec<_>>(),
+        vec!["notify.stopping"],
+    );
+    // It identifies which activation of which service, so an operator can tie
+    // it to the stop they are looking at.
+    assert_eq!(read_str(&events[0].payload, "service"), "app");
+    assert_eq!(
+        read_str(&events[0].payload, "job_id"),
+        sender.job_id.to_string(),
+    );
+}
+
+/// READY=1 and RELOADING=1 stay unrecorded, deliberately: both are observable
+/// through the state transitions they cause, so an event would be noise.
+#[test]
+fn ready_and_reloading_are_still_not_separately_recorded() {
+    let sender = AuthenticatedNotifySender {
+        service: "app".to_string(),
+        job_id: job_id(),
+        operation_id: Some(operation_id()),
+        generation: 3,
+        job_created_at_ns: 1_000,
+        cgroup_generation: 7,
+    };
+
+    let events = encode_notify_applied_field_events(
+        &sender,
+        &[NotifyAppliedField::Ready, NotifyAppliedField::Reloading],
+    )
+    .expect("notify events");
+
+    assert!(events.is_empty());
+}

@@ -39,6 +39,11 @@ pub struct RestartStartExecutionTerminalDispatch {
     pub outcome: StartPreCheckTerminalOutcome,
     pub operation_events: Vec<OperationEvent>,
     pub service_transitions: Vec<ServiceTableTransition>,
+    /// Graph events from the failure, where the restart's operation belongs to
+    /// a context. An administrator's restart creates none, so this is usually
+    /// empty; a restart-policy relaunch does, and its co-released members are
+    /// what the propagation reaches.
+    pub graph_events: Vec<crate::execution::graph::GraphExecutionEvent>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
