@@ -2,7 +2,6 @@ use crate::registry::{
     RegistryConfigWarning, SUPPORTED_SERVICES_SCHEMA_VERSION,
     build_boot_success_grace_from_registry_values, build_control_security_from_registry_values,
     build_control_socket_limits_from_registry_values,
-    build_eventd_log_datagram_bytes_from_registry_values,
     build_global_environment_from_registry_values,
     build_max_log_buffer_per_service_from_registry_values,
     build_max_log_line_length_from_registry_values, build_max_parallel_starts_from_registry_values,
@@ -32,21 +31,6 @@ fn builds_global_environment_from_registry_values() {
                 value: "/lib/test.so".to_string(),
             },
         ],
-    );
-}
-
-#[test]
-fn builds_eventd_log_datagram_ceiling_from_registry_values() {
-    assert_eq!(
-        build_eventd_log_datagram_bytes_from_registry_values(&[dword(
-            "MaxLogDatagramBytes",
-            512 * 1024,
-        )]),
-        Some(512 * 1024),
-    );
-    assert_eq!(
-        build_eventd_log_datagram_bytes_from_registry_values(&[]),
-        None,
     );
 }
 

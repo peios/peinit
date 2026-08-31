@@ -20,7 +20,6 @@ struct StaticRegistry {
     shutdown_timeout_secs: Option<u32>,
     global_environment: Vec<ServiceEnvironmentVariable>,
     eventd_log_socket_path: Option<String>,
-    eventd_log_datagram_bytes: Option<u32>,
     reads: usize,
 }
 
@@ -38,7 +37,6 @@ impl StaticRegistry {
             shutdown_timeout_secs: None,
             global_environment: Vec::new(),
             eventd_log_socket_path: None,
-            eventd_log_datagram_bytes: None,
             reads: 0,
         }
     }
@@ -56,7 +54,6 @@ impl StaticRegistry {
             shutdown_timeout_secs: None,
             global_environment: Vec::new(),
             eventd_log_socket_path: None,
-            eventd_log_datagram_bytes: None,
             reads: 0,
         }
     }
@@ -89,11 +86,6 @@ impl StaticRegistry {
 
     fn eventd_log_socket_path(mut self, path: impl Into<String>) -> Self {
         self.eventd_log_socket_path = Some(path.into());
-        self
-    }
-
-    fn with_eventd_log_datagram_bytes(mut self, value: Option<u32>) -> Self {
-        self.eventd_log_datagram_bytes = value;
         self
     }
 }
@@ -166,10 +158,6 @@ impl RegistryClient for StaticRegistry {
 
     fn read_eventd_log_socket_path(&mut self) -> Result<Option<String>, BoundaryError> {
         Ok(self.eventd_log_socket_path.clone())
-    }
-
-    fn read_eventd_log_datagram_bytes(&mut self) -> Result<Option<u32>, BoundaryError> {
-        Ok(self.eventd_log_datagram_bytes)
     }
 }
 
