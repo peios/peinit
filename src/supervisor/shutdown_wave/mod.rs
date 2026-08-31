@@ -46,15 +46,17 @@ where
 
     for participant in &wave.services {
         if participant.already_stopping {
-            let deadline = retained_stop_deadline(work, &participant.service, wave_index)?;
-            stop_deadlines.push(deadline.clone());
+            let retained =
+                retained_stop_deadline(work, &participant.service, wave_index, now_ns)?;
+            stop_deadlines.push(retained.deadline.clone());
             dispatches.push(SupervisorShutdownStopDispatch {
                 service: participant.service.clone(),
                 already_stopping: true,
                 target: None,
                 signal: None,
                 service_transition: None,
-                deadline: Some(deadline),
+                deadline: Some(retained.deadline),
+                unsubstantiated_deadline: retained.unsubstantiated,
             });
             continue;
         }
@@ -107,6 +109,7 @@ where
             signal: (!stopping_acknowledged).then_some(ProcessSignal::Sigterm),
             service_transition: Some(service_transition),
             deadline: Some(deadline),
+            unsubstantiated_deadline: None,
         });
     }
 

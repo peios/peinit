@@ -7,11 +7,53 @@ use super::super::work::SupervisorWork;
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
 
+/// The deadline for an already-stopping participant, and whether peinit had to
+/// substitute one.
+pub(super) struct RetainedStopDeadline {
+    pub(super) deadline: ShutdownStopDeadline,
+    /// Why the retained evidence could not substantiate a deadline, when it
+    /// could not. The service is then given no graceful budget at all rather
+    /// than a guessed one.
+    pub(super) unsubstantiated: Option<&'static str>,
+}
+
+/// The `StopTimeout` an already-stopping service is entitled to, from the
+/// evidence retained when it entered Stopping (§10.1).
+///
+/// peinit never guesses a deadline it cannot substantiate — a stop that began
+/// before the shutdown keeps its own clock, and inventing a fresh budget here
+/// would hand a service a second full `StopTimeout` it had already spent.
+///
+/// But failing *closed* is not the same as failing *loudly*. This used to
+/// return an error, which propagated out of `begin_stop_wave` into
+/// `begin_shutdown` and failed the whole shutdown command; raised on a later
+/// wave it reached `run_turn` as a `RuntimeShutdownLoopError`, ended PID 1's
+/// event loop mid-shutdown, and left the machine with some services stopped
+/// and some not — worse than either finishing or not starting (PEI-349).
+///
+/// So the failure is isolated to the participant: no substantiated deadline
+/// means no graceful budget, which is a deadline already due. The timeout scan
+/// escalates that one service to SIGKILL on its wave and the shutdown carries
+/// on.
 pub(super) fn retained_stop_deadline(
     work: &SupervisorWork,
     service: &str,
     wave_index: usize,
-) -> Result<ShutdownStopDeadline, ShutdownError> {
+    now_ns: u64,
+) -> Result<RetainedStopDeadline, ShutdownError> {
+    let cgroup_id = service_root_cgroup_id(&work.services, service)?;
+    let substitute = |unsubstantiated: &'static str| RetainedStopDeadline {
+        deadline: ShutdownStopDeadline {
+            service: service.to_string(),
+            cgroup_id: cgroup_id.clone(),
+            started_at_ns: now_ns,
+            due_at_ns: now_ns,
+            wave: wave_index,
+            operation_id: None,
+        },
+        unsubstantiated: Some(unsubstantiated),
+    };
+
     if let Some(operation) = work
         .operations
         .current_for_service(service)
@@ -23,23 +65,23 @@ pub(super) fn retained_stop_deadline(
                 )
         })
     {
-        let retained = work.control.stop_timeout(operation.id).ok_or_else(|| {
-            ShutdownError::MissingStoppingTimeoutEvidence {
-                service: service.to_string(),
-            }
-        })?;
+        let Some(retained) = work.control.stop_timeout(operation.id) else {
+            return Ok(substitute("no retained timeout for the in-flight stop operation"));
+        };
+        let Some(started_at_ns) = operation.started_at_ns else {
+            return Ok(substitute("the in-flight stop operation records no start time"));
+        };
 
-        return Ok(ShutdownStopDeadline {
-            service: service.to_string(),
-            cgroup_id: service_root_cgroup_id(&work.services, service)?,
-            started_at_ns: operation.started_at_ns.ok_or_else(|| {
-                ShutdownError::MissingStoppingTimeoutEvidence {
-                    service: service.to_string(),
-                }
-            })?,
-            due_at_ns: retained.due_at_ns,
-            wave: wave_index,
-            operation_id: Some(operation.id),
+        return Ok(RetainedStopDeadline {
+            deadline: ShutdownStopDeadline {
+                service: service.to_string(),
+                cgroup_id,
+                started_at_ns,
+                due_at_ns: retained.due_at_ns,
+                wave: wave_index,
+                operation_id: Some(operation.id),
+            },
+            unsubstantiated: None,
         });
     }
 
@@ -48,28 +90,34 @@ pub(super) fn retained_stop_deadline(
             service: service.to_string(),
         })
     })?;
-    let retained = runtime.stopping_timeout.as_ref().ok_or_else(|| {
-        ShutdownError::MissingStoppingTimeoutEvidence {
-            service: service.to_string(),
-        }
-    })?;
-    if runtime.state != crate::service::runtime::ServiceState::Stopping
-        || runtime.cause != Some(retained.cause)
-        || !retained_stop_cause(retained.cause)
-        || retained.due_at_ns < retained.started_at_ns
-    {
-        return Err(ShutdownError::MissingStoppingTimeoutEvidence {
-            service: service.to_string(),
-        });
+    let Some(retained) = runtime.stopping_timeout.as_ref() else {
+        return Ok(substitute("no retained stopping timeout"));
+    };
+    // Each of these is a distinct way for the evidence to have outlived or
+    // contradicted the state it describes, and the operator gets told which.
+    if runtime.state != crate::service::runtime::ServiceState::Stopping {
+        return Ok(substitute("retained timeout but the service is not Stopping"));
+    }
+    if runtime.cause != Some(retained.cause) {
+        return Ok(substitute("retained timeout's cause does not match the service's"));
+    }
+    if !retained_stop_cause(retained.cause) {
+        return Ok(substitute("retained timeout's cause is not a stop cause"));
+    }
+    if retained.due_at_ns < retained.started_at_ns {
+        return Ok(substitute("retained timeout is due before it started"));
     }
 
-    Ok(ShutdownStopDeadline {
-        service: service.to_string(),
-        cgroup_id: service_root_cgroup_id(&work.services, service)?,
-        started_at_ns: retained.started_at_ns,
-        due_at_ns: retained.due_at_ns,
-        wave: wave_index,
-        operation_id: None,
+    Ok(RetainedStopDeadline {
+        deadline: ShutdownStopDeadline {
+            service: service.to_string(),
+            cgroup_id,
+            started_at_ns: retained.started_at_ns,
+            due_at_ns: retained.due_at_ns,
+            wave: wave_index,
+            operation_id: None,
+        },
+        unsubstantiated: None,
     })
 }
 
