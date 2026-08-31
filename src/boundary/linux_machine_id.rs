@@ -15,11 +15,21 @@ const HEX: &[u8; 16] = b"0123456789abcdef";
 #[cfg(feature = "peios-boundary")]
 const MACHINE_ID_FILE_SDDL: &str = "O:SYG:SYD:(A;;GA;;;SY)(A;;GA;;;BA)(A;;FR;;;BU)";
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LinuxMachineIdStatus {
     Existing,
     Generated,
     ReplacedInvalid,
+    /// The identifier could not be read or persisted, so this boot uses one
+    /// that will not survive it.
+    ///
+    /// §2.1 gives this step no recovery path — "invalid non-empty contents
+    /// MUST be retained or logged as warning evidence, but MUST NOT enter
+    /// Recovery mode" — and the machine ID is "a local opaque install ID"
+    /// which "MUST NOT be treated as a security principal, credential, SID,
+    /// account, or authorization input". Failing a boot over it is
+    /// disproportionate to what it is for (PEI-363).
+    Ephemeral { reason: String },
 }
 
 #[derive(Debug)]
@@ -41,14 +51,17 @@ fn ensure_linux_machine_id_with_syscalls<S>(
 where
     S: LinuxMachineIdSyscallApi + ?Sized,
 {
+    // A read failure is not a reason to stop. It leaves peinit unable to say
+    // whether a valid identifier is on disk, which is the same position as
+    // finding none — so it takes the same path, and the boot continues with
+    // whatever it can manage.
+    let mut read_failure = None;
     let file_state = match syscalls.read_machine_id(path, MACHINE_ID_READ_LIMIT + 1) {
         Ok(Some(bytes)) => classify_machine_id_file(&bytes),
         Ok(None) => MachineIdFileState::Missing,
         Err(source) => {
-            return Err(LinuxMachineIdError::Read {
-                path: path.to_path_buf(),
-                source,
-            });
+            read_failure = Some(format!("read {} failed: {source}", path.display()));
+            MachineIdFileState::Missing
         }
     };
 
@@ -56,15 +69,21 @@ where
         return Ok(LinuxMachineIdStatus::Existing);
     }
 
+    // The one arm that does justify recovery. If the kernel cannot produce
+    // random bytes, nothing else on the machine can be trusted either.
     let machine_id =
         generate_machine_id(syscalls).map_err(|source| LinuxMachineIdError::Generate { source })?;
     let text = encode_machine_id(machine_id);
-    syscalls
-        .write_machine_id_atomically(path, &text)
-        .map_err(|source| LinuxMachineIdError::Write {
-            path: path.to_path_buf(),
-            source,
-        })?;
+    if let Err(source) = syscalls.write_machine_id_atomically(path, &text) {
+        return Ok(LinuxMachineIdStatus::Ephemeral {
+            reason: format!("write {} failed: {source}", path.display()),
+        });
+    }
+    if let Some(reason) = read_failure {
+        // Written, but peinit could not read what was there before, so it may
+        // have replaced a valid identifier. Worth saying.
+        return Ok(LinuxMachineIdStatus::Ephemeral { reason });
+    }
 
     Ok(match file_state {
         MachineIdFileState::Missing | MachineIdFileState::Empty => LinuxMachineIdStatus::Generated,
@@ -220,6 +239,12 @@ fn write_machine_id_atomically(path: &Path, bytes: &[u8]) -> io::Result<()> {
             format!("machine-id path has no parent: {}", path.display()),
         )
     })?;
+    // Step 4 runs before the path-provisioning machinery (§2.1 step 7) that
+    // exists to make directories exist, and `/lcl` is a StrataFS view the
+    // initramfs assembled — so whether `/lcl/etc/` is there is a property of
+    // the image, not of peinit. Creating it here is the difference between a
+    // first boot and a recovery shell (PEI-363).
+    std::fs::create_dir_all(parent)?;
     let temp_path = temp_machine_id_path(path);
     let result = write_machine_id_temp_and_rename(path, &temp_path, parent, bytes);
     if result.is_err() {
@@ -439,6 +464,9 @@ mod tests {
         existing: Option<Vec<u8>>,
         random: VecDeque<[u8; 16]>,
         writes: Vec<(String, Vec<u8>)>,
+        read_error: Option<io::ErrorKind>,
+        write_error: Option<io::ErrorKind>,
+        random_error: bool,
     }
 
     impl FakeMachineIdSyscalls {
@@ -452,19 +480,84 @@ mod tests {
 
     impl LinuxMachineIdSyscallApi for FakeMachineIdSyscalls {
         fn read_machine_id(&mut self, _path: &Path, _limit: usize) -> io::Result<Option<Vec<u8>>> {
+            if let Some(kind) = self.read_error {
+                return Err(io::Error::new(kind, "read failed"));
+            }
             Ok(self.existing.clone())
         }
 
         fn read_kernel_random(&mut self, out: &mut [u8]) -> io::Result<()> {
+            if self.random_error {
+                return Err(io::Error::other("no entropy"));
+            }
             let next = self.random.pop_front().expect("random bytes");
             out.copy_from_slice(&next);
             Ok(())
         }
 
         fn write_machine_id_atomically(&mut self, path: &Path, bytes: &[u8]) -> io::Result<()> {
+            if let Some(kind) = self.write_error {
+                return Err(io::Error::new(kind, "write failed"));
+            }
             self.writes
                 .push((path.display().to_string(), bytes.to_vec()));
             Ok(())
         }
+    }
+
+    // PEI-363. §2.1 step 4 gives the machine ID no recovery path: "invalid
+    // non-empty contents MUST be retained or logged as warning evidence, but
+    // MUST NOT enter Recovery mode", and the failure table lists only
+    // "generate/replace and continue". Any Err mapped to recovery, and the
+    // write arm was reachable for a reason that has nothing to do with the
+    // file's contents — an image shipping without `/lcl/etc/` present dropped
+    // straight into a recovery shell on first boot.
+    //
+    // The value does not justify it either: §2.1 calls it "a local opaque
+    // install ID" that "MUST NOT be treated as a security principal,
+    // credential, SID, account, or authorization input".
+    #[test]
+    fn a_write_failure_yields_an_ephemeral_id_rather_than_recovery() {
+        let mut syscalls = FakeMachineIdSyscalls::with_random([[0xab; 16]]);
+        syscalls.write_error = Some(io::ErrorKind::PermissionDenied);
+
+        let status =
+            ensure_linux_machine_id_with_syscalls(Path::new("/lcl/etc/machine-id"), &mut syscalls)
+                .expect("a write failure must not fail the boot");
+
+        assert!(matches!(status, LinuxMachineIdStatus::Ephemeral { .. }));
+    }
+
+    /// A read failure leaves peinit unable to say whether a valid identifier
+    /// is on disk — the same position as finding none, so it takes the same
+    /// path. Ephemeral rather than Generated, because it may have replaced
+    /// something valid and the operator should know.
+    #[test]
+    fn a_read_failure_generates_and_reports_rather_than_entering_recovery() {
+        let mut syscalls = FakeMachineIdSyscalls::with_random([[0xab; 16]]);
+        syscalls.read_error = Some(io::ErrorKind::PermissionDenied);
+
+        let status =
+            ensure_linux_machine_id_with_syscalls(Path::new("/lcl/etc/machine-id"), &mut syscalls)
+                .expect("a read failure must not fail the boot");
+
+        assert!(matches!(status, LinuxMachineIdStatus::Ephemeral { .. }));
+        assert_eq!(syscalls.writes.len(), 1, "an identifier was still written");
+    }
+
+    /// The one arm where recovery is right. If the kernel cannot produce
+    /// random bytes, nothing else on the machine can be trusted either.
+    #[test]
+    fn a_csprng_failure_is_still_fatal() {
+        let mut syscalls = FakeMachineIdSyscalls {
+            random_error: true,
+            ..FakeMachineIdSyscalls::default()
+        };
+
+        let error =
+            ensure_linux_machine_id_with_syscalls(Path::new("/lcl/etc/machine-id"), &mut syscalls)
+                .expect_err("a CSPRNG failure is not survivable");
+
+        assert!(matches!(error, LinuxMachineIdError::Generate { .. }));
     }
 }

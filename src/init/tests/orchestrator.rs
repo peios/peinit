@@ -960,3 +960,40 @@ fn a_recovery_registryd_uses_the_parsed_notify_socket_path() {
         Some("/run/alt/notify.sock"),
     );
 }
+
+// PEI-363. The boot continues, loudly, when the identifier cannot be
+// persisted. §2.1 step 4 has no recovery path — the failure table says only
+// "generate/replace and continue" — and dropping to a recovery shell for a
+// missing `/lcl/etc/` on first boot was disproportionate to what the value is:
+// "a local opaque install ID" that "MUST NOT be treated as a security
+// principal, credential, SID, account, or authorization input".
+#[test]
+fn an_unpersistable_machine_id_warns_and_boots() {
+    let mut platform = Platform::new().machine_id_status(MachineIdStatus::Ephemeral {
+        reason: "write /lcl/etc/machine-id failed: No such file or directory".to_string(),
+    });
+    let mut registry = Registry::with_services([service("app")]);
+    let mut clock = ClockAt(10);
+    let mut runtime = Runtime::default();
+
+    let result = run_init(
+        InitConfig::default(),
+        &mut platform,
+        &mut registry,
+        &mut clock,
+        &mut runtime,
+    )
+    .expect("boot");
+
+    assert!(matches!(result, InitRunResult::RuntimeReturned));
+    assert!(runtime.entered);
+    assert!(platform.recovery_reasons.is_empty());
+    assert!(
+        platform.console_messages.iter().any(|message| {
+            message.starts_with("peinit warning: machine-id not persisted")
+                && message.contains("using an identifier for this boot only")
+        }),
+        "the operator was told nothing: {:?}",
+        platform.console_messages,
+    );
+}
