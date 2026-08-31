@@ -88,3 +88,32 @@ fn eventd_log_sink_reuses_its_connected_socket_and_payload_allocation() {
     drop(receiver);
     let _ = std::fs::remove_file(path);
 }
+
+// PEI-357. The classification the lossy design turns on: a full receiver is a
+// drop, a broken one is a transport failure. Getting this wrong in the
+// permissive direction would hide a genuinely dead eventd; getting it wrong in
+// the strict direction — which is what happened — flips peinit out of
+// real-time forwarding every time eventd falls behind.
+#[test]
+fn a_full_receive_buffer_is_a_drop_and_anything_else_is_a_failure() {
+    use std::io::Error;
+
+    for errno in [libc::EAGAIN, libc::EWOULDBLOCK, libc::ENOBUFS] {
+        assert!(
+            super::is_receiver_full(&Error::from_raw_os_error(errno)),
+            "errno {errno} should read as a full receiver",
+        );
+    }
+    for errno in [
+        libc::ECONNREFUSED,
+        libc::ENOENT,
+        libc::EPIPE,
+        libc::EMSGSIZE,
+        libc::EACCES,
+    ] {
+        assert!(
+            !super::is_receiver_full(&Error::from_raw_os_error(errno)),
+            "errno {errno} is a transport failure, not a drop",
+        );
+    }
+}

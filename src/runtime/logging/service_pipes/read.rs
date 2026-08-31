@@ -119,15 +119,31 @@ impl RuntimeServiceLogPipes {
                 records[index..].iter(),
                 self.config.eventd_log_datagram_bytes,
             );
-            if batch_len == 0
-                || sink
-                    .send_eventd_log_records(&socket_path, &records[index..index + batch_len])
-                    .is_err()
-            {
+            if batch_len == 0 {
                 for unsent in &records[index..] {
                     self.pre_eventd.push(unsent.clone());
                 }
                 return;
+            }
+            match sink.send_eventd_log_records(&socket_path, &records[index..index + batch_len]) {
+                // A drop is the designed outcome of a busy eventd, not a
+                // transport failure. Discard the batch and keep forwarding:
+                // buffering it and clearing the socket path — as this used to
+                // — flips peinit out of real-time forwarding under exactly the
+                // load the lossy design exists to absorb, then replays records
+                // eventd may already hold (PEI-357).
+                Ok(crate::boundary::EventdSendOutcome::Dropped) => {
+                    self.eventd_dropped_records = self
+                        .eventd_dropped_records
+                        .saturating_add(batch_len);
+                }
+                Ok(crate::boundary::EventdSendOutcome::Sent) => {}
+                Err(_) => {
+                    for unsent in &records[index..] {
+                        self.pre_eventd.push(unsent.clone());
+                    }
+                    return;
+                }
             }
             index += batch_len;
         }

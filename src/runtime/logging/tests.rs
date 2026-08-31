@@ -539,6 +539,101 @@ fn live_eventd_send_failure_buffers_unsent_records_and_disables_forwarding() {
     assert!(!pipes.eventd_forwarding_enabled());
 }
 
+// PEI-357. §12.1 makes log ingestion deliberately lossy: eventd's SO_RCVBUF
+// filling drops datagrams silently, and "peinit ... accepts that some MAY be
+// dropped under load". A drop is therefore the designed outcome, not a
+// transport failure.
+//
+// Treating it as one made peinit clear its socket path and push the whole rest
+// of the batch back into the pre-eventd buffer — then the end-of-turn
+// `sync_eventd_forwarding` re-enabled forwarding and replayed. So the system
+// oscillated between forwarding and buffering under exactly the load the lossy
+// design exists to absorb, and re-sent records eventd may already have held.
+// The busier eventd got, the more peinit churned.
+#[test]
+fn a_dropped_live_datagram_keeps_forwarding_and_does_not_rebuffer() {
+    let (read, mut write) = pipe_pair();
+    use std::io::Write;
+    write.write_all(b"one\ntwo\nthree\n").expect("write logs");
+    drop(write);
+
+    let mut pipes = RuntimeServiceLogPipes::default();
+    let mut registrar = TestRegistrar::default();
+    let event = job_event(JobType::ServiceMain);
+    let fd = read.into_raw_fd();
+    pipes
+        .register_pipe(
+            fd,
+            "app".to_string(),
+            LogStream::Stdout,
+            &event,
+            &mut registrar,
+        )
+        .expect("register pipe");
+    let mut setup_sink = FakeEventdSink::default();
+    pipes.sync_eventd_forwarding_with_sink(
+        true,
+        Some("/run/services/eventd/eventd.sock"),
+        &mut setup_sink,
+    );
+    // One record per datagram, and the second one is dropped.
+    let mut sink = FakeEventdSink::drop_on_call(2);
+    pipes.config.eventd_log_datagram_bytes = 1 + [
+        service_record("one"),
+        service_record("two"),
+        service_record("three"),
+    ]
+    .iter()
+    .map(crate::logging::encoded_eventd_log_record_len)
+    .max()
+    .expect("records");
+
+    pipes.process_pipe_event_with_sink(fd, &mut ClockAt(20), &mut registrar, &mut sink);
+
+    // "two" is gone, and "three" went out behind it rather than being
+    // buffered: one dropped datagram must not stop the ones after it.
+    assert_eq!(
+        sink.sent
+            .iter()
+            .map(|(_, record)| record.message.as_str())
+            .collect::<Vec<_>>(),
+        vec!["one", "three"],
+    );
+    assert!(
+        pipes.buffered_records().is_empty(),
+        "a dropped datagram was pushed back into the pre-eventd buffer",
+    );
+    assert!(
+        pipes.eventd_forwarding_enabled(),
+        "a dropped datagram flipped peinit out of real-time forwarding",
+    );
+    // Dropping silently is not the same as dropping invisibly.
+    assert_eq!(pipes.eventd_dropped_records(), 1);
+}
+
+// The replay path is the one place waiting beats dropping — the records are
+// already buffered and the buffer is bounded, so the next turn tries again.
+// What must not happen either way is the mode flip.
+#[test]
+fn a_dropped_replay_datagram_leaves_the_records_buffered_and_forwarding_on() {
+    let mut pipes = RuntimeServiceLogPipes::default();
+    pipes.pre_eventd.push(service_record("one"));
+    pipes.pre_eventd.push(service_record("two"));
+    force_single_record_datagrams(&mut pipes);
+    let mut sink = FakeEventdSink::drop_on_call(1);
+
+    let flush = pipes.sync_eventd_forwarding_with_sink(
+        true,
+        Some("/run/services/eventd/eventd.sock"),
+        &mut sink,
+    );
+
+    assert_eq!(flush.sent_records, 0);
+    assert!(flush.error.is_none(), "a drop is not a transport error");
+    assert_eq!(pipes.buffered_records().len(), 2);
+    assert!(pipes.eventd_forwarding_enabled());
+}
+
 #[derive(Default)]
 struct TestRegistrar {
     calls: Vec<i32>,
@@ -584,6 +679,9 @@ struct FakeEventdSink {
     sent: Vec<(String, ServiceLogRecord)>,
     batch_sizes: Vec<usize>,
     fail_on_call: Option<usize>,
+    /// Calls that report the receive buffer full — the designed drop, not a
+    /// transport failure.
+    drop_on_call: Option<usize>,
     calls: usize,
 }
 
@@ -594,6 +692,13 @@ impl FakeEventdSink {
             ..Self::default()
         }
     }
+
+    fn drop_on_call(call: usize) -> Self {
+        Self {
+            drop_on_call: Some(call),
+            ..Self::default()
+        }
+    }
 }
 
 impl EventdLogSink for FakeEventdSink {
@@ -601,10 +706,14 @@ impl EventdLogSink for FakeEventdSink {
         &mut self,
         socket_path: &str,
         records: &[ServiceLogRecord],
-    ) -> Result<(), BoundaryError> {
+    ) -> Result<crate::boundary::EventdSendOutcome, BoundaryError> {
         self.calls += 1;
         if self.fail_on_call == Some(self.calls) {
             return Err(BoundaryError::EventdLog("eventd unavailable".to_string()));
+        }
+        if self.drop_on_call == Some(self.calls) {
+            self.batch_sizes.push(records.len());
+            return Ok(crate::boundary::EventdSendOutcome::Dropped);
         }
         self.batch_sizes.push(records.len());
         self.sent.extend(
@@ -613,7 +722,7 @@ impl EventdLogSink for FakeEventdSink {
                 .cloned()
                 .map(|record| (socket_path.to_string(), record)),
         );
-        Ok(())
+        Ok(crate::boundary::EventdSendOutcome::Sent)
     }
 }
 

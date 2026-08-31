@@ -26,7 +26,9 @@ mod linux_launch;
 #[cfg(feature = "peios-boundary")]
 mod linux_process;
 
-pub use eventd::{EventdLogSink, LinuxEventdLogSink, send_eventd_log_record};
+pub use eventd::{
+    EventdLogSink, EventdSendOutcome, LinuxEventdLogSink, send_eventd_log_record,
+};
 #[cfg(feature = "peios-boundary")]
 pub use linux_boot_attempts::LinuxBootAttemptCounter;
 pub use linux_child::{
