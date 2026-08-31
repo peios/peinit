@@ -10,6 +10,9 @@ use crate::operation::{OperationState, OperationType};
 use crate::security::TokenSummary;
 
 use super::dispatch::SupervisorRestartBackoffDispatch;
+
+/// The abort reason §8.1 names, verbatim.
+pub(super) const RESTART_DEFINITION_REMOVED: &str = "definition_removed_during_restart_stop_leg";
 use super::state::{Supervisor, SupervisorError};
 use super::work::SupervisorWork;
 
@@ -55,12 +58,13 @@ impl Supervisor {
 
 pub(super) fn begin_restart_start_after_stop(
     work: &mut SupervisorWork,
-    dispatch: &ServiceMainJobTerminalDispatch,
+    dispatch: &mut ServiceMainJobTerminalDispatch,
     started_at_ns: u64,
 ) -> Result<Vec<RestartStartExecutionDispatch>, SupervisorError> {
-    let Some(service) = dispatch.job_event.service.as_deref() else {
+    let Some(service) = dispatch.job_event.service.as_deref().map(ToString::to_string) else {
         return Ok(Vec::new());
     };
+    let service = service.as_str();
     let Some(operation) = work.operations.current_for_service(service).cloned() else {
         return Ok(Vec::new());
     };
@@ -73,6 +77,32 @@ pub(super) fn begin_restart_start_after_stop(
         return Ok(Vec::new());
     }
     work.control.remove_stop_timeout(operation.id);
+
+    // §8.1: the definition went away while the stop leg was draining. The stop
+    // still drained the instance -- that is what the transition above just
+    // recorded -- but the start leg must not begin, because there is nothing
+    // left to start from.
+    //
+    // `discarded_definition_removed` is the signal because the entry is
+    // already gone by now: the transition that ended the stop leg is the same
+    // one that discarded it. Without this the start leg looked the definition
+    // up, found None, and raised MissingStartCredentials -- an internal error
+    // out of the terminal-job path, which is not a control-flow outcome, so
+    // the rest of that turn's work did not happen either (PEI-345).
+    if dispatch
+        .service_transitions
+        .iter()
+        .any(|transition| transition.discarded_definition_removed)
+    {
+        let event = work
+            .operations
+            .abort_operation(operation.id, started_at_ns, RESTART_DEFINITION_REMOVED)
+            .map_err(|error| SupervisorError::Control(
+                crate::execution::control::ControlExecutionError::OperationStore(error),
+            ))?;
+        dispatch.operation_events.push(event);
+        return Ok(Vec::new());
+    }
 
     let definition = work.services.definition(service).ok_or_else(|| {
         SupervisorError::MissingStartCredentials {

@@ -26,7 +26,7 @@ mod process_setup;
 mod ready;
 mod relationships;
 mod reload_config;
-mod restart;
+pub(crate) mod restart;
 mod shutdown;
 mod shutdown_completed;
 mod shutdown_deadline_timer;
