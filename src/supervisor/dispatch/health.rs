@@ -70,6 +70,16 @@ pub enum SupervisorHealthCheckOutcome {
         consecutive_failures: u32,
         retries: u32,
     },
+    /// The probe could not be launched at all — a token that could not be
+    /// materialised, a fork that failed.
+    ///
+    /// Deliberately not a health failure. Only a probe that *ran* is evidence
+    /// about the service, and collapsing the two meant a transient authd
+    /// unavailability could kill a service outright: with
+    /// `HealthCheckRetries=1`, a reasonable setting for a probe an operator
+    /// trusts, one failed token materialisation exhausted the budget and
+    /// restarted the service (PEI-367).
+    NotLaunched,
     Stale,
 }
 

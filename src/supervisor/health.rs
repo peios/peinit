@@ -16,5 +16,6 @@ pub(super) use model::{
 };
 pub(in crate::supervisor) use terminal_apply::{
     apply_health_check_terminal_in_work, fail_created_health_check_in_work,
+    fail_launched_health_check_in_work,
     fail_timed_out_health_check_in_work, health_critical_reboot_due,
 };

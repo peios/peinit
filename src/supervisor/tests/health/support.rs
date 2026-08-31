@@ -7,7 +7,7 @@ use crate::supervisor::{
 };
 
 use super::super::{
-    APP_LAUNCH_NS, BOOT_NS, ScriptedClock, StaticRegistry, TestProcessController,
+    APP_LAUNCH_NS, BOOT_NS, ScriptedClock, StaticRegistry,
     TestProcessLauncher, TestTokenProvider, alive_service, process, settings,
 };
 
@@ -96,13 +96,11 @@ pub(super) fn launch_next_health_check(
     let mut tokens = TestTokenProvider::default();
     let mut launcher = TestProcessLauncher::new(vec![process(pid, pidfd)]);
     let mut clock = ScriptedClock::new([launched_at_ns]);
-    let mut controller = TestProcessController::default();
     let result = supervisor
         .launch_next_pending_health_check_job(
             &mut tokens,
             &mut launcher,
             &mut clock,
-            &mut controller,
         )
         .expect("launch health")
         .expect("health launch result");

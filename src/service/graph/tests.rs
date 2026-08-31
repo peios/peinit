@@ -1,6 +1,6 @@
 use crate::service::{
     Readiness, ServiceDefinition, ServiceDependencyKind, ServiceGraphFinding, ServiceGraphWarning,
-    ServiceTrigger, validate_service_graph,
+    ServiceTrigger, ServiceType, validate_service_graph,
 };
 
 fn service(name: &str) -> ServiceDefinition {
@@ -197,5 +197,61 @@ fn self_references_are_reported_as_cycles() {
         vec![ServiceGraphFinding::Cycle {
             services: vec!["app".to_string()],
         }]
+    );
+}
+
+// PEI-367. The flap constraint `HealthCheckRetries * HealthCheckInterval <
+// RestartWindow` exists because a configuration violating it restarts
+// indefinitely. Health checks are scheduled for Simple services only, so a
+// Oneshot carrying one cannot flap — but the validation filtered on
+// `health_check.is_some()` alone, so such a definition was blocked at boot, or
+// rejected a whole reload, over the interaction of two settings neither of
+// which would ever be consulted.
+//
+// A Oneshot with a HealthCheck *is* a mistake. Saying so via timing arithmetic
+// is not: the operator adjusts RestartWindow, the definition validates, and the
+// check still does nothing.
+#[test]
+fn a_oneshot_health_check_is_reported_as_unschedulable_not_as_bad_timing() {
+    let mut task = service("task");
+    task.service_type = ServiceType::Oneshot;
+    task.triggers.clear();
+    task.health_check = Some("/bin/probe".to_string());
+    // Timing that would trip the flap constraint if it applied.
+    task.health_check_retries = 10;
+    task.health_check_interval_secs = 60;
+    task.restart_window_secs = 30;
+
+    let failure = validate_service_graph(&[task]).expect_err("a oneshot health check is invalid");
+
+    assert_eq!(
+        failure.findings,
+        vec![ServiceGraphFinding::UnschedulableHealthCheck {
+            service: "task".to_string(),
+            service_type: ServiceType::Oneshot,
+        }],
+    );
+}
+
+/// A Simple service is still held to the constraint. Narrowing it keeps it
+/// applying exactly where a check can flap.
+#[test]
+fn a_simple_service_still_fails_the_flap_constraint() {
+    let mut app = service("app");
+    app.health_check = Some("/bin/probe".to_string());
+    app.health_check_retries = 10;
+    app.health_check_interval_secs = 60;
+    app.restart_window_secs = 30;
+
+    let failure = validate_service_graph(&[app]).expect_err("flap constraint");
+
+    assert_eq!(
+        failure.findings,
+        vec![ServiceGraphFinding::InvalidHealthCheckRestartWindow {
+            service: "app".to_string(),
+            retries: 10,
+            interval_secs: 60,
+            restart_window_secs: 30,
+        }],
     );
 }
