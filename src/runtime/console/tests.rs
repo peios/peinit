@@ -311,6 +311,7 @@ fn shutdown_signal_emits_shutdown_progress() {
                         signal: None,
                         service_transition: None,
                         deadline: None,
+                        unsubstantiated_deadline: None,
                     }],
                     startup_operation_events: Vec::new(),
                     startup_job_events: Vec::new(),

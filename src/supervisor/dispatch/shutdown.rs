@@ -41,6 +41,11 @@ pub struct SupervisorShutdownStopDispatch {
     pub signal: Option<ProcessSignal>,
     pub service_transition: Option<ServiceTableTransition>,
     pub deadline: Option<ShutdownStopDeadline>,
+    /// Set when an already-stopping participant's retained timeout evidence
+    /// could not substantiate a deadline, so it was given none: the deadline
+    /// above is already due and the timeout scan escalates it to SIGKILL. The
+    /// text says which way the evidence was unusable.
+    pub unsubstantiated_deadline: Option<&'static str>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

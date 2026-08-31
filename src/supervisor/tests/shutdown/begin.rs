@@ -299,8 +299,20 @@ fn starting_services_fail_unforked_jobs_without_post_kill_retention() {
     assert!(supervisor.pending_launch_jobs().is_empty());
 }
 
+// PEI-349. peinit still refuses to guess a deadline it cannot substantiate —
+// a stop that began before the shutdown keeps its own clock, and inventing a
+// fresh budget would hand the service a second full StopTimeout it had already
+// spent. What changed is the blast radius. This used to propagate out of
+// begin_stop_wave into begin_shutdown and fail the entire shutdown command; on
+// a later wave it reached run_turn as a RuntimeShutdownLoopError, ended PID 1's
+// event loop mid-shutdown, and left the machine with some services stopped and
+// some not.
+//
+// Now the one participant gets no graceful budget — a deadline already due, so
+// the timeout scan escalates it to SIGKILL on its wave — and everything else
+// shuts down.
 #[test]
-fn already_stopping_without_retained_timeout_evidence_fails_closed() {
+fn a_participant_without_retained_timeout_evidence_gets_no_graceful_period() {
     let mut supervisor = shutdown_fixture();
     let operation_id = supervisor
         .operations
@@ -310,16 +322,32 @@ fn already_stopping_without_retained_timeout_evidence_fails_closed() {
     supervisor.control.remove_stop_timeout(operation_id);
     let mut controller = TestProcessController::default();
 
-    let error = supervisor
+    let dispatch = supervisor
         .begin_shutdown(ShutdownKind::Reboot, &mut controller, SHUTDOWN_NS)
-        .expect_err("missing retained evidence");
+        .expect("one participant's bookkeeping must not fail the shutdown");
 
-    assert!(matches!(
-        error,
-        crate::supervisor::SupervisorError::Shutdown(
-            crate::shutdown::ShutdownError::MissingStoppingTimeoutEvidence { service }
-        ) if service == "draining"
-    ));
+    let draining = dispatch
+        .first_wave
+        .iter()
+        .find(|stop| stop.service == "draining")
+        .expect("draining participant");
+    assert_eq!(
+        draining.unsubstantiated_deadline,
+        Some("no retained timeout for the in-flight stop operation"),
+    );
+    let deadline = draining.deadline.as_ref().expect("substituted deadline");
+    assert_eq!(deadline.due_at_ns, SHUTDOWN_NS, "no graceful budget");
+    // And the rest of the wave is untouched: `app` keeps its full StopTimeout.
+    let app = dispatch
+        .first_wave
+        .iter()
+        .find(|stop| stop.service == "app")
+        .expect("app participant");
+    assert_eq!(app.unsubstantiated_deadline, None);
+    assert!(
+        app.deadline.as_ref().expect("app deadline").due_at_ns > SHUTDOWN_NS,
+        "an unrelated participant lost its graceful period",
+    );
 }
 
 #[test]
@@ -368,8 +396,10 @@ fn already_stopping_uses_service_level_timeout_evidence_without_active_operation
     assert!(already_stopping.signal.is_none());
 }
 
+// PEI-349, the service-level half: the evidence is there but contradicts the
+// state it describes. Same isolation, and the reason names which way.
 #[test]
-fn already_stopping_with_stale_service_level_timeout_evidence_fails_closed() {
+fn a_participant_with_stale_service_level_evidence_gets_no_graceful_period() {
     let mut supervisor = shutdown_fixture();
     let operation_id = supervisor
         .operations
@@ -394,16 +424,27 @@ fn already_stopping_with_stale_service_level_timeout_evidence_fails_closed() {
         .expect("stale service-level stop evidence");
     let mut controller = TestProcessController::default();
 
-    let error = supervisor
+    let dispatch = supervisor
         .begin_shutdown(ShutdownKind::Reboot, &mut controller, SHUTDOWN_NS)
-        .expect_err("stale retained evidence");
+        .expect("stale evidence for one participant must not fail the shutdown");
 
-    assert!(matches!(
-        error,
-        crate::supervisor::SupervisorError::Shutdown(
-            crate::shutdown::ShutdownError::MissingStoppingTimeoutEvidence { service }
-        ) if service == "draining"
-    ));
+    let draining = dispatch
+        .first_wave
+        .iter()
+        .find(|stop| stop.service == "draining")
+        .expect("draining participant");
+    assert_eq!(
+        draining.unsubstantiated_deadline,
+        Some("retained timeout's cause does not match the service's"),
+    );
+    assert_eq!(
+        draining
+            .deadline
+            .as_ref()
+            .expect("substituted deadline")
+            .due_at_ns,
+        SHUTDOWN_NS,
+    );
 }
 
 #[test]

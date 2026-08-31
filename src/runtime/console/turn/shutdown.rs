@@ -162,6 +162,20 @@ fn collect_shutdown_stop_console_message(
     dispatch: &SupervisorShutdownStopDispatch,
     out: &mut Vec<ConsoleMessage>,
 ) {
+    if let Some(reason) = dispatch.unsubstantiated_deadline {
+        // The operator needs to know this service was killed rather than
+        // asked, and why — it is the difference between a clean stop and a
+        // process losing whatever it was in the middle of.
+        crate::runtime::console::push_error(
+            out,
+            format!(
+                "peinit: shutdown cannot substantiate a stop timeout for {} ({}); \
+                 killing it without a graceful period\n",
+                dispatch.service, reason,
+            ),
+        );
+        return;
+    }
     if dispatch.already_stopping {
         push_message(
             out,

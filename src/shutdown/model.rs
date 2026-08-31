@@ -175,7 +175,6 @@ pub enum ShutdownError {
     MissingJobRecord { job_id: crate::ids::JobId },
     JobNotRunning { job_id: crate::ids::JobId },
     MissingProcessHandle { job_id: crate::ids::JobId },
-    MissingStoppingTimeoutEvidence { service: String },
     InvalidTimeoutExtension { service: String, value: String },
     NoShutdownInProgress,
     ShutdownNotReady,
