@@ -59,6 +59,7 @@ impl Supervisor {
                     deadline,
                     now_ns,
                     self.settings.phase2.max_parallel_starts,
+                    &mut leaks,
                 )?;
                 all_start_dispatches.extend(start_dispatches);
             }
@@ -123,12 +124,17 @@ fn process_populated_cgroup_cleanup(
     }
 }
 
+/// The cgroup read as unpopulated, so peinit is reclaiming the tree.
+///
+/// "Unpopulated" and "removable" are not the same question, which is the point
+/// of `record_busy_cgroups` below.
 fn process_empty_cgroup_cleanup<P>(
     work: &mut SupervisorWork,
     controller: &mut P,
     deadline: CgroupCleanupDeadline,
     now_ns: u64,
     max_parallel_starts: u32,
+    leaks: &mut Vec<SupervisorLeakedCgroupDispatch>,
 ) -> Result<Vec<crate::execution::start::RestartStartExecutionDispatch>, SupervisorError>
 where
     P: ProcessController + ?Sized,
@@ -141,16 +147,18 @@ where
             Ok(Vec::new())
         }
         CgroupCleanupKind::ServiceTree => {
-            cleanup_service_cgroup_tree(controller, &deadline.cgroup_id)
+            let report = cleanup_service_cgroup_tree(controller, &deadline.cgroup_id)
                 .map_err(SupervisorError::ProcessControl)?;
+            record_busy_cgroups(work, &deadline.service, &report.busy, now_ns, leaks)?;
             Ok(Vec::new())
         }
         CgroupCleanupKind::StopMain {
             operation_id,
             root_cgroup_id,
         } => {
-            cleanup_service_cgroup_tree(controller, &root_cgroup_id)
+            let report = cleanup_service_cgroup_tree(controller, &root_cgroup_id)
                 .map_err(SupervisorError::ProcessControl)?;
+            record_busy_cgroups(work, &deadline.service, &report.busy, now_ns, leaks)?;
             apply_stop_main_empty(
                 work,
                 &deadline.service,
@@ -159,6 +167,51 @@ where
                 max_parallel_starts,
             )
         }
+    }
+}
+
+/// A cgroup that `rmdir` refused with `EBUSY` is a leak, and peinit used to
+/// throw the answer away.
+///
+/// §4.1 names `rmdir` failing `EBUSY` as *the* trigger for a new generation.
+/// The implementation triggered on `cgroup.events` reporting `populated == 1`
+/// instead, and the two are not the same question: `populated` counts live
+/// processes, `EBUSY` also covers a tree that cannot be removed for any other
+/// reason. `CgroupCleanupReport.busy` was computed and carried all the way to
+/// these callers, which then discarded it — so where the two diverged, the
+/// next start reused a tree that already existed and was not empty, and the
+/// service's processes joined whatever was still in it (PEI-353).
+fn record_busy_cgroups(
+    work: &mut SupervisorWork,
+    service: &str,
+    busy: &[String],
+    now_ns: u64,
+    leaks: &mut Vec<SupervisorLeakedCgroupDispatch>,
+) -> Result<(), SupervisorError> {
+    for cgroup_id in busy {
+        record_leaked_cgroup(
+            work,
+            service,
+            cgroup_id.clone(),
+            busy_cgroup_kind(cgroup_id),
+            now_ns,
+            leaks,
+        )?;
+    }
+    Ok(())
+}
+
+/// Which part of the service tree a busy path is, by its last component. The
+/// root and `main/` are both the service tree proper: neither can be given up
+/// without giving up the generation.
+fn busy_cgroup_kind(cgroup_id: &str) -> LeakedCgroupKind {
+    match std::path::Path::new(cgroup_id)
+        .file_name()
+        .and_then(|name| name.to_str())
+    {
+        Some("hooks") => LeakedCgroupKind::Hooks,
+        Some("health") => LeakedCgroupKind::Health,
+        _ => LeakedCgroupKind::ServiceTree,
     }
 }
 

@@ -197,3 +197,66 @@ fn put_active_service_in_backoff(table: &mut ServiceTable, service: &str, due_at
         .transition_service_to_restart_backoff(service, TransitionCause::ProcessCrash, due_at_ns)
         .expect("backoff");
 }
+
+// PEI-353. The generation is "the tree at N is unusable, use N+1" — not a
+// count of leaks. It used to increment once per leak *record*, and one failed
+// start records two cleanup deadlines (`hooks` and `ServiceTree`) while a tree
+// cleanup can report `main`, `hooks`, `health` and the root separately. All of
+// those are the same tree, so N jumped by however many paths happened to be
+// unreclaimable.
+#[test]
+fn every_leak_in_one_tree_advances_the_generation_once() {
+    let mut table = table(&["app"]);
+
+    for (path, kind) in [
+        ("/sys/fs/cgroup/peinit/app/main", LeakedCgroupKind::ServiceTree),
+        ("/sys/fs/cgroup/peinit/app/hooks", LeakedCgroupKind::Hooks),
+        ("/sys/fs/cgroup/peinit/app/health", LeakedCgroupKind::Health),
+        ("/sys/fs/cgroup/peinit/app", LeakedCgroupKind::ServiceTree),
+    ] {
+        assert!(
+            table
+                .record_leaked_cgroup("app", path.to_string(), kind, 1_000)
+                .expect("record leak"),
+            "{path} should be a new record",
+        );
+    }
+
+    // Four records, all of the same tree, one generation.
+    let runtime = table.runtime("app").expect("runtime");
+    assert_eq!(runtime.leaked_cgroups.len(), 4);
+    assert_eq!(runtime.cgroup_generation, 1);
+}
+
+// And a leak in the *new* tree does advance it again — the rule is per tree,
+// not once ever.
+#[test]
+fn a_leak_in_the_current_tree_advances_the_generation_again() {
+    let mut table = table(&["app"]);
+    table
+        .record_leaked_cgroup(
+            "app",
+            "/sys/fs/cgroup/peinit/app".to_string(),
+            LeakedCgroupKind::ServiceTree,
+            1_000,
+        )
+        .expect("first leak");
+    assert_eq!(
+        table.runtime("app").expect("runtime").cgroup_generation,
+        1,
+    );
+
+    table
+        .record_leaked_cgroup(
+            "app",
+            "/sys/fs/cgroup/peinit/app%gen1/main".to_string(),
+            LeakedCgroupKind::ServiceTree,
+            2_000,
+        )
+        .expect("second leak");
+
+    assert_eq!(
+        table.runtime("app").expect("runtime").cgroup_generation,
+        2,
+    );
+}

@@ -33,12 +33,26 @@ pub fn encode_service_cgroup_id(service: &str) -> String {
     encoded
 }
 
+/// Separator between a service's encoded cgroup id and its generation.
+///
+/// `%g` rather than `.`, because `.` is in the safe set and service names
+/// permit it: `app.gen1` at generation 0 and `app` at generation 1 both
+/// produced `/sys/fs/cgroup/peinit/app.gen1`, so a service could share a tree
+/// with another service's leaked generation (PEI-353). The encoding's
+/// injectivity argument covers the id and does not extend to a suffix appended
+/// afterwards.
+///
+/// `%` self-escapes, and the encoder only ever emits it followed by two
+/// *uppercase hex* digits — so `%g` cannot occur inside an encoded id, and its
+/// first occurrence in a path separates id from generation unambiguously.
+const GENERATION_SEPARATOR: &str = "%gen";
+
 pub fn service_cgroup_root_path(service: &str, generation: u64) -> String {
     let encoded = encode_service_cgroup_id(service);
     if generation == 0 {
         format!("{PEINIT_CGROUP_ROOT}/{encoded}")
     } else {
-        format!("{PEINIT_CGROUP_ROOT}/{encoded}.gen{generation}")
+        format!("{PEINIT_CGROUP_ROOT}/{encoded}{GENERATION_SEPARATOR}{generation}")
     }
 }
 
