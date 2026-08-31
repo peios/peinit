@@ -53,6 +53,7 @@ pub(super) fn apply_stopping_simple_exit(
         service_transitions: vec![service_transition],
         graph_events: Vec::new(),
         post_start_hook: None,
+        late_exit: None,
     })
 }
 

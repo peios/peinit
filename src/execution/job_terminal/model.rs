@@ -15,6 +15,11 @@ pub struct ServiceMainJobTerminalDispatch {
     pub service_transitions: Vec<ServiceTableTransition>,
     pub graph_events: Vec<GraphExecutionEvent>,
     pub post_start_hook: Option<JobEvent>,
+    /// The state the service was already in when its main process's exit
+    /// arrived — set only when that state had stopped expecting one, so the
+    /// exit was recorded rather than acted on. See
+    /// [`apply_service_main_job_terminal`](super::apply_service_main_job_terminal).
+    pub late_exit: Option<ServiceState>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,10 +37,6 @@ pub enum ServiceMainJobTerminalError {
     },
     NotTerminalEvent {
         job_id: JobId,
-    },
-    UnsupportedServiceState {
-        service: String,
-        state: ServiceState,
     },
     MissingStoppingOperation {
         service: String,

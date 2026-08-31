@@ -93,6 +93,7 @@ fn dispatch_from_readiness(
         service_transitions: dispatch.service_transitions,
         graph_events: dispatch.graph_events,
         post_start_hook: dispatch.post_start_hook,
+        late_exit: None,
     }
 }
 
@@ -106,5 +107,6 @@ fn dispatch_from_failure(
         service_transitions: dispatch.service_transitions,
         graph_events: dispatch.graph_events,
         post_start_hook: None,
+        late_exit: None,
     }
 }

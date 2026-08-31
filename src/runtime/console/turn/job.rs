@@ -11,7 +11,7 @@ use super::shutdown;
 use crate::runtime::console::{
     collect_restart_start_dispatches_console_messages, collect_service_transition_console_message,
     collect_service_transitions_console_messages, collect_start_dispatches_console_messages,
-    push_critical_service_failure,
+    push_critical_service_failure, push_error,
 };
 
 pub(super) fn collect_child_reap_turn_console_messages(
@@ -155,6 +155,7 @@ fn collect_terminal_dispatch_console_messages(
     dispatch: &SupervisorTerminalDispatch,
     out: &mut Vec<ConsoleMessage>,
 ) {
+    push_late_service_exit(&dispatch.terminal, out);
     collect_service_transitions_console_messages(&dispatch.terminal.service_transitions, out);
     collect_start_dispatches_console_messages(&dispatch.start_dispatches, out);
     collect_restart_start_dispatches_console_messages(&dispatch.restart_start_dispatches, out);
@@ -189,6 +190,31 @@ fn collect_watchdog_timeout_console_messages(
     if dispatch.critical_reboot.is_some() {
         push_critical_service_failure(out, &dispatch.service, "watchdog timeout");
     }
+}
+
+/// Report a main process that exited after its service had stopped expecting
+/// one.
+///
+/// There is no transition to report — that is the point of a late exit — so
+/// without this the event leaves no trace at all, and a service stuck in a
+/// stale state would be a silent mystery. It is an error rather than status
+/// because every route to it is something having gone wrong earlier: the
+/// service was abandoned as unkillable, or it left a running process behind
+/// when it failed.
+fn push_late_service_exit(
+    dispatch: &crate::execution::job_terminal::ServiceMainJobTerminalDispatch,
+    out: &mut Vec<ConsoleMessage>,
+) {
+    let Some(state) = dispatch.late_exit else {
+        return;
+    };
+    let Some(service) = dispatch.job_event.service.as_deref() else {
+        return;
+    };
+    push_error(
+        out,
+        format!("peinit: service {service} main process exited in state {state:?}; no action taken\n"),
+    );
 }
 
 fn leaked_cgroup_kind_console(kind: crate::service::runtime::LeakedCgroupKind) -> &'static str {
