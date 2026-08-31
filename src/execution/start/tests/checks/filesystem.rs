@@ -87,6 +87,7 @@ fn filesystem_assert_records_pending_restart_check_after_entering_starting() {
     let mut services = ServiceTable::from_boot_snapshot(vec![definition]).expect("service table");
     let mut operations = running_restart_operation("app");
     let operation_id = operation_id(0);
+    let mut graph = crate::execution::graph::GraphExecutionStore::new();
     let mut jobs = JobStore::new();
     let mut job_ids = JobIdAllocator::new();
     let mut start_store = StartExecutionStore::new();
@@ -94,6 +95,7 @@ fn filesystem_assert_records_pending_restart_check_after_entering_starting() {
     let outcome = begin_restart_start_leg(
         &mut services,
         &mut operations,
+        &mut graph,
         &mut jobs,
         &mut job_ids,
         &mut start_store,

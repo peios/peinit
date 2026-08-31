@@ -93,8 +93,33 @@ fn notify_field_event(
             "exit_status",
             value,
         )),
+        // §10.1 asks for STOPPING=1 to be acknowledged by logging it, and the
+        // reason is sharper than it looks. STOPPING=1's only effect is the
+        // *absence* of an action — peinit suppresses the SIGTERM — which is
+        // the one kind of effect that cannot be inferred from what happened.
+        //
+        // Without this, a service that was stopping and correctly received no
+        // SIGTERM is indistinguishable, after the fact, from a service that
+        // should have received one and did not: the first is right, the second
+        // is a bug in peinit, and an operator looking at a service that took
+        // its full StopTimeout and then got SIGKILLed could not tell which
+        // they had (PEI-368).
+        //
+        // READY=1 and RELOADING=1 need no equivalent: both are observable
+        // through the state transitions they cause.
+        NotifyAppliedField::Stopping => Some(encode_notify_event(sender, "notify.stopping")),
         _ => None,
     }
+}
+
+fn encode_notify_event(
+    sender: &AuthenticatedNotifySender,
+    event_type: &'static str,
+) -> Result<KmesEvent, BoundaryError> {
+    let mut writer = Writer::new();
+    writer.write_map(4);
+    write_notify_sender(&mut writer, sender);
+    finish_event(event_type, writer)
 }
 
 fn encode_notify_value_event(
