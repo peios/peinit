@@ -6,7 +6,7 @@ use crate::operation::store::{OperationEvent, OperationStore, OperationStoreErro
 use crate::service::{ServiceTable, ServiceTableError, ServiceTableTransition};
 
 use super::super::command::ExecutableCommandParseError;
-use super::store::ControlExecutionStore;
+use super::store::{ControlExecutionStore, ReloadDetectionPhase};
 
 pub struct ControlExecutionContext<'a, P>
 where
@@ -72,6 +72,17 @@ pub struct StopEscalationDispatch {
 pub struct ReloadDetectionCompletion {
     pub operation_event: OperationEvent,
     pub service_transition: ServiceTableTransition,
+    /// Which of the two advisory outcomes this was.
+    ///
+    /// `ExtendedWait` is the diagnostic one: the service explicitly announced
+    /// `RELOADING=1` and then never said `READY=1`, so it has either wedged
+    /// mid-reload or lost its handler. That is worse than a service which
+    /// never implements the handshake at all, because this one started
+    /// something. Carried here because the phase was otherwise lost at the
+    /// dispatch boundary, and `reload` defaults to `wait=false` — so the
+    /// default way to issue a reload produced no record of it anywhere
+    /// (PEI-359).
+    pub phase: ReloadDetectionPhase,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

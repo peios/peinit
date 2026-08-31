@@ -1,5 +1,4 @@
 use crate::boundary::{ProcessSignal, ProcessTarget};
-use crate::service::ServiceDefinition;
 use crate::service::runtime::{ServiceState, ServiceTransition, TransitionCause};
 
 use super::model::{
@@ -16,7 +15,6 @@ pub(super) fn begin_signal_reload<P>(
     request: ControlOperationRequest,
     target: ProcessTarget,
     signal: ProcessSignal,
-    definition: &ServiceDefinition,
 ) -> Result<ControlExecutionDispatch, ControlExecutionError>
 where
     P: crate::boundary::ProcessController + ?Sized,
@@ -28,15 +26,6 @@ where
     let operation_event = next_operations
         .start_operation(request.operation_id, request.observed_at_ns)
         .map_err(ControlExecutionError::OperationStore)?;
-    let operation = next_operations
-        .get(request.operation_id)
-        .ok_or(
-            crate::operation::store::OperationStoreError::UnknownOperation {
-                id: request.operation_id,
-            },
-        )
-        .map_err(ControlExecutionError::OperationStore)?
-        .clone();
     let service_transition = next_services
         .transition_service(
             &target.service,
@@ -46,13 +35,20 @@ where
             },
         )
         .map_err(ControlExecutionError::ServiceTable)?;
-    let detection_deadline_ns = request
+    // §5.3: the detection window is two seconds, "fixed and not configurable
+    // via the registry". It used to be clamped to the operation's own
+    // StartTimeout-derived deadline, which made the constant a ceiling rather
+    // than a value and made it indirectly registry-configurable: a service with
+    // `StartTimeout` under two seconds got a shorter window, for no reason
+    // connected to reloading (PEI-359).
+    //
+    // Nothing is lost by dropping the clamp. The reload operation's own
+    // lifetime still bounds the whole thing, and a detection window that
+    // outlives it simply resolves against an operation that has already
+    // finished.
+    let deadline_ns = request
         .observed_at_ns
         .saturating_add(RELOAD_DETECTION_WINDOW_NS);
-    let operation_deadline_ns = operation
-        .created_at_ns
-        .saturating_add(definition.start_timeout_secs.saturating_mul(NANOS_PER_SEC));
-    let deadline_ns = detection_deadline_ns.min(operation_deadline_ns);
 
     context
         .controller

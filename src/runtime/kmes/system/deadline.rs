@@ -72,8 +72,19 @@ fn collect_reload_detection(
     out: &mut Vec<KmesEvent>,
 ) -> Result<(), BoundaryError> {
     let ReloadDetectionCompletion {
-        operation_event, ..
+        operation_event,
+        phase,
+        ..
     } = &dispatch.completion;
+    // A service that announced RELOADING=1 and never finished has either
+    // wedged or lost its handler. The operation event alone carries no
+    // severity and, since `reload` defaults to wait=false, nobody is
+    // necessarily reading it (PEI-359).
+    if *phase == crate::execution::control::ReloadDetectionPhase::ExtendedWait {
+        out.push(crate::kmes::encode_reload_unconfirmed_event(
+            &operation_event.service,
+        )?);
+    }
     push_operation(out, operation_event)
 }
 

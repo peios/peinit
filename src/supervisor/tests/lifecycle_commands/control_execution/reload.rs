@@ -135,3 +135,55 @@ fn main_process_crash_during_signal_reload_cancels_reload_operation_and_deadline
         operation_id,
     );
 }
+
+// PEI-359. §5.3: the detection window is two seconds, "fixed and is not
+// configurable via the registry". It was clamped to the reload operation's own
+// StartTimeout-derived deadline, which made the constant a ceiling rather than
+// a value — and made it indirectly registry-configurable through
+// `StartTimeout`. A service configured to start fast, which is a reasonable
+// thing to do, got a shorter reload window as a consequence, for no reason
+// connected to reloading.
+#[test]
+fn the_reload_detection_window_is_two_seconds_whatever_the_start_timeout() {
+    use crate::supervisor::tests::{
+        StaticRegistry, TestProcessLauncher, TestTokenProvider, alive_service, process, settings,
+    };
+    use crate::supervisor::{Supervisor, SupervisorSettings};
+
+    let mut app = alive_service("app");
+    app.start_timeout_secs = 1;
+    let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
+    let mut registry = StaticRegistry::services(vec![app]);
+    let mut boot_clock = ScriptedClock::new([
+        crate::supervisor::tests::BOOT_NS,
+        crate::supervisor::tests::APP_LAUNCH_NS,
+    ]);
+    supervisor
+        .run_phase2_boot(&mut registry, &mut boot_clock)
+        .expect("boot app");
+    let mut tokens = TestTokenProvider::default();
+    let mut launcher = TestProcessLauncher::new(vec![process(8000, 50)]);
+    supervisor
+        .launch_next_pending_job(&mut tokens, &mut launcher, &mut boot_clock)
+        .expect("launch app")
+        .expect("app launch dispatch");
+    let mut command_clock = ScriptedClock::new([LIFECYCLE_COMMAND_NS]);
+    supervisor
+        .reload_service("app", None, &mut command_clock)
+        .expect("reload app");
+    let mut controller = TestProcessController::default();
+    let mut control_clock = ScriptedClock::new([CONTROL_NS]);
+
+    supervisor
+        .execute_next_pending_control_operation(&mut controller, &mut control_clock)
+        .expect("execute reload")
+        .expect("reload dispatch");
+
+    assert_eq!(
+        supervisor
+            .next_reload_detection_deadline()
+            .expect("reload detection")
+            .due_at_ns,
+        CONTROL_NS + 2_000_000_000,
+    );
+}
