@@ -44,7 +44,17 @@ pub struct TimerLastRunWriteRequest {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TimerLastRunWriteOutcome {
-    Queued,
+    /// The write was handed to a forked child, which is the only way peinit
+    /// can perform it without blocking: the LCS write goes to registryd, a
+    /// service peinit supervises, so a synchronous call would let a wedged
+    /// registryd stall PID 1's event loop.
+    ///
+    /// The pid is carried so the runtime can match the child's exit against
+    /// this write. Without it the failure existed only as an exit status the
+    /// generic reaper discarded as untracked, so a persistent timer whose
+    /// timestamp writes kept failing produced a spurious catch-up run on every
+    /// boot and nothing anywhere said why (PEI-369).
+    Queued { pid: u32 },
 }
 
 /// A service key that exists but whose values will not decode.

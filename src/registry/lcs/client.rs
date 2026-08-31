@@ -159,7 +159,7 @@ impl TimerLastRunWriter for LcsTimerLastRunWriter {
             request.storage,
             request.timestamp_realtime_ns,
         )
-        .map(|()| TimerLastRunWriteOutcome::Queued)
+        .map(|pid| TimerLastRunWriteOutcome::Queued { pid })
         .map_err(|error| BoundaryError::Registry(error.to_string()))
     }
 }

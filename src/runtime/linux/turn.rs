@@ -238,6 +238,8 @@ impl LinuxShutdownRuntime {
             &maintenance_after_sources,
             &calendar_turns,
         )?;
+        self.record_queued_timer_last_run_writes(&calendar_turns);
+        let failed_last_run_writes = self.claim_timer_last_run_write_exits(&turn.turns);
         let mut console_messages = Vec::new();
         collect_runtime_loop_console_messages(
             &pre_work,
@@ -246,6 +248,20 @@ impl LinuxShutdownRuntime {
             &calendar_turns,
             &mut console_messages,
         );
+        for failed in &failed_last_run_writes {
+            // The write is best-effort by design, so this is a warning rather
+            // than a failure — but it has to be *said*. A persistent timer
+            // whose timestamp never lands runs its catch-up on every boot, and
+            // that is otherwise a mystery with no thread to pull (PEI-369).
+            crate::runtime::console::push_error(
+                &mut console_messages,
+                format!(
+                    "peinit warning: recording the last run of timer {} for service {} failed; \
+                     it will run catch-up again after a reboot\n",
+                    failed.schedule, failed.service,
+                ),
+            );
+        }
         if let Some(reboot) = &critical_budget_reboot {
             crate::runtime::console::push_critical_budget_reboot_message(
                 &mut console_messages,
@@ -260,6 +276,50 @@ impl LinuxShutdownRuntime {
             }));
         turn.pre_work = pre_work;
         Ok(turn)
+    }
+
+    /// Remember the children this turn forked, so their exits can be matched.
+    fn record_queued_timer_last_run_writes(
+        &mut self,
+        calendar_turns: &[(i32, crate::runtime::RuntimeCalendarTimerTurn)],
+    ) {
+        for (fd, calendar_turn) in calendar_turns {
+            let crate::runtime::RuntimeCalendarTimerTurn::Read {
+                last_run_write: Some(Ok(crate::boundary::TimerLastRunWriteOutcome::Queued { pid })),
+                ..
+            } = calendar_turn
+            else {
+                continue;
+            };
+            let Some((service, schedule)) = self.calendar_timers.identity_for(*fd) else {
+                continue;
+            };
+            self.timer_last_run_writes.record(*pid, service, schedule);
+        }
+    }
+
+    /// Match this turn's untracked child reaps against outstanding writes.
+    fn claim_timer_last_run_write_exits(
+        &mut self,
+        turns: &[crate::runtime::RuntimeShutdownEventTurn],
+    ) -> Vec<super::timer_last_run::FailedTimerLastRunWrite> {
+        let mut failed = Vec::new();
+        for event_turn in turns {
+            let crate::runtime::RuntimeShutdownEventTurn::Pid1Signal { child_reaps, .. } =
+                event_turn
+            else {
+                continue;
+            };
+            for reap in child_reaps {
+                let crate::supervisor::SupervisorChildReapTurn::Untracked { child } = reap else {
+                    continue;
+                };
+                if let Some(write) = self.timer_last_run_writes.claim(child.pid, child.status) {
+                    failed.push(write);
+                }
+            }
+        }
+        failed
     }
 
     pub fn run_forever(

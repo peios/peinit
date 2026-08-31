@@ -119,6 +119,7 @@ impl LinuxShutdownRuntime {
             token_provider: LinuxSystemTokenProvider::new(),
             process_launcher: LinuxProcessLauncher::new(),
             filesystem_check_launcher: LinuxFilesystemCheckHelper::new(),
+            timer_last_run_writes: super::timer_last_run::TimerLastRunWrites::default(),
             filesystem_check_reader: LinuxFilesystemCheckHelper::new(),
             finalizer: LinuxShutdownFinalizer::new(),
             access_checker: PeiosSystemAccessChecker::new(),
