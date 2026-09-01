@@ -37,6 +37,20 @@ pub fn encode_graph_validation_warning_event(
             );
             finish_event("graph.validation_warning", writer)
         }
+        ServiceGraphWarning::UnfilledRole { role, services } => {
+            let mut writer = Writer::new();
+            writer.write_map(5);
+            write_str_field(&mut writer, "phase", phase);
+            write_str_field(&mut writer, "warning", "unfilled_role");
+            write_str_field(&mut writer, "role", role);
+            write_string_array_field(&mut writer, "services", services);
+            write_str_field(
+                &mut writer,
+                "message",
+                &format!("no service provides {role}, which other services need to start"),
+            );
+            finish_event("graph.validation_warning", writer)
+        }
     }
 }
 

@@ -61,4 +61,12 @@ pub enum ServiceGraphWarning {
         service: String,
         dependents: Vec<String>,
     },
+    /// Services need the authority to start and no service fills the role.
+    ///
+    /// A warning rather than a finding, deliberately. The image is broken —
+    /// none of these services can obtain a token — but failing validation
+    /// would reject a whole *reload* transaction, so an operator could not
+    /// even reload a definition that adds the missing authority. The
+    /// individual launches still fail, loudly, where the fault actually is.
+    UnfilledRole { role: String, services: Vec<String> },
 }

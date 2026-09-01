@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::service::definition::ServiceDefinition;
 use crate::service::runtime::ServiceRuntimeSnapshot;
+use crate::service::synthesise_role_dependencies;
 
 use super::ServiceTable;
 use super::model::{
@@ -142,11 +143,18 @@ fn runtime_effective_definition(
     effective
 }
 
+/// Index a definition set by name, deriving the dependencies its identities
+/// imply on the way through.
+///
+/// The synthesis happens here rather than at either caller because this is
+/// the one point both the boot table and a reload pass through, and an edge
+/// that existed on one path and not the other would be worse than no edge at
+/// all: the ordering would hold until the first reload and then silently stop.
 pub(super) fn map_definitions(
     definitions: Vec<ServiceDefinition>,
 ) -> Result<BTreeMap<String, ServiceDefinition>, ServiceTableError> {
     let mut mapped = BTreeMap::new();
-    for definition in definitions {
+    for definition in synthesise_role_dependencies(definitions) {
         let name = definition.name.clone();
         if mapped.insert(name.clone(), definition).is_some() {
             return Err(ServiceTableError::DuplicateService { service: name });

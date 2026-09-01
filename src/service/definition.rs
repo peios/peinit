@@ -105,6 +105,18 @@ pub struct ServiceDefinition {
     pub wants: Vec<String>,
     pub binds_to: Vec<String>,
     pub conflicts: Vec<String>,
+    /// Virtual names this service fills, as a role other services depend on
+    /// without naming it.
+    ///
+    /// A role is not a service name, and that indirection is the point:
+    /// peinit knows it needs *an* authority to mint a non-SYSTEM token, and
+    /// hardcodes the socket that authority listens on, but the name of the
+    /// service behind it is registry data and none of peinit's business.
+    ///
+    /// Virtual and real names share one namespace, exactly as they do for
+    /// packages (PSPU §5.4): a dependency on `authn` is satisfied by a
+    /// service literally called `authn`, or by any service providing it.
+    pub provides: Vec<String>,
     pub on_failure: Option<String>,
     pub readiness: Readiness,
     pub notify_access: NotifyAccess,
@@ -216,6 +228,7 @@ impl ServiceDefinition {
             wants: Vec::new(),
             binds_to: Vec::new(),
             conflicts: Vec::new(),
+            provides: Vec::new(),
             on_failure: None,
             readiness: Readiness::Notify,
             notify_access: NotifyAccess::Main,

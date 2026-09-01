@@ -26,6 +26,38 @@ pub(in crate::registry::service) fn parse_service_reference_list(
         .collect()
 }
 
+/// Parse a `Provides` entry: a bare role name, with no level suffix.
+///
+/// A role is a *virtual name*, and it is validated against the ordinary
+/// service-name grammar rather than a looser one of its own, because
+/// virtual and real names share a single namespace — exactly as they do
+/// for packages (PSPU §5.4). `Requires = ["authn"]` is satisfied by a
+/// service literally called `authn` or by any service providing it, and
+/// that only works while both sides admit the same strings.
+///
+/// A level is rejected rather than ignored. `netd:routed` names a
+/// condition *on* a service, and a role is not a service, so there is
+/// nothing for the level to qualify — accepting it silently would take a
+/// definition that cannot mean what it says and pretend it does.
+pub(in crate::registry::service) fn parse_role_name_list(
+    value: &RawRegistryValue,
+    field: Field,
+) -> Result<Vec<String>, ServiceRegistryDecodeError> {
+    decode_multi_sz_field(value, field.name())?
+        .into_iter()
+        .map(|entry| {
+            if is_valid_service_name(&entry) {
+                Ok(entry)
+            } else {
+                Err(ServiceRegistryDecodeError::InvalidServiceReference {
+                    field: field.name(),
+                    value: entry,
+                })
+            }
+        })
+        .collect()
+}
+
 /// Validate a `Requires`/`Wants`/`BindsTo`/`Conflicts` entry, which may
 /// carry a readiness level: `netd:routed`.
 ///
@@ -39,8 +71,7 @@ fn validate_dependency_reference(
     value: &str,
 ) -> Result<(), ServiceRegistryDecodeError> {
     let (service, level) = split_target(value);
-    let valid = is_valid_service_name(&service)
-        && level.as_deref().is_none_or(is_valid_level);
+    let valid = is_valid_service_name(&service) && level.as_deref().is_none_or(is_valid_level);
     if valid {
         Ok(())
     } else {
@@ -59,9 +90,7 @@ fn validate_dependency_reference(
 /// enough to keep a stray newline or a megabyte of registry data out of a
 /// comparison, and no more.
 fn is_valid_level(level: &str) -> bool {
-    !level.is_empty()
-        && level.len() <= 64
-        && level.chars().all(|c| c.is_ascii_graphic())
+    !level.is_empty() && level.len() <= 64 && level.chars().all(|c| c.is_ascii_graphic())
 }
 
 pub(in crate::registry::service) fn parse_service_reference_field(
