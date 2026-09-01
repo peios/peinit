@@ -17,6 +17,15 @@ use super::notify::{RuntimeNotifyRead, RuntimeNotifySupervisorTurn};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RuntimeShutdownEventTurn {
+    /// Exits that were reaped before their job existed, replayed once it did.
+    ///
+    /// Carried as its own turn rather than folded into [`Self::Pid1Signal`]
+    /// because there is no signal read behind it: the SIGCHLD was handled turns
+    /// ago, and only the application of the exit was outstanding.
+    DeferredChildReaps {
+        child_reaps: Vec<SupervisorChildReapTurn>,
+        ended_at_ns: u64,
+    },
     Pid1Signal {
         read: LinuxSignalFdRead,
         supervisor: SupervisorPid1SignalFdTurn,

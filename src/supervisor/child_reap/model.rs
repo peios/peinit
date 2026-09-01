@@ -18,6 +18,10 @@ pub enum SupervisorChildReapTurn {
     Untracked {
         child: ChildReap,
     },
+    /// Reaped before its job recorded a pid; held for replay once it does.
+    DeferredUntilSetup {
+        child: ChildReap,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -183,6 +183,30 @@ impl LinuxShutdownRuntime {
             .clock
             .realtime_ns()
             .map_err(RuntimeShutdownLoopError::Clock)?;
+        // Replay any exit that was reaped before its job carried a pid. The
+        // setup status that gives the job its pid may have been processed in
+        // this very turn, and nothing else will deliver the exit again.
+        let deferred_reaps = supervisor.take_ready_deferred_reaps();
+        if !deferred_reaps.is_empty() {
+            let mut child_reaps = Vec::with_capacity(deferred_reaps.len());
+            for child in deferred_reaps {
+                child_reaps.push(
+                    supervisor
+                        .apply_reaped_child(
+                            child,
+                            after_sources_ns,
+                            &mut self.controller,
+                            &mut self.finalizer,
+                        )
+                        .map_err(RuntimeShutdownLoopError::DeferredChildReap)?,
+                );
+            }
+            turn.turns
+                .push(crate::runtime::RuntimeShutdownEventTurn::DeferredChildReaps {
+                    child_reaps,
+                    ended_at_ns: after_sources_ns,
+                });
+        }
         let maintenance_after_sources = process_due_operation_maintenance_at(
             supervisor,
             &mut self.controller,
