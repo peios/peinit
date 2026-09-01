@@ -11,6 +11,35 @@ use super::state::{Supervisor, SupervisorError};
 pub(in crate::supervisor) use signal::signal_failure_cause;
 
 impl Supervisor {
+    /// Is a launched-but-not-yet-started process using this pid?
+    fn has_pending_setup_for_pid(&self, pid: u32) -> bool {
+        self.pending_process_setups
+            .values()
+            .any(|setup| setup.process.pid == pid)
+    }
+
+    /// Exits held back by [`Self::apply_reaped_child`] whose job now exists.
+    ///
+    /// Drained by the runtime after a setup status is processed, and replayed
+    /// through the ordinary reap path so that job-type routing, shutdown and
+    /// submitted-job handling stay in one place.
+    pub fn take_ready_deferred_reaps(&mut self) -> Vec<ChildReap> {
+        let ready: Vec<u32> = self
+            .reaped_before_setup
+            .keys()
+            .copied()
+            .filter(|pid| self.jobs.active_job_by_pid(*pid).is_some())
+            .collect();
+        ready
+            .into_iter()
+            .filter_map(|pid| {
+                self.reaped_before_setup
+                    .remove(&pid)
+                    .map(|status| ChildReap { pid, status })
+            })
+            .collect()
+    }
+
     pub fn apply_reaped_child<P, F>(
         &mut self,
         child: ChildReap,
@@ -23,6 +52,20 @@ impl Supervisor {
         F: ShutdownFinalizer,
     {
         let Some(job_id) = self.jobs.active_job_by_pid(child.pid) else {
+            // No job carries this pid *yet*. A launched process is only findable
+            // by pid once its setup status has been read and the job started,
+            // and a short-lived child — a one-line ExecStartPre hook, say — can
+            // be gone before peinit gets back to the setup pipe.
+            //
+            // Dropping the exit here is unrecoverable: the job is started
+            // moments later against a pid that is already reaped, and no second
+            // SIGCHLD is ever coming, so it stays Running for ever and its
+            // service never leaves Starting. Hold the exit instead and replay it
+            // once the job exists.
+            if self.has_pending_setup_for_pid(child.pid) {
+                self.reaped_before_setup.insert(child.pid, child.status);
+                return Ok(SupervisorChildReapTurn::DeferredUntilSetup { child });
+            }
             return Ok(SupervisorChildReapTurn::Untracked { child });
         };
         let job_type = self

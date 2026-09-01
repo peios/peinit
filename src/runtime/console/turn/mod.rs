@@ -27,6 +27,11 @@ pub(super) fn collect_runtime_shutdown_turn_console_messages(
                 shutdown::collect_shutdown_drive_dispatch_console_messages(drive, out);
             }
         }
+        RuntimeShutdownEventTurn::DeferredChildReaps { child_reaps, .. } => {
+            for reap in child_reaps {
+                job::collect_child_reap_turn_console_messages(reap, out);
+            }
+        }
         RuntimeShutdownEventTurn::ControlConnection { supervisor, .. } => {
             control::collect_control_connection_table_turn_console_messages(supervisor, out);
         }

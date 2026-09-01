@@ -9,6 +9,7 @@ pub use settings::SupervisorSettings;
 
 use std::collections::{BTreeMap, VecDeque};
 
+use crate::boundary::ChildExitStatus;
 use crate::control::socket::ControlSocketLimits;
 use crate::control::system::ControlSecurityDescriptor;
 use crate::execution::control::ControlExecutionStore;
@@ -63,6 +64,14 @@ pub struct Supervisor {
     pub(super) submitted: SubmittedJobStore,
     pub(super) pending_submitted_launches: VecDeque<JobId>,
     pub(super) pending_process_setups: BTreeMap<i32, PendingLaunchSetup>,
+    /// Exits reaped before the job could record its pid, by pid.
+    ///
+    /// A launched process is only findable by pid once its setup status
+    /// has been read and the job started. A short-lived child can be gone
+    /// before that, and its exit would otherwise be dropped on the floor —
+    /// leaving a job Running against a process that is already reaped, with
+    /// no second SIGCHLD ever coming. Held here until the job exists.
+    pub(super) reaped_before_setup: BTreeMap<u32, ChildExitStatus>,
     pub(super) pending_control_operations: VecDeque<PendingControlOperation>,
     pub(super) retained_service_launches: Vec<LaunchCreatedJobDispatch>,
     pub(super) boot_settle: BootSettleTracker,
@@ -102,6 +111,7 @@ impl Supervisor {
             submitted: SubmittedJobStore::new(),
             pending_submitted_launches: VecDeque::new(),
             pending_process_setups: BTreeMap::new(),
+            reaped_before_setup: BTreeMap::new(),
             pending_control_operations: VecDeque::new(),
             retained_service_launches: Vec::new(),
             boot_settle: BootSettleTracker::default(),

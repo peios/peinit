@@ -65,6 +65,11 @@ pub(crate) fn collect_runtime_shutdown_turn_kmes_events(
                 collect_shutdown_drive_dispatch(drive, out)?;
             }
         }
+        RuntimeShutdownEventTurn::DeferredChildReaps { child_reaps, .. } => {
+            for reap in child_reaps {
+                collect_child_reap_turn(reap, out)?;
+            }
+        }
         RuntimeShutdownEventTurn::ControlConnection { supervisor, .. } => {
             collect_control_connection_table_turn(supervisor, out)?;
         }

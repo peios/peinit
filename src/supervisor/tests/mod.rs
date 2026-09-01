@@ -9,6 +9,7 @@ mod on_demand_start;
 mod operation_maintenance;
 mod phase1_registryd;
 mod post_start_hooks;
+mod reaped_before_setup;
 mod relationships;
 mod restart;
 mod shutdown;
