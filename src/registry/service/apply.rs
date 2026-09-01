@@ -12,7 +12,7 @@ use super::builder::DefinitionBuilder;
 use super::parse::{
     parse_absolute_path_field, parse_environment_variables, parse_executable_command_field,
     parse_executable_command_list, parse_identity_field, parse_non_empty_list,
-    parse_optional_string, parse_runtime_directories, parse_service_checks,
+    parse_optional_string, parse_role_name_list, parse_runtime_directories, parse_service_checks,
     parse_service_reference_field, parse_service_reference_list, validate_exec_reload,
 };
 
@@ -53,6 +53,9 @@ pub(super) fn apply_service_field(
         }
         Field::Requires => {
             builder.requires = parse_service_reference_list(value, Field::Requires)?;
+        }
+        Field::Provides => {
+            builder.provides = parse_role_name_list(value, Field::Provides)?;
         }
         Field::Wants => {
             builder.wants = parse_service_reference_list(value, Field::Wants)?;

@@ -51,5 +51,9 @@ fn service_graph_warning_message(warning: &ServiceGraphWarning) -> String {
             "service {service} uses Alive readiness while hard dependents require readiness: {}",
             dependents.join(", "),
         ),
+        ServiceGraphWarning::UnfilledRole { role, services } => format!(
+            "no service provides {role}, which these services need to start: {}",
+            services.join(", "),
+        ),
     }
 }

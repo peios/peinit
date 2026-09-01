@@ -2,6 +2,7 @@ mod definition;
 mod dependency;
 pub mod graph;
 mod restart;
+pub(crate) mod role;
 pub mod table;
 
 pub mod runtime;
@@ -24,6 +25,7 @@ pub use restart::{
     RestartEvaluation, RestartEvaluationAction, evaluate_restart_after_failure,
     is_success_exit_code,
 };
+pub use role::{AUTHN_ROLE, synthesise_role_dependencies};
 pub use table::{
     RestartBackoffDeadline, RestartWindowResetDeadline, ServiceActivationSnapshot, ServiceEntry,
     ServiceReloadSummary, ServiceTable, ServiceTableError, ServiceTableTransition,

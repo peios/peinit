@@ -38,6 +38,7 @@ service_fields! {
     ("Wants", Wants),
     ("BindsTo", BindsTo),
     ("Conflicts", Conflicts),
+    ("Provides", Provides),
     ("OnFailure", OnFailure),
     ("Readiness", Readiness),
     ("NotifyAccess", NotifyAccess),

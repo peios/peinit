@@ -255,3 +255,60 @@ fn a_simple_service_still_fails_the_flap_constraint() {
         }],
     );
 }
+
+fn authority() -> ServiceDefinition {
+    let mut authd = service("authd");
+    authd.provides = vec![crate::service::AUTHN_ROLE.to_string()];
+    authd
+}
+
+fn local_service(name: &str) -> ServiceDefinition {
+    let mut definition = service(name);
+    definition.identity = crate::security::LOCAL_SERVICE_IDENTITY.to_string();
+    definition
+}
+
+/// PEI-601. A derived edge can close a cycle exactly as a declared one can,
+/// so validation has to see the graph after synthesis. An authority that
+/// depends on a service which is itself non-SYSTEM is that shape, and a cycle
+/// found only at boot would be a hang rather than a finding.
+#[test]
+fn a_cycle_closed_by_a_synthesised_edge_is_found() {
+    let mut authd = authority();
+    authd.requires.push("netd".to_string());
+
+    let failure =
+        validate_service_graph(&[authd, local_service("netd")]).expect_err("cycle through authn");
+
+    assert_eq!(
+        failure.findings,
+        vec![ServiceGraphFinding::Cycle {
+            services: vec!["authd".to_string(), "netd".to_string()],
+        }]
+    );
+}
+
+/// An image whose services need a token and which ships no authority is
+/// broken, but it must stay *reloadable* — otherwise the operator cannot
+/// install the authority that would fix it. So this warns and validates.
+#[test]
+fn an_unfilled_authority_role_warns_rather_than_failing() {
+    let validation =
+        validate_service_graph(&[local_service("resolvd")]).expect("still a valid graph");
+
+    assert_eq!(
+        validation.warnings,
+        vec![ServiceGraphWarning::UnfilledRole {
+            role: "authn".to_string(),
+            services: vec!["resolvd".to_string()],
+        }]
+    );
+}
+
+#[test]
+fn a_filled_authority_role_warns_about_nothing() {
+    let validation =
+        validate_service_graph(&[authority(), local_service("resolvd")]).expect("valid graph");
+
+    assert!(validation.warnings.is_empty());
+}

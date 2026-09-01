@@ -6,14 +6,25 @@ use crate::service::{
 };
 use crate::timer::calendar::CalendarSchedule;
 
+use crate::service::role::{AUTHN_ROLE, requires_authority, role_providers};
+use crate::service::synthesise_role_dependencies;
+
 use super::cycle::find_cycles;
 use super::model::{
     ServiceGraphFinding, ServiceGraphValidation, ServiceGraphValidationFailure, ServiceGraphWarning,
 };
 
+/// Validate a definition set, as it will actually be executed.
+///
+/// The set is passed through role synthesis first, so validation sees the
+/// same graph the supervisor will: a derived edge can close a cycle just as a
+/// declared one can — an authority that `Requires` a service which is itself
+/// non-SYSTEM is exactly that shape — and a cycle peinit only discovered at
+/// boot would be a hang rather than a finding.
 pub fn validate_service_graph(
     definitions: &[ServiceDefinition],
 ) -> Result<ServiceGraphValidation, ServiceGraphValidationFailure> {
+    let definitions = &synthesise_role_dependencies(definitions.to_vec());
     let index = index_definitions(definitions);
     let mut findings = invalid_service_name_findings(definitions);
     findings.extend(index.duplicate_findings);
@@ -28,9 +39,11 @@ pub fn validate_service_graph(
         return Err(ServiceGraphValidationFailure { findings });
     }
 
+    let mut warnings = readiness_warnings(&index.by_name);
+    warnings.extend(unfilled_role_warnings(definitions));
     Ok(ServiceGraphValidation {
         service_count: index.by_name.len(),
-        warnings: readiness_warnings(&index.by_name),
+        warnings,
     })
 }
 
@@ -163,12 +176,10 @@ fn unschedulable_health_check_findings(
         .filter(|definition| {
             definition.health_check.is_some() && !health_check_is_scheduled(definition)
         })
-        .map(
-            |definition| ServiceGraphFinding::UnschedulableHealthCheck {
-                service: definition.name.clone(),
-                service_type: definition.service_type,
-            },
-        )
+        .map(|definition| ServiceGraphFinding::UnschedulableHealthCheck {
+            service: definition.name.clone(),
+            service_type: definition.service_type,
+        })
         .collect()
 }
 
@@ -237,4 +248,28 @@ fn readiness_warnings(by_name: &BTreeMap<&str, &ServiceDefinition>) -> Vec<Servi
                 )
         })
         .collect()
+}
+
+/// Services that cannot start because nothing fills the role they need.
+///
+/// This is the case role synthesis deliberately declines to express as an
+/// edge (see [`crate::service::role`]): inventing a dependency on a name no
+/// service answers to would make every reload of this image fail validation,
+/// including the reload that would install the missing authority.
+fn unfilled_role_warnings(definitions: &[ServiceDefinition]) -> Vec<ServiceGraphWarning> {
+    if !role_providers(definitions, AUTHN_ROLE).is_empty() {
+        return Vec::new();
+    }
+    let services: Vec<String> = definitions
+        .iter()
+        .filter(|definition| requires_authority(definition))
+        .map(|definition| definition.name.clone())
+        .collect();
+    if services.is_empty() {
+        return Vec::new();
+    }
+    vec![ServiceGraphWarning::UnfilledRole {
+        role: AUTHN_ROLE.to_string(),
+        services,
+    }]
 }
