@@ -181,15 +181,22 @@ fn fail_reload_command_job(
         return Ok(None);
     };
     match job.state {
-        JobState::Created => work
-            .jobs
-            .fail_job_before_start(
-                job_id,
-                observed_at_ns,
-                "reload command cancelled because service main exited during reload",
-            )
-            .map(Some)
-            .map_err(SupervisorError::JobStore),
+        JobState::Created => {
+            // Still queued for launch, so drop it from the queue as well as the
+            // store. The drain tolerates a stale entry (PEI-605), but leaving
+            // one behind means the next control launch does nothing at all
+            // while it works through the rubbish ahead of it.
+            work.pending_control_launches
+                .retain(|pending| *pending != job_id);
+            work.jobs
+                .fail_job_before_start(
+                    job_id,
+                    observed_at_ns,
+                    "reload command cancelled because service main exited during reload",
+                )
+                .map(Some)
+                .map_err(SupervisorError::JobStore)
+        }
         JobState::Running => fail_running_reload_command_job(
             work,
             controller,

@@ -25,7 +25,11 @@ impl Supervisor {
         C: Clock + ?Sized,
         R: ProcessController + ?Sized,
     {
-        let Some(job_id) = self.pending_post_hook_launches.front().copied() else {
+        let Some(job_id) = crate::supervisor::pending_queue::next_live_front(
+            &mut self.pending_post_hook_launches,
+            &self.jobs,
+            &mut self.stale_launch_entries,
+        ) else {
             return Ok(None);
         };
         let launched_at_ns = clock.monotonic_ns().map_err(SupervisorError::Clock)?;

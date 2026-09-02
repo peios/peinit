@@ -13,6 +13,7 @@ mod reaped_before_setup;
 mod relationships;
 mod restart;
 mod shutdown;
+mod stale_launch_queue;
 mod start_hooks;
 mod submitted;
 mod terminal_release;
