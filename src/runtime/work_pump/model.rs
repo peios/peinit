@@ -48,6 +48,8 @@ pub struct RuntimeWorkPumpTurn {
     pub submitted_launches: Vec<SupervisorSubmittedLaunchDispatch>,
     pub submitted_launch_failures: Vec<SupervisorSubmittedLaunchFailureDispatch>,
     pub stale_control_operations: usize,
+    /// Queue entries dropped because their job record had gone (PEI-605).
+    pub stale_launch_entries: usize,
 }
 
 impl RuntimeWorkPumpTurn {
@@ -69,6 +71,7 @@ impl RuntimeWorkPumpTurn {
             && self.submitted_launches.is_empty()
             && self.submitted_launch_failures.is_empty()
             && self.stale_control_operations == 0
+            && self.stale_launch_entries == 0
     }
 
     pub(super) fn extend(&mut self, step: RuntimeWorkPumpStep) {
@@ -97,6 +100,7 @@ impl RuntimeWorkPumpTurn {
         self.submitted_launch_failures
             .extend(step.submitted_launch_failure);
         self.stale_control_operations += step.stale_control_operations;
+        self.stale_launch_entries += step.stale_launch_entries;
     }
 }
 
@@ -118,6 +122,8 @@ pub(super) struct RuntimeWorkPumpStep {
     pub submitted_launch: Option<SupervisorSubmittedLaunchDispatch>,
     pub submitted_launch_failure: Option<SupervisorSubmittedLaunchFailureDispatch>,
     pub stale_control_operations: usize,
+    /// Queue entries dropped because their job record had gone (PEI-605).
+    pub stale_launch_entries: usize,
 }
 
 impl RuntimeWorkPumpStep {
@@ -138,6 +144,7 @@ impl RuntimeWorkPumpStep {
             || self.submitted_launch.is_some()
             || self.submitted_launch_failure.is_some()
             || self.stale_control_operations > 0
+            || self.stale_launch_entries > 0
     }
 }
 

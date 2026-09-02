@@ -19,6 +19,7 @@ mod lifecycle_deadline_timer;
 mod notify;
 mod operation_maintenance;
 mod phase1_registryd;
+mod pending_queue;
 mod post_start_hooks;
 mod power_button;
 mod pre_start_checks;

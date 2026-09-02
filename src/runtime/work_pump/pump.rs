@@ -232,6 +232,7 @@ where
         submitted_launch,
         submitted_launch_failure,
         stale_control_operations,
+        stale_launch_entries: supervisor.take_stale_launch_entries(),
     })
 }
 

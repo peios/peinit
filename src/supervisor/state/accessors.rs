@@ -97,6 +97,19 @@ impl Supervisor {
         self.pending_process_setups.keys().copied().collect()
     }
 
+    /// Queued launch ids dropped since the last call because their job record
+    /// had gone. Reset on read; the work pump reports it for the turn.
+    pub fn take_stale_launch_entries(&mut self) -> usize {
+        std::mem::take(&mut self.stale_launch_entries)
+    }
+
+    /// Mutate the job store directly, to stage bookkeeping faults a correct
+    /// caller would not create.
+    #[cfg(test)]
+    pub(crate) fn jobs_mut(&mut self) -> &mut crate::job::JobStore {
+        &mut self.jobs
+    }
+
     pub fn pending_control_operations(&self) -> Vec<PendingControlOperation> {
         self.pending_control_operations.iter().cloned().collect()
     }

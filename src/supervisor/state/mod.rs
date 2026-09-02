@@ -72,6 +72,11 @@ pub struct Supervisor {
     /// leaving a job Running against a process that is already reaped, with
     /// no second SIGCHLD ever coming. Held here until the job exists.
     pub(super) reaped_before_setup: BTreeMap<u32, ChildExitStatus>,
+    /// Queued launch ids dropped because their job record had gone.
+    ///
+    /// Counted rather than fatal: see [`crate::supervisor::pending_queue`].
+    /// Drained by the work pump so a bookkeeping fault surfaces as a number.
+    pub(super) stale_launch_entries: usize,
     pub(super) pending_control_operations: VecDeque<PendingControlOperation>,
     pub(super) retained_service_launches: Vec<LaunchCreatedJobDispatch>,
     pub(super) boot_settle: BootSettleTracker,
@@ -112,6 +117,7 @@ impl Supervisor {
             pending_submitted_launches: VecDeque::new(),
             pending_process_setups: BTreeMap::new(),
             reaped_before_setup: BTreeMap::new(),
+            stale_launch_entries: 0,
             pending_control_operations: VecDeque::new(),
             retained_service_launches: Vec::new(),
             boot_settle: BootSettleTracker::default(),
