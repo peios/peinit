@@ -24,6 +24,18 @@ pub(super) enum OperationExpectation {
     Queue,
 }
 
+/// Whether a start request against a service already in `state` is a no-op.
+///
+/// This is the admission matrix's `Already` verdict for `Start`, exposed so the
+/// relationship-start paths (`OnFailure`, `BindsTo` recovery) can answer the
+/// same question the control interface does without going through admission.
+/// They must: a service in one of these states has no legal transition into
+/// `Starting`, so planning a start for it ends in `InvalidTransition` out of a
+/// failure-reaction path rather than a benign refusal (PEI-597).
+pub fn start_is_already_satisfied(state: ServiceState) -> bool {
+    matches!(classify_start(state), CommandAdmission::Already)
+}
+
 pub(super) fn classify(command: LifecycleCommand, state: ServiceState) -> CommandAdmission {
     match command {
         LifecycleCommand::Start => classify_start(state),
