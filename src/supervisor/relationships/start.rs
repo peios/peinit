@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use crate::control::lifecycle::{
     LifecycleCommandError, dispatch_on_demand_start_plan, plan_binds_to_recovery_start,
-    plan_on_failure_start,
+    plan_on_failure_start, start_is_already_satisfied,
 };
 use crate::execution::start::StartExecutionDispatch;
 use crate::ids::OperationId;
@@ -60,6 +60,25 @@ fn dispatch_relationship_start(
     observed_at_ns: u64,
     max_parallel_starts: u32,
 ) -> Result<Vec<StartExecutionDispatch>, SupervisorError> {
+    // A relationship start names a service the supervisor picked, not one an
+    // administrator typed, so it never passes through `admit_lifecycle_command`
+    // and never gets that path's "already active -> no-op" answer. Ask the same
+    // question here. Without this an `OnFailure` handler that is already Active
+    // is planned for a start it has no legal transition into, and the resulting
+    // `InvalidTransition` surfaces out of the failure-reaction pipeline
+    // (PEI-597).
+    //
+    // Resolved before the operation id is allocated: there is nothing to start,
+    // so there should be no operation, no context, and no chain entry recording
+    // a cascade that never happened.
+    if work
+        .services
+        .get(request.service)
+        .is_some_and(|entry| start_is_already_satisfied(entry.runtime.state))
+    {
+        return Ok(Vec::new());
+    }
+
     let request_id = allocate_operation_id(work, observed_at_ns)?;
     let plan = match request.plan {
         RelationshipStartPlan::BindsToRecovery => {

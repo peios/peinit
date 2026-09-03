@@ -229,6 +229,54 @@ fn on_failure_self_reference_is_suppressed_at_runtime() {
     assert!(supervisor.pending_launch_jobs().is_empty());
 }
 
+// PEI-597. A relationship start never passes through `admit_lifecycle_command`,
+// so it never got that path's "already active -> no-op" answer. An OnFailure
+// handler that was already Active was therefore planned for a start it has no
+// legal transition into ((Active, Starting) has no arm in the rule table), and
+// the InvalidTransition surfaced out of the failure-reaction pipeline rather
+// than as a benign refusal.
+//
+// The loop guard used to mask this: a handler that started and stayed running
+// kept its chain-membership entry forever, so a second attempt was refused as a
+// cycle before it reached the transition. PEI-362 retires that entry once the
+// handler has been dependent-satisfying for its RestartWindow, which leaves the
+// path reachable for a *fresh* failure whose handler is already up. This test
+// takes the case the guard never covered at all: the handler is Active because
+// it was boot-triggered, not because it was started by an earlier failure, so
+// no chain exists to save it.
+#[test]
+fn an_on_failure_handler_that_is_already_active_is_refused_benignly() {
+    let mut app = alive_service("app");
+    app.on_failure = Some("fallback".to_string());
+    app.restart_policy = RestartPolicy::Never;
+    // Triggers left intact, so the handler is Active before anything fails.
+    let fallback = alive_service("fallback");
+    // Three ticks: the boot itself, then one per boot-triggered launch.
+    let mut supervisor = boot_and_launch(
+        vec![app, fallback],
+        [BOOT_NS, APP_LAUNCH_NS, APP_LAUNCH_NS + 1],
+    );
+
+    let before = supervisor.service_status("fallback").expect("fallback");
+    assert_eq!(before.state, ServiceState::Active);
+    let handler_job = before.current_job.expect("handler job").id;
+
+    let app_job = current_job(&supervisor, "app");
+    let terminal = supervisor
+        .complete_job(app_job, APP_CRASH_NS, 1)
+        .expect("the failure reaction must not raise InvalidTransition");
+
+    assert!(terminal.start_dispatches.is_empty());
+    assert!(supervisor.pending_launch_jobs().is_empty());
+
+    // The running handler is left exactly as it was — same state, same job, and
+    // no operation was minted for a start that never happened.
+    let after = supervisor.service_status("fallback").expect("fallback");
+    assert_eq!(after.state, ServiceState::Active);
+    assert_eq!(after.current_job.expect("handler job").id, handler_job);
+    assert!(after.current_operation.is_none());
+}
+
 #[test]
 fn on_failure_loop_guard_survives_active_fallback_crashes() {
     let mut a = alive_service("a");

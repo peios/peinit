@@ -9,6 +9,7 @@ mod synchronous_clear;
 mod tests;
 
 pub use admission::admit_lifecycle_command;
+pub use matrix::start_is_already_satisfied;
 pub use dependency_admission::admit_lifecycle_command_with_operation_ids;
 pub use model::{
     LifecycleCommand, LifecycleCommandError, LifecycleCommandOutcome, LifecycleCommandRequest,
