@@ -251,3 +251,67 @@ fn two_terminals_are_two_queues() {
     assert_eq!(state(&supervisor, "console-login"), ServiceState::Active);
     assert_eq!(state(&supervisor, "tty2-login"), ServiceState::Starting);
 }
+
+/// The bug jack hit on a real first boot: setup said "you can log in now"
+/// and no prompt appeared until the machine was restarted.
+///
+/// Setup retires itself by removing its own two service definitions and
+/// then exiting, both within a second. peinit discards a removed
+/// definition's entry the moment the service reaches a state that does
+/// not retain one — which is the same moment it releases its terminal —
+/// so the reaction, which looked the `TTYPath` up in the table after the
+/// transition, found nothing and handed the console to nobody.
+///
+/// The terminal now rides on the transition, which is the only place both
+/// the definition and the two states are in hand at once.
+#[test]
+fn a_holder_that_deleted_its_own_definition_still_hands_the_console_on() {
+    let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
+    let oobe = console_service("oobe-tui", 100);
+    let login = console_service("login-console", 0);
+    let mut registry = StaticRegistry::services(vec![oobe, login.clone()]);
+    let mut clock = ScriptedClock::new([
+        BOOT_NS,
+        ADMIN_START_NS,
+        DB_LAUNCH_NS,
+        ON_DEMAND_APP_LAUNCH_NS,
+    ]);
+    supervisor
+        .run_phase2_boot(&mut registry, &mut clock)
+        .expect("boot supervisor");
+    supervisor
+        .start_service("oobe-tui", None, &mut clock)
+        .expect("start oobe-tui");
+    launch(&mut supervisor, DB_LAUNCH_NS, 9350, 135);
+    assert_eq!(state(&supervisor, "oobe-tui"), ServiceState::Active);
+
+    // Setup finishes: it deletes its own key from the registry, peinit
+    // notices, and only then does the process exit.
+    let mut retired = StaticRegistry::services(vec![login]);
+    supervisor
+        .reload_config_from_registry(&mut retired)
+        .expect("reload after retirement");
+    assert!(
+        supervisor
+            .service_status("oobe-tui")
+            .expect("status")
+            .definition_removed,
+        "the definition is gone but the service is still running",
+    );
+
+    let oobe_job = current_job(&supervisor, "oobe-tui");
+    let released = supervisor
+        .complete_job(oobe_job, ON_DEMAND_APP_LAUNCH_NS, 0)
+        .expect("oobe-tui exits");
+
+    assert_eq!(
+        released
+            .start_dispatches
+            .iter()
+            .map(|dispatch| dispatch.ready.service.as_str())
+            .collect::<Vec<_>>(),
+        vec!["login-console"],
+        "a console whose owner retired itself must still reach the prompt",
+    );
+    assert_eq!(state(&supervisor, "login-console"), ServiceState::Starting);
+}

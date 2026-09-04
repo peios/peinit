@@ -365,6 +365,7 @@ fn encodes_shutdown_abandonment_and_critical_failure() {
                 generation: 6,
             },
             discarded_definition_removed: false,
+            released_tty: None,
         },
     })
     .expect("shutdown abandoned event");
@@ -573,9 +574,8 @@ fn a_stopping_notification_is_acknowledged_as_an_event() {
         cgroup_generation: 7,
     };
 
-    let events =
-        encode_notify_applied_field_events(&sender, &[NotifyAppliedField::Stopping])
-            .expect("notify events");
+    let events = encode_notify_applied_field_events(&sender, &[NotifyAppliedField::Stopping])
+        .expect("notify events");
 
     assert_eq!(
         events

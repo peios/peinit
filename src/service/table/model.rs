@@ -49,6 +49,16 @@ pub struct ServiceActivationSnapshot {
 pub struct ServiceTableTransition {
     pub event: ServiceTransitionEvent,
     pub discarded_definition_removed: bool,
+    /// The `TTYPath` this transition let go of, if it let go of one.
+    ///
+    /// Carried on the transition rather than looked up afterwards, and
+    /// that is not a convenience. A service whose definition has been
+    /// removed loses its entry the moment it reaches a state that does
+    /// not retain one — which is the same moment it releases its
+    /// terminal, and the exact case of a first-boot setup flow that
+    /// deletes its own service and exits. Asking the table after the
+    /// fact gets nothing, and the terminal is never handed on.
+    pub released_tty: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

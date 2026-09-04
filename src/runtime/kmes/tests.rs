@@ -262,6 +262,7 @@ fn abandoned_dispatch(service: &str) -> SupervisorShutdownAbandonedDispatch {
                 generation: 4,
             },
             discarded_definition_removed: false,
+            released_tty: None,
         },
     }
 }

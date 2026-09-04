@@ -15,7 +15,7 @@ use std::collections::BTreeMap;
 
 use crate::execution::start::StartExecutionDispatch;
 use crate::service::ServiceTableTransition;
-use crate::service::tty::{holds_tty, tty_holder, tty_release_candidate};
+use crate::service::tty::{tty_holder, tty_release_candidate};
 use crate::supervisor::state::SupervisorError;
 use crate::supervisor::work::SupervisorWork;
 
@@ -36,18 +36,19 @@ pub(super) fn apply_tty_release_starts(
     let mut dispatches = Vec::new();
     let mut released: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for transition in transitions {
-        let event = &transition.event;
-        if !holds_tty(event.from) || holds_tty(event.to) {
-            continue;
-        }
-        let Some(tty) = work
-            .services
-            .definition(&event.service)
-            .and_then(|definition| definition.console_path.clone())
-        else {
+        // From the transition, not from the table. A service that removed
+        // its own definition and then exited has already lost its entry by
+        // the time this runs — and that is not a corner case, it is what a
+        // first-boot setup flow does on the way out. Looking the terminal
+        // up here found nothing, so the console was never handed on and
+        // the machine sat on a screen whose owner had gone.
+        let Some(tty) = transition.released_tty.clone() else {
             continue;
         };
-        released.entry(tty).or_default().push(event.service.clone());
+        released
+            .entry(tty)
+            .or_default()
+            .push(transition.event.service.clone());
     }
 
     for (tty, released_by) in released {
