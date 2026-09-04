@@ -7,10 +7,12 @@ use crate::supervisor::work::SupervisorWork;
 mod binds_to;
 mod conflict;
 mod on_failure;
+mod tty;
 
 use binds_to::{apply_binds_to_propagation, apply_binds_to_recovery_starts};
 use conflict::release_unblocked_conflict_contexts;
 use on_failure::{apply_on_failure_starts, clear_finished_on_failure_chains};
+use tty::apply_tty_release_starts;
 
 /// A service leaving a dependent-satisfying state stops making level
 /// claims. That cannot open a `Requires = ["svc:level"]` gate (that takes
@@ -72,6 +74,16 @@ pub(in crate::supervisor) fn apply_relationship_reactions_after_transitions(
         max_parallel_starts,
     )?);
     start_dispatches.extend(release_level_waiters_after_transitions(
+        work,
+        transitions,
+        observed_at_ns,
+        max_parallel_starts,
+    )?);
+    // Last, deliberately. Everything above can put a service into a state that
+    // holds a terminal — a BindsTo recovery, an OnFailure handler, a conflict
+    // release — and offering the device to a waiter before those have run
+    // would hand it over just in time to be taken back.
+    start_dispatches.extend(apply_tty_release_starts(
         work,
         transitions,
         observed_at_ns,

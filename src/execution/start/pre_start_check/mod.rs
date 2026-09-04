@@ -94,19 +94,17 @@ fn complete_pre_start_check_from_pending(
 ) -> Result<PreStartCheckCompletionDispatch, StartExecutionError> {
     match evaluate_pre_start_checks_with_filesystem_results(
         &transaction.services,
-        &pending.activation.definition.conditions,
-        &pending.activation.definition.asserts,
+        &pending.service,
+        &pending.activation.definition.clone(),
         results,
     ) {
         PreStartCheckDecision::Passed => {
             passed::apply_check_passed(transaction, result_fd, pending)
         }
-        PreStartCheckDecision::ConditionSkipped(check) => terminal::apply_condition_skipped(
-            transaction,
-            result_fd,
-            pending,
-            format!("ConditionSkipped: {} not satisfied", format_check(&check)),
-        ),
+        PreStartCheckDecision::Skipped(reason) => {
+            let (cause, message) = (reason.cause(), reason.message());
+            terminal::apply_skipped(transaction, result_fd, pending, cause, message)
+        }
         PreStartCheckDecision::AssertionFailed(check) => terminal::apply_assertion_failed(
             transaction,
             result_fd,

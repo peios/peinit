@@ -1,12 +1,83 @@
 use crate::boundary::FilesystemCheckResult;
-use crate::service::{ServiceCheck, ServiceCheckKind, ServiceTable};
+use crate::service::runtime::TransitionCause;
+use crate::service::tty::tty_holder;
+use crate::service::{ServiceCheck, ServiceCheckKind, ServiceDefinition, ServiceTable};
+
+use super::model::StartPreCheckTerminalOutcome;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum PreStartCheckDecision {
     Passed,
-    ConditionSkipped(ServiceCheck),
+    Skipped(SkipReason),
     AssertionFailed(ServiceCheck),
     RequiresFilesystemHelper { checks: Vec<ServiceCheck> },
+}
+
+/// Why a start stopped before it began, without that being a failure.
+///
+/// Both reasons end the same way — Skipped, operation completed, dependents
+/// satisfied — so they share every start path's terminal arm and differ only
+/// in what they say happened. Keeping them as one decision is what stops the
+/// four start paths (direct, graph, restart, and the filesystem-helper
+/// completion) from having to grow a fourth arm each.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum SkipReason {
+    /// A `Conditions` entry the system does not satisfy.
+    Condition(ServiceCheck),
+    /// The `TTYPath` this service names is in another service's hands.
+    TtyHeld { tty: String, holder: String },
+}
+
+impl SkipReason {
+    pub(super) fn cause(&self) -> TransitionCause {
+        match self {
+            Self::Condition(_) => TransitionCause::ConditionSkipped,
+            Self::TtyHeld { .. } => TransitionCause::TtyUnavailable,
+        }
+    }
+
+    /// What the completed operation records.
+    pub(super) fn message(&self) -> String {
+        match self {
+            Self::Condition(check) => {
+                format!("ConditionSkipped: {} not satisfied", format_check(check))
+            }
+            Self::TtyHeld { tty, holder } => {
+                format!("TtyUnavailable: {tty} is held by {holder}")
+            }
+        }
+    }
+
+    pub(super) fn outcome(&self) -> StartPreCheckTerminalOutcome {
+        match self {
+            Self::Condition(check) => StartPreCheckTerminalOutcome::ConditionSkipped {
+                check: format_check(check),
+            },
+            Self::TtyHeld { tty, holder } => StartPreCheckTerminalOutcome::TtyUnavailable {
+                tty: tty.clone(),
+                holder: holder.clone(),
+            },
+        }
+    }
+}
+
+/// Whether the terminal this service names is already somebody else's.
+///
+/// Checked on every start path, ahead of the operator's own conditions: a
+/// terminal is a fact about the machine right now, and evaluating conditions
+/// first would mean running a filesystem helper for a start that was never
+/// going to happen.
+fn tty_unavailable(
+    services: &ServiceTable,
+    service: &str,
+    definition: &ServiceDefinition,
+) -> Option<SkipReason> {
+    let tty = definition.console_path.as_deref()?;
+    let holder = tty_holder(services, tty, service)?;
+    Some(SkipReason::TtyHeld {
+        tty: tty.to_string(),
+        holder: holder.to_string(),
+    })
 }
 
 /// Decide what a service's conditions and asserts require before it can start.
@@ -28,14 +99,21 @@ pub(super) enum PreStartCheckDecision {
 /// the same assert.
 pub(super) fn evaluate_cacheable_pre_start_checks(
     services: &ServiceTable,
-    conditions: &[ServiceCheck],
-    asserts: &[ServiceCheck],
+    service: &str,
+    definition: &ServiceDefinition,
 ) -> PreStartCheckDecision {
+    let conditions = &definition.conditions;
+    let asserts = &definition.asserts;
+    if let Some(reason) = tty_unavailable(services, service, definition) {
+        return PreStartCheckDecision::Skipped(reason);
+    }
     let mut filesystem_checks = Vec::new();
 
     match evaluate_check_set(services, conditions) {
         CheckSetDecision::Passed => {}
-        CheckSetDecision::Failed(check) => return PreStartCheckDecision::ConditionSkipped(check),
+        CheckSetDecision::Failed(check) => {
+            return PreStartCheckDecision::Skipped(SkipReason::Condition(check));
+        }
         CheckSetDecision::RequiresFilesystemHelper { checks } => {
             extend_filesystem_checks(&mut filesystem_checks, checks);
         }
@@ -77,12 +155,19 @@ fn extend_filesystem_checks(gathered: &mut Vec<ServiceCheck>, checks: Vec<Servic
 
 pub(super) fn evaluate_pre_start_checks_with_filesystem_results(
     services: &ServiceTable,
-    conditions: &[ServiceCheck],
-    asserts: &[ServiceCheck],
+    service: &str,
+    definition: &ServiceDefinition,
     results: &[FilesystemCheckResult],
 ) -> PreStartCheckDecision {
+    let conditions = &definition.conditions;
+    let asserts = &definition.asserts;
+    // Re-asked rather than carried over from the cacheable pass: the helper
+    // ran in between, and a terminal can change hands while it did.
+    if let Some(reason) = tty_unavailable(services, service, definition) {
+        return PreStartCheckDecision::Skipped(reason);
+    }
     if let Some(check) = failed_check_with_filesystem_results(services, conditions, results) {
-        return PreStartCheckDecision::ConditionSkipped(check);
+        return PreStartCheckDecision::Skipped(SkipReason::Condition(check));
     }
     if let Some(check) = failed_check_with_filesystem_results(services, asserts, results) {
         return PreStartCheckDecision::AssertionFailed(check);

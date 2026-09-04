@@ -53,6 +53,7 @@ pub(super) fn transition_cause_wire(cause: TransitionCause) -> &'static str {
         TransitionCause::ValidationError => "validation_error",
         TransitionCause::AssertionError => "assertion_error",
         TransitionCause::ConditionSkipped => "condition_skipped",
+        TransitionCause::TtyUnavailable => "tty_unavailable",
         TransitionCause::ProcessUnkillable => "process_unkillable",
     }
 }
@@ -90,6 +91,7 @@ pub(super) fn operation_source_wire(source: OperationSource) -> &'static str {
         OperationSource::BindsToPropagation => "binds_to_propagation",
         OperationSource::ConflictResolution => "conflict_resolution",
         OperationSource::OnFailure => "on_failure",
+        OperationSource::TtyRelease => "tty_release",
     }
 }
 

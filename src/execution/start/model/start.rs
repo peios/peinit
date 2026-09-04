@@ -89,8 +89,19 @@ pub struct StartExecutionCheckPendingDispatch {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StartPreCheckTerminalOutcome {
-    ConditionSkipped { check: String },
-    AssertionFailed { check: String },
+    ConditionSkipped {
+        check: String,
+    },
+    /// The service's `TTYPath` was in another service's hands, so it was
+    /// skipped rather than started. It goes back into the queue for that
+    /// terminal if it carries a `tty:released` trigger.
+    TtyUnavailable {
+        tty: String,
+        holder: String,
+    },
+    AssertionFailed {
+        check: String,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

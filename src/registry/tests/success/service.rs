@@ -413,6 +413,127 @@ fn relative_tty_path_is_rejected() {
     assert!(format!("{error:?}").contains("TTYPath"), "{error:?}");
 }
 
+/// `tty:released` — the queue on a terminal. A service names the device in
+/// `TTYPath` and asks to be started when whoever holds it lets go.
+#[test]
+fn tty_released_trigger_is_accepted() {
+    let definition = build_service_definition_from_registry_values(
+        "login-console",
+        &[
+            sz("ImagePath", "/bin/login"),
+            sz("TTYPath", "/dev/console"),
+            multi_sz("Triggers", &["tty:released"]),
+        ],
+    )
+    .expect("definition");
+
+    assert_eq!(definition.triggers, vec![ServiceTrigger::TtyReleased]);
+    assert!(definition.has_tty_released_trigger());
+    // Not a boot-plan member and not a deferred start either: the terminal
+    // coming free is the only thing that starts it.
+    assert!(!definition.has_boot_trigger());
+    assert!(!definition.has_boot_settled_trigger());
+}
+
+/// `TTYPrecedence` decides who wins a terminal several services want at once.
+#[test]
+fn tty_precedence_is_accepted_alongside_a_tty_path() {
+    let definition = build_service_definition_from_registry_values(
+        "oobe",
+        &[
+            sz("ImagePath", "/sbin/oobe"),
+            sz("TTYPath", "/dev/console"),
+            dword("TTYPrecedence", 100),
+        ],
+    )
+    .expect("definition");
+
+    assert_eq!(definition.console_precedence, 100);
+}
+
+#[test]
+fn absent_tty_precedence_is_the_bottom_of_the_queue() {
+    let definition = build_service_definition_from_registry_values(
+        "login-console",
+        &[sz("ImagePath", "/bin/login"), sz("TTYPath", "/dev/console")],
+    )
+    .expect("definition");
+
+    assert_eq!(definition.console_precedence, 0);
+}
+
+/// Both terminal fields are about a terminal the service names, and neither
+/// means anything without one. Refused rather than ignored: a `tty:released`
+/// with no `TTYPath` describes a service that would silently never start, and
+/// starting is the entire point of the trigger.
+#[test]
+fn the_tty_fields_are_refused_without_a_tty_path() {
+    let error = build_service_definition_from_registry_values(
+        "login-console",
+        &[
+            sz("ImagePath", "/bin/login"),
+            multi_sz("Triggers", &["tty:released"]),
+        ],
+    )
+    .expect_err("tty:released without TTYPath must be rejected");
+    assert!(
+        format!("{error:?}").contains("FieldRequiresTtyPath"),
+        "{error:?}"
+    );
+
+    let error = build_service_definition_from_registry_values(
+        "app",
+        &[sz("ImagePath", "/sbin/app"), dword("TTYPrecedence", 5)],
+    )
+    .expect_err("TTYPrecedence without TTYPath must be rejected");
+    assert!(
+        format!("{error:?}").contains("FieldRequiresTtyPath"),
+        "{error:?}"
+    );
+}
+
+/// An emptied `TTYPath` leaves no terminal, so it takes the fields that
+/// depend on one down with it — the same rule, reached by the other route.
+#[test]
+fn an_emptied_tty_path_refuses_the_fields_that_depend_on_it() {
+    let error = build_service_definition_from_registry_values(
+        "login-console",
+        &[
+            sz("ImagePath", "/bin/login"),
+            sz("TTYPath", ""),
+            multi_sz("Triggers", &["tty:released"]),
+        ],
+    )
+    .expect_err("an emptied TTYPath must take tty:released with it");
+
+    assert!(
+        format!("{error:?}").contains("FieldRequiresTtyPath"),
+        "{error:?}"
+    );
+}
+
+/// The `tty:` namespace carries the same arity rule as `boot:` — a bare word
+/// that names no event is an error, and so is an unlisted sub-type.
+#[test]
+fn unknown_tty_sub_triggers_are_rejected() {
+    for trigger in ["tty", "tty:", "tty:freed", "tty:release"] {
+        let error = build_service_definition_from_registry_values(
+            "app",
+            &[
+                sz("ImagePath", "/sbin/app"),
+                sz("TTYPath", "/dev/console"),
+                multi_sz("Triggers", &[trigger]),
+            ],
+        )
+        .expect_err("{trigger} must be rejected");
+
+        assert!(
+            format!("{error:?}").contains("InvalidTrigger"),
+            "{trigger}: {error:?}",
+        );
+    }
+}
+
 /// `boot:settled` — a boot trigger that waits for the boot set to stop moving.
 #[test]
 fn boot_settled_trigger_is_accepted() {

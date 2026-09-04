@@ -38,14 +38,14 @@ pub fn begin_graph_pre_start_check(
 
     let outcome = match evaluate_cacheable_pre_start_checks(
         &transaction.services,
-        &activation.definition.conditions,
-        &activation.definition.asserts,
+        &request.ready.service,
+        &activation.definition,
     ) {
         PreStartCheckDecision::Passed => {
             outcome::apply_passed(&mut transaction, request, activation, cleared_skipped)
         }
-        PreStartCheckDecision::ConditionSkipped(check) => {
-            outcome::apply_condition_skipped(&mut transaction, request, check, cleared_skipped)
+        PreStartCheckDecision::Skipped(reason) => {
+            outcome::apply_skipped(&mut transaction, request, reason, cleared_skipped)
         }
         PreStartCheckDecision::AssertionFailed(check) => {
             outcome::apply_assertion_failed(&mut transaction, request, check, cleared_skipped)

@@ -76,6 +76,26 @@ pub fn plan_on_failure_start(
     )
 }
 
+/// Plan the start of a service whose terminal has just come free.
+///
+/// `ExplicitStart` as the cause, like `OnFailure`, and for one reason that
+/// matters: the waiter is almost always sitting in Skipped from the moment it
+/// lost the terminal, and `Skipped -> Inactive` is only travelled on an
+/// explicit start. Any other cause would reach the activation still Skipped
+/// and die on an invalid transition — the service would be woken and then
+/// refused, every time.
+pub fn plan_tty_release_start(
+    services: &ServiceTable,
+    service: &str,
+) -> Result<OnDemandStartPlan, OnDemandStartPlanError> {
+    plan_start(
+        services,
+        service,
+        OperationSource::TtyRelease,
+        TransitionCause::ExplicitStart,
+    )
+}
+
 fn plan_start(
     services: &ServiceTable,
     service: &str,

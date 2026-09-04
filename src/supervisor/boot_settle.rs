@@ -62,9 +62,26 @@ impl BootSettleTracker {
                     definition.has_boot_settled_trigger() && !definition.disabled
                 })
             })
-            .map(ToString::to_string)
+            .map(|service| {
+                let precedence = services
+                    .definition(service)
+                    .map_or(0, |definition| definition.console_precedence);
+                (precedence, service.to_string())
+            })
             .collect::<Vec<_>>();
-        pending_starts.sort();
+        // Highest `TTYPrecedence` first, then by name. These services are
+        // started one at a time and have no relationship to each other, so the
+        // order is free — except for the ones that want the same terminal,
+        // where it is the whole answer. The first to start takes the device and
+        // the rest are skipped, so "first" has to mean the one the operator
+        // ranked highest rather than the one whose name sorts earliest.
+        pending_starts.sort_by(|(left, left_name), (right, right_name)| {
+            right.cmp(left).then_with(|| left_name.cmp(right_name))
+        });
+        let pending_starts = pending_starts
+            .into_iter()
+            .map(|(_, service)| service)
+            .collect::<Vec<_>>();
 
         self.awaiting = awaiting;
         self.pending_starts = pending_starts;
@@ -376,6 +393,31 @@ mod tests {
         let tracker = configured(&services, &["app"]);
 
         assert!(tracker.next_deadline(&services).is_none());
+    }
+
+    /// Deferred services are started one at a time, so for two that want the
+    /// same terminal the order is the whole answer: the first to start takes
+    /// the device and the second is skipped. "First" must therefore mean the
+    /// one the operator ranked highest, not the one whose name sorts earliest
+    /// — which is what this pins, by naming the high-precedence service last
+    /// in the alphabet.
+    #[test]
+    fn deferred_starts_are_ordered_by_tty_precedence() {
+        let mut oobe = settled_service("zzz-oobe");
+        oobe.console_path = Some("/dev/console".to_string());
+        oobe.console_precedence = 100;
+        let mut login = settled_service("aaa-login");
+        login.console_path = Some("/dev/console".to_string());
+        let mut services = table(vec![boot_service("app"), oobe, login]);
+        set_state(&mut services, "app", ServiceState::Active);
+        let mut tracker = configured(&services, &["app"]);
+
+        let due = tracker.take_due(&services, OBSERVED_AT_NS).expect("due");
+
+        assert_eq!(
+            due.services,
+            vec!["zzz-oobe".to_string(), "aaa-login".to_string()],
+        );
     }
 
     /// Disabled suppresses automatic activation by *any* trigger, and

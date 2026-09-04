@@ -74,6 +74,7 @@ service_fields! {
     ("ServiceSecurity", ServiceSecurity),
     ("TimerPersistent", TimerPersistent),
     ("TTYPath", TtyPath),
+    ("TTYPrecedence", TtyPrecedence),
     ("TimerJitter", TimerJitter),
 }
 
@@ -117,6 +118,13 @@ pub(super) fn parse_error_control(value: u32) -> Result<ErrorControl, ServiceReg
 /// being silently tolerated as an unknown trigger kind.
 const BOOT_SUB_TRIGGERS: &[(&str, ServiceTrigger)] = &[("settled", ServiceTrigger::BootSettled)];
 
+/// Terminal sub-triggers, as a closed set, on the same rule as `boot:`.
+///
+/// `tty` alone is not a trigger — there is no event called "a terminal" — so
+/// the bare word is rejected like a bare `timer`, and an unlisted sub-type is
+/// an error rather than an unknown trigger kind.
+const TTY_SUB_TRIGGERS: &[(&str, ServiceTrigger)] = &[("released", ServiceTrigger::TtyReleased)];
+
 pub(super) fn classify_trigger(
     value: String,
 ) -> Result<ServiceTrigger, ServiceRegistryDecodeError> {
@@ -124,6 +132,14 @@ pub(super) fn classify_trigger(
         Ok(ServiceTrigger::Boot)
     } else if let Some(sub) = value.strip_prefix("boot:") {
         BOOT_SUB_TRIGGERS
+            .iter()
+            .find(|(name, _)| *name == sub)
+            .map(|(_, trigger)| trigger.clone())
+            .ok_or(ServiceRegistryDecodeError::InvalidTrigger { value })
+    } else if value == "tty" {
+        Err(ServiceRegistryDecodeError::InvalidTrigger { value })
+    } else if let Some(sub) = value.strip_prefix("tty:") {
+        TTY_SUB_TRIGGERS
             .iter()
             .find(|(name, _)| *name == sub)
             .map(|(_, trigger)| trigger.clone())

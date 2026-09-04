@@ -22,6 +22,9 @@ pub enum OperationSource {
     BindsToPropagation,
     ConflictResolution,
     OnFailure,
+    /// A service started because the terminal it names in `TTYPath` was
+    /// released by whoever held it.
+    TtyRelease,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

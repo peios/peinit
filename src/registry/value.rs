@@ -98,6 +98,11 @@ pub enum ServiceRegistryDecodeError {
         field: &'static str,
         key: String,
     },
+    /// A field or trigger that only means something alongside a `TTYPath`,
+    /// on a definition that has none.
+    FieldRequiresTtyPath {
+        field: &'static str,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

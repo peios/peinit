@@ -131,6 +131,14 @@ pub enum TransitionCause {
     ValidationError,
     AssertionError,
     ConditionSkipped,
+    /// Skipped because another service was holding the terminal this one
+    /// names in `TTYPath`.
+    ///
+    /// Its own cause rather than `ConditionSkipped`: nothing in the
+    /// definition was unmet, and an operator asking why there is no login
+    /// prompt needs to be told the console is taken and by whom, not that a
+    /// condition they never wrote did not hold.
+    TtyUnavailable,
     ProcessUnkillable,
 }
 
@@ -163,7 +171,8 @@ impl TransitionCause {
             | Self::ValidationError
             | Self::DependencyFailure
             | Self::AssertionError
-            | Self::ConditionSkipped => RestartConsultation::Never,
+            | Self::ConditionSkipped
+            | Self::TtyUnavailable => RestartConsultation::Never,
         }
     }
 
@@ -176,6 +185,7 @@ impl TransitionCause {
                 | Self::DependencyFailure
                 | Self::AssertionError
                 | Self::ConditionSkipped
+                | Self::TtyUnavailable
         )
     }
 }

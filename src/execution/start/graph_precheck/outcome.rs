@@ -1,7 +1,7 @@
 use crate::service::runtime::{ServiceState, ServiceTransition, TransitionCause};
 use crate::service::{ServiceActivationSnapshot, ServiceCheck, ServiceTableTransition};
 
-use super::super::checks::format_check;
+use super::super::checks::{SkipReason, format_check};
 use super::super::deadline::start_operation_deadline_ns;
 use super::super::model::{
     GraphPreStartCheckOutcome, GraphPreStartCheckPassedDispatch, GraphPreStartCheckPendingDispatch,
@@ -45,20 +45,19 @@ pub(super) fn apply_passed(
     ))
 }
 
-pub(super) fn apply_condition_skipped(
+pub(super) fn apply_skipped(
     transaction: &mut GraphPreStartCheckTransaction,
     request: StartExecutionRequest,
-    check: ServiceCheck,
+    reason: SkipReason,
     cleared_skipped: Option<ServiceTableTransition>,
 ) -> Result<GraphPreStartCheckOutcome, StartExecutionError> {
-    let check = format_check(&check);
     let transition = transaction
         .services
         .transition_service(
             &request.ready.service,
             ServiceTransition {
                 to: ServiceState::Skipped,
-                cause: TransitionCause::ConditionSkipped,
+                cause: reason.cause(),
             },
         )
         .map_err(StartExecutionError::ServiceTable)?;
@@ -71,7 +70,7 @@ pub(super) fn apply_condition_skipped(
         .complete_operation(
             request.ready.operation_id,
             request.started_at_ns,
-            format!("ConditionSkipped: {check} not satisfied"),
+            reason.message(),
         )
         .map_err(StartExecutionError::OperationStore)?;
     let graph_events = transaction
@@ -89,7 +88,7 @@ pub(super) fn apply_condition_skipped(
     Ok(GraphPreStartCheckOutcome::Terminal(
         GraphPreStartCheckTerminalDispatch {
             ready: request.ready,
-            outcome: StartPreCheckTerminalOutcome::ConditionSkipped { check },
+            outcome: reason.outcome(),
             operation_events,
             service_transitions: cleared_skipped
                 .into_iter()
