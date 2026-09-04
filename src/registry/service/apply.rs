@@ -156,6 +156,9 @@ pub(super) fn apply_service_field(
                 });
             };
         }
+        Field::TtyPrecedence => {
+            builder.console_precedence = decode_dword_field(value, Field::TtyPrecedence.name())?;
+        }
         Field::RuntimeDirectories => {
             builder.runtime_directories =
                 parse_runtime_directories(value, Field::RuntimeDirectories)?;

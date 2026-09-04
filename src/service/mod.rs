@@ -6,6 +6,7 @@ pub(crate) mod role;
 pub mod table;
 
 pub mod runtime;
+pub mod tty;
 
 pub use definition::{
     ErrorControl, NotifyAccess, Readiness, RestartPolicy, ServiceCheck, ServiceCheckKind,

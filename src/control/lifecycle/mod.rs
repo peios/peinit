@@ -9,8 +9,8 @@ mod synchronous_clear;
 mod tests;
 
 pub use admission::admit_lifecycle_command;
-pub use matrix::start_is_already_satisfied;
 pub use dependency_admission::admit_lifecycle_command_with_operation_ids;
+pub use matrix::start_is_already_satisfied;
 pub use model::{
     LifecycleCommand, LifecycleCommandError, LifecycleCommandOutcome, LifecycleCommandRequest,
     ServiceStatusSnapshot, SynchronousClearOutcome,
@@ -20,5 +20,5 @@ pub use start_plan::{
     OnDemandStartPlanError, PlannedStart, StartBlockReason, StartPlanBlockedService,
     dispatch_existing_requested_start_plan, dispatch_on_demand_start_plan,
     plan_binds_to_recovery_start, plan_on_demand_start, plan_on_failure_start,
-    plan_restart_policy_start, plan_timer_start,
+    plan_restart_policy_start, plan_timer_start, plan_tty_release_start,
 };

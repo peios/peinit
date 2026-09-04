@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use crate::control::lifecycle::{
     LifecycleCommandError, dispatch_on_demand_start_plan, plan_binds_to_recovery_start,
-    plan_on_failure_start, start_is_already_satisfied,
+    plan_on_failure_start, plan_tty_release_start, start_is_already_satisfied,
 };
 use crate::execution::start::StartExecutionDispatch;
 use crate::ids::OperationId;
@@ -54,6 +54,25 @@ pub(super) fn dispatch_on_failure_start(
     )
 }
 
+pub(super) fn dispatch_tty_release_start(
+    work: &mut SupervisorWork,
+    service: &str,
+    observed_at_ns: u64,
+    max_parallel_starts: u32,
+) -> Result<Vec<StartExecutionDispatch>, SupervisorError> {
+    dispatch_relationship_start(
+        work,
+        RelationshipStart {
+            service,
+            source: OperationSource::TtyRelease,
+            plan: RelationshipStartPlan::TtyRelease,
+            on_failure_chain: None,
+        },
+        observed_at_ns,
+        max_parallel_starts,
+    )
+}
+
 fn dispatch_relationship_start(
     work: &mut SupervisorWork,
     request: RelationshipStart<'_>,
@@ -85,6 +104,9 @@ fn dispatch_relationship_start(
             plan_binds_to_recovery_start(&work.services, request.service)
         }
         RelationshipStartPlan::OnFailure => plan_on_failure_start(&work.services, request.service),
+        RelationshipStartPlan::TtyRelease => {
+            plan_tty_release_start(&work.services, request.service)
+        }
     }
     .map_err(|source| SupervisorError::Lifecycle(LifecycleCommandError::StartPlan(source)))?;
     let start_services = plan
@@ -151,4 +173,5 @@ struct RelationshipStart<'a> {
 enum RelationshipStartPlan {
     BindsToRecovery,
     OnFailure,
+    TtyRelease,
 }

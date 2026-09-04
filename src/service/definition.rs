@@ -48,6 +48,21 @@ pub enum ServiceTrigger {
     /// looks broken when its prompt is written over. That is a scheduling
     /// preference, and the trigger is where "when do I start" belongs.
     BootSettled,
+    /// `tty:released` — start once whoever was holding this service's
+    /// `TTYPath` has let go of it.
+    ///
+    /// A terminal has one owner at a time, and the services that want one are
+    /// exactly the interactive ones: a login prompt, an installer, a
+    /// first-boot setup flow. Two of them on the same device do not conflict
+    /// in the `Conflicts` sense — that fails both, which on a console means
+    /// losing the only way in. They queue.
+    ///
+    /// The subject is always the service's own `TTYPath`, so the trigger takes
+    /// no argument and a definition carrying it without a `TTYPath` is
+    /// refused. Naming another service instead would be a dependency by
+    /// another route, and would have to be rewritten every time the set of
+    /// things that might hold the console changed.
+    TtyReleased,
     Timer {
         schedule: String,
     },
@@ -166,6 +181,16 @@ pub struct ServiceDefinition {
     /// Attaching a tty suppresses log capture — the pipes eventd would read are
     /// closed — so output goes to the terminal and nowhere else.
     pub console_path: Option<String>,
+    /// `TTYPrecedence`: who wins when several services want the same terminal
+    /// at the same moment. Higher wins; ties break on service name so the
+    /// outcome is never arbitrary. Meaningless — and refused — without a
+    /// `TTYPath`.
+    ///
+    /// Consulted only among *simultaneous* candidates. A service that already
+    /// holds a terminal is never preempted by a higher-precedence latecomer:
+    /// taking a live terminal away from a process that is using it would lose
+    /// whatever the operator was in the middle of typing.
+    pub console_precedence: u32,
 
     /// peinit defines this service itself; the registry does not and cannot.
     ///
@@ -265,6 +290,7 @@ impl ServiceDefinition {
             timer_persistent: Self::DEFAULT_TIMER_PERSISTENT,
             timer_jitter_secs: Self::DEFAULT_TIMER_JITTER_SECS,
             console_path: None,
+            console_precedence: 0,
             compiled_in: false,
         }
     }
@@ -301,6 +327,13 @@ impl ServiceDefinition {
         self.triggers
             .iter()
             .any(|trigger| matches!(trigger, ServiceTrigger::BootSettled))
+    }
+
+    /// Whether this service starts when its terminal is let go of.
+    pub fn has_tty_released_trigger(&self) -> bool {
+        self.triggers
+            .iter()
+            .any(|trigger| matches!(trigger, ServiceTrigger::TtyReleased))
     }
 }
 

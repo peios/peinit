@@ -60,17 +60,17 @@ pub fn begin_ready_start(
 
     match evaluate_cacheable_pre_start_checks(
         &next_services,
-        &activation.definition.conditions,
-        &activation.definition.asserts,
+        &request.ready.service,
+        &activation.definition,
     ) {
         PreStartCheckDecision::Passed => {}
-        PreStartCheckDecision::ConditionSkipped(check) => {
+        PreStartCheckDecision::Skipped(reason) => {
             let transition = next_services
                 .transition_service(
                     &request.ready.service,
                     ServiceTransition {
                         to: ServiceState::Skipped,
-                        cause: TransitionCause::ConditionSkipped,
+                        cause: reason.cause(),
                     },
                 )
                 .map_err(StartExecutionError::ServiceTable)?;
@@ -81,7 +81,7 @@ pub fn begin_ready_start(
                 .complete_operation(
                     request.ready.operation_id,
                     request.started_at_ns,
-                    format!("ConditionSkipped: {} not satisfied", format_check(&check)),
+                    reason.message(),
                 )
                 .map_err(StartExecutionError::OperationStore)?;
             let graph_events = next_graph
@@ -95,9 +95,7 @@ pub fn begin_ready_start(
             return Ok(StartExecutionOutcome::Terminal(
                 StartExecutionTerminalDispatch {
                     ready: request.ready,
-                    outcome: StartPreCheckTerminalOutcome::ConditionSkipped {
-                        check: format_check(&check),
-                    },
+                    outcome: reason.outcome(),
                     operation_events: vec![operation_event, completed],
                     service_transitions: cleared_skipped
                         .into_iter()

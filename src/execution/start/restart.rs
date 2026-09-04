@@ -62,17 +62,17 @@ pub fn begin_restart_start_leg(
 
     match evaluate_cacheable_pre_start_checks(
         &next_services,
-        &activation.definition.conditions,
-        &activation.definition.asserts,
+        &request.service,
+        &activation.definition,
     ) {
         PreStartCheckDecision::Passed => {}
-        PreStartCheckDecision::ConditionSkipped(check) => {
+        PreStartCheckDecision::Skipped(reason) => {
             let skipped = next_services
                 .transition_service(
                     &request.service,
                     ServiceTransition {
                         to: ServiceState::Skipped,
-                        cause: TransitionCause::ConditionSkipped,
+                        cause: reason.cause(),
                     },
                 )
                 .map_err(StartExecutionError::ServiceTable)?;
@@ -83,7 +83,7 @@ pub fn begin_restart_start_leg(
                 .complete_operation(
                     request.operation_id,
                     request.started_at_ns,
-                    format!("ConditionSkipped: {} not satisfied", format_check(&check)),
+                    reason.message(),
                 )
                 .map_err(StartExecutionError::OperationStore)?;
 
@@ -94,9 +94,7 @@ pub fn begin_restart_start_leg(
                 RestartStartExecutionTerminalDispatch {
                     service: request.service,
                     operation_id: request.operation_id,
-                    outcome: StartPreCheckTerminalOutcome::ConditionSkipped {
-                        check: format_check(&check),
-                    },
+                    outcome: reason.outcome(),
                     operation_events: vec![completed],
                     service_transitions: vec![service_transition, skipped],
                     graph_events: Vec::new(),

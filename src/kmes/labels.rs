@@ -47,6 +47,7 @@ pub(super) fn operation_source_label(value: OperationSource) -> &'static str {
         OperationSource::BindsToPropagation => "binds_to_propagation",
         OperationSource::ConflictResolution => "conflict_resolution",
         OperationSource::OnFailure => "on_failure",
+        OperationSource::TtyRelease => "tty_release",
     }
 }
 
@@ -121,6 +122,7 @@ pub(super) fn transition_cause_label(value: TransitionCause) -> &'static str {
         TransitionCause::ValidationError => "validation_error",
         TransitionCause::AssertionError => "assertion_error",
         TransitionCause::ConditionSkipped => "condition_skipped",
+        TransitionCause::TtyUnavailable => "tty_unavailable",
         TransitionCause::ProcessUnkillable => "process_unkillable",
     }
 }

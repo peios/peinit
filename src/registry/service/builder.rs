@@ -44,6 +44,7 @@ pub(super) struct DefinitionBuilder {
     pub(super) environment: Vec<ServiceEnvironmentVariable>,
     pub(super) working_directory: String,
     pub(super) console_path: Option<String>,
+    pub(super) console_precedence: u32,
     pub(super) runtime_directories: Vec<ServiceRuntimeDirectory>,
     pub(super) limit_nofile: Option<u64>,
     pub(super) limit_core: Option<u64>,
@@ -99,6 +100,7 @@ impl DefinitionBuilder {
             environment: Vec::new(),
             working_directory: ServiceDefinition::DEFAULT_WORKING_DIRECTORY.to_string(),
             console_path: None,
+            console_precedence: 0,
             runtime_directories: Vec::new(),
             limit_nofile: None,
             limit_core: None,
@@ -120,6 +122,25 @@ impl DefinitionBuilder {
     pub(super) fn finish(mut self) -> Result<ServiceDefinition, ServiceRegistryDecodeError> {
         if self.error_control == ErrorControl::Critical {
             self.safe_mode = true;
+        }
+        // Both terminal fields are about a terminal this service names, and
+        // neither has any meaning without one. Refusing them outright beats
+        // ignoring them: an operator who wrote `tty:released` with no `TTYPath`
+        // has a service that would silently never start, and the whole point of
+        // the trigger is that it does.
+        if self.console_path.is_none() {
+            if self
+                .triggers
+                .iter()
+                .any(|trigger| matches!(trigger, ServiceTrigger::TtyReleased))
+            {
+                return Err(ServiceRegistryDecodeError::FieldRequiresTtyPath { field: "Triggers" });
+            }
+            if self.console_precedence != 0 {
+                return Err(ServiceRegistryDecodeError::FieldRequiresTtyPath {
+                    field: "TTYPrecedence",
+                });
+            }
         }
         Ok(ServiceDefinition {
             name: self.name,
@@ -174,6 +195,7 @@ impl DefinitionBuilder {
             timer_persistent: self.timer_persistent,
             timer_jitter_secs: self.timer_jitter_secs,
             console_path: self.console_path,
+            console_precedence: self.console_precedence,
             // Never set from the registry, by definition: this marks a service
             // peinit defines itself. A registry entry claiming it would make
             // itself un-removable.

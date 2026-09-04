@@ -8,10 +8,11 @@ use super::super::pre_dependency::{
 use super::super::store::{PendingPreStartCheck, PendingPreStartCheckStart};
 use super::transaction::PreStartCheckTransaction;
 
-pub(super) fn apply_condition_skipped(
+pub(super) fn apply_skipped(
     transaction: &mut PreStartCheckTransaction,
     result_fd: i32,
     pending: PendingPreStartCheck,
+    cause: TransitionCause,
     reason: String,
 ) -> Result<PreStartCheckCompletionDispatch, StartExecutionError> {
     let cleared_skipped = pending.cleared_skipped.clone();
@@ -21,7 +22,7 @@ pub(super) fn apply_condition_skipped(
             &pending.service,
             ServiceTransition {
                 to: ServiceState::Skipped,
-                cause: TransitionCause::ConditionSkipped,
+                cause,
             },
         )
         .map_err(StartExecutionError::ServiceTable)?;

@@ -18,6 +18,7 @@ mod start_hooks;
 mod submitted;
 mod terminal_release;
 mod timer;
+mod tty_arbitration;
 mod watchdog;
 
 use std::collections::{BTreeMap, VecDeque};

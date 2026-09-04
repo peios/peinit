@@ -196,9 +196,7 @@ pub(super) fn push_critical_service_failure(
 pub(crate) fn push_critical_budget_reboot_message(out: &mut Vec<ConsoleMessage>, service: &str) {
     push_critical(
         out,
-        format!(
-            "peinit: critical service {service} exhausted its restart budget; rebooting\n"
-        ),
+        format!("peinit: critical service {service} exhausted its restart budget; rebooting\n"),
     );
 }
 
@@ -237,6 +235,10 @@ pub(super) fn push_critical(out: &mut Vec<ConsoleMessage>, message: impl Into<St
     out.push(ConsoleMessage::critical(message));
 }
 
+/// `TtyUnavailable` is deliberately absent. It is not a boot problem —
+/// a service queued on a busy console is the mechanism working — and printing
+/// it would write onto the very terminal whose new owner is at that moment
+/// drawing on it.
 fn skipped_for_boot_problem(cause: TransitionCause) -> bool {
     matches!(
         cause,

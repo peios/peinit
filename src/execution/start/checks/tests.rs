@@ -1,9 +1,39 @@
 use crate::boundary::FilesystemCheckResult;
 use crate::service::{ServiceCheck, ServiceCheckKind, ServiceDefinition, ServiceTable};
 
-use super::{
-    PreStartCheckDecision, cached_registry_key_exists, evaluate_cacheable_pre_start_checks,
-};
+use super::{PreStartCheckDecision, SkipReason, cached_registry_key_exists};
+
+/// The two evaluators under test take a whole definition; these tests are
+/// about condition and assert precedence, so they build the smallest
+/// definition that carries the lists and leave the rest alone.
+fn evaluate_cacheable_pre_start_checks(
+    services: &ServiceTable,
+    conditions: &[ServiceCheck],
+    asserts: &[ServiceCheck],
+) -> PreStartCheckDecision {
+    super::evaluate_cacheable_pre_start_checks(services, "app", &checked(conditions, asserts))
+}
+
+fn evaluate_pre_start_checks_with_filesystem_results(
+    services: &ServiceTable,
+    conditions: &[ServiceCheck],
+    asserts: &[ServiceCheck],
+    results: &[FilesystemCheckResult],
+) -> PreStartCheckDecision {
+    super::evaluate_pre_start_checks_with_filesystem_results(
+        services,
+        "app",
+        &checked(conditions, asserts),
+        results,
+    )
+}
+
+fn checked(conditions: &[ServiceCheck], asserts: &[ServiceCheck]) -> ServiceDefinition {
+    let mut definition = ServiceDefinition::simple_system_boot("app", "/sbin/app");
+    definition.conditions = conditions.to_vec();
+    definition.asserts = asserts.to_vec();
+    definition
+}
 
 #[test]
 fn cached_registry_service_keys_are_resolved_from_service_table() {
@@ -48,7 +78,7 @@ fn conditions_short_circuit_before_asserts() {
             std::slice::from_ref(&condition),
             &[assertion]
         ),
-        PreStartCheckDecision::ConditionSkipped(condition)
+        PreStartCheckDecision::Skipped(SkipReason::Condition(condition))
     );
 }
 
@@ -91,16 +121,16 @@ fn filesystem_results_fail_closed_when_missing_or_false() {
     };
 
     assert_eq!(
-        super::evaluate_pre_start_checks_with_filesystem_results(
+        evaluate_pre_start_checks_with_filesystem_results(
             &services,
             std::slice::from_ref(&check),
             &[],
             &[],
         ),
-        PreStartCheckDecision::ConditionSkipped(check.clone())
+        PreStartCheckDecision::Skipped(SkipReason::Condition(check.clone()))
     );
     assert_eq!(
-        super::evaluate_pre_start_checks_with_filesystem_results(
+        evaluate_pre_start_checks_with_filesystem_results(
             &services,
             std::slice::from_ref(&check),
             &[],
@@ -109,7 +139,7 @@ fn filesystem_results_fail_closed_when_missing_or_false() {
                 satisfied: false,
             }],
         ),
-        PreStartCheckDecision::ConditionSkipped(check)
+        PreStartCheckDecision::Skipped(SkipReason::Condition(check))
     );
 }
 
@@ -152,7 +182,7 @@ fn filesystem_conditions_and_asserts_are_gathered_into_one_helper_run() {
 
     // ...and with both stat'd and satisfied, the service starts.
     assert_eq!(
-        super::evaluate_pre_start_checks_with_filesystem_results(
+        evaluate_pre_start_checks_with_filesystem_results(
             &services,
             std::slice::from_ref(&condition),
             std::slice::from_ref(&assertion),
@@ -226,7 +256,7 @@ fn a_failing_registry_assert_defers_to_the_helper_when_conditions_need_one() {
 
     // An unmet condition wins...
     assert_eq!(
-        super::evaluate_pre_start_checks_with_filesystem_results(
+        evaluate_pre_start_checks_with_filesystem_results(
             &services,
             std::slice::from_ref(&condition),
             std::slice::from_ref(&assertion),
@@ -235,12 +265,12 @@ fn a_failing_registry_assert_defers_to_the_helper_when_conditions_need_one() {
                 satisfied: false,
             }],
         ),
-        PreStartCheckDecision::ConditionSkipped(condition.clone())
+        PreStartCheckDecision::Skipped(SkipReason::Condition(condition.clone()))
     );
 
     // ...and once it is met, the assert is reported.
     assert_eq!(
-        super::evaluate_pre_start_checks_with_filesystem_results(
+        evaluate_pre_start_checks_with_filesystem_results(
             &services,
             std::slice::from_ref(&condition),
             std::slice::from_ref(&assertion),

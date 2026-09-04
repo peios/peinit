@@ -12,9 +12,10 @@ pub(super) fn is_allowed_transition(
                 | TransitionCause::DependencyStart
                 | TransitionCause::Timer
         ),
-        (ServiceState::Inactive, ServiceState::Skipped) => {
-            cause == TransitionCause::ConditionSkipped
-        }
+        (ServiceState::Inactive, ServiceState::Skipped) => matches!(
+            cause,
+            TransitionCause::ConditionSkipped | TransitionCause::TtyUnavailable
+        ),
         (ServiceState::Inactive, ServiceState::Failed) => matches!(
             cause,
             TransitionCause::ValidationError
