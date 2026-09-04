@@ -100,9 +100,7 @@ fn a_reset_that_leaves_the_abandoned_cgroup_leaked_warns_on_the_console() {
 // The console handled `reload_command_timeouts` and never `reload_detections`.
 #[test]
 fn an_unconfirmed_reload_is_reported_on_the_console() {
-    let turn = reload_detection_turn(
-        crate::execution::control::ReloadDetectionPhase::ExtendedWait,
-    );
+    let turn = reload_detection_turn(crate::execution::control::ReloadDetectionPhase::ExtendedWait);
 
     let mut messages = Vec::new();
     collect_runtime_loop_console_messages(
@@ -126,9 +124,8 @@ fn an_unconfirmed_reload_is_reported_on_the_console() {
 // that would make the line above worthless.
 #[test]
 fn an_expired_reload_detection_window_says_nothing() {
-    let turn = reload_detection_turn(
-        crate::execution::control::ReloadDetectionPhase::DetectionWindow,
-    );
+    let turn =
+        reload_detection_turn(crate::execution::control::ReloadDetectionPhase::DetectionWindow);
 
     let mut messages = Vec::new();
     collect_runtime_loop_console_messages(
@@ -581,6 +578,7 @@ fn transition(
             generation: 1,
         },
         discarded_definition_removed: false,
+        released_tty: None,
     }
 }
 

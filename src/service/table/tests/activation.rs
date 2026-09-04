@@ -209,7 +209,10 @@ fn every_leak_in_one_tree_advances_the_generation_once() {
     let mut table = table(&["app"]);
 
     for (path, kind) in [
-        ("/sys/fs/cgroup/peinit/app/main", LeakedCgroupKind::ServiceTree),
+        (
+            "/sys/fs/cgroup/peinit/app/main",
+            LeakedCgroupKind::ServiceTree,
+        ),
         ("/sys/fs/cgroup/peinit/app/hooks", LeakedCgroupKind::Hooks),
         ("/sys/fs/cgroup/peinit/app/health", LeakedCgroupKind::Health),
         ("/sys/fs/cgroup/peinit/app", LeakedCgroupKind::ServiceTree),
@@ -241,10 +244,7 @@ fn a_leak_in_the_current_tree_advances_the_generation_again() {
             1_000,
         )
         .expect("first leak");
-    assert_eq!(
-        table.runtime("app").expect("runtime").cgroup_generation,
-        1,
-    );
+    assert_eq!(table.runtime("app").expect("runtime").cgroup_generation, 1,);
 
     table
         .record_leaked_cgroup(
@@ -255,8 +255,85 @@ fn a_leak_in_the_current_tree_advances_the_generation_again() {
         )
         .expect("second leak");
 
+    assert_eq!(table.runtime("app").expect("runtime").cgroup_generation, 2,);
+}
+
+/// PEI-596. A transition says which terminal it let go of, and it has to
+/// say so even when the entry does not survive the transition.
+///
+/// The case is a first-boot setup flow on the way out: it removes its own
+/// service definition so it never runs again, then exits. Both happen
+/// within a second, so by the time anything reacts to the exit the entry
+/// has been discarded and the table can no longer be asked what `TTYPath`
+/// the service had. Read after the fact, the answer was "none", the
+/// console was never handed on, and the machine sat on a finished setup
+/// screen with no login prompt behind it.
+#[test]
+fn a_transition_reports_its_released_terminal_even_when_the_entry_goes() {
+    let mut console = service("oobe-tui", "/bin/oobe-tui");
+    console.console_path = Some("/dev/console".to_string());
+    let mut table = ServiceTable::from_boot_snapshot(vec![console]).expect("service table");
+    table
+        .transition_service(
+            "oobe-tui",
+            transition(ServiceState::Starting, TransitionCause::ExplicitStart),
+        )
+        .expect("starting");
+    table
+        .transition_service(
+            "oobe-tui",
+            transition(ServiceState::Active, TransitionCause::ExplicitStart),
+        )
+        .expect("active");
+    // Setup deletes its own key, then exits.
+    table
+        .apply_definition_snapshot(Vec::new())
+        .expect("remove snapshot");
+
+    let done = table
+        .transition_service(
+            "oobe-tui",
+            transition(ServiceState::Inactive, TransitionCause::CleanExit),
+        )
+        .expect("exited");
+
+    assert!(
+        done.discarded_definition_removed,
+        "a removed definition is discarded once nothing retains it",
+    );
+    assert!(
+        table.get("oobe-tui").is_none(),
+        "the entry is gone, which is why the terminal must ride on the transition",
+    );
+    assert_eq!(done.released_tty.as_deref(), Some("/dev/console"));
+}
+
+/// The other half: a transition that did not let go of a terminal says so
+/// too, whether or not the service has one. Starting is holding, and a
+/// service still holding must not have its console offered to a waiter.
+#[test]
+fn a_transition_that_keeps_or_never_had_a_terminal_releases_nothing() {
+    let mut console = service("oobe-tui", "/bin/oobe-tui");
+    console.console_path = Some("/dev/console".to_string());
+    let mut table = ServiceTable::from_boot_snapshot(vec![console, service("app", "/sbin/app")])
+        .expect("service table");
+
+    let starting = table
+        .transition_service(
+            "oobe-tui",
+            transition(ServiceState::Starting, TransitionCause::ExplicitStart),
+        )
+        .expect("starting");
+    assert_eq!(starting.released_tty, None, "Inactive -> Starting takes it");
+
+    let app = table
+        .transition_service(
+            "app",
+            transition(ServiceState::Starting, TransitionCause::ExplicitStart),
+        )
+        .expect("starting");
     assert_eq!(
-        table.runtime("app").expect("runtime").cgroup_generation,
-        2,
+        app.released_tty, None,
+        "a service with no TTYPath has none to give"
     );
 }
