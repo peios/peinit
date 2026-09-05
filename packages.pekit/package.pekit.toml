@@ -5,6 +5,8 @@
 format = "peipkg"
 
 [package]
-version      = "{{version}}-38"
+# -39: a TTYPath terminal is opened with READ_ATTRIBUTES as well, so the
+# session it starts can fstat/ttyname its own terminal. PEI-716.
+version      = "{{version}}-39"
 architecture = "x86_64"
 license      = "MIT"
