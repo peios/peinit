@@ -124,7 +124,9 @@ fn apply_submitted_notify_fields(
             // field is accepted rather than refused because a program that
             // can run as either should not have to know which it is.
             NotifyField::Level(value) => {
-                applied.push(SubmittedNotifyField::Level { value: value.clone() });
+                applied.push(SubmittedNotifyField::Level {
+                    value: value.clone(),
+                });
             }
             NotifyField::Progress(value) => {
                 // An unexpected value is ignored, never repaired (§4.17).

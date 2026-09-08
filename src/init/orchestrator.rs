@@ -11,7 +11,11 @@ mod recovery;
 #[cfg(test)]
 mod tests;
 
-use recovery::{RecoveryRegistryd, enter_recovery, log_console, log_console_error};
+use crate::console_style::ConsoleTag;
+use recovery::{
+    RecoveryRegistryd, enter_recovery, log_console, log_console_error, log_console_raw,
+    log_console_tagged, log_console_warn,
+};
 
 pub fn run_init<P, R, C, T>(
     config: InitConfig,
@@ -27,11 +31,57 @@ where
     T: InitRuntime + ?Sized,
 {
     platform.assert_pid1().map_err(InitRunError::Fatal)?;
-    // Before the command line is read, so `peios.quiet` cannot apply yet:
-    // peinit cannot honour a preference it has not seen. These few lines are
-    // also the only evidence peinit started at all, which makes them the right
-    // ones to be unconditional.
+
+    // Unconditional, and deliberately ahead of the command line: this line is
+    // the only evidence peinit started at all, and it has to survive a peinit
+    // that cannot read /proc/cmdline. `peios.quiet` cannot apply to it because
+    // peinit has not seen the preference yet, which is the documented reason
+    // the first lines of Phase 1 escape the policy.
     log_console(platform, QuietLevel::Verbose, "peinit: phase1 starting\n");
+
+    // Then the command line, still before any Phase 1 work, because the
+    // stage banner below needs the boot mode and the colour setting needs
+    // `TERM`. That is safe this early for the same reason Phase 1's own mount
+    // step is: /proc is `initramfs_provided`, prelude mount-moves it into the
+    // root before exec'ing peinit, and `mount_virtual_filesystems` already
+    // reads /proc/self/mountinfo before it mounts anything.
+    //
+    // The one behavioural consequence: a machine with BOTH an unreadable
+    // command line and, say, missing privileges now reports the command line as
+    // its recovery reason rather than the privileges. Both end in recovery, and
+    // the command line is the more fundamental of the two.
+    let command_line = match platform.read_kernel_command_line() {
+        Ok(command_line) => command_line,
+        Err(error) => {
+            return enter_recovery(
+                platform,
+                InitRecoveryReason::KernelCommandLine(error),
+                RecoveryRegistryd::Start(Box::new(SupervisorSettings::new(config.phase2))),
+            );
+        }
+    };
+    crate::console_style::set_colour(!command_line.dumb_terminal);
+
+    // The stage banner: punctuation between one PID 1 and the next. The
+    // operator has just watched prelude hand over, and this says the real root
+    // is in charge and in which mode.
+    //
+    // The mode named is the one this boot *starts* in. A later downgrade to
+    // Safe -- from a dependency cycle involving a Critical service, say -- is
+    // announced by its own message rather than by reprinting a banner, because
+    // a second banner would read as a second stage.
+    log_console_raw(
+        platform,
+        command_line.quiet,
+        &crate::console_style::peinit_banner(if command_line.recovery {
+            "RECOVERY MODE"
+        } else if command_line.safe_mode || config.phase2.mode == BootMode::Safe {
+            "Safe mode"
+        } else {
+            "Full boot"
+        }),
+    );
+
 
     // Before anything is attempted with them. SeCreateTokenPrivilege used to
     // surface only as an EPERM from kacs_create_token at the *first* service
@@ -70,9 +120,10 @@ where
             RecoveryRegistryd::Start(Box::new(SupervisorSettings::new(config.phase2))),
         );
     }
-    log_console(
+    log_console_tagged(
         platform,
         QuietLevel::Verbose,
+        ConsoleTag::Ok,
         "peinit: phase1 virtual filesystems mounted\n",
     );
 
@@ -82,7 +133,7 @@ where
     match platform.apply_device_node_policy() {
         Ok(report) => {
             for failure in &report.failures {
-                log_console_error(
+                log_console_warn(
                     platform,
                     &format!(
                         "peinit warning: device node {} ({}) descriptor failed: {}\n",
@@ -98,9 +149,10 @@ where
                 );
             }
             if !report.applied.is_empty() {
-                log_console(
+                log_console_tagged(
                     platform,
                     QuietLevel::Verbose,
+                    ConsoleTag::Ok,
                     &format!(
                         "peinit: phase1 device node policy applied to {} node(s)\n",
                         report.applied.len()
@@ -108,20 +160,21 @@ where
                 );
             }
         }
-        Err(error) => log_console_error(
+        Err(error) => log_console_warn(
             platform,
             &format!("peinit warning: device node policy failed: {error:?}\n"),
         ),
     }
 
     match platform.restore_random_seed() {
-        Ok(true) => log_console(
+        Ok(true) => log_console_tagged(
             platform,
             QuietLevel::Verbose,
+            ConsoleTag::Ok,
             "peinit: phase1 restored random seed\n",
         ),
         Ok(false) => {}
-        Err(error) => log_console_error(
+        Err(error) => log_console_warn(
             platform,
             &format!("peinit warning: random seed restore failed: {error:?}\n"),
         ),
@@ -129,13 +182,14 @@ where
 
     match platform.ensure_machine_id() {
         Ok(MachineIdStatus::Existing) => {}
-        Ok(MachineIdStatus::Generated) => log_console(
+        Ok(MachineIdStatus::Generated) => log_console_tagged(
             platform,
             QuietLevel::Verbose,
+            ConsoleTag::Ok,
             "peinit: phase1 generated machine-id\n",
         ),
         Ok(MachineIdStatus::ReplacedInvalid) => {
-            log_console_error(platform, "peinit warning: invalid machine-id replaced\n")
+            log_console_warn(platform, "peinit warning: invalid machine-id replaced\n")
         }
         Ok(MachineIdStatus::Ephemeral { reason }) => log_console_error(
             platform,
@@ -153,16 +207,6 @@ where
         }
     }
 
-    let command_line = match platform.read_kernel_command_line() {
-        Ok(command_line) => command_line,
-        Err(error) => {
-            return enter_recovery(
-                platform,
-                InitRecoveryReason::KernelCommandLine(error),
-                RecoveryRegistryd::Start(Box::new(SupervisorSettings::new(config.phase2))),
-            );
-        }
-    };
     let quiet = command_line.quiet;
     // Settled here rather than after the boot-attempt checks, so that a
     // recovery entered from one of them starts its registryd with the settings
@@ -173,6 +217,7 @@ where
     if command_line.safe_mode {
         settings.phase2.mode = BootMode::Safe;
     }
+
     if let Some(path) = &command_line.notify_socket_path {
         settings.notify_socket_path = path.clone();
     }
@@ -251,7 +296,7 @@ where
             RecoveryRegistryd::AlreadyAttempted,
         );
     }
-    log_console(platform, quiet, "peinit: phase1 registryd started\n");
+    log_console_tagged(platform, quiet, ConsoleTag::Ok, "peinit: phase1 registryd started\n");
     // Phase 1.5: run the image's autorun scripts now that the registry is
     // serving, before Phase 2 enumerates Machine\System\Services — so a script
     // that seeds services (the seed-apply autorun) has them present when the boot
@@ -343,7 +388,7 @@ where
     };
     log_phase2_boot_progress(platform, &boot_dispatch);
     emit_phase2_boot_audit_events(platform, &boot_dispatch);
-    log_console(platform, quiet, "peinit: phase2 boot complete\n");
+    log_console_tagged(platform, quiet, ConsoleTag::Ok, "peinit: phase2 boot complete\n");
 
     match runtime.enter_runtime(supervisor, infrastructure) {
         Ok(()) => Ok(InitRunResult::RuntimeReturned),

@@ -14,9 +14,9 @@
 use crate::boundary::{
     BoundaryError, ChildExitStatus, ChildReap, ProcessSetupStatus, ShutdownFinalizer,
 };
-use crate::shutdown::ShutdownKind;
 use crate::job::JobState;
 use crate::service::runtime::ServiceState;
+use crate::shutdown::ShutdownKind;
 use crate::supervisor::{
     Supervisor, SupervisorChildReapTurn, SupervisorServiceLaunchDispatch, SupervisorSettings,
 };
@@ -135,19 +135,13 @@ fn an_exit_reaped_before_the_setup_status_is_held_and_replayed() {
     let replayed = supervisor
         .apply_reaped_child(ready[0], APP_LAUNCH_NS + 3, &mut controller, &mut finalizer)
         .expect("replay");
-    assert!(matches!(
-        replayed,
-        SupervisorChildReapTurn::Tracked { .. }
-    ));
+    assert!(matches!(replayed, SupervisorChildReapTurn::Tracked { .. }));
     assert!(
         supervisor.jobs().get(job_id).is_none(),
         "the job is retired rather than left Running against a reaped pid",
     );
     assert_ne!(
-        supervisor
-            .service_status("app")
-            .expect("app status")
-            .state,
+        supervisor.service_status("app").expect("app status").state,
         ServiceState::Starting,
         "the service must not be parked in Starting",
     );

@@ -13,8 +13,8 @@ use crate::boundary::ProcessController;
 use super::cgroup_cleanup::{CgroupCleanupKind, record_cgroup_cleanup};
 use super::state::{Supervisor, SupervisorError};
 use super::work::SupervisorWork;
-use pending_timeout::fail_pending_operation_timeout;
 use on_failure_chain::settle_due_on_failure_chains;
+use pending_timeout::fail_pending_operation_timeout;
 use restart_window::reset_due_restart_windows;
 use service_main_start_timeout::process_due_service_main_start_timeout;
 

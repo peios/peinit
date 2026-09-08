@@ -1,4 +1,5 @@
 use crate::boundary::RegistryClient;
+use crate::console_style::ConsoleTag;
 use crate::supervisor::{Supervisor, SupervisorSettings};
 
 use super::{InitPlatform, InitRecoveryReason, InitRunError, InitRunResult, QuietLevel};
@@ -50,7 +51,7 @@ where
     // Never suppressed, at any quiet level and whoever owns the terminal: the
     // system is about to stop being the system, and the recovery shell is
     // taking that terminal next in any case.
-    log_console_error(
+    log_console_critical(
         platform,
         &format!("peinit: entering recovery: {reason:?}\n"),
     );
@@ -86,10 +87,40 @@ pub(super) fn log_console<P>(platform: &mut P, quiet: QuietLevel, message: &str)
 where
     P: InitPlatform + ?Sized,
 {
+    log_console_tagged(platform, quiet, ConsoleTag::None, message);
+}
+
+/// Phase-1 progress that reports an outcome, so it earns a tag.
+///
+/// Phase 1 reaches the console by a different path than the runtime does —
+/// raw strings through `InitPlatform::write_console_message`, rather than a
+/// `ConsoleMessage` through the `ConsoleSink` — so the rendering has to happen
+/// here too. Both call the same renderer, which is the point of keeping it in
+/// `console_style` rather than in either path.
+pub(super) fn log_console_tagged<P>(
+    platform: &mut P,
+    quiet: QuietLevel,
+    tag: ConsoleTag,
+    message: &str,
+) where
+    P: InitPlatform + ?Sized,
+{
     if quiet.suppresses_status() {
         return;
     }
-    let _ = platform.write_console_message(message);
+    let _ = platform.write_console_message(tag, message);
+}
+
+/// Phase-1 output with nothing to report but the fact of it: a banner, or a
+/// line that is already its own punctuation. Never tagged, never padded.
+pub(super) fn log_console_raw<P>(platform: &mut P, quiet: QuietLevel, message: &str)
+where
+    P: InitPlatform + ?Sized,
+{
+    if quiet.suppresses_status() {
+        return;
+    }
+    let _ = platform.write_console_message(ConsoleTag::Bare, message);
 }
 
 /// Phase 1 output that survives a blackout: something went wrong, and silence
@@ -98,7 +129,23 @@ pub(super) fn log_console_error<P>(platform: &mut P, message: &str)
 where
     P: InitPlatform + ?Sized,
 {
-    let _ = platform.write_console_message(message);
+    let _ = platform.write_console_message(ConsoleTag::Failed, message);
+}
+
+/// Phase-1 output for something wrong that the boot survives.
+pub(super) fn log_console_warn<P>(platform: &mut P, message: &str)
+where
+    P: InitPlatform + ?Sized,
+{
+    let _ = platform.write_console_message(ConsoleTag::Warn, message);
+}
+
+/// Phase-1 output for losing the machine.
+pub(super) fn log_console_critical<P>(platform: &mut P, message: &str)
+where
+    P: InitPlatform + ?Sized,
+{
+    let _ = platform.write_console_message(ConsoleTag::Crit, message);
 }
 
 #[cfg(feature = "peios-boundary")]

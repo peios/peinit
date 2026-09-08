@@ -46,8 +46,7 @@ where
 
     for participant in &wave.services {
         if participant.already_stopping {
-            let retained =
-                retained_stop_deadline(work, &participant.service, wave_index, now_ns)?;
+            let retained = retained_stop_deadline(work, &participant.service, wave_index, now_ns)?;
             stop_deadlines.push(retained.deadline.clone());
             dispatches.push(SupervisorShutdownStopDispatch {
                 service: participant.service.clone(),

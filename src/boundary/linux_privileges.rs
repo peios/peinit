@@ -42,9 +42,8 @@ const REQUIRED: &[(&str, Privileges)] = &[
 /// Present *and* enabled: a privilege the token carries but has not enabled is
 /// not usable, and the failure would look identical to it being absent.
 pub fn verify_peinit_privileges() -> Result<(), BoundaryError> {
-    let token = Token::open_self(true, TokenAccess::QUERY).map_err(|error| {
-        BoundaryError::Token(format!("open peinit token failed: {error}"))
-    })?;
+    let token = Token::open_self(true, TokenAccess::QUERY)
+        .map_err(|error| BoundaryError::Token(format!("open peinit token failed: {error}")))?;
     let privileges = token.privileges().map_err(|error| {
         BoundaryError::Token(format!("query peinit privileges failed: {error}"))
     })?;

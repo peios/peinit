@@ -41,6 +41,9 @@ pub(super) struct Platform {
     pub(super) increment_calls: usize,
     pub(super) warning_logs: Vec<Phase1InfrastructureWarning>,
     pub(super) console_messages: Vec<String>,
+    /// The same lines with the tag peinit chose, for tests that care which
+    /// outcome an operator would have seen.
+    pub(super) console_tags: Vec<(crate::console_style::ConsoleTag, String)>,
     pub(super) recovery_reasons: Vec<InitRecoveryReason>,
     pub(super) kmes_events: Vec<KmesEvent>,
 }
@@ -73,6 +76,7 @@ impl Platform {
             increment_calls: 0,
             warning_logs: Vec::new(),
             console_messages: Vec::new(),
+            console_tags: Vec::new(),
             recovery_reasons: Vec::new(),
             kmes_events: Vec::new(),
         }
@@ -249,8 +253,19 @@ impl InitPlatform for Platform {
         Ok(())
     }
 
-    fn write_console_message(&mut self, message: &str) -> Result<(), BoundaryError> {
+    /// Records what peinit *said*, not what the console would have shown.
+    ///
+    /// Rendering is the Linux platform's job (it owns the device), so the
+    /// double keeps the message and the tag apart. Assertions stay readable —
+    /// no padding, no escape bytes in an expected value — and a test that
+    /// cares about the tag can say so.
+    fn write_console_message(
+        &mut self,
+        tag: crate::console_style::ConsoleTag,
+        message: &str,
+    ) -> Result<(), BoundaryError> {
         self.console_messages.push(message.to_string());
+        self.console_tags.push((tag, message.to_string()));
         Ok(())
     }
 

@@ -12,9 +12,7 @@ use crate::supervisor::launch::record_pending_process_setup;
 use crate::supervisor::state::{Supervisor, SupervisorError};
 use crate::supervisor::work::SupervisorWork;
 
-use super::{
-    HealthCheckError, fail_launched_health_check_in_work,
-};
+use super::{HealthCheckError, fail_launched_health_check_in_work};
 
 impl Supervisor {
     /// The controller a health-check launch used to need is gone: the only

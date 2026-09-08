@@ -140,11 +140,7 @@ fn a_disabled_service_can_still_be_started_explicitly() {
 
     assert_eq!(
         planned_services(&plan.starts),
-        vec![(
-            "db",
-            OperationSource::Admin,
-            TransitionCause::ExplicitStart,
-        )],
+        vec![("db", OperationSource::Admin, TransitionCause::ExplicitStart,)],
     );
     assert!(plan.blocked.is_empty());
 }

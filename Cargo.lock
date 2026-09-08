@@ -220,7 +220,7 @@ dependencies = [
 
 [[package]]
 name = "libauthd"
-version = "0.0.1"
+version = "0.0.14"
 dependencies = [
  "libc",
 ]

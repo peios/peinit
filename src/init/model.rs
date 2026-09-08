@@ -51,6 +51,16 @@ pub struct KernelCommandLine {
     pub notify_socket_path: Option<String>,
     /// `peios.quiet=N` — how much peinit may write to the console.
     pub quiet: QuietLevel,
+    /// `TERM=dumb` — the console cannot render escape sequences, so peinit
+    /// writes its tag column without colour.
+    ///
+    /// Not a `peios.*` token on purpose. peinit is PID 1 and has no inherited
+    /// `TERM` to consult, so the command line is the only place an operator
+    /// can say this; and `TERM=dumb` is the spelling systemd already uses for
+    /// exactly this decision, so it costs nobody a new thing to learn. The
+    /// `peios.*` set is kept deliberately small (see the boot docs) and a
+    /// presentation switch does not earn a place in it.
+    pub dumb_terminal: bool,
 }
 
 /// How much peinit may write to `/dev/console`.
@@ -133,6 +143,7 @@ impl KernelCommandLine {
                 Some(("peios.notifysocket", value)) if !value.is_empty() => {
                     command_line.notify_socket_path = Some(value.to_string());
                 }
+                Some(("TERM", value)) => command_line.dumb_terminal = value == "dumb",
                 Some(("peios.quiet", value)) => {
                     // Unparseable leaves the default, like the other valued
                     // tokens: a typo in a logging knob must not decide how the
@@ -208,7 +219,18 @@ pub trait InitPlatform {
     ) -> Result<(), BoundaryError> {
         Ok(())
     }
-    fn write_console_message(&mut self, _message: &str) -> Result<(), BoundaryError> {
+    /// Write one line to the console.
+    ///
+    /// The tag is passed rather than pre-rendered into `message` so that the
+    /// implementation — the thing that owns the device — decides how a tag
+    /// looks, exactly as the runtime's `ConsoleSink` does. It also keeps the
+    /// test double asserting on what peinit *said* rather than on padding and
+    /// escape bytes.
+    fn write_console_message(
+        &mut self,
+        _tag: crate::console_style::ConsoleTag,
+        _message: &str,
+    ) -> Result<(), BoundaryError> {
         Ok(())
     }
     fn emit_kmes_event(
@@ -325,7 +347,9 @@ pub enum MachineIdStatus {
     /// will not survive it. A warning, never a reason to enter recovery
     /// (§2.1) — the machine ID is a local opaque install identifier, not a
     /// credential, and failing a boot over it is disproportionate.
-    Ephemeral { reason: String },
+    Ephemeral {
+        reason: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

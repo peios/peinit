@@ -18,8 +18,8 @@ mod lifecycle;
 mod lifecycle_deadline_timer;
 mod notify;
 mod operation_maintenance;
-mod phase1_registryd;
 mod pending_queue;
+mod phase1_registryd;
 mod post_start_hooks;
 mod power_button;
 mod pre_start_checks;
@@ -54,7 +54,6 @@ mod work;
 mod tests;
 
 pub use cgroup_cleanup::SupervisorLeakedCgroupDispatch;
-pub use critical_budget::SupervisorCriticalBudgetRebootDispatch;
 pub use child_reap::{SupervisorChildReapDispatch, SupervisorChildReapTurn};
 pub use control_boundary::{PendingControlOperation, PendingControlRequirement};
 pub use control_command::{
@@ -74,6 +73,7 @@ pub use control_connection::{
 pub use control_connection::{
     SupervisorControlFrameContext, SupervisorShutdownControlFrameContext,
 };
+pub use critical_budget::SupervisorCriticalBudgetRebootDispatch;
 pub use dispatch::{
     SupervisedSubmittedTerminalDispatch, SupervisorBootDispatch, SupervisorBootSuccessDispatch,
     SupervisorControlDispatch, SupervisorControlLaunchDispatch, SupervisorControlLaunchResult,

@@ -73,8 +73,7 @@ fn include_closure(
             // those too — so the cautious mode was the one that started a
             // service without the thing it declared it needs, on the very
             // path a Full boot had already failed.
-            Some(target_definition)
-                if !target_definition.disabled && mode != BootMode::Full => {}
+            Some(target_definition) if !target_definition.disabled && mode != BootMode::Full => {}
             _ => {
                 // Through block_service, not or_insert: a service can be
                 // missing more than one hard dependency, and or_insert kept

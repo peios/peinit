@@ -1,9 +1,7 @@
 use crate::boundary::BoundaryError;
 use crate::job::{JobEventDetail, JobType};
 use crate::service::runtime::{ServiceHealthStatus, ServiceState};
-use crate::supervisor::tests::{
-    ScriptedClock, TestProcessLauncher, TestTokenProvider, process,
-};
+use crate::supervisor::tests::{ScriptedClock, TestProcessLauncher, TestTokenProvider, process};
 use crate::supervisor::{
     SupervisorHealthCheckIntervalAction, SupervisorHealthCheckLaunchResult,
     SupervisorHealthCheckOutcome,
@@ -62,11 +60,7 @@ fn health_check_launch_uses_health_timeout_for_setup_handshake() {
     let mut launcher = TestProcessLauncher::new(vec![process(9000, 70)]);
     let mut clock = ScriptedClock::new([first_due + 10_000]);
     supervisor
-        .launch_next_pending_health_check_job(
-            &mut tokens,
-            &mut launcher,
-            &mut clock,
-        )
+        .launch_next_pending_health_check_job(&mut tokens, &mut launcher, &mut clock)
         .expect("launch health")
         .expect("health launch result");
 

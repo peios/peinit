@@ -248,7 +248,9 @@ fn push_late_service_exit(
     };
     push_error(
         out,
-        format!("peinit: service {service} main process exited in state {state:?}; no action taken\n"),
+        format!(
+            "peinit: service {service} main process exited in state {state:?}; no action taken\n"
+        ),
     );
 }
 

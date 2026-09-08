@@ -20,8 +20,7 @@ use super::{
 /// Boot two independent services, so two ids sit in the launch queue.
 fn booted_with_two_queued_jobs() -> (Supervisor, Vec<crate::ids::JobId>) {
     let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
-    let mut registry =
-        StaticRegistry::services(vec![alive_service("app"), alive_service("other")]);
+    let mut registry = StaticRegistry::services(vec![alive_service("app"), alive_service("other")]);
     let mut clock = ScriptedClock::new([BOOT_NS, AUTHD_LAUNCH_NS, APP_LAUNCH_NS]);
     supervisor
         .run_phase2_boot(&mut registry, &mut clock)

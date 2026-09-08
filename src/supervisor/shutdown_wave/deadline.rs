@@ -66,10 +66,14 @@ pub(super) fn retained_stop_deadline(
         })
     {
         let Some(retained) = work.control.stop_timeout(operation.id) else {
-            return Ok(substitute("no retained timeout for the in-flight stop operation"));
+            return Ok(substitute(
+                "no retained timeout for the in-flight stop operation",
+            ));
         };
         let Some(started_at_ns) = operation.started_at_ns else {
-            return Ok(substitute("the in-flight stop operation records no start time"));
+            return Ok(substitute(
+                "the in-flight stop operation records no start time",
+            ));
         };
 
         return Ok(RetainedStopDeadline {
@@ -96,10 +100,14 @@ pub(super) fn retained_stop_deadline(
     // Each of these is a distinct way for the evidence to have outlived or
     // contradicted the state it describes, and the operator gets told which.
     if runtime.state != crate::service::runtime::ServiceState::Stopping {
-        return Ok(substitute("retained timeout but the service is not Stopping"));
+        return Ok(substitute(
+            "retained timeout but the service is not Stopping",
+        ));
     }
     if runtime.cause != Some(retained.cause) {
-        return Ok(substitute("retained timeout's cause does not match the service's"));
+        return Ok(substitute(
+            "retained timeout's cause does not match the service's",
+        ));
     }
     if !retained_stop_cause(retained.cause) {
         return Ok(substitute("retained timeout's cause is not a stop cause"));

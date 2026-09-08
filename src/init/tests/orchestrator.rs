@@ -45,6 +45,7 @@ fn recovery_flag_enters_recovery_after_root_probe_and_counter_increment() {
         boot_attempt_threshold: None,
         notify_socket_path: None,
         quiet: QuietLevel::default(),
+        dumb_terminal: false,
     });
     let mut registry = Registry::with_services([]);
     let mut clock = ClockAt(1);
@@ -79,6 +80,7 @@ fn recovery_flag_does_not_require_readable_boot_attempt_counter() {
             boot_attempt_threshold: None,
             notify_socket_path: None,
             quiet: QuietLevel::default(),
+            dumb_terminal: false,
         })
         .boot_attempt_counter_error("malformed counter");
     let mut registry = Registry::with_services([]);
@@ -105,7 +107,7 @@ fn recovery_flag_does_not_require_readable_boot_attempt_counter() {
 }
 
 #[test]
-fn kernel_command_line_is_read_after_virtual_filesystem_mounts() {
+fn kernel_command_line_is_read_before_any_phase1_work() {
     let mut platform = Platform::new().command_line_error("missing /proc/cmdline");
     let mut registry = Registry::with_services([]);
     let mut clock = ClockAt(1);
@@ -126,17 +128,79 @@ fn kernel_command_line_is_read_after_virtual_filesystem_mounts() {
             reason: InitRecoveryReason::KernelCommandLine(_),
         },
     ));
-    let mounted_index = platform
-        .console_messages
-        .iter()
-        .position(|message| message == "peinit: phase1 virtual filesystems mounted\n")
-        .expect("mounted message");
+    // "phase1 starting" still comes first: it is the evidence peinit ran, and a
+    // machine that cannot read its command line is exactly when that matters.
+    //
+    // Nothing else from Phase 1 should have run. This reverses an earlier invariant
+    // ("read the command line AFTER the virtual filesystem mounts"), which
+    // assumed mounting is what makes /proc/cmdline readable. It is not:
+    // `mount_phase1_virtual_filesystems` reads /proc/self/mountinfo *before* it
+    // mounts anything, and /proc is `initramfs_provided` — prelude mount-moves
+    // it into the root before exec'ing peinit. A peinit that cannot read
+    // /proc/cmdline could not have read mountinfo either, so the old ordering
+    // bought nothing and cost the stage banner its place at the stage.
+    assert!(
+        !platform
+            .console_messages
+            .iter()
+            .any(|message| message.starts_with("peinit: phase1 mounting")),
+        "no Phase 1 work should precede the command line: {:?}",
+        platform.console_messages
+    );
     let recovery_index = platform
         .console_messages
         .iter()
         .position(|message| message.starts_with("peinit: entering recovery: KernelCommandLine("))
         .expect("recovery message");
-    assert!(mounted_index < recovery_index);
+    let starting_index = platform
+        .console_messages
+        .iter()
+        .position(|message| message == "peinit: phase1 starting\n")
+        .expect("starting message");
+    assert!(starting_index < recovery_index);
+}
+
+/// The tag is what an operator actually scans for, so it is worth asserting
+/// separately from the prose. In particular a Phase 1 "warning" must render as
+/// `[ WARN ]` and not `[FAILED]`: every one of these sites used the error
+/// helper before there were tags, which was invisible then and overstates the
+/// problem now.
+#[test]
+fn phase1_tags_match_what_happened() {
+    use crate::console_style::ConsoleTag;
+
+    let mut platform = Platform::new();
+    let mut registry = Registry::with_services([service("app")]);
+    let mut clock = ClockAt(10);
+    let mut runtime = Runtime::default();
+
+    run_init(
+        InitConfig::default(),
+        &mut platform,
+        &mut registry,
+        &mut clock,
+        &mut runtime,
+    )
+    .expect("runtime");
+
+    let tag_of = |needle: &str| {
+        platform
+            .console_tags
+            .iter()
+            .find(|(_, message)| message.contains(needle))
+            .map(|(tag, _)| *tag)
+            .unwrap_or_else(|| panic!("no message containing {needle:?}"))
+    };
+
+    // Outcomes.
+    assert_eq!(tag_of("virtual filesystems mounted"), ConsoleTag::Ok);
+    assert_eq!(tag_of("registryd started"), ConsoleTag::Ok);
+    assert_eq!(tag_of("phase2 boot complete"), ConsoleTag::Ok);
+    // Progress with no outcome yet holds the column but stays blank.
+    assert_eq!(tag_of("phase1 starting\n"), ConsoleTag::None);
+    assert_eq!(tag_of("phase2 boot starting"), ConsoleTag::None);
+    // The banner brings its own layout and must not be given a tag column.
+    assert_eq!(tag_of("real root · PID 1"), ConsoleTag::Bare);
 }
 
 #[test]
@@ -506,16 +570,27 @@ fn successful_boot_enters_runtime_with_phase2_booted_supervisor() {
     assert!(runtime.entered);
     assert_eq!(runtime.supervisor_mode, Some(BootMode::Full));
     assert!(runtime.service_names.contains(&"app".to_string()));
+    // The stage banner sits between peinit announcing itself and its first
+    // Phase 1 step, and carries the mode this boot started in. Matched by its
+    // content rather than spelled out, so a change to the rule character or the
+    // width does not fail an unrelated test.
+    let banner = platform
+        .console_messages
+        .iter()
+        .find(|message| message.contains("peinit · real root · PID 1 · Full boot"))
+        .cloned()
+        .expect("stage banner");
     assert_eq!(
         platform.console_messages,
         vec![
-            "peinit: phase1 starting\n",
-            "peinit: phase1 mounting virtual filesystems\n",
-            "peinit: phase1 virtual filesystems mounted\n",
-            "peinit: phase1 starting registryd\n",
-            "peinit: phase1 registryd started\n",
-            "peinit: phase2 boot starting\n",
-            "peinit: phase2 boot complete\n",
+            "peinit: phase1 starting\n".to_string(),
+            banner,
+            "peinit: phase1 mounting virtual filesystems\n".to_string(),
+            "peinit: phase1 virtual filesystems mounted\n".to_string(),
+            "peinit: phase1 starting registryd\n".to_string(),
+            "peinit: phase1 registryd started\n".to_string(),
+            "peinit: phase2 boot starting\n".to_string(),
+            "peinit: phase2 boot complete\n".to_string(),
         ],
     );
 }
@@ -710,6 +785,7 @@ fn safemode_flag_sets_supervisor_boot_mode() {
         boot_attempt_threshold: None,
         notify_socket_path: None,
         quiet: QuietLevel::default(),
+        dumb_terminal: false,
     });
     let mut registry = Registry::with_services([critical_service("core"), service("app")]);
     let mut clock = ClockAt(10);

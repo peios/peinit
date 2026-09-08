@@ -133,9 +133,8 @@ impl RuntimeServiceLogPipes {
                 // load the lossy design exists to absorb, then replays records
                 // eventd may already hold (PEI-357).
                 Ok(crate::boundary::EventdSendOutcome::Dropped) => {
-                    self.eventd_dropped_records = self
-                        .eventd_dropped_records
-                        .saturating_add(batch_len);
+                    self.eventd_dropped_records =
+                        self.eventd_dropped_records.saturating_add(batch_len);
                 }
                 Ok(crate::boundary::EventdSendOutcome::Sent) => {}
                 Err(_) => {

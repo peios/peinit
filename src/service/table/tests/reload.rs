@@ -328,11 +328,7 @@ fn a_definition_withdrawn_while_a_service_is_in_backoff_discards_the_entry() {
         )
         .expect("active");
     table
-        .transition_service_to_restart_backoff(
-            "app",
-            TransitionCause::ProcessCrash,
-            2_000_000_000,
-        )
+        .transition_service_to_restart_backoff("app", TransitionCause::ProcessCrash, 2_000_000_000)
         .expect("backoff");
 
     let summary = table
