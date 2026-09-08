@@ -67,10 +67,7 @@ impl TimerLastRunWrites {
         pid: u32,
         status: ChildExitStatus,
     ) -> Option<FailedTimerLastRunWrite> {
-        let index = self
-            .outstanding
-            .iter()
-            .position(|write| write.pid == pid)?;
+        let index = self.outstanding.iter().position(|write| write.pid == pid)?;
         let write = self.outstanding.remove(index)?;
         match status {
             ChildExitStatus::Exited { code: 0 } => None,
@@ -144,7 +141,10 @@ mod tests {
         let mut writes = TimerLastRunWrites::default();
         writes.record(4242, "backup".to_string(), "daily UTC".to_string());
 
-        assert_eq!(writes.claim(9999, ChildExitStatus::Exited { code: 1 }), None);
+        assert_eq!(
+            writes.claim(9999, ChildExitStatus::Exited { code: 1 }),
+            None
+        );
     }
 
     /// A child that somehow never gets reaped must not grow the ring.
@@ -157,13 +157,13 @@ mod tests {
 
         assert_eq!(writes.outstanding.len(), MAX_OUTSTANDING);
         // The oldest are the ones dropped.
-        assert_eq!(
-            writes.claim(0, ChildExitStatus::Exited { code: 1 }),
-            None,
-        );
+        assert_eq!(writes.claim(0, ChildExitStatus::Exited { code: 1 }), None,);
         assert!(
             writes
-                .claim(MAX_OUTSTANDING as u32 * 2 - 1, ChildExitStatus::Exited { code: 1 })
+                .claim(
+                    MAX_OUTSTANDING as u32 * 2 - 1,
+                    ChildExitStatus::Exited { code: 1 }
+                )
                 .is_some(),
         );
     }

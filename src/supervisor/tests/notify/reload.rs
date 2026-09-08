@@ -139,7 +139,10 @@ fn an_unconfirmed_reload_is_audited_and_reported_rather_than_only_returned() {
     // The phase reaches the dispatch, which is what the console and the audit
     // stream key on. Without it the two outcomes are indistinguishable there.
     assert_eq!(completions.len(), 1);
-    assert_eq!(completions[0].completion.phase, ReloadDetectionPhase::ExtendedWait);
+    assert_eq!(
+        completions[0].completion.phase,
+        ReloadDetectionPhase::ExtendedWait
+    );
 }
 
 // The ordinary outcome is not a diagnostic. A service that never implements

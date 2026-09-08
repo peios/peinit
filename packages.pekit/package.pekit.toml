@@ -7,6 +7,57 @@ format = "peipkg"
 [package]
 # -39: a TTYPath terminal is opened with READ_ATTRIBUTES as well, so the
 # session it starts can fstat/ttyname its own terminal. PEI-716.
-version      = "{{version}}-39"
+# -40: peinit's console output gains the shared boot line format — a
+# fixed-width outcome tag ([  OK  ] / [ SKIP ] / [ WARN ] / [FAILED] /
+# [ CRIT ]) and a stage banner naming the boot mode. Rendered at the sink
+# (the Linux ConsoleSink and the Linux InitPlatform) rather than at the
+# ~35 producers, because colour depends on the terminal and a producer in
+# the supervisor has no business knowing about it. Colour follows systemd's
+# rule: on unless the command line says TERM=dumb.
+#
+# Two behaviour changes worth knowing about:
+#   - the kernel command line is now read at the very top of run_init,
+#     before Phase 1 work, so the stage banner can name the boot mode. It
+#     was read after the virtual-filesystem mounts on the assumption that
+#     mounting is what makes /proc/cmdline readable; it is not, because the
+#     mount step reads /proc/self/mountinfo first and /proc is
+#     initramfs_provided. A machine with both an unreadable command line and
+#     another Phase 1 fault now reports the command line as its recovery
+#     reason.
+#   - Phase 1 "peinit warning: ..." lines were emitted through the error
+#     helper and now render [ WARN ] rather than [FAILED], which is what
+#     they always meant.
+#
+# -41: the autorun runner and the two remaining raw console writers in the
+# Linux platform (phase 1 infrastructure warnings, unarmed calendar timers)
+# render through the same formatter. They wrote straight to /dev/console and
+# were the last untagged lines peinit produced, which showed up on a real boot
+# as three unaligned lines in the middle of a tagged log. PEI-783.
+# -42: two output changes that go together.
+#
+# Autorun scripts are captured instead of inheriting peinit's console, so
+# their lines carry the tag column under the script's own name and the
+# script's exit code decides the [  OK  ] / [ WARN ]. Their output is
+# sanitised first: a script sharing the console could otherwise steer it with
+# an escape sequence, and peinit's own lines share the device.
+#
+# Phase 1 now relays whatever registryd printed when it fails to become
+# ready (report_registryd_output). peinit gives every service capture pipes
+# and drains them in the runtime loop, but Phase 1 has no loop, so a
+# registryd that printed exactly why it could not serve was reported as
+# nothing but a readiness timeout. That gap is why loregd opened /dev/console
+# itself; with this it does not have to, and its startup lines go to the
+# pre-eventd buffer and on to eventd like every other service's.
+#
+# Failure path only. peinit still does not echo service output to the console
+# on a normal boot. Ship this BEFORE the loregd that drops its console
+# redirect: the other order restores the silent failure.
+# -43 supersedes -42, which shipped the same behaviour with the two relays
+# each formatting their own lines. They now share one formatter
+# (console_style::relay_lines), which is also where it is tested — the autorun
+# runner and the registryd path both live behind `peios-boundary` and cannot
+# be built, let alone tested, without libpeios.
+# PEI-783.
+version      = "{{version}}-43"
 architecture = "x86_64"
 license      = "MIT"

@@ -127,7 +127,14 @@ fn serializes_list_response_as_compact_query_authorized_summaries() {
     assert_eq!(sorted_keys(&response), ["services", "status"]);
     assert_eq!(
         sorted_keys(&response["services"][0]),
-        ["cause", "description", "display_name", "health", "service", "state"],
+        [
+            "cause",
+            "description",
+            "display_name",
+            "health",
+            "service",
+            "state"
+        ],
     );
     assert_eq!(response["services"][0]["service"], "app");
     assert_eq!(response["services"][0]["display_name"], "Application");

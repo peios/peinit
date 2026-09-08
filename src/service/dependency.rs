@@ -50,7 +50,11 @@ pub fn split_target(declared: &str) -> (String, Option<String>) {
 
 fn dependency(declared: &str, kind: ServiceDependencyKind) -> ServiceDependency {
     let (target, level) = split_target(declared);
-    ServiceDependency { target, level, kind }
+    ServiceDependency {
+        target,
+        level,
+        kind,
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -77,7 +81,12 @@ pub fn all_declared_dependencies(definition: &ServiceDefinition) -> Vec<ServiceD
         .requires
         .iter()
         .map(|d| dependency(d, ServiceDependencyKind::Requires))
-        .chain(definition.wants.iter().map(|d| dependency(d, ServiceDependencyKind::Wants)))
+        .chain(
+            definition
+                .wants
+                .iter()
+                .map(|d| dependency(d, ServiceDependencyKind::Wants)),
+        )
         .chain(
             definition
                 .binds_to
@@ -179,12 +188,18 @@ mod level_tests {
     #[test]
     fn a_plain_name_has_no_level() {
         assert_eq!(split_target("netd"), ("netd".into(), None));
-        assert_eq!(split_target("lpsd-first-account"), ("lpsd-first-account".into(), None));
+        assert_eq!(
+            split_target("lpsd-first-account"),
+            ("lpsd-first-account".into(), None)
+        );
     }
 
     #[test]
     fn a_level_splits_off() {
-        assert_eq!(split_target("netd:routed"), ("netd".into(), Some("routed".into())));
+        assert_eq!(
+            split_target("netd:routed"),
+            ("netd".into(), Some("routed".into()))
+        );
         assert_eq!(
             split_target("timed:synchronised"),
             ("timed".into(), Some("synchronised".into()))
@@ -239,10 +254,16 @@ mod level_tests {
         definition.requires = vec!["netd:routed".into()];
         definition.wants = vec!["timed:synchronised".into()];
         let all = all_declared_dependencies(&definition);
-        let requires = all.iter().find(|d| d.kind == ServiceDependencyKind::Requires).unwrap();
+        let requires = all
+            .iter()
+            .find(|d| d.kind == ServiceDependencyKind::Requires)
+            .unwrap();
         assert_eq!(requires.target, "netd");
         assert_eq!(requires.level.as_deref(), Some("routed"));
-        let wants = all.iter().find(|d| d.kind == ServiceDependencyKind::Wants).unwrap();
+        let wants = all
+            .iter()
+            .find(|d| d.kind == ServiceDependencyKind::Wants)
+            .unwrap();
         assert_eq!(wants.target, "timed");
         assert_eq!(wants.level.as_deref(), Some("synchronised"));
     }

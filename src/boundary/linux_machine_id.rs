@@ -29,7 +29,9 @@ pub enum LinuxMachineIdStatus {
     /// which "MUST NOT be treated as a security principal, credential, SID,
     /// account, or authorization input". Failing a boot over it is
     /// disproportionate to what it is for (PEI-363).
-    Ephemeral { reason: String },
+    Ephemeral {
+        reason: String,
+    },
 }
 
 #[derive(Debug)]

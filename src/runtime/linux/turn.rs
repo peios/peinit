@@ -50,7 +50,12 @@ impl LinuxShutdownRuntime {
             if !self.quiet_policy.allows(message.severity) {
                 continue;
             }
-            let _ = self.console_sink.write_console(&message.text);
+            // Rendered here, at the one place that owns the device, rather
+            // than at the dozens of producers: the tag column and its colours
+            // are a property of the console, and a producer deep in the
+            // supervisor has no way to know about either.
+            let line = crate::console_style::render(message.tag, &message.text);
+            let _ = self.console_sink.write_console(&line);
         }
     }
 
@@ -201,11 +206,12 @@ impl LinuxShutdownRuntime {
                         .map_err(RuntimeShutdownLoopError::DeferredChildReap)?,
                 );
             }
-            turn.turns
-                .push(crate::runtime::RuntimeShutdownEventTurn::DeferredChildReaps {
+            turn.turns.push(
+                crate::runtime::RuntimeShutdownEventTurn::DeferredChildReaps {
                     child_reaps,
                     ended_at_ns: after_sources_ns,
-                });
+                },
+            );
         }
         let maintenance_after_sources = process_due_operation_maintenance_at(
             supervisor,

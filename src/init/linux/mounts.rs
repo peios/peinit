@@ -312,7 +312,12 @@ impl Phase1MountSyscalls for LinuxPhase1MountSyscalls {
         // mount is DENY_MISSING until this very call takes effect.
         let path = c_string(mount_point)?;
         // SAFETY: plain open(2); the fd is owned below.
-        let fd = unsafe { libc::open(path.as_ptr(), libc::O_PATH | libc::O_DIRECTORY | libc::O_CLOEXEC) };
+        let fd = unsafe {
+            libc::open(
+                path.as_ptr(),
+                libc::O_PATH | libc::O_DIRECTORY | libc::O_CLOEXEC,
+            )
+        };
         if fd < 0 {
             return Err(io::Error::last_os_error());
         }

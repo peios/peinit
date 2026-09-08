@@ -145,11 +145,18 @@ impl InitPlatform for LinuxInitPlatform {
         &mut self,
         warning: &super::Phase1InfrastructureWarning,
     ) -> Result<(), BoundaryError> {
-        write_console(&format!("peinit warning: {warning}\n"))
+        write_console(&crate::console_style::render(
+            crate::console_style::ConsoleTag::Warn,
+            &format!("peinit warning: {warning}\n"),
+        ))
     }
 
-    fn write_console_message(&mut self, message: &str) -> Result<(), BoundaryError> {
-        write_console(message)
+    fn write_console_message(
+        &mut self,
+        tag: crate::console_style::ConsoleTag,
+        message: &str,
+    ) -> Result<(), BoundaryError> {
+        write_console(&crate::console_style::render(tag, message))
     }
 
     fn emit_kmes_event(&mut self, event: &crate::boundary::KmesEvent) -> Result<(), BoundaryError> {
@@ -246,8 +253,9 @@ fn machine_id_error(error: crate::boundary::LinuxMachineIdError) -> BoundaryErro
 /// happened silently.
 fn log_rejected_calendar_timers(rejected: &[crate::timer::boot::TimerBootPlanError]) {
     for error in rejected {
-        let _ = write_console(&format!(
-            "peinit warning: calendar timer not armed: {error:?}\n"
+        let _ = write_console(&crate::console_style::render(
+            crate::console_style::ConsoleTag::Warn,
+            &format!("peinit warning: calendar timer not armed: {error:?}\n"),
         ));
     }
 }

@@ -325,19 +325,13 @@ fn repeated_eventd_sync_reuses_the_configured_path_allocation() {
     let path = "/run/services/eventd/eventd-log.sock";
 
     pipes.sync_eventd_forwarding_with_sink(true, Some(path), &mut sink);
-    let first_path = pipes
-        .eventd_socket_path
-        .as_ref()
-        .expect("forwarding path");
+    let first_path = pipes.eventd_socket_path.as_ref().expect("forwarding path");
     let first_ptr = first_path.as_ptr();
     let first_capacity = first_path.capacity();
 
     pipes.sync_eventd_forwarding_with_sink(true, Some(path), &mut sink);
 
-    let second_path = pipes
-        .eventd_socket_path
-        .as_ref()
-        .expect("forwarding path");
+    let second_path = pipes.eventd_socket_path.as_ref().expect("forwarding path");
     assert_eq!(second_path.as_ptr(), first_ptr);
     assert_eq!(second_path.capacity(), first_capacity);
 }

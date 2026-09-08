@@ -5,11 +5,14 @@ use crate::boundary::{
     BoundaryError, Clock, LinuxMonotonicClock, LinuxProcessController, LinuxProcessLauncher,
     LinuxSystemTokenProvider, ProcessLauncher, ProcessSetupStatus, RegistryClient,
 };
+use crate::console_style::{relay_lines, render, ConsoleTag};
 use crate::notify::{NotifySocket, NotifySocketReadError};
 use crate::supervisor::{
     Supervisor, SupervisorError, SupervisorLaunchDispatch, SupervisorProcessSetupDispatch,
     SupervisorServiceLaunchDispatch,
 };
+
+use super::recovery_console::write_console;
 
 const REGISTRYD_READY_TIMEOUT_NS: u64 = 30_000_000_000;
 const REGISTRYD_SETUP_TIMEOUT_NS: u64 = 30_000_000_000;
@@ -91,19 +94,101 @@ pub(super) fn start_linux_phase1_registryd(
     }
 
     let mut wait_clock = LinuxMonotonicClock::new();
-    wait_for_registryd_ready(
+    // Every failure from here on relays what registryd printed before returning.
+    // These are exactly the cases an operator cannot diagnose from peinit's own
+    // message: the daemon started, so the fault is inside it.
+    if let Err(error) = wait_for_registryd_ready(
         supervisor,
         &notify_socket,
         &mut wait_clock,
         observed_at_ns.saturating_add(REGISTRYD_READY_TIMEOUT_NS),
-    )?;
+    ) {
+        report_registryd_output(&launch.launch.process);
+        return Err(error);
+    }
     // With registryd serving, ensure the base service-registry structure exists
     // before anything reads it. On a fresh system this creates
     // Machine\System\Services + SchemaVersion; on later boots it is a no-op.
-    registry.provision_base_registry()?;
-    registry.read_services_schema_version()?;
+    //
+    // A failure here means registryd said READY=1 and then could not serve,
+    // which is the case where its own words matter most.
+    if let Err(error) = registry
+        .provision_base_registry()
+        .and_then(|_| registry.read_services_schema_version())
+    {
+        report_registryd_output(&launch.launch.process);
+        return Err(error);
+    }
     supervisor.retain_service_launch_for_runtime(launch.launch.clone());
     Ok(())
+}
+
+/// Relay whatever registryd printed before it failed, to the console, tagged.
+///
+/// The gap this closes: peinit gives every service capture pipes and drains
+/// them in the runtime loop, but Phase 1 has no loop. A registryd that printed
+/// exactly why it could not serve was therefore reported to the operator as
+/// nothing but `registryd readiness timeout expired before READY=1`, and the
+/// reason went into a pipe nobody ever read. loregd worked around this by
+/// opening /dev/console and pointing its logger there — which fixed the
+/// silence, but also took its output out of the pipe, so eventd never received
+/// its startup lines either.
+///
+/// Failure path only. On success the fds are retained for the runtime, which
+/// drains them into the pre-eventd buffer and on to eventd, exactly as it does
+/// for every other service. peinit still does not echo service output to the
+/// console during a normal boot.
+///
+/// Safe to call with PID 1's stack: the read ends are non-blocking
+/// (`create_output_pipe`), so a registryd that is alive and silent yields
+/// `EAGAIN` rather than hanging the boot.
+fn report_registryd_output(process: &crate::boundary::LaunchedProcess) {
+    let mut said = false;
+    for (fd, stream) in [(process.stdout_fd, "stdout"), (process.stderr_fd, "stderr")] {
+        let Some(fd) = fd else { continue };
+        let captured = drain_nonblocking(fd);
+        for (tag, line) in relay_lines(&format!("registryd({stream})"), &captured) {
+            if !said {
+                let _ = write_console(&render(
+                    ConsoleTag::Failed,
+                    "peinit: registryd failed; what it said follows\n",
+                ));
+                said = true;
+            }
+            let _ = write_console(&render(tag, &line));
+        }
+    }
+    if !said {
+        let _ = write_console(&render(
+            ConsoleTag::Failed,
+            "peinit: registryd failed and printed nothing\n",
+        ));
+    }
+}
+
+/// Read everything currently buffered on a non-blocking fd.
+///
+/// Stops at `EAGAIN` (nothing more right now) rather than at EOF, because the
+/// child may still be alive — this runs on a failure path where waiting for it
+/// to exit is the last thing the operator wants. Bounded, so a registryd that
+/// died mid-flood cannot fill PID 1's memory with its last words.
+fn drain_nonblocking(fd: i32) -> String {
+    const CHUNK: usize = 4096;
+    let cap = crate::console_style::MAX_RELAYED_LINE * crate::console_style::MAX_RELAYED_LINES;
+    let mut out = Vec::new();
+    let mut buffer = [0u8; CHUNK];
+    loop {
+        let read = unsafe { libc::read(fd, buffer.as_mut_ptr() as *mut libc::c_void, CHUNK) };
+        if read <= 0 {
+            break;
+        }
+        out.extend_from_slice(&buffer[..read as usize]);
+        if out.len() >= cap {
+            out.truncate(cap);
+            break;
+        }
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 fn wait_for_registryd_ready<C>(
@@ -239,7 +324,6 @@ fn poll_fd_readable(fd: i32, remaining_ns: u64) -> Result<(), BoundaryError> {
     }
 }
 
-
 fn ensure_notify_socket_parent(path: &str) -> Result<(), BoundaryError> {
     let Some(parent) = Path::new(path).parent() else {
         return Ok(());
@@ -280,7 +364,9 @@ fn ensure_notify_socket_parent(path: &str) -> Result<(), BoundaryError> {
 fn ancestors_under_run(path: &Path) -> Vec<std::path::PathBuf> {
     let mut levels: Vec<std::path::PathBuf> = path
         .ancestors()
-        .take_while(|p| p.as_os_str() != "/run" && p.as_os_str() != "/" && !p.as_os_str().is_empty())
+        .take_while(|p| {
+            p.as_os_str() != "/run" && p.as_os_str() != "/" && !p.as_os_str().is_empty()
+        })
         .map(std::path::Path::to_path_buf)
         .collect();
     levels.reverse();

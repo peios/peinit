@@ -22,9 +22,7 @@ where
     P: crate::boundary::ProcessController + ?Sized,
 {
     match reload_action(&target.service, definition)? {
-        ReloadAction::Signal(signal) => {
-            begin_signal_reload(context, request, target, signal)
-        }
+        ReloadAction::Signal(signal) => begin_signal_reload(context, request, target, signal),
         ReloadAction::Command(argv) => {
             begin_command_reload(context, request, target, definition, argv)
         }

@@ -261,8 +261,7 @@ fn sets_the_synth_policy_on_devpts_alone() {
 
 #[test]
 fn surfaces_policy_failure_as_recovery_error() {
-    let mut syscalls =
-        FakeMountSyscalls::with_mountinfo("").fail_policy("/dev/pts", libc::EACCES);
+    let mut syscalls = FakeMountSyscalls::with_mountinfo("").fail_policy("/dev/pts", libc::EACCES);
     let error = mount_phase1_virtual_filesystems(Path::new(DEFAULT_MOUNTINFO_PATH), &mut syscalls)
         .expect_err("policy failure");
     assert!(format!("{error:?}").contains("set mount policy on /dev/pts"));

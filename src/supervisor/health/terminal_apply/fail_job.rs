@@ -52,14 +52,16 @@ pub(in crate::supervisor) fn fail_launched_health_check_in_work(
         .fail_job_before_start(job_id, failed_at_ns, reason)
         .map_err(|error| SupervisorError::Health(HealthCheckError::JobStore(error)))?;
     work.health.remove_invocation(job_id);
-    Ok(crate::supervisor::dispatch::SupervisorHealthCheckTerminalDispatch {
-        job_event,
-        service_job_event: None,
-        outcome: crate::supervisor::dispatch::SupervisorHealthCheckOutcome::NotLaunched,
-        service_transitions: Vec::new(),
-        killed_cgroup_id: cgroup_id,
-        critical_reboot: None,
-    })
+    Ok(
+        crate::supervisor::dispatch::SupervisorHealthCheckTerminalDispatch {
+            job_event,
+            service_job_event: None,
+            outcome: crate::supervisor::dispatch::SupervisorHealthCheckOutcome::NotLaunched,
+            service_transitions: Vec::new(),
+            killed_cgroup_id: cgroup_id,
+            critical_reboot: None,
+        },
+    )
 }
 
 pub(in crate::supervisor) fn fail_timed_out_health_check_in_work(

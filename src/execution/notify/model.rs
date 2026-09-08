@@ -55,21 +55,41 @@ pub enum NotifyAppliedField {
     Ready,
     Reloading,
     Stopping,
-    Status { text: String },
+    Status {
+        text: String,
+    },
     /// A readiness level the service published, for dependents declaring
     /// `Requires = ["<service>:<level>"]`. An empty value retracts it.
-    Level { value: String },
-    Progress { value: String },
-    ProgressUnit { value: String },
-    Errno { value: String },
-    ExitStatus { value: String },
+    Level {
+        value: String,
+    },
+    Progress {
+        value: String,
+    },
+    ProgressUnit {
+        value: String,
+    },
+    Errno {
+        value: String,
+    },
+    ExitStatus {
+        value: String,
+    },
     Watchdog,
-    WatchdogUsec { value: String },
-    ExtendTimeoutUsec { value: String },
+    WatchdogUsec {
+        value: String,
+    },
+    ExtendTimeoutUsec {
+        value: String,
+    },
     FdStore,
-    FdName { name: String },
+    FdName {
+        name: String,
+    },
     FdStoreRemove,
-    FdPoll { value: String },
+    FdPoll {
+        value: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

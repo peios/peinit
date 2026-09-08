@@ -398,7 +398,10 @@ mod reference_tests {
             requiring("web", &["network:routed"]),
         ]);
 
-        assert_eq!(find(&resolved, "web").requires, vec!["netd:routed".to_string()]);
+        assert_eq!(
+            find(&resolved, "web").requires,
+            vec!["netd:routed".to_string()]
+        );
     }
 
     #[test]
@@ -493,7 +496,10 @@ mod reference_tests {
             requiring("web", &["network:routed", "netd:routed"]),
         ]);
 
-        assert_eq!(find(&resolved, "web").requires, vec!["netd:routed".to_string()]);
+        assert_eq!(
+            find(&resolved, "web").requires,
+            vec!["netd:routed".to_string()]
+        );
     }
 
     #[test]

@@ -50,5 +50,8 @@ impl ServiceTable {
 
 /// Whether a leaked path is the given tree's root, or something inside it.
 fn leak_affects_tree(path: &str, root: &str) -> bool {
-    path == root || path.strip_prefix(root).is_some_and(|rest| rest.starts_with('/'))
+    path == root
+        || path
+            .strip_prefix(root)
+            .is_some_and(|rest| rest.starts_with('/'))
 }

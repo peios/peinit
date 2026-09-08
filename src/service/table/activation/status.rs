@@ -20,11 +20,7 @@ impl ServiceTable {
     /// re-evaluating dependents when something actually moved — a daemon
     /// that republishes its level on a timer is a reasonable thing to
     /// write and must not cost a graph walk each time.
-    pub fn update_level(
-        &mut self,
-        service: &str,
-        level: &str,
-    ) -> Result<bool, ServiceTableError> {
+    pub fn update_level(&mut self, service: &str, level: &str) -> Result<bool, ServiceTableError> {
         let entry = self.require_entry_mut(service)?;
         let next = (!level.is_empty()).then(|| level.to_string());
         let changed = entry.runtime.level != next;

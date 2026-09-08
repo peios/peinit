@@ -61,7 +61,12 @@ pub(super) fn begin_restart_start_after_stop(
     dispatch: &mut ServiceMainJobTerminalDispatch,
     started_at_ns: u64,
 ) -> Result<Vec<RestartStartExecutionDispatch>, SupervisorError> {
-    let Some(service) = dispatch.job_event.service.as_deref().map(ToString::to_string) else {
+    let Some(service) = dispatch
+        .job_event
+        .service
+        .as_deref()
+        .map(ToString::to_string)
+    else {
         return Ok(Vec::new());
     };
     let service = service.as_str();
@@ -97,9 +102,11 @@ pub(super) fn begin_restart_start_after_stop(
         let event = work
             .operations
             .abort_operation(operation.id, started_at_ns, RESTART_DEFINITION_REMOVED)
-            .map_err(|error| SupervisorError::Control(
-                crate::execution::control::ControlExecutionError::OperationStore(error),
-            ))?;
+            .map_err(|error| {
+                SupervisorError::Control(
+                    crate::execution::control::ControlExecutionError::OperationStore(error),
+                )
+            })?;
         dispatch.operation_events.push(event);
         return Ok(Vec::new());
     }

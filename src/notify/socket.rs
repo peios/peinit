@@ -33,8 +33,14 @@ pub struct NotifySocket {
 
 #[derive(Debug)]
 pub enum NotifySocketBindError {
-    StalePathCleanup { path: PathBuf, source: io::Error },
-    Bind { path: PathBuf, source: io::Error },
+    StalePathCleanup {
+        path: PathBuf,
+        source: io::Error,
+    },
+    Bind {
+        path: PathBuf,
+        source: io::Error,
+    },
     SetPassCred(io::Error),
     SetNonblocking(io::Error),
     /// The socket bound but its security descriptor could not be installed.

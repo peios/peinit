@@ -11,6 +11,7 @@ mod tests;
 #[cfg(feature = "peios-boundary")]
 pub(crate) use policy::QuietPolicy;
 
+use crate::console_style::ConsoleTag;
 use crate::runtime::{RuntimeCalendarTimerTurn, RuntimeShutdownEventTurn, RuntimeWorkPumpTurn};
 use crate::service::ServiceTableTransition;
 use crate::service::runtime::{ServiceState, TransitionCause};
@@ -57,13 +58,51 @@ pub(crate) enum ConsoleSeverity {
 pub(crate) struct ConsoleMessage {
     pub text: String,
     pub severity: ConsoleSeverity,
+    /// How the line is tagged when it reaches the console. Carried with the
+    /// message rather than inferred at the sink from its text, for the same
+    /// reason severity is: the producer knows what happened and the sink does
+    /// not, and matching on prose is how a rename silently turns every `OK`
+    /// into a blank.
+    pub tag: ConsoleTag,
 }
 
 impl ConsoleMessage {
+    /// Progress with no outcome yet, and the unnamed default. See
+    /// [`push_message`].
     pub fn status(text: impl Into<String>) -> Self {
         Self {
             text: text.into(),
             severity: ConsoleSeverity::Status,
+            tag: ConsoleTag::None,
+        }
+    }
+
+    /// Something worked. Status severity — a success is ordinary progress as
+    /// far as `peios.quiet` is concerned; the tag is presentation, not news.
+    pub fn ok(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            severity: ConsoleSeverity::Status,
+            tag: ConsoleTag::Ok,
+        }
+    }
+
+    /// Deliberately not done. Also Status: a skip is the mechanism working.
+    pub fn skip(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            severity: ConsoleSeverity::Status,
+            tag: ConsoleTag::Skip,
+        }
+    }
+
+    /// Wrong, but the boot continues. Error severity, so it survives a
+    /// requested blackout.
+    pub fn warn(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            severity: ConsoleSeverity::Error,
+            tag: ConsoleTag::Warn,
         }
     }
 
@@ -71,6 +110,7 @@ impl ConsoleMessage {
         Self {
             text: text.into(),
             severity: ConsoleSeverity::Error,
+            tag: ConsoleTag::Failed,
         }
     }
 
@@ -78,6 +118,7 @@ impl ConsoleMessage {
         Self {
             text: text.into(),
             severity: ConsoleSeverity::Critical,
+            tag: ConsoleTag::Crit,
         }
     }
 }
@@ -132,7 +173,7 @@ pub(super) fn collect_service_transition_console_message(
                 event.service, event.cause
             ),
         ),
-        ServiceState::Skipped if skipped_for_boot_problem(event.cause) => push_message(
+        ServiceState::Skipped if skipped_for_boot_problem(event.cause) => push_skip(
             out,
             format!(
                 "peinit: service {} skipped: {:?}\n",
@@ -152,7 +193,7 @@ pub(super) fn push_service_started(
     job_event: &crate::job::JobEvent,
 ) {
     if let Some(service) = job_event.service.as_deref() {
-        push_message(out, format!("peinit: service {service} started\n"));
+        push_ok(out, format!("peinit: service {service} started\n"));
     }
 }
 
@@ -209,11 +250,11 @@ pub(super) fn collect_shutdown_finalization_state_console_message(
         ShutdownFinalizationState::Ready => {
             push_message(out, "peinit: shutdown ready to finalize\n")
         }
-        ShutdownFinalizationState::Failed { message, .. } => push_message(
+        ShutdownFinalizationState::Failed { message, .. } => push_warn(
             out,
             format!("peinit: shutdown final action failed: {message}\n"),
         ),
-        ShutdownFinalizationState::Completed => push_message(out, "peinit: shutdown completed\n"),
+        ShutdownFinalizationState::Completed => push_ok(out, "peinit: shutdown completed\n"),
     }
 }
 
@@ -222,6 +263,22 @@ pub(super) fn collect_shutdown_finalization_state_console_message(
 /// make the few that are not status harder to spot rather than easier.
 pub(super) fn push_message(out: &mut Vec<ConsoleMessage>, message: impl Into<String>) {
     out.push(ConsoleMessage::status(message));
+}
+
+/// Something worked. Same severity as [`push_message`]; the difference is the
+/// tag the operator sees.
+pub(super) fn push_ok(out: &mut Vec<ConsoleMessage>, message: impl Into<String>) {
+    out.push(ConsoleMessage::ok(message));
+}
+
+/// Deliberately not done.
+pub(super) fn push_skip(out: &mut Vec<ConsoleMessage>, message: impl Into<String>) {
+    out.push(ConsoleMessage::skip(message));
+}
+
+/// Wrong, but the boot continues.
+pub(super) fn push_warn(out: &mut Vec<ConsoleMessage>, message: impl Into<String>) {
+    out.push(ConsoleMessage::warn(message));
 }
 
 /// Something went wrong. Overrides a requested blackout; does not override

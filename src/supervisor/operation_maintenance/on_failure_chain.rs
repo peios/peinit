@@ -96,7 +96,8 @@ pub(in crate::supervisor::operation_maintenance) fn settle_due_on_failure_chains
         if !still_settled(work, &candidate, now_ns) {
             continue;
         }
-        work.relationships.clear_on_failure_chain(&candidate.service);
+        work.relationships
+            .clear_on_failure_chain(&candidate.service);
         settled.push(candidate);
     }
     Ok(settled)
