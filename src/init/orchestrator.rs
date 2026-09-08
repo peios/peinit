@@ -437,6 +437,17 @@ where
             let _ = platform.emit_kmes_event(&event);
         }
     }
+    // Warnings are not blocking, so nothing above carries them, and the
+    // boot is where they matter most: an `Alive` service with hard
+    // dependents is about to release them before it is usable. Tagged
+    // `boot` rather than `reload_config`, which was the only phase these
+    // were ever emitted under.
+    for warning in &dispatch.plan.warnings {
+        let Ok(event) = crate::kmes::encode_graph_validation_warning_event("boot", warning) else {
+            continue;
+        };
+        let _ = platform.emit_kmes_event(&event);
+    }
 }
 
 #[cfg(not(feature = "peios-boundary"))]

@@ -1,7 +1,7 @@
 use crate::boot::BootMode;
 use crate::boundary::UndecodableService;
 use crate::ids::{JobIdAllocator, OperationIdAllocator};
-use crate::service::ServiceDefinition;
+use crate::service::{ServiceDefinition, validate_service_graph};
 
 use super::graph::{BlockedServiceDraft, build_phase2_boot_graph, safe_mode_downgrade_findings};
 use super::model::{
@@ -63,6 +63,7 @@ pub(crate) fn prepare_phase2_boot_plan_with_retained(
             starts: Vec::new(),
             blocked: Vec::new(),
             safe_mode_downgrade: Vec::new(),
+            warnings: Vec::new(),
         });
     }
 
@@ -79,6 +80,16 @@ pub(crate) fn prepare_phase2_boot_plan_with_retained(
     } else {
         BootMode::Safe
     };
+
+    // Validation findings are not consulted here: Phase 2 blocks the
+    // services it cannot start individually, rather than refusing the
+    // whole graph the way a reload does, and the blocking below is what
+    // produces those. The warnings are the part a boot has no other way
+    // to surface, so they are carried out on the plan and emitted with
+    // the rest of its audit record.
+    let warnings = validate_service_graph(services)
+        .map(|validation| validation.warnings)
+        .unwrap_or_default();
 
     let graph = build_phase2_boot_graph(effective_mode, services)?;
     // Keys that exist but will not decode are Failed with ValidationError,
@@ -144,5 +155,6 @@ pub(crate) fn prepare_phase2_boot_plan_with_retained(
         max_parallel_starts,
         starts,
         blocked: blocked_services,
+        warnings,
     })
 }

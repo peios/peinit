@@ -41,6 +41,7 @@ fn boot_plan(starts: Vec<PreparedStart>) -> Phase2BootPlan {
         max_parallel_starts: 10,
         starts,
         blocked: Vec::new(),
+        warnings: Vec::new(),
     }
 }
 

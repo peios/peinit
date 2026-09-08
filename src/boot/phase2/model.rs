@@ -1,6 +1,7 @@
 use crate::boot::BootMode;
 use crate::ids::{IdAllocationError, JobId, OperationId};
 pub use crate::service::ServiceDependencyKind as DependencyKind;
+use crate::service::ServiceGraphWarning;
 use crate::service::runtime::TransitionCause;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -104,6 +105,17 @@ pub struct Phase2BootPlan {
     pub blocked: Vec<BlockedService>,
     /// Why this boot was downgraded to Safe mode; empty if it was not.
     pub safe_mode_downgrade: Vec<SafeModeDowngrade>,
+    /// Graph validation warnings for the definition set this plan was
+    /// built from — an `Alive` service with hard dependents, a role
+    /// nothing fills.
+    ///
+    /// Warnings are not blocking, and the plan is built whether there
+    /// are any or not. They are carried here so the boot can emit them,
+    /// which is the boot where they matter: a `Readiness=Alive` service
+    /// with dependents is about to release them before it is usable, and
+    /// an operator who only ever saw that on a later `reload-config`
+    /// would be told after the fact.
+    pub warnings: Vec<ServiceGraphWarning>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
