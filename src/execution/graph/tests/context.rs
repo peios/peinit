@@ -138,6 +138,7 @@ fn boot_context_keeps_blocked_members_terminal() {
             },
             additional_reasons: Vec::new(),
         }],
+        warnings: Vec::new(),
     };
     let mut store = GraphExecutionStore::new();
 
