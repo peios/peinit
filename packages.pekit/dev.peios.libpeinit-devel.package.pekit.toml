@@ -1,0 +1,25 @@
+# peinit-devel — development files for libpeinit, the public C ABI used by
+# services and administration tools to integrate with Peinit.
+#
+# The versioned runtime object is shipped separately by dev.peios.libpeinit;
+# this package contains only the hand-written headers, the unversioned linker
+# symlink, and pkg-config metadata.
+
+[package]
+name        = "dev.peios.libpeinit-devel"
+description = "Peios service-manager client library development files"
+
+[provides]
+peinit-devel = "{{version}}-1"
+
+[replaces]
+peinit-devel = "<= 0.0.1-43"
+
+[dependencies]
+"dev.peios.libpeinit" = "{{version}}-1"
+
+[files]
+"@source:LICENSE" = "usr/share/licenses/dev.peios.libpeinit-devel/LICENSE"
+":usr/include/**" = "usr/include/"
+":usr/lib/x86_64-linux-peios/libpeinit.so" = "usr/lib/x86_64-linux-peios/libpeinit.so"
+":usr/lib/x86_64-linux-peios/pkgconfig/peinit.pc" = "usr/lib/x86_64-linux-peios/pkgconfig/peinit.pc"

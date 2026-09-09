@@ -1,0 +1,17 @@
+# The service-control and shutdown client is not PID 1. Keeping it separate
+# lets administration and recovery images carry the client without replacing
+# the init implementation.
+[package]
+name        = "dev.peios.peinit-svctl"
+description = "Peios service manager control and shutdown client"
+
+[provides]
+svctl = "{{version}}-1"
+
+[files]
+"@source:LICENSE"   = "usr/share/licenses/dev.peios.peinit-svctl/LICENSE"
+":usr/bin/svctl"    = "usr/bin/svctl"
+":usr/bin/reboot"   = "usr/bin/reboot"
+":usr/bin/poweroff" = "usr/bin/poweroff"
+":usr/bin/halt"     = "usr/bin/halt"
+":usr/bin/shutdown" = "usr/bin/shutdown"

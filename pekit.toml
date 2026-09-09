@@ -1,219 +1,268 @@
-# peinit2 — replacement Peios real-root PID 1 service manager.
-#
-# This recipe mirrors peinit's packaged build strategy, but builds the fully
-# wired Linux PID1 path by enabling all features. The important libpeios detail
-# is deliberate: use pkg-config, not PEIOS_LIB_DIR, so peios-sys does not embed a
-# checkout-local rpath in the packaged binary. Local monorepo builds synthesize a
-# temporary peios.pc from the sibling libpeios/pkm trees when libpeios-devel is
-# not already installed in the build root.
+# peinit — Peios PID 1, its control client, and the public libpeinit ABI.
+# One hermetic build produces independently installable runtime, client,
+# library, development, debugging, and corresponding-source packages.
 
 out_dir = "out"
 
-[build]
-command = """
+[source_package]
+name = "dev.peios.peinit-source"
+
+[build.vendor]
+command = '''
+set -eu
+export CARGO_HOME=/tmp/cargo
+mkdir -p "$CARGO_HOME" "$PEKIT_OUT"
+cargo vendor --locked "$PEKIT_OUT/vendor" > "$PEKIT_OUT/cargo-config.toml"
+test -s "$PEKIT_OUT/cargo-config.toml"
+test -n "$(find "$PEKIT_OUT/vendor" -mindepth 1 -maxdepth 1 -type d -print -quit)"
+'''
+
+[build.vendor.dependencies.peipkg]
+"org.rust-lang.rust" = ">= 1.98.1"
+"org.gnu.findutils"  = "*"
+"org.mozilla.ca-certificates" = "*"
+
+[build.vendor.dependencies.apt]
+cargo           = "*"
+git             = "*"
+ca-certificates = "*"
+findutils       = "*"
+
+[build.main]
+needs = ["vendor"]
+command = '''
 set -eu
 set -o pipefail 2>/dev/null || true
 
-SRC="$(pwd)"
-REPO_ROOT="$(cd "$SRC/.." && pwd)"
+SRC=$(pwd -P)
 TRIPLET=x86_64-linux-peios
 LIBDIR="usr/lib/$TRIPLET"
+DEBUG_PREFIX="/usr/src/debug/dev.peios.peinit-$PEKIT_VERSION"
+export CARGO_HOME="$PEKIT_OUT/cargo-home"
+mkdir -p "$CARGO_HOME"
+cp "$PEKIT_VENDOR_OUT/cargo-config.toml" "$CARGO_HOME/config.toml"
 
-for tool in cargo rustc gcc pkg-config objcopy strip readelf debugedit; do
-  command -v "$tool" >/dev/null || { echo "missing required peinit2 build tool: $tool" >&2; exit 1; }
+for tool in cargo rustc gcc g++ pkg-config cbindgen objcopy strip readelf debugedit python3; do
+  command -v "$tool" >/dev/null || {
+    echo "peinit: missing required build tool: $tool" >&2
+    exit 1
+  }
 done
 
-# Force the packaging-safe peios-sys path even if a developer shell happens to
-# carry the env overrides used for quick local tests.
+# Production consumes only the packaged C ABI and the exact public Rust
+# revisions in Cargo.lock. No sibling checkout or mutable Cargo cache is
+# visible in either build environment.
 unset PEIOS_LIB_DIR PEIOS_INCLUDE PKM_UAPI
-
-if ! pkg-config --exists peios; then
-  LIBPEIOS_ROOT="$REPO_ROOT/libpeios"
-  PKM_UAPI_ROOT="$REPO_ROOT/pkm/uapi"
-
-  [ -f "$LIBPEIOS_ROOT/Cargo.toml" ] || {
-    echo "libpeios package metadata not found at $LIBPEIOS_ROOT" >&2
-    exit 1
-  }
-  [ -d "$LIBPEIOS_ROOT/include/peios" ] || {
-    echo "libpeios headers not found at $LIBPEIOS_ROOT/include" >&2
-    exit 1
-  }
-  [ -d "$PKM_UAPI_ROOT/pkm" ] || {
-    echo "pkm UAPI headers not found at $PKM_UAPI_ROOT" >&2
-    exit 1
-  }
-
-  cargo build --release --locked --manifest-path "$LIBPEIOS_ROOT/Cargo.toml"
-
-  PC_DIR="$PEKIT_OUT/pkgconfig"
-  mkdir -p "$PC_DIR"
-  LIBPEIOS_VERSION="$(sed -n 's/^version = "\\([^"]*\\)".*/\\1/p' "$LIBPEIOS_ROOT/Cargo.toml" | head -1)"
-  {
-    printf 'prefix=%s\\n' "$LIBPEIOS_ROOT"
-    printf 'exec_prefix=${prefix}\\n'
-    printf 'libdir=%s/target/release\\n' "$LIBPEIOS_ROOT"
-    printf 'includedir=%s/include\\n' "$LIBPEIOS_ROOT"
-    printf '\\n'
-    printf 'Name: peios\\n'
-    printf 'Description: Peios userspace C ABI library (libpeios)\\n'
-    printf 'Version: %s\\n' "$LIBPEIOS_VERSION"
-    printf 'Libs: -L${libdir} -lpeios\\n'
-    printf 'Cflags: -I${includedir} -I%s\\n' "$PKM_UAPI_ROOT"
-  } > "$PC_DIR/peios.pc"
-  export PKG_CONFIG_PATH="$PC_DIR${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
-fi
-
-# bindgen needs freestanding C headers such as stddef.h. A full clang install
-# has these in its resource dir; libclang-only hosts often need GCC's include
-# dir passed explicitly.
+pkg-config --exists peios || {
+  echo "peinit: dev.peios.libpeios-devel is required" >&2
+  exit 1
+}
 export BINDGEN_EXTRA_CLANG_ARGS="-isystem $(gcc -print-file-name=include) ${BINDGEN_EXTRA_CLANG_ARGS:-}"
 
-CARGO_PROFILE_RELEASE_DEBUG=2 CARGO_PROFILE_RELEASE_SPLIT_DEBUGINFO=off \
-  cargo build --release --locked --all-features --bin peinit2 --bin svctl --lib --target-dir "$PEKIT_OUT/target"
+cargo metadata --locked --offline --no-deps --format-version 1 |
+  python3 -c '
+import json, os, sys
+metadata = json.load(sys.stdin)
+members = set(metadata["workspace_members"])
+versions = sorted({p["version"] for p in metadata["packages"] if p["id"] in members})
+expected = os.environ["PEKIT_VERSION"]
+if versions != [expected]:
+    raise SystemExit(f"peinit: workspace versions {versions!r} do not equal package version {expected!r}")
+'
 
-mkdir -p "$PEKIT_OUT/usr/bin" "$PEKIT_OUT/usr/sbin" "$PEKIT_OUT/$LIBDIR" "$PEKIT_OUT/usr/include/peinit" "$PEKIT_OUT/$LIBDIR/pkgconfig"
+# Stable DWARF names keep the checkout, build root, and vendored-source cache
+# out of every shipped ELF and detached symbol file.
+export RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }--remap-path-prefix=$PEKIT_WORKSPACE_ROOT=$DEBUG_PREFIX/.workspace --remap-path-prefix=$PEKIT_OUT_BASE=$DEBUG_PREFIX/.build --remap-path-prefix=$SRC=$DEBUG_PREFIX --remap-path-prefix=$PEKIT_VENDOR_OUT/vendor=$DEBUG_PREFIX/vendor"
+export CARGO_PROFILE_RELEASE_DEBUG=2
+export CARGO_PROFILE_RELEASE_SPLIT_DEBUGINFO=off
+
+# The portable/default feature set is the host-runnable unit-test rung. The
+# Peios boundary feature deliberately executes Peios-only syscalls in a few
+# integration tests, so compile that complete test graph here but run it only
+# on a booted Peios system.
+cargo test --release --locked --offline --target-dir "$PEKIT_OUT/target"
+cargo test --release --locked --offline --all-features --no-run \
+  --target-dir "$PEKIT_OUT/target"
+cargo build --release --locked --offline --all-features \
+  --bin peinit2 --bin svctl --target-dir "$PEKIT_OUT/target"
+cargo rustc --release --locked --offline --all-features --lib \
+  --crate-type cdylib --target-dir "$PEKIT_OUT/target" -- \
+  -C link-arg=-Wl,-soname,libpeinit.so.0
+
+mkdir -p "$PEKIT_OUT/usr/bin" "$PEKIT_OUT/usr/sbin" \
+  "$PEKIT_OUT/$LIBDIR" "$PEKIT_OUT/usr/include/peinit" \
+  "$PEKIT_OUT/$LIBDIR/pkgconfig"
 install -m 0755 "$PEKIT_OUT/target/release/peinit2" "$PEKIT_OUT/usr/bin/peinit2"
 install -m 0755 "$PEKIT_OUT/target/release/svctl" "$PEKIT_OUT/usr/bin/svctl"
-# The shutdown verbs, as argv[0] aliases of svctl. In /usr/bin rather than
-# /usr/sbin: shutting a machine down is gated by the control socket's security
-# descriptor, not by which directory the binary sits in, so filing them under
-# sbin implied an access rule that does not exist. A relative link with no
-# ../ now that they are siblings of the target.
-ln -s svctl "$PEKIT_OUT/usr/bin/reboot"
-ln -s svctl "$PEKIT_OUT/usr/bin/poweroff"
-ln -s svctl "$PEKIT_OUT/usr/bin/halt"
-ln -s svctl "$PEKIT_OUT/usr/bin/shutdown"
+for alias in reboot poweroff halt shutdown; do
+  ln -s svctl "$PEKIT_OUT/usr/bin/$alias"
+done
 install -m 0755 "$PEKIT_OUT/target/release/libpeinit.so" "$PEKIT_OUT/$LIBDIR/libpeinit.so.0"
 ln -s libpeinit.so.0 "$PEKIT_OUT/$LIBDIR/libpeinit.so"
 cp include/peinit.h "$PEKIT_OUT/usr/include/"
 cp include/peinit/*.h "$PEKIT_OUT/usr/include/peinit/"
-
-PCVER="$(sed -n 's/^version = "\\([^"]*\\)".*/\\1/p' Cargo.toml | head -1)"
-sed -e "s|@prefix@|/usr|g" \
+sed -e 's|@prefix@|/usr|g' \
     -e "s|@libdir@|/$LIBDIR|g" \
-    -e "s|@version@|$PCVER|g" \
+    -e "s|@version@|$PEKIT_VERSION|g" \
     peinit.pc.in > "$PEKIT_OUT/$LIBDIR/pkgconfig/peinit.pc"
 
-# Split debug info in the same style as libpeios/peiosutils: DWARF goes to a
-# build-id-indexed .debug file, shipped ELF objects are stripped, and only this
-# crate's referenced sources are staged under /usr/src/debug/peinit.
-bin="$PEKIT_OUT/usr/bin/peinit2"
-svctl="$PEKIT_OUT/usr/bin/svctl"
-so="$PEKIT_OUT/$LIBDIR/libpeinit.so.0"
-: > "$PEKIT_OUT/.srclist.all"
+# One debug package is intentional for now: this source family previously
+# shipped one combined peinit-debuginfo artifact, and preserving that migration
+# capability without ambiguous multiple providers matters more than splitting
+# three small symbol files. Runtime/client/library payloads remain independent.
+: > "$PEKIT_OUT/.debug-sources"
 split_debug() {
-  elf="$1"
-  list="$PEKIT_OUT/.srclist.$(basename "$elf")"
-  debugedit -b "$SRC" -d /usr/src/debug/peinit -l "$list" -n "$elf"
-  cat "$list" >> "$PEKIT_OUT/.srclist.all"
-  bid=$(readelf -n "$elf" | sed -n 's/^[[:space:]]*Build ID: //p' | head -1)
-  if [ -n "$bid" ]; then
-    p2=$(printf %s "$bid" | cut -c1-2)
-    rest=$(printf %s "$bid" | cut -c3-)
-    mkdir -p "$PEKIT_OUT/usr/lib/debug/.build-id/$p2"
-    objcopy --only-keep-debug "$elf" "$PEKIT_OUT/usr/lib/debug/.build-id/$p2/$rest.debug"
-    chmod 0644 "$PEKIT_OUT/usr/lib/debug/.build-id/$p2/$rest.debug"
-  fi
-  strip "$elf"
+  component=$1
+  elf=$2
+  list="$PEKIT_OUT/.debug-$component"
+  debugedit -b "$SRC" -d "$DEBUG_PREFIX" -l "$list" -n "$elf"
+  cat "$list" >> "$PEKIT_OUT/.debug-sources"
+  build_id=$(readelf -n "$elf" | sed -n 's/^[[:space:]]*Build ID: //p' | head -1)
+  [ -n "$build_id" ] || {
+    echo "peinit: $elf has no build ID" >&2
+    exit 1
+  }
+  first=$(printf %s "$build_id" | cut -c1-2)
+  rest=$(printf %s "$build_id" | cut -c3-)
+  debug="$PEKIT_OUT/debug/usr/lib/debug/.build-id/$first/$rest.debug"
+  mkdir -p "$(dirname "$debug")"
+  objcopy --only-keep-debug "$elf" "$debug"
+  strip --strip-unneeded "$elf"
+  objcopy --add-gnu-debuglink="$debug" "$elf"
   rm -f "$list"
 }
-split_debug "$bin"
-split_debug "$svctl"
-split_debug "$so"
 
-tr '\\0' '\\n' < "$PEKIT_OUT/.srclist.all" | sort -u | while IFS= read -r rel; do
+split_debug peinit "$PEKIT_OUT/usr/bin/peinit2"
+split_debug svctl "$PEKIT_OUT/usr/bin/svctl"
+split_debug libpeinit "$PEKIT_OUT/$LIBDIR/libpeinit.so.0"
+
+DEBUG_ROOT="$PEKIT_OUT$DEBUG_PREFIX"
+mkdir -p "$DEBUG_ROOT"
+tr '\0' '\n' < "$PEKIT_OUT/.debug-sources" | LC_ALL=C sort -u | while IFS= read -r rel; do
   [ -n "$rel" ] || continue
-  case "$rel" in */) continue;; esac
-  [ -f "$SRC/$rel" ] || continue
-  mkdir -p "$PEKIT_OUT/usr/src/debug/peinit/$(dirname "$rel")"
-  cp "$SRC/$rel" "$PEKIT_OUT/usr/src/debug/peinit/$rel"
+  case "$rel" in */) continue ;; esac
+  case "$rel" in
+    vendor/*) origin="$PEKIT_VENDOR_OUT/$rel" ;;
+    *)        origin="$SRC/$rel" ;;
+  esac
+  [ -f "$origin" ] || continue
+  mkdir -p "$DEBUG_ROOT/$(dirname "$rel")"
+  cp "$origin" "$DEBUG_ROOT/$rel"
 done
-rm -f "$PEKIT_OUT/.srclist.all"
-"""
+rm -f "$PEKIT_OUT/.debug-sources"
+test -n "$(find "$DEBUG_ROOT" -type f -print -quit)"
 
-[build.dependencies.peipkg]
-cargo = "*"
-rust = "*"
-gcc = "*"
-"gcc-c++" = "*"
-clang = "*"
-pkgconf-pkg-config = "*"
-libpeios-devel = "*"
-kernel-headers = "*"
-cbindgen = "0.29.2"
-binutils = "*"
-debugedit = "*"
+# Fail closed on hardening, symbol/source pairing, and build-path policy.
+for record in \
+  "peinit:$PEKIT_OUT/usr/bin/peinit2:exe" \
+  "svctl:$PEKIT_OUT/usr/bin/svctl:exe" \
+  "libpeinit:$PEKIT_OUT/$LIBDIR/libpeinit.so.0:dso"
+do
+  remain=${record#*:}
+  elf=${remain%:*}
+  kind=${record##*:}
+  readelf -h "$elf" | grep -Eq 'Type:[[:space:]]+DYN'
+  readelf -lW "$elf" | grep -q 'GNU_RELRO'
+  readelf -lW "$elf" | grep -Eq 'GNU_STACK[[:space:]].*RW[[:space:]]'
+  readelf -dW "$elf" | grep -q 'BIND_NOW'
+  ! readelf -dW "$elf" | grep -Eq '(RPATH|RUNPATH)'
+  ! readelf -SW "$elf" | grep -q '\.debug_info'
+  if [ "$kind" = exe ]; then
+    readelf -dW "$elf" | grep -Eq 'FLAGS_1.*PIE'
+  else
+    readelf -dW "$elf" | grep -Fq 'Library soname: [libpeinit.so.0]'
+  fi
+  build_id=$(readelf -n "$elf" | sed -n 's/^[[:space:]]*Build ID: //p' | head -1)
+  debug="$PEKIT_OUT/debug/usr/lib/debug/.build-id/$(printf %s "$build_id" | cut -c1-2)/$(printf %s "$build_id" | cut -c3-).debug"
+  test -s "$debug"
+  readelf -SW "$debug" | grep -q '\.debug_info'
+  test "$(readelf -n "$debug" | sed -n 's/^[[:space:]]*Build ID: //p' | head -1)" = "$build_id"
+  for forbidden in "$SRC" "$PEKIT_VENDOR_OUT" "$PEKIT_OUT_BASE" "$PEKIT_WORKSPACE_ROOT"; do
+    ! grep -aF "$forbidden" "$elf" "$debug" >/dev/null
+  done
+done
 
-[build.dependencies.apt]
-cargo = "*"
-rustc = "*"
-gcc = "*"
-"g++" = "*"
-pkg-config = "*"
-"libclang-dev" = "*"
-cbindgen = "*"
-binutils = "*"
-debugedit = "*"
+test -L "$PEKIT_OUT/usr/bin/reboot"
+test "$(readlink "$PEKIT_OUT/usr/bin/reboot")" = svctl
+test -s "$PEKIT_OUT/usr/include/peinit.h"
+PKG_CONFIG_SYSROOT_DIR="$PEKIT_OUT" \
+PKG_CONFIG_PATH="$PEKIT_OUT/$LIBDIR/pkgconfig" \
+  pkg-config --exact-version="$PEKIT_VERSION" peinit
+./tools/verify-abi.sh
+'''
+
+[build.main.dependencies.peipkg]
+"org.git.kernel.dash"      = "*"
+"org.gnu.coreutils"        = "*"
+"org.gnu.findutils"        = "*"
+"org.gnu.grep"             = "*"
+"org.gnu.sed"              = "*"
+"org.rust-lang.rust"       = ">= 1.98.1"
+"org.gnu.gcc"              = "*"
+"org.gnu.gcc-c++"          = "*"
+"org.llvm.clang"           = ">= 22"
+"org.pkgconf.pkgconf"      = "*"
+"org.mozilla.cbindgen"     = "0.29.2"
+"org.gnu.binutils"         = "*"
+"org.sourceware.debugedit" = "*"
+"org.python.python3"       = "*"
+"dev.peios.libpeios-devel" = ">= 0.5.0"
+"dev.peios.kernel-headers" = ">= 0.20.1-rc13"
+
+[build.main.dependencies.apt]
+dash         = "*"
+coreutils    = "*"
+findutils    = "*"
+grep         = "*"
+sed          = "*"
+cargo        = "*"
+rustc        = "*"
+gcc          = "*"
+"g++"        = "*"
+pkg-config   = "*"
+libclang-dev = "*"
+cbindgen     = "*"
+binutils     = "*"
+debugedit    = "*"
+python3      = "*"
 
 [test]
-command = """
+needs = ["vendor"]
+command = '''
 set -eu
-set -o pipefail 2>/dev/null || true
-
-SRC="$(pwd)"
-REPO_ROOT="$(cd "$SRC/.." && pwd)"
-
-for tool in cargo rustc gcc g++ pkg-config cbindgen; do
-  command -v "$tool" >/dev/null || { echo "missing required peinit2 test tool: $tool" >&2; exit 1; }
-done
-
+export CARGO_HOME="$PEKIT_OUT/cargo-home"
+mkdir -p "$CARGO_HOME"
+cp "$PEKIT_VENDOR_OUT/cargo-config.toml" "$CARGO_HOME/config.toml"
 unset PEIOS_LIB_DIR PEIOS_INCLUDE PKM_UAPI
-
-if ! pkg-config --exists peios; then
-  LIBPEIOS_ROOT="$REPO_ROOT/libpeios"
-  PKM_UAPI_ROOT="$REPO_ROOT/pkm/uapi"
-
-  [ -f "$LIBPEIOS_ROOT/Cargo.toml" ] || {
-    echo "libpeios package metadata not found at $LIBPEIOS_ROOT" >&2
-    exit 1
-  }
-  [ -d "$LIBPEIOS_ROOT/include/peios" ] || {
-    echo "libpeios headers not found at $LIBPEIOS_ROOT/include" >&2
-    exit 1
-  }
-  [ -d "$PKM_UAPI_ROOT/pkm" ] || {
-    echo "pkm UAPI headers not found at $PKM_UAPI_ROOT" >&2
-    exit 1
-  }
-
-  cargo build --release --locked --manifest-path "$LIBPEIOS_ROOT/Cargo.toml"
-
-  PEKIT_TEST_OUT="${PEKIT_OUT:-target/pekit-test}"
-  PC_DIR="$PEKIT_TEST_OUT/pkgconfig"
-  mkdir -p "$PC_DIR"
-  LIBPEIOS_VERSION="$(sed -n 's/^version = "\\([^"]*\\)".*/\\1/p' "$LIBPEIOS_ROOT/Cargo.toml" | head -1)"
-  {
-    printf 'prefix=%s\\n' "$LIBPEIOS_ROOT"
-    printf 'exec_prefix=${prefix}\\n'
-    printf 'libdir=%s/target/release\\n' "$LIBPEIOS_ROOT"
-    printf 'includedir=%s/include\\n' "$LIBPEIOS_ROOT"
-    printf '\\n'
-    printf 'Name: peios\\n'
-    printf 'Description: Peios userspace C ABI library (libpeios)\\n'
-    printf 'Version: %s\\n' "$LIBPEIOS_VERSION"
-    printf 'Libs: -L${libdir} -lpeios\\n'
-    printf 'Cflags: -I${includedir} -I%s\\n' "$PKM_UAPI_ROOT"
-  } > "$PC_DIR/peios.pc"
-  export PKG_CONFIG_PATH="$PC_DIR${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
-  export LD_LIBRARY_PATH="$LIBPEIOS_ROOT/target/release${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-fi
-
+pkg-config --exists peios
 export BINDGEN_EXTRA_CLANG_ARGS="-isystem $(gcc -print-file-name=include) ${BINDGEN_EXTRA_CLANG_ARGS:-}"
-
-cargo test --locked --all-features
+cargo test --workspace --locked --offline
+cargo test --workspace --locked --offline --all-features --no-run
 ./tools/verify-abi.sh
-"""
+'''
+
+[test.dependencies.peipkg]
+"org.git.kernel.dash"      = "*"
+"org.gnu.coreutils"        = "*"
+"org.rust-lang.rust"       = ">= 1.98.1"
+"org.gnu.gcc"              = "*"
+"org.gnu.gcc-c++"          = "*"
+"org.llvm.clang"           = ">= 22"
+"org.pkgconf.pkgconf"      = "*"
+"org.mozilla.cbindgen"     = "0.29.2"
+"dev.peios.libpeios-devel" = ">= 0.5.0"
+"dev.peios.kernel-headers" = ">= 0.20.1-rc13"
+
+[test.dependencies.apt]
+dash         = "*"
+coreutils    = "*"
+cargo        = "*"
+rustc        = "*"
+gcc          = "*"
+"g++"        = "*"
+pkg-config   = "*"
+libclang-dev = "*"
+cbindgen     = "*"
 
 [clean]
 command = "cargo clean"

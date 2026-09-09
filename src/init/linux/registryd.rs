@@ -5,7 +5,7 @@ use crate::boundary::{
     BoundaryError, Clock, LinuxMonotonicClock, LinuxProcessController, LinuxProcessLauncher,
     LinuxSystemTokenProvider, ProcessLauncher, ProcessSetupStatus, RegistryClient,
 };
-use crate::console_style::{relay_lines, render, ConsoleTag};
+use crate::console_style::{ConsoleTag, relay_lines, render};
 use crate::notify::{NotifySocket, NotifySocketReadError};
 use crate::supervisor::{
     Supervisor, SupervisorError, SupervisorLaunchDispatch, SupervisorProcessSetupDispatch,
