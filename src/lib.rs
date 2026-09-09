@@ -24,6 +24,8 @@ pub mod boot;
 pub mod boundary;
 #[doc(hidden)]
 pub mod capi;
+#[doc(hidden)]
+pub mod cli;
 /// The console line format: the tag column, its colours, and the stage
 /// banners. Public because `ConsoleTag` appears in the `InitPlatform` trait,
 /// which an out-of-crate platform implements; `pub` rather than crate-private
@@ -31,8 +33,6 @@ pub mod capi;
 /// both have to render identically.
 #[doc(hidden)]
 pub mod console_style;
-#[doc(hidden)]
-pub mod cli;
 #[doc(hidden)]
 pub mod control;
 #[doc(hidden)]

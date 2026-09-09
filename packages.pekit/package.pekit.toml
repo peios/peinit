@@ -1,6 +1,6 @@
-# Base metadata shared by every peinit package. The runtime package, libpeinit
-# development files, debuginfo, and debugsource are all carved from one
-# build.main tree, matching the peiosutils/libpeios split-package style.
+# Base metadata shared by the production peinit family. PID 1, its control
+# client, and the public libpeinit runtime are independently installable; the
+# development, debug, and source companions are carved from the same build.
 
 format = "peipkg"
 
@@ -58,6 +58,12 @@ format = "peipkg"
 # runner and the registryd path both live behind `peios-boundary` and cannot
 # be built, let alone tested, without libpeios.
 # PEI-783.
-version      = "{{version}}-43"
+# 0.0.2-1 is the production-qualified baseline: public immutable inputs,
+# vendored/offline dependencies, independent PID1/client/library packages,
+# conventional source/debug companions, exact ABI metadata, and native
+# hardening, payload, and checkout-path gates.
+version      = "{{version}}-1"
 architecture = "x86_64"
 license      = "MIT"
+license_class = "free"
+homepage     = "https://github.com/peios/peinit"

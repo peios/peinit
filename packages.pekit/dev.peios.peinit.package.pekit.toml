@@ -4,16 +4,20 @@
 # base package.pekit.toml. Runtime library dependencies such as libpeios/glibc
 # are derived from the binary's DT_NEEDED entries; registryd is explicit because
 # peinit's compiled-in Phase 1 service definition requires a registryd provider
-# at /usr/sbin/registryd. The libpeinit runtime shared object ships here with
-# PID 1. svctl is the matching command-line client for Peinit's current control
-# socket surface. Headers and the unversioned linker symlink are in
-# peinit-devel.
+# at /usr/sbin/registryd. libpeinit, svctl, headers, and debug material are
+# independently installable packages from this same source build.
 
 [package]
+name        = "dev.peios.peinit"
 description = "Peios real-root PID 1 service manager"
 
 [provides]
+peinit = "{{version}}-1"
+# `init` is a role rather than the historical package identity.
 init = "1"
+
+[replaces]
+peinit = "<= 0.0.1-43"
 
 [claims.provides.init.bin]
 target = "/usr/bin/peinit2"
@@ -26,10 +30,5 @@ registryd = "*"
 path = "/usr/sbin/registryd"
 
 [files]
+"@source:LICENSE" = "usr/share/licenses/dev.peios.peinit/LICENSE"
 ":usr/bin/peinit2" = "usr/bin/peinit2"
-":usr/bin/svctl" = "usr/bin/svctl"
-":usr/bin/reboot" = "usr/bin/reboot"
-":usr/bin/poweroff" = "usr/bin/poweroff"
-":usr/bin/halt" = "usr/bin/halt"
-":usr/bin/shutdown" = "usr/bin/shutdown"
-":usr/lib/x86_64-linux-peios/libpeinit.so.0" = "usr/lib/x86_64-linux-peios/libpeinit.so.0"

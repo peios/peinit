@@ -82,7 +82,6 @@ where
         }),
     );
 
-
     // Before anything is attempted with them. SeCreateTokenPrivilege used to
     // surface only as an EPERM from kacs_create_token at the *first* service
     // start — registryd, in step 6 — so a peinit that could not mint tokens
@@ -296,7 +295,12 @@ where
             RecoveryRegistryd::AlreadyAttempted,
         );
     }
-    log_console_tagged(platform, quiet, ConsoleTag::Ok, "peinit: phase1 registryd started\n");
+    log_console_tagged(
+        platform,
+        quiet,
+        ConsoleTag::Ok,
+        "peinit: phase1 registryd started\n",
+    );
     // Phase 1.5: run the image's autorun scripts now that the registry is
     // serving, before Phase 2 enumerates Machine\System\Services — so a script
     // that seeds services (the seed-apply autorun) has them present when the boot
@@ -388,7 +392,12 @@ where
     };
     log_phase2_boot_progress(platform, &boot_dispatch);
     emit_phase2_boot_audit_events(platform, &boot_dispatch);
-    log_console_tagged(platform, quiet, ConsoleTag::Ok, "peinit: phase2 boot complete\n");
+    log_console_tagged(
+        platform,
+        quiet,
+        ConsoleTag::Ok,
+        "peinit: phase2 boot complete\n",
+    );
 
     match runtime.enter_runtime(supervisor, infrastructure) {
         Ok(()) => Ok(InitRunResult::RuntimeReturned),

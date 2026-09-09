@@ -1,0 +1,20 @@
+# peinit-debugsource — Rust sources referenced by peinit's debug info, staged
+# under /usr/src/debug/peinit. Pairs with peinit-debuginfo.
+
+[package]
+name         = "dev.peios.peinit-debugsource"
+architecture = "noarch"
+description = "Peios PID 1 service manager - debug sources"
+
+[provides]
+peinit-debugsource = "{{version}}-1"
+
+[replaces]
+peinit-debugsource = "<= 0.0.1-43"
+
+[dependencies]
+"dev.peios.peinit-debuginfo" = "{{version}}-1"
+
+[files]
+"@source:LICENSE"   = "usr/share/licenses/dev.peios.peinit-debugsource/LICENSE"
+":usr/src/debug/**" = "usr/src/debug/"

@@ -1,6 +1,6 @@
 [package]
 name = "peinit2"
-version = "0.0.1"
+version = "0.0.2"
 description = "Replacement Peios PID 1 service-manager spine."
 edition = "2024"
 license = "MIT"
@@ -22,8 +22,8 @@ libc = "0.2"
 # message: a second implementation of a security-critical wire format is the
 # hazard authd's own service_sid module documents at length, and this is the
 # message that mints identity.
-libauthd = { path = "../authd/libauthd", optional = true }
-peios = { path = "../peios-rs/peios", optional = true }
+libauthd = { git = "https://github.com/peios/authd.git", rev = "3386525989f49f84facc555968d6fc5f5d5e3d53", optional = true }
+peios = { git = "https://github.com/peios/peios-rs.git", rev = "f4309f78fbaa878a14429a5e07d778dba9ddfab7", optional = true }
 serde_json = "1"
 sha1 = "0.10"
 

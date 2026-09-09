@@ -106,10 +106,10 @@ impl ConsoleTag {
     fn sgr(self) -> Option<&'static str> {
         match self {
             Self::None | Self::Bare => None,
-            Self::Ok => Some("1;32"),     // bold green
-            Self::Skip => Some("1;33"),   // bold yellow
-            Self::Warn => Some("1;33"),   // bold yellow
-            Self::Failed => Some("1;31"), // bold red
+            Self::Ok => Some("1;32"),      // bold green
+            Self::Skip => Some("1;33"),    // bold yellow
+            Self::Warn => Some("1;33"),    // bold yellow
+            Self::Failed => Some("1;31"),  // bold red
             Self::Crit => Some("1;37;41"), // bold white on red
         }
     }

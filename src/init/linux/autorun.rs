@@ -24,7 +24,7 @@ use std::process::{Command, Stdio};
 
 use crate::boundary::BoundaryError;
 
-use crate::console_style::{relay_lines, render, ConsoleTag};
+use crate::console_style::{ConsoleTag, relay_lines, render};
 
 use super::recovery_console::write_console;
 
@@ -181,7 +181,7 @@ fn list_scripts() -> std::io::Result<Vec<PathBuf>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{relay_component, AUTORUN_PATH};
+    use super::{AUTORUN_PATH, relay_component};
     use std::path::Path;
 
     #[test]

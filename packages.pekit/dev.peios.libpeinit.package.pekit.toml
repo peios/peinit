@@ -1,0 +1,9 @@
+# Public C client ABI for programs integrating with peinit. Consumers of this
+# library must not acquire or replace PID 1 as a packaging side effect.
+[package]
+name        = "dev.peios.libpeinit"
+description = "Peios service manager client library"
+
+[files]
+"@source:LICENSE" = "usr/share/licenses/dev.peios.libpeinit/LICENSE"
+":usr/lib/x86_64-linux-peios/libpeinit.so.0" = "usr/lib/x86_64-linux-peios/libpeinit.so.0"

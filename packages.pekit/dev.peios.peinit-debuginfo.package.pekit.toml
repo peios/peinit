@@ -1,0 +1,22 @@
+# peinit-debuginfo — separated debug symbols for the peinit PID 1 binary,
+# svctl, and the libpeinit runtime shared object. build.main splits DWARF into
+# /usr/lib/debug/.build-id/ so gdb/perf/debuginfod can find symbols by build-id.
+
+[package]
+name        = "dev.peios.peinit-debuginfo"
+description = "Peios PID 1 service manager - debugging symbols"
+
+[provides]
+peinit-debuginfo = "{{version}}-1"
+
+[replaces]
+peinit-debuginfo = "<= 0.0.1-43"
+
+[dependencies]
+"dev.peios.peinit"       = "{{version}}-1"
+"dev.peios.peinit-svctl" = "{{version}}-1"
+"dev.peios.libpeinit"    = "{{version}}-1"
+
+[files]
+"@source:LICENSE"      = "usr/share/licenses/dev.peios.peinit-debuginfo/LICENSE"
+":debug/usr/lib/debug/**" = "usr/lib/debug/"
