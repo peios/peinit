@@ -9,6 +9,7 @@ use serde_json::{Value, json};
 use super::socket::{JOBS_SOCKET_PATH, MAX_JOBS_MESSAGE_DESCRIPTORS};
 use super::wire::JobsErrorCode;
 
+#[cfg(feature = "peios-boundary")]
 const MAX_JOBS_RESPONSE_BYTES: usize = 1024 * 1024;
 
 #[derive(Debug)]
@@ -173,6 +174,7 @@ fn connect_seqpacket(path: &Path) -> std::io::Result<OwnedFd> {
     Ok(socket)
 }
 
+#[cfg(feature = "peios-boundary")]
 fn decode_response(bytes: &[u8], pidfd: Option<OwnedFd>) -> Result<JobsResponse, JobsClientError> {
     let raw_json = String::from_utf8(bytes.to_vec())
         .map_err(|error| JobsClientError::Protocol(format!("response is not UTF-8: {error}")))?;
