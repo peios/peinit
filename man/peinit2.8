@@ -1,0 +1,36 @@
+.TH PEINIT2 8 "September 2026" "Peios" "System Administration"
+.SH NAME
+peinit2 \- Peios real-root service manager and process 1
+.SH SYNOPSIS
+.B peinit2
+.SH DESCRIPTION
+.B peinit2
+is the Peios real-root init process.  It prepares the required boot
+infrastructure, starts the registry service, reads service definitions from
+the registry, and supervises the resulting service graph.
+.PP
+The kernel starts
+.B peinit2
+as process 1.  It is not an interactive command and should not be started by
+an administrator in an already-running system.
+.PP
+Service operations and system shutdown requests are submitted with
+.BR svctl (8).
+.SH FILES
+.TP
+.I /usr/bin/peinit2
+The service-manager executable.
+.TP
+.I /run/peinit/control.sock
+The default service-control socket.
+.TP
+.I /run/peinit/jobs.sock
+The default submitted-jobs socket.
+.SH EXIT STATUS
+As process 1,
+.B peinit2
+normally runs for the lifetime of the system.  A fatal boot or supervision
+failure enters the configured recovery path rather than returning to the
+kernel.
+.SH SEE ALSO
+.BR svctl (8)

@@ -1,0 +1,157 @@
+.TH SVCTL 8 "September 2026" "Peios" "System Administration"
+.SH NAME
+svctl \- control Peios services, submitted jobs, and system shutdown
+.SH SYNOPSIS
+.B svctl
+.RI [ options ]
+.BR start | stop | restart | reload | reset | status
+.I service
+.br
+.B svctl
+.RI [ options ]
+.BR list | reload-config
+.br
+.B svctl
+.RI [ options ]
+.B op
+.I operation-id
+.br
+.B svctl
+.RI [ options ]
+.B shutdown
+.BR poweroff | reboot | halt
+.br
+.B svctl
+.RI [ options ]
+.B job
+.I command
+.RI [ arguments ]
+.SH DESCRIPTION
+.B svctl
+is the administrative client for the Peios service manager.  Service and
+system commands use the control socket.  Submitted-job commands use either
+the control socket or the jobs socket, as described below.
+.SH GLOBAL OPTIONS
+.TP
+.BI --socket " path"
+Use
+.I path
+instead of the default control socket.
+.TP
+.BI --jobs-socket " path"
+Use
+.I path
+instead of the default submitted-jobs socket.
+.TP
+.B --json
+Write machine-readable JSON output.
+.TP
+.BR --wait , " " --no-wait
+Wait, or do not wait, for a supported asynchronous operation to complete.
+.TP
+.BR -h , " " --help
+Show command usage.
+.TP
+.B --version
+Show the client version.
+.SH SERVICE COMMANDS
+.TP
+.BI start " service"
+Start a service.
+.TP
+.BI stop " service"
+Stop a service.
+.TP
+.BI restart " service"
+Restart a service.
+.TP
+.BI reload " service"
+Reload a service.
+.TP
+.BI reset " service"
+Clear the service's failed state.
+.TP
+.BI status " service"
+Show service status.
+.TP
+.B list
+List services.
+.TP
+.BI op " operation-id"
+Show an operation.
+.TP
+.B reload-config
+Reload service definitions from the registry.
+.TP
+.BI shutdown " poweroff|reboot|halt"
+Request an immediate system shutdown of the selected kind.
+.SH SUBMITTED JOBS
+.TP
+.B job list
+List submitted jobs.  Results may be filtered with
+.BR --submitter ,
+.BR --identity ,
+.BR --logon-session ,
+or
+.BR --state .
+.TP
+.BI "job status" " job-id"
+Show one submitted job.
+.TP
+.BI "job stop" " job-id"
+Stop one submitted job.
+.TP
+.BI "job submit" " [options] image [argument ...]"
+Submit an absolute executable image.  Options include
+.BR --description ,
+.BR --cwd ,
+repeatable
+.BR --env ,
+.BR --timeout ,
+.BR --stop-timeout ,
+.BR --readiness ,
+.BR --readiness-timeout ,
+repeatable
+.BR --success-exit-code ,
+repeatable
+.BR --fd ,
+.BR --output ,
+and
+.BR --security-descriptor .
+The job runs with the caller's primary token.
+.TP
+.BI "job wait" " [--for ready|terminal] job-id"
+Wait for a job to become ready or terminal.
+.TP
+.BI "job signal" " job-id signal"
+Send a signal to a job.
+.SH MULTICALL NAMES
+The installed
+.BR reboot ,
+.BR poweroff ,
+.BR halt ,
+and
+.B shutdown
+commands are links to
+.BR svctl .
+The first three request their named action immediately.
+.B shutdown
+accepts only immediate forms:
+.BR "shutdown now" ,
+.BR "shutdown -h now" ,
+.BR "shutdown -P now" ,
+.BR "shutdown -r now" ,
+and
+.BR "shutdown -H now" .
+.SH EXIT STATUS
+Zero indicates success.  Command-usage errors return 64.  A waited submitted
+job returns success only when the job completed successfully.
+.SH FILES
+.TP
+.I /run/peinit/control.sock
+Default service-control socket.
+.TP
+.I /run/peinit/jobs.sock
+Default submitted-jobs socket.
+.SH SEE ALSO
+.BR peinit2 (8)
