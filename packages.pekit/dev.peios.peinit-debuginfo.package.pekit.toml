@@ -6,11 +6,7 @@
 name        = "dev.peios.peinit-debuginfo"
 description = "Peios PID 1 service manager - debugging symbols"
 
-[provides]
-peinit-debuginfo = "{{version}}-1"
 
-[replaces]
-peinit-debuginfo = "<= 0.0.1-43"
 
 [dependencies]
 "dev.peios.peinit"       = "{{version}}-1"

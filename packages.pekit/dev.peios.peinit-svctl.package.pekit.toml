@@ -7,8 +7,6 @@ side_effects = ["man-db"]
 name        = "dev.peios.peinit-svctl"
 description = "Peios service manager control and shutdown client"
 
-[provides]
-svctl = "{{version}}-1"
 
 [files]
 "@source:LICENSE"   = "usr/share/licenses/dev.peios.peinit-svctl/LICENSE"

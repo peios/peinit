@@ -9,11 +9,7 @@
 name        = "dev.peios.libpeinit-devel"
 description = "Peios service-manager client library development files"
 
-[provides]
-peinit-devel = "{{version}}-1"
 
-[replaces]
-peinit-devel = "<= 0.0.1-43"
 
 [dependencies]
 "dev.peios.libpeinit" = "{{version}}-1"
