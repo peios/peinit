@@ -14,12 +14,9 @@ name        = "dev.peios.peinit"
 description = "Peios real-root PID 1 service manager"
 
 [provides]
-peinit = "{{version}}-1"
 # `init` is a role rather than the historical package identity.
 init = "1"
 
-[replaces]
-peinit = "<= 0.0.1-43"
 
 [claims.provides.init.bin]
 target = "/usr/bin/peinit2"

@@ -6,11 +6,7 @@ name         = "dev.peios.peinit-debugsource"
 architecture = "noarch"
 description = "Peios PID 1 service manager - debug sources"
 
-[provides]
-peinit-debugsource = "{{version}}-1"
 
-[replaces]
-peinit-debugsource = "<= 0.0.1-43"
 
 [dependencies]
 "dev.peios.peinit-debuginfo" = "{{version}}-1"
