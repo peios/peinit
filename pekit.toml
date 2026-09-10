@@ -21,12 +21,15 @@ test -n "$(find "$PEKIT_OUT/vendor" -mindepth 1 -maxdepth 1 -type d -print -quit
 "org.rust-lang.rust" = ">= 1.98.1"
 "org.gnu.findutils"  = "*"
 "org.mozilla.ca-certificates" = "*"
+"org.git.kernel.dash" = "*"
+"dev.peios.peiosutils" = ">= 0.8.5"
 
 [build.vendor.dependencies.apt]
 cargo           = "*"
 git             = "*"
 ca-certificates = "*"
 findutils       = "*"
+dash            = "*"
 
 [build.main]
 needs = ["vendor"]
@@ -72,7 +75,7 @@ if versions != [expected]:
 
 # Stable DWARF names keep the checkout, build root, and vendored-source cache
 # out of every shipped ELF and detached symbol file.
-export RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }--remap-path-prefix=$PEKIT_WORKSPACE_ROOT=$DEBUG_PREFIX/.workspace --remap-path-prefix=$PEKIT_OUT_BASE=$DEBUG_PREFIX/.build --remap-path-prefix=$SRC=$DEBUG_PREFIX --remap-path-prefix=$PEKIT_VENDOR_OUT/vendor=$DEBUG_PREFIX/vendor"
+export RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }-Dwarnings --remap-path-prefix=$PEKIT_WORKSPACE_ROOT=$DEBUG_PREFIX/.workspace --remap-path-prefix=$PEKIT_OUT_BASE=$DEBUG_PREFIX/.build --remap-path-prefix=$SRC=$DEBUG_PREFIX --remap-path-prefix=$PEKIT_VENDOR_OUT/vendor=$DEBUG_PREFIX/vendor"
 export CARGO_PROFILE_RELEASE_DEBUG=2
 export CARGO_PROFILE_RELEASE_SPLIT_DEBUGINFO=off
 
@@ -92,12 +95,12 @@ cargo rustc --release --locked --offline --all-features --lib \
 mkdir -p "$PEKIT_OUT/usr/bin" "$PEKIT_OUT/usr/sbin" \
   "$PEKIT_OUT/$LIBDIR" "$PEKIT_OUT/usr/include/peinit" \
   "$PEKIT_OUT/$LIBDIR/pkgconfig"
-install -m 0755 "$PEKIT_OUT/target/release/peinit2" "$PEKIT_OUT/usr/bin/peinit2"
-install -m 0755 "$PEKIT_OUT/target/release/svctl" "$PEKIT_OUT/usr/bin/svctl"
+cp "$PEKIT_OUT/target/release/peinit2" "$PEKIT_OUT/usr/bin/peinit2"
+cp "$PEKIT_OUT/target/release/svctl" "$PEKIT_OUT/usr/bin/svctl"
 for alias in reboot poweroff halt shutdown; do
   ln -s svctl "$PEKIT_OUT/usr/bin/$alias"
 done
-install -m 0755 "$PEKIT_OUT/target/release/libpeinit.so" "$PEKIT_OUT/$LIBDIR/libpeinit.so.0"
+cp "$PEKIT_OUT/target/release/libpeinit.so" "$PEKIT_OUT/$LIBDIR/libpeinit.so.0"
 ln -s libpeinit.so.0 "$PEKIT_OUT/$LIBDIR/libpeinit.so"
 cp include/peinit.h "$PEKIT_OUT/usr/include/"
 cp include/peinit/*.h "$PEKIT_OUT/usr/include/peinit/"
@@ -193,8 +196,11 @@ PKG_CONFIG_PATH="$PEKIT_OUT/$LIBDIR/pkgconfig" \
 
 [build.main.dependencies.peipkg]
 "org.git.kernel.dash"      = "*"
-"org.gnu.coreutils"        = "*"
+"org.gnu.bash"             = "*"
+"dev.peios.peiosutils"     = ">= 0.8.5"
+"org.gnu.diffutils"        = "*"
 "org.gnu.findutils"        = "*"
+"org.gnu.gawk"             = "*"
 "org.gnu.grep"             = "*"
 "org.gnu.sed"              = "*"
 "org.rust-lang.rust"       = ">= 1.98.1"
@@ -208,11 +214,15 @@ PKG_CONFIG_PATH="$PEKIT_OUT/$LIBDIR/pkgconfig" \
 "org.python.python3"       = "*"
 "dev.peios.libpeios-devel" = ">= 0.5.0"
 "dev.peios.kernel-headers" = ">= 0.20.1-rc13"
+"org.iana.tzdata"          = ">= 2026c"
 
 [build.main.dependencies.apt]
 dash         = "*"
+bash         = "*"
 coreutils    = "*"
+diffutils    = "*"
 findutils    = "*"
+gawk         = "*"
 grep         = "*"
 sed          = "*"
 cargo        = "*"
@@ -225,6 +235,7 @@ cbindgen     = "*"
 binutils     = "*"
 debugedit    = "*"
 python3      = "*"
+tzdata       = "*"
 
 [test]
 needs = ["vendor"]
@@ -236,6 +247,7 @@ cp "$PEKIT_VENDOR_OUT/cargo-config.toml" "$CARGO_HOME/config.toml"
 unset PEIOS_LIB_DIR PEIOS_INCLUDE PKM_UAPI
 pkg-config --exists peios
 export BINDGEN_EXTRA_CLANG_ARGS="-isystem $(gcc -print-file-name=include) ${BINDGEN_EXTRA_CLANG_ARGS:-}"
+export RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }-Dwarnings"
 cargo test --workspace --locked --offline
 cargo test --workspace --locked --offline --all-features --no-run
 ./tools/verify-abi.sh
@@ -243,7 +255,12 @@ cargo test --workspace --locked --offline --all-features --no-run
 
 [test.dependencies.peipkg]
 "org.git.kernel.dash"      = "*"
-"org.gnu.coreutils"        = "*"
+"org.gnu.bash"             = "*"
+"dev.peios.peiosutils"     = ">= 0.8.5"
+"org.gnu.diffutils"        = "*"
+"org.gnu.gawk"             = "*"
+"org.gnu.grep"             = "*"
+"org.gnu.sed"              = "*"
 "org.rust-lang.rust"       = ">= 1.98.1"
 "org.gnu.gcc"              = "*"
 "org.gnu.gcc-c++"          = "*"
@@ -252,10 +269,16 @@ cargo test --workspace --locked --offline --all-features --no-run
 "org.mozilla.cbindgen"     = "0.29.2"
 "dev.peios.libpeios-devel" = ">= 0.5.0"
 "dev.peios.kernel-headers" = ">= 0.20.1-rc13"
+"org.iana.tzdata"          = ">= 2026c"
 
 [test.dependencies.apt]
 dash         = "*"
+bash         = "*"
 coreutils    = "*"
+diffutils    = "*"
+gawk         = "*"
+grep         = "*"
+sed          = "*"
 cargo        = "*"
 rustc        = "*"
 gcc          = "*"
@@ -263,6 +286,7 @@ gcc          = "*"
 pkg-config   = "*"
 libclang-dev = "*"
 cbindgen     = "*"
+tzdata       = "*"
 
 [clean]
 command = "cargo clean"
