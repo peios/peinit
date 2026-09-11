@@ -297,6 +297,8 @@ gate = true
 needs = ["main", "vendor"]
 command = '''
 set -eu
+TRIPLET=x86_64-linux-peios
+LIBDIR="usr/lib/$TRIPLET"
 export CARGO_HOME="$PEKIT_OUT/cargo-home"
 mkdir -p "$CARGO_HOME"
 cp "$PEKIT_VENDOR_OUT/cargo-config.toml" "$CARGO_HOME/config.toml"
