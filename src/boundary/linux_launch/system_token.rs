@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use peios::security::{GroupAttributes, IntegrityLevel, Sid, WellKnown};
+use peios::security::{GroupAttributes, IntegrityLevel, Sid, WellKnown, sddl};
 use peios::token::{
     ImpersonationLevel, PrivilegeSet, SessionId, Token, TokenAccess, TokenBuilder, TokenType,
 };
@@ -9,6 +9,20 @@ use crate::boundary::BoundaryError;
 use crate::security::service_sid;
 
 const PEINIT_TOKEN_SOURCE: &str = "peinit";
+
+/// The DACL an object created by a SYSTEM service gets when it has no parent
+/// to inherit from: SYSTEM and Administrators full control, nobody else.
+///
+/// The same DACL the bootstrap SYSTEM token carries, and stated here rather
+/// than copied from the template because the template's default DACL is not
+/// something `Token` can query. The kernel supplies no fallback of its own --
+/// a token with an empty default DACL leaves such an object with a *null*
+/// DACL, which grants everything to everybody -- so a platform daemon that
+/// binds an abstract socket or creates a key under a container written
+/// without inheritable ACEs would otherwise publish it world-writable.
+/// Objects with a parent never reach this: every root descriptor peinit
+/// stamps carries inheritable ACEs.
+const SYSTEM_DEFAULT_DACL_SDDL: &str = "D:(A;;GA;;;SY)(A;;GA;;;BA)";
 
 pub(super) fn create_system_token(service: &str) -> Result<Token, BoundaryError> {
     let template = SystemTokenTemplate::from_self_token()?;
@@ -93,9 +107,13 @@ fn build_system_token(
     let group_attrs = GroupAttributes::MANDATORY
         .union(GroupAttributes::ENABLED_BY_DEFAULT)
         .union(GroupAttributes::ENABLED);
+    let default_dacl = sddl::parse_acl(SYSTEM_DEFAULT_DACL_SDDL).map_err(|error| {
+        BoundaryError::Token(format!("parse the SYSTEM default DACL failed: {error}"))
+    })?;
     let mut builder = TokenBuilder::new();
     builder
         .user(&template.user)
+        .default_dacl(&default_dacl)
         // The impersonation level is a ratchet on every token: nothing captured
         // from, conveyed by, or duplicated out of this token can act above it.
         // A SYSTEM service starts at the top, like the bootstrap SYSTEM token
@@ -139,14 +157,13 @@ fn service_group() -> Result<Sid, BoundaryError> {
 
 #[cfg(test)]
 mod tests {
-    use peios::security::{IntegrityLevel, Privileges, Sid, WellKnown};
+    use peios::security::{IntegrityLevel, Privileges, Sid, WellKnown, sddl};
     use peios::token::{PrivilegeSet, SessionId};
 
-    use super::{SystemTokenTemplate, build_system_token};
+    use super::{SYSTEM_DEFAULT_DACL_SDDL, SystemTokenTemplate, build_system_token};
 
-    #[test]
-    fn system_token_spec_uses_auth_id_not_interactivity_scope() {
-        let template = SystemTokenTemplate {
+    fn template() -> SystemTokenTemplate {
+        SystemTokenTemplate {
             user: Sid::well_known(WellKnown::System),
             groups: Vec::new(),
             privileges: PrivilegeSet {
@@ -157,7 +174,31 @@ mod tests {
             },
             integrity: IntegrityLevel::SYSTEM,
             auth_id: SessionId(999),
-        };
+        }
+    }
+
+    /// A SYSTEM service token carries a default DACL, so an object it
+    /// creates with no parent to inherit from is administrator-only rather
+    /// than left with a null DACL.
+    #[test]
+    fn system_token_spec_carries_the_system_default_dacl() {
+        let spec = build_system_token("registryd", &template())
+            .expect("build SYSTEM token")
+            .to_bytes()
+            .expect("serialize SYSTEM token");
+
+        let dacl = sddl::parse_acl(SYSTEM_DEFAULT_DACL_SDDL).expect("the shipped SDDL parses");
+        let dacl = dacl.as_bytes();
+        assert!(!dacl.is_empty(), "the default DACL must not be empty");
+        assert!(
+            spec.windows(dacl.len()).any(|window| window == dacl),
+            "the create spec must embed the SYSTEM default DACL"
+        );
+    }
+
+    #[test]
+    fn system_token_spec_uses_auth_id_not_interactivity_scope() {
+        let template = template();
 
         let spec = build_system_token("registryd", &template)
             .expect("build SYSTEM token")
