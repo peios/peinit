@@ -262,4 +262,15 @@ mod tests {
     fn fcntl_getfd(fd: i32) -> i32 {
         unsafe { libc::fcntl(fd, libc::F_GETFD) }
     }
+
+    /// TRM §5.4 — a setup failure exits 126 and a failed exec 127, the
+    /// conventional shell codes for "found but not executable" and "not
+    /// found". The child `_exit`s with these after writing its error-pipe
+    /// payload; peinit acts on the pipe rather than the wait status, so the
+    /// codes never surface to a guest and are asserted here on the constants.
+    #[test]
+    fn child_setup_and_exec_use_the_conventional_exit_codes() {
+        assert_eq!(super::CHILD_SETUP_EXIT_CODE, 126);
+        assert_eq!(super::CHILD_EXEC_EXIT_CODE, 127);
+    }
 }

@@ -142,3 +142,58 @@ impl ProcessPreExecStep {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::ProcessPreExecStep;
+
+    /// TRM §5.3 — the child setup step identifiers. The wire between the child
+    /// and the parent over the setup pipe carries the numeric id, so the whole
+    /// table has to be stable in both directions. No guest can read the numbers:
+    /// they exist only inside PID 1 and on the pipe between it and its
+    /// pre-exec child.
+    #[test]
+    fn pre_exec_step_ids_match_the_wire_table() {
+        let table = [
+            (1, ProcessPreExecStep::CloseErrorPipeRead),
+            (2, ProcessPreExecStep::SetStdio),
+            (3, ProcessPreExecStep::ResetSignals),
+            (4, ProcessPreExecStep::InstallToken),
+            (5, ProcessPreExecStep::SetRlimits),
+            (6, ProcessPreExecStep::SetOomScore),
+            (7, ProcessPreExecStep::SetWorkingDirectory),
+            (8, ProcessPreExecStep::SetEnvironment),
+            (9, ProcessPreExecStep::SetNotifySocket),
+            (10, ProcessPreExecStep::InjectStoredFileDescriptors),
+            (11, ProcessPreExecStep::Exec),
+            (12, ProcessPreExecStep::CreateSession),
+            (13, ProcessPreExecStep::AcquireControllingTerminal),
+        ];
+        for (id, step) in table {
+            assert_eq!(step.id(), id, "{step:?} must encode as {id}");
+            assert_eq!(
+                ProcessPreExecStep::from_id(id),
+                Some(step),
+                "id {id} must decode back to {step:?}",
+            );
+        }
+        // Nothing outside the table decodes.
+        assert_eq!(ProcessPreExecStep::from_id(0), None);
+        assert_eq!(ProcessPreExecStep::from_id(14), None);
+    }
+
+    /// TRM §5.3/§5.4 — identifier 8 is reserved. It maps to the environment
+    /// step, which the child never performs: peinit builds the environment in
+    /// the parent and applies it with `execve`, so there is no child step that
+    /// could fail and emit id 8. The slot is kept so the numbering of every
+    /// other step is fixed regardless.
+    #[test]
+    fn identifier_eight_is_the_reserved_environment_step() {
+        assert_eq!(
+            ProcessPreExecStep::from_id(8),
+            Some(ProcessPreExecStep::SetEnvironment),
+        );
+        assert_eq!(ProcessPreExecStep::SetEnvironment.id(), 8);
+        assert_eq!(ProcessPreExecStep::SetEnvironment.label(), "set-environment");
+    }
+}

@@ -225,6 +225,44 @@ mod tests {
 
         assert!(LaunchCommand::new(&job, &environment).is_err());
     }
+
+    /// TRM §5.4 — the child's step 9 is a confirmation, not a set: it checks
+    /// that `NOTIFY_SOCKET` is present in the prebuilt environment and fails
+    /// with a synthetic `EINVAL` when it is not. This is the predicate that
+    /// confirmation reads. A guest cannot reach the failing branch — peinit
+    /// always inserts `NOTIFY_SOCKET` in environment layer 4 and filters any
+    /// configured value out of the layers below — so the discriminator is
+    /// asserted here rather than from a VM.
+    #[test]
+    fn notify_socket_confirmation_discriminates_present_from_absent() {
+        let job = crate::boundary::linux_launch::tests::test_job();
+
+        let with = LaunchCommand::new(
+            &job,
+            &[EnvironmentVariable {
+                name: "NOTIFY_SOCKET".to_string(),
+                value: "/run/notify.sock".to_string(),
+            }],
+        )
+        .expect("launch command");
+        assert!(
+            with.environment_contains_notify_socket(),
+            "the confirmation sees NOTIFY_SOCKET when it is present",
+        );
+
+        let without = LaunchCommand::new(
+            &job,
+            &[EnvironmentVariable {
+                name: "PATH".to_string(),
+                value: "/sbin:/bin".to_string(),
+            }],
+        )
+        .expect("launch command");
+        assert!(
+            !without.environment_contains_notify_socket(),
+            "and reports its absence, which is what the child turns into EINVAL",
+        );
+    }
 }
 
 #[cfg(test)]

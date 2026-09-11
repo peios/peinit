@@ -94,6 +94,31 @@ mod tests {
 
     use super::{ChildSetupEvidence, MalformedChildSetupEvidence};
 
+    /// TRM §5.3 — the error payload is exactly eight bytes: a little-endian
+    /// `u32` step id in bytes 0-3 and a little-endian `i32` errno in bytes 4-7,
+    /// written with one `write(2)`. The layout is the wire between the child and
+    /// PID 1 over the setup pipe and is not observable from a guest.
+    #[test]
+    fn child_setup_evidence_payload_is_exactly_eight_bytes() {
+        assert_eq!(ChildSetupEvidence::BYTE_LEN, 8);
+        let evidence = ChildSetupEvidence {
+            step: ProcessPreExecStep::Exec,
+            errno: libc::ENOENT,
+        };
+        let bytes = evidence.encode();
+        assert_eq!(bytes.len(), 8);
+        assert_eq!(
+            u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
+            ProcessPreExecStep::Exec.id(),
+            "bytes 0-3 are the little-endian step id",
+        );
+        assert_eq!(
+            i32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]),
+            libc::ENOENT,
+            "bytes 4-7 are the little-endian errno",
+        );
+    }
+
     #[test]
     fn child_setup_evidence_round_trips_exact_payload() {
         let evidence = ChildSetupEvidence {
