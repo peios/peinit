@@ -301,7 +301,7 @@ dependencies = [
 
 [[package]]
 name = "peinit2"
-version = "0.0.2"
+version = "0.0.4"
 dependencies = [
  "jiff",
  "libauthd",
