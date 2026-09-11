@@ -23,6 +23,9 @@ struct FakeMountSyscalls {
     mountinfo: String,
     read_failures: VecDeque<i32>,
     calls: Vec<MountCall>,
+    /// How many mount-side calls had been made when each mountinfo read
+    /// happened, so a test can say where in the sequence a read fell.
+    reads_at: Vec<usize>,
     mount_failures: BTreeMap<String, i32>,
     seed_failures: BTreeMap<String, i32>,
     policy_failures: BTreeMap<String, i32>,
@@ -34,6 +37,7 @@ impl FakeMountSyscalls {
             mountinfo: mountinfo.to_string(),
             read_failures: VecDeque::new(),
             calls: Vec::new(),
+            reads_at: Vec::new(),
             mount_failures: BTreeMap::new(),
             seed_failures: BTreeMap::new(),
             policy_failures: BTreeMap::new(),
@@ -63,6 +67,7 @@ impl FakeMountSyscalls {
 
 impl Phase1MountSyscalls for FakeMountSyscalls {
     fn read_mountinfo(&mut self, _path: &Path) -> std::io::Result<String> {
+        self.reads_at.push(self.calls.len());
         if let Some(errno) = self.read_failures.pop_front() {
             return Err(std::io::Error::from_raw_os_error(errno));
         }
@@ -155,6 +160,100 @@ fn mounts_proc_before_reading_default_mountinfo_when_proc_is_absent() {
         .flat_map(expected_calls_for_spec)
         .collect();
     assert_eq!(syscalls.calls, expected);
+}
+
+/// TRM §2.3 step 2: mountinfo lives in `/proc`, which is one of the things
+/// being checked for, so a read that fails with `ENOENT` *or* `ENOTDIR` mounts
+/// `/proc` from the table and reads again. The second read is a real retry: it
+/// happens after the `/proc` mount and its result is what the rest of the step
+/// works from, so `/proc` is not mounted a second time.
+#[test]
+fn mountinfo_enoent_or_enotdir_mounts_proc_and_reads_again() {
+    for errno in [libc::ENOENT, libc::ENOTDIR] {
+        let mountinfo_after_proc = "1 0 0:1 / /proc rw - proc proc rw\n";
+        let mut syscalls =
+            FakeMountSyscalls::with_mountinfo(mountinfo_after_proc).fail_read_once(errno);
+
+        mount_phase1_virtual_filesystems(Path::new(DEFAULT_MOUNTINFO_PATH), &mut syscalls)
+            .unwrap_or_else(|error| panic!("errno {errno}: mount setup failed: {error:?}"));
+
+        assert_eq!(
+            syscalls.reads_at,
+            vec![0, 2],
+            "errno {errno}: one failed read, then a second read after /proc's create and mount",
+        );
+        assert_eq!(
+            syscalls.calls[..2],
+            [
+                MountCall::CreateDir("/proc".to_string()),
+                MountCall::Mount {
+                    mount_point: "/proc".to_string(),
+                    filesystem: "proc".to_string(),
+                    flags: libc::MS_NOSUID | libc::MS_NODEV | libc::MS_NOEXEC,
+                },
+            ],
+            "errno {errno}: /proc is mounted before the retry",
+        );
+        let proc_mounts = syscalls
+            .calls
+            .iter()
+            .filter(|call| matches!(call, MountCall::Mount { mount_point, .. } if mount_point == "/proc"))
+            .count();
+        assert_eq!(
+            proc_mounts, 1,
+            "errno {errno}: the retried mountinfo lists /proc, so it is not mounted again",
+        );
+    }
+}
+
+/// TRM §2.3 step 2: any failure to read or parse mountinfo other than the
+/// `ENOENT`/`ENOTDIR` bootstrap case is a recovery error — including the retry
+/// itself failing — and nothing further is mounted on the strength of a table
+/// peinit could not read.
+#[test]
+fn an_unreadable_or_unparseable_mountinfo_is_a_recovery_error() {
+    // Any other read errno: no retry, no /proc mount, no mounts at all.
+    let mut syscalls = FakeMountSyscalls::with_mountinfo("").fail_read_once(libc::EACCES);
+    let error = mount_phase1_virtual_filesystems(Path::new(DEFAULT_MOUNTINFO_PATH), &mut syscalls)
+        .expect_err("an EACCES mountinfo read is fatal");
+    assert!(
+        matches!(&error, crate::boundary::BoundaryError::Recovery(message)
+            if message.contains("read /proc/self/mountinfo failed")),
+        "{error:?}",
+    );
+    assert_eq!(syscalls.reads_at, vec![0], "read once, not retried");
+    assert!(syscalls.calls.is_empty(), "nothing mounted: {:?}", syscalls.calls);
+
+    // The bootstrap retry that fails too: /proc was mounted for it, and then
+    // the step stops.
+    let mut syscalls = FakeMountSyscalls::with_mountinfo("")
+        .fail_read_once(libc::ENOENT)
+        .fail_read_once(libc::EIO);
+    let error = mount_phase1_virtual_filesystems(Path::new(DEFAULT_MOUNTINFO_PATH), &mut syscalls)
+        .expect_err("a failed retry is fatal");
+    assert!(
+        matches!(&error, crate::boundary::BoundaryError::Recovery(message)
+            if message.contains("read /proc/self/mountinfo failed")),
+        "{error:?}",
+    );
+    assert_eq!(syscalls.reads_at, vec![0, 2]);
+    assert_eq!(
+        syscalls.calls.len(),
+        2,
+        "only /proc's create and mount, for the retry: {:?}",
+        syscalls.calls,
+    );
+
+    // Readable but not parseable.
+    let mut syscalls = FakeMountSyscalls::with_mountinfo("26 23 0:22 /\n");
+    let error = mount_phase1_virtual_filesystems(Path::new(DEFAULT_MOUNTINFO_PATH), &mut syscalls)
+        .expect_err("an unparseable mountinfo is fatal");
+    assert!(
+        matches!(&error, crate::boundary::BoundaryError::Recovery(message)
+            if message.contains("parse /proc/self/mountinfo failed")),
+        "{error:?}",
+    );
+    assert!(syscalls.calls.is_empty(), "nothing mounted: {:?}", syscalls.calls);
 }
 
 /// The CreateDir + Mount calls a spec produces, plus the Seed call for the

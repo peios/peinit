@@ -73,6 +73,63 @@ fn parent_setup_launch_failure_marks_start_failed_and_service_backoff() {
     );
 }
 
+/// TRM §14.4: `ENOMEM` from `clone3` behaves like the descriptor and PID
+/// exhaustion cases — the start fails with `ParentSetupFailure`, which is
+/// restart-eligible, so the service waits in Backoff and gets another go once
+/// the delay has passed. The error is the one `clone_process_into_cgroup`
+/// produces, as `launch_linux_process` hands it back wrapped as a parent-side
+/// setup failure.
+#[test]
+fn a_clone3_enomem_is_a_restart_eligible_parent_setup_failure() {
+    let mut supervisor = boot_single_service("authd");
+    let mut tokens = TestTokenProvider::default();
+    let mut launcher = TestProcessLauncher::results(vec![
+        Err(BoundaryError::ProcessLaunch(ProcessLaunchError::parent_setup(
+            "clone3(CLONE_PIDFD|CLONE_INTO_CGROUP) failed: Cannot allocate memory (os error 12)",
+        ))),
+        Ok(process(7001, 71)),
+    ]);
+    let mut clock = ScriptedClock::new([AUTHD_LAUNCH_NS]);
+
+    let dispatch = supervisor
+        .launch_next_pending_service_job(&mut tokens, &mut launcher, &mut clock)
+        .expect("launch failure is handled")
+        .expect("launch failure dispatch");
+    let SupervisorServiceLaunchDispatch::Failed(dispatch) = dispatch else {
+        panic!("expected failed launch dispatch");
+    };
+    assert_eq!(
+        dispatch.failure.service_transitions[0].event.cause,
+        TransitionCause::ParentSetupFailure
+    );
+    assert_failure_cause(
+        &dispatch.job_event,
+        "ParentSetupFailure: clone3(CLONE_PIDFD|CLONE_INTO_CGROUP) failed: \
+         Cannot allocate memory (os error 12)",
+    );
+    assert_service_backoff(&supervisor, "authd", TransitionCause::ParentSetupFailure);
+
+    // Restart-eligible means another go, not just a Backoff label: once the
+    // delay is due the same service is launched again, and with memory back
+    // it comes up.
+    let deadline = supervisor
+        .next_restart_backoff_deadline()
+        .expect("a restart is scheduled");
+    assert_eq!(deadline.service, "authd");
+    let relaunches = supervisor
+        .process_due_restart_backoffs(deadline.due_at_ns)
+        .expect("due restart scan");
+    assert_eq!(relaunches.len(), 1, "the restart was taken");
+    let mut clock = ScriptedClock::new([deadline.due_at_ns]);
+    supervisor
+        .launch_next_pending_service_job(&mut tokens, &mut launcher, &mut clock)
+        .expect("relaunch")
+        .expect("relaunch dispatch");
+    let status = supervisor.service_status("authd").expect("service status");
+    assert_eq!(status.state, ServiceState::Active);
+    assert_eq!(status.current_job.expect("relaunched job").pid, Some(7001));
+}
+
 #[test]
 fn pre_exec_launch_failure_marks_start_failed_and_service_backoff() {
     let mut supervisor = boot_single_service("authd");
