@@ -8,6 +8,7 @@ mod fixture;
 mod immediate;
 mod progress;
 mod response;
+mod retained_evidence;
 mod runtime_turn;
 mod signals;
 mod timeouts;

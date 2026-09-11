@@ -35,6 +35,41 @@ fn shutdown_extend_timeout_resets_stop_deadline_and_clamps_to_service_cap() {
     assert_eq!(deadline.due_at_ns, SHUTDOWN_NS + 40_000_000_000);
 }
 
+// §6.6: during a shutdown the extended deadline is held to four times the
+// StopTimeout *and* to what is left of the global ShutdownTimeout, and where
+// both apply the stricter wins. `app`'s StopTimeout is ten seconds, so its
+// fourfold cap is forty. With the default ninety-second global timeout the
+// fourfold cap is the stricter; with twenty seconds the global deadline is.
+// A request inside both is used as it stands.
+#[test]
+fn shutdown_extend_timeout_takes_the_stricter_of_the_fourfold_and_global_caps() {
+    let extend = |global_timeout_secs: u64, request: &[u8]| {
+        let mut supervisor = active_app_supervisor();
+        supervisor.settings.shutdown.global_timeout_secs = global_timeout_secs;
+        let mut controller = TestProcessController::default();
+        supervisor
+            .begin_shutdown(ShutdownKind::Poweroff, &mut controller, SHUTDOWN_NS)
+            .expect("begin shutdown");
+        apply_notify(&mut supervisor, datagram(8000, request), EXTEND_NS)
+            .expect("extend timeout");
+        (
+            shutdown_deadline(&supervisor, "app").due_at_ns,
+            supervisor.shutdown().expect("shutdown").global_deadline_ns,
+        )
+    };
+
+    let (due, global) = extend(90, b"EXTEND_TIMEOUT_USEC=1000000000");
+    assert_eq!(global, SHUTDOWN_NS + 90_000_000_000);
+    assert_eq!(due, SHUTDOWN_NS + 40_000_000_000, "the fourfold cap is the stricter");
+
+    let (due, global) = extend(20, b"EXTEND_TIMEOUT_USEC=1000000000");
+    assert_eq!(global, SHUTDOWN_NS + 20_000_000_000);
+    assert_eq!(due, global, "the global deadline is the stricter");
+
+    let (due, _) = extend(20, b"EXTEND_TIMEOUT_USEC=5000000");
+    assert_eq!(due, EXTEND_NS + 5_000_000_000, "a request inside both caps stands");
+}
+
 #[test]
 fn shutdown_extend_timeout_updates_retained_stop_operation_deadline() {
     let mut supervisor = active_app_supervisor();
