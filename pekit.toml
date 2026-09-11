@@ -167,9 +167,6 @@ export CARGO_PROFILE_RELEASE_SPLIT_DEBUGINFO=off
 # Peios boundary feature deliberately executes Peios-only syscalls in a few
 # integration tests, so compile that complete test graph here but run it only
 # on a booted Peios system.
-cargo test --release --locked --offline --target-dir "$PEKIT_OUT/target-test"
-cargo test --release --locked --offline --all-features --no-run \
-  --target-dir "$PEKIT_OUT/target-test"
 for target in target-a target-b; do
   cargo build --release --locked --offline --all-features \
     --bin peinit2 --bin svctl --target-dir "$PEKIT_OUT/$target"
@@ -251,43 +248,6 @@ done
 rm -f "$PEKIT_OUT/.debug-sources"
 test -n "$(find "$DEBUG_ROOT" -type f -print -quit)"
 
-# Fail closed on hardening, symbol/source pairing, and build-path policy.
-for record in \
-  "peinit:$PEKIT_OUT/usr/bin/peinit2:exe" \
-  "svctl:$PEKIT_OUT/usr/bin/svctl:exe" \
-  "libpeinit:$PEKIT_OUT/$LIBDIR/libpeinit.so.0:dso"
-do
-  remain=${record#*:}
-  elf=${remain%:*}
-  kind=${record##*:}
-  readelf -h "$elf" | grep -Eq 'Type:[[:space:]]+DYN'
-  readelf -lW "$elf" | grep -q 'GNU_RELRO'
-  readelf -lW "$elf" | grep -Eq 'GNU_STACK[[:space:]].*RW[[:space:]]'
-  readelf -dW "$elf" | grep -q 'BIND_NOW'
-  ! readelf -dW "$elf" | grep -Eq '(RPATH|RUNPATH)'
-  ! readelf -SW "$elf" | grep -q '\.debug_info'
-  if [ "$kind" = exe ]; then
-    readelf -dW "$elf" | grep -Eq 'FLAGS_1.*PIE'
-  else
-    readelf -dW "$elf" | grep -Fq 'Library soname: [libpeinit.so.0]'
-  fi
-  build_id=$(readelf -n "$elf" | sed -n 's/^[[:space:]]*Build ID: //p' | head -1)
-  debug="$PEKIT_OUT/debug/usr/lib/debug/.build-id/$(printf %s "$build_id" | cut -c1-2)/$(printf %s "$build_id" | cut -c3-).debug"
-  test -s "$debug"
-  readelf -SW "$debug" | grep -q '\.debug_info'
-  test "$(readelf -n "$debug" | sed -n 's/^[[:space:]]*Build ID: //p' | head -1)" = "$build_id"
-  for forbidden in "$SRC" "$PEKIT_VENDOR_OUT" "$PEKIT_OUT_BASE" "$PEKIT_WORKSPACE_ROOT"; do
-    ! grep -aF "$forbidden" "$elf" "$debug" >/dev/null
-  done
-done
-
-test -L "$PEKIT_OUT/usr/bin/reboot"
-test "$(readlink "$PEKIT_OUT/usr/bin/reboot")" = svctl
-test -s "$PEKIT_OUT/usr/include/peinit.h"
-PKG_CONFIG_SYSROOT_DIR="$PEKIT_OUT" \
-PKG_CONFIG_PATH="$PEKIT_OUT/$LIBDIR/pkgconfig" \
-  pkg-config --exact-version="$PEKIT_VERSION" peinit
-./tools/verify-abi.sh
 '''
 
 [build.main.dependencies.peipkg]
@@ -333,7 +293,8 @@ python3      = "*"
 tzdata       = "*"
 
 [test]
-needs = ["vendor"]
+gate = true
+needs = ["main"]
 command = '''
 set -eu
 export CARGO_HOME="$PEKIT_OUT/cargo-home"
@@ -344,8 +305,50 @@ unset PEIOS_LIB_DIR PEIOS_INCLUDE PKM_UAPI
 . packaging/prepare-libpeios.sh
 export BINDGEN_EXTRA_CLANG_ARGS="-isystem $(gcc -print-file-name=include) ${BINDGEN_EXTRA_CLANG_ARGS:-}"
 export RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }-Dwarnings"
-cargo test --workspace --locked --offline
-cargo test --workspace --locked --offline --all-features --no-run
+cargo test --release --locked --offline --target-dir "$PEKIT_OUT/target-test"
+cargo test --release --locked --offline --all-features --no-run \
+  --target-dir "$PEKIT_OUT/target-test"
+./tools/verify-abi.sh
+
+# Validate the exact staged package output produced by build.main.
+SRC=$(pwd -P)
+PEKIT_OUT="$PEKIT_MAIN_OUT"
+# Fail closed on hardening, symbol/source pairing, and build-path policy.
+for record in \
+  "peinit:$PEKIT_OUT/usr/bin/peinit2:exe" \
+  "svctl:$PEKIT_OUT/usr/bin/svctl:exe" \
+  "libpeinit:$PEKIT_OUT/$LIBDIR/libpeinit.so.0:dso"
+do
+  remain=${record#*:}
+  elf=${remain%:*}
+  kind=${record##*:}
+  readelf -h "$elf" | grep -Eq 'Type:[[:space:]]+DYN'
+  readelf -lW "$elf" | grep -q 'GNU_RELRO'
+  readelf -lW "$elf" | grep -Eq 'GNU_STACK[[:space:]].*RW[[:space:]]'
+  readelf -dW "$elf" | grep -q 'BIND_NOW'
+  ! readelf -dW "$elf" | grep -Eq '(RPATH|RUNPATH)'
+  ! readelf -SW "$elf" | grep -q '\.debug_info'
+  if [ "$kind" = exe ]; then
+    readelf -dW "$elf" | grep -Eq 'FLAGS_1.*PIE'
+  else
+    readelf -dW "$elf" | grep -Fq 'Library soname: [libpeinit.so.0]'
+  fi
+  build_id=$(readelf -n "$elf" | sed -n 's/^[[:space:]]*Build ID: //p' | head -1)
+  debug="$PEKIT_OUT/debug/usr/lib/debug/.build-id/$(printf %s "$build_id" | cut -c1-2)/$(printf %s "$build_id" | cut -c3-).debug"
+  test -s "$debug"
+  readelf -SW "$debug" | grep -q '\.debug_info'
+  test "$(readelf -n "$debug" | sed -n 's/^[[:space:]]*Build ID: //p' | head -1)" = "$build_id"
+  for forbidden in "$SRC" "$PEKIT_VENDOR_OUT" "$PEKIT_OUT_BASE" "$PEKIT_WORKSPACE_ROOT"; do
+    ! grep -aF "$forbidden" "$elf" "$debug" >/dev/null
+  done
+done
+
+test -L "$PEKIT_OUT/usr/bin/reboot"
+test "$(readlink "$PEKIT_OUT/usr/bin/reboot")" = svctl
+test -s "$PEKIT_OUT/usr/include/peinit.h"
+PKG_CONFIG_SYSROOT_DIR="$PEKIT_OUT" \
+PKG_CONFIG_PATH="$PEKIT_OUT/$LIBDIR/pkgconfig" \
+  pkg-config --exact-version="$PEKIT_VERSION" peinit
 ./tools/verify-abi.sh
 '''
 
@@ -354,8 +357,10 @@ cargo test --workspace --locked --offline --all-features --no-run
 "org.gnu.bash"             = "*"
 "dev.peios.peiosutils"     = ">= 0.8.5"
 "org.gnu.diffutils"        = "*"
+"org.gnu.findutils"        = "*"
 "org.gnu.gawk"             = "*"
 "org.gnu.grep"             = "*"
+"org.gnu.gzip"             = "*"
 "org.gnu.sed"              = "*"
 "org.rust-lang.rust"       = ">= 1.98.1"
 "org.gnu.gcc"              = "*"
@@ -363,6 +368,9 @@ cargo test --workspace --locked --offline --all-features --no-run
 "org.llvm.clang"           = ">= 22"
 "org.pkgconf.pkgconf"      = "*"
 "org.mozilla.cbindgen"     = "0.29.2"
+"org.gnu.binutils"         = "*"
+"org.sourceware.debugedit" = "*"
+"org.python.python3"       = "*"
 "dev.peios.libpeios-devel" = ">= 0.5.0"
 "dev.peios.kernel-headers" = ">= 0.20.1-rc13"
 "org.iana.tzdata"          = ">= 2026c"
@@ -372,14 +380,18 @@ dash         = "*"
 bash         = "*"
 coreutils    = "*"
 diffutils    = "*"
+findutils    = "*"
 gawk         = "*"
 grep         = "*"
+gzip         = "*"
 sed          = "*"
 gcc          = "*"
 "g++"        = "*"
 pkg-config   = "*"
 libclang-dev = "*"
 binutils     = "*"
+debugedit    = "*"
+python3      = "*"
 tzdata       = "*"
 
 [clean]
