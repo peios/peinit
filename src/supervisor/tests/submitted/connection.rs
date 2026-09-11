@@ -320,3 +320,64 @@ fn eof_closes_the_connection() {
     assert!(read.close_connection);
     let _ = record.peer().pidfd.as_raw_fd();
 }
+
+/// §10.7: an answer that cannot be built — a job whose record was purged
+/// before the flush, or a pidfd that cannot be duplicated — becomes that one
+/// connection's error record and never aborts the flush of every other wait.
+///
+/// No guest can time two waits so that one's record is purged at the instant
+/// of the flush while another's is answerable; here two pending waits are set
+/// directly, the first on a job id with no entry (the purged case: its view
+/// cannot be built, so it is `UNKNOWN_JOB`) and the second on a job that has
+/// gone terminal and is answerable. The purged one is ordered first, so a
+/// flush that gave up on it would never reach the second.
+#[test]
+fn an_unbuildable_answer_does_not_abort_the_flush_of_the_others() {
+    let mut supervisor = submitted_supervisor();
+    let mut boundaries = Boundaries::at([SUBMIT_NS, LAUNCH_NS + 1]);
+    let live = super::support::running_job(&mut supervisor, &mut boundaries, 9000, 90);
+    super::support::reap(
+        &mut supervisor,
+        &mut boundaries.controller,
+        9000,
+        ChildExitStatus::Exited { code: 0 },
+        LAUNCH_NS + 2,
+    );
+
+    let purged = crate::ids::JobId::parse_canonical_str("00000000-0000-7000-8000-000000000000")
+        .expect("a well-formed but unknown job id");
+
+    let mut connections = ControlConnectionTable::new(4);
+    for (fd, job_id) in [(80, purged), (81, live)] {
+        let mut record = JobsConnectionRecord::new_with_activity(
+            FakeJobsIo::default(),
+            jobs_peer(SUBMITTER),
+            Some(LAUNCH_NS + 2),
+        );
+        record.state_mut().set_pending_wait(JobsPendingWait::Wait {
+            job_id,
+            condition: JobsWaitCondition::Terminal,
+        });
+        connections.admit(fd, record).expect("admit");
+    }
+
+    let flush = supervisor
+        .flush_jobs_waits(&mut connections, time(LAUNCH_NS + 3), LAUNCH_NS + 3)
+        .expect("flush");
+    assert_eq!(
+        flush.completed.len(),
+        2,
+        "both waits were answered; the unbuildable one did not abort the flush",
+    );
+
+    // The purged wait got this connection's error record...
+    let purged_json = response_json(&connections.get_mut(80).expect("record").io_mut().writes[0].0);
+    assert_eq!(purged_json["status"], "error");
+    assert_eq!(
+        purged_json["code"],
+        crate::jobs::wire::JobsErrorCode::UnknownJob.as_str(),
+    );
+    // ...and the answerable one got its terminal view all the same.
+    let live_json = response_json(&connections.get_mut(81).expect("record").io_mut().writes[0].0);
+    assert_eq!(live_json["job"]["state"], "completed");
+}

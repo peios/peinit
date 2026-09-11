@@ -243,3 +243,48 @@ fn decode_timer_value_name(value_name: Vec<u8>) -> String {
         )
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::timer::state::TimerLastRunStorage;
+
+    /// §9.2: the write is performed in a forked child, so the event loop never
+    /// waits on the registry.
+    ///
+    /// The proof is a real fork: the call returns the pid of a *distinct*
+    /// process rather than doing the write inline and returning the caller's
+    /// own pid. What that child then does — succeed or fail against the
+    /// registry — is beside this point; it is killed and reaped here so the
+    /// test leaves nothing behind, precisely because the parent did not wait
+    /// for it. That is the whole claim: the parent returned a child's pid at
+    /// once.
+    #[test]
+    fn the_last_run_write_is_performed_in_a_forked_child() {
+        let parent = std::process::id();
+
+        let pid = queue_timer_last_run_write(
+            "pt-timer".to_string(),
+            "daily UTC".to_string(),
+            TimerLastRunStorage::SingleTimer,
+            1_000_000,
+        )
+        .expect("the write is queued");
+
+        assert!(pid > 1, "a real child pid was returned, not a sentinel");
+        assert_ne!(
+            pid, parent,
+            "the write runs in a forked child, not inline in the caller's process",
+        );
+
+        // The child is the writer, not this process; kill and reap it so the
+        // test leaves no process behind whatever the child was doing. SIGKILL
+        // is uncatchable, so this terminates it regardless.
+        unsafe {
+            libc::kill(pid as libc::pid_t, libc::SIGKILL);
+            let mut status = 0;
+            let reaped = libc::waitpid(pid as libc::pid_t, &mut status, 0);
+            assert_eq!(reaped, pid as libc::pid_t, "the forked child is reaped");
+        }
+    }
+}

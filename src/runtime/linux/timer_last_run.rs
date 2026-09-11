@@ -147,6 +147,36 @@ mod tests {
         );
     }
 
+    /// §9.2: a failed last-run write is reported once and nothing is retried.
+    ///
+    /// The failed child surfaces the timer it belonged to — that is the
+    /// "reported" half, which the runtime turns into the console warning. And
+    /// the entry is then gone: a second reap of the same pid finds nothing, and
+    /// there is no other outstanding write, so nothing is left to re-attempt.
+    /// The write is recorded only by a fresh firing, never re-queued from here.
+    #[test]
+    fn a_failed_write_is_reported_once_and_then_forgotten() {
+        let mut writes = TimerLastRunWrites::default();
+        writes.record(4242, "backup".to_string(), "daily UTC".to_string());
+
+        // Reported: the timer it belonged to is named, for the warning.
+        assert_eq!(
+            writes.claim(4242, ChildExitStatus::Exited { code: 1 }),
+            Some(FailedTimerLastRunWrite {
+                service: "backup".to_string(),
+                schedule: "daily UTC".to_string(),
+            }),
+        );
+
+        // Not retried: the entry is gone, and there is no other outstanding
+        // write to attempt. Nothing anywhere re-queues a failed write.
+        assert_eq!(writes.claim(4242, ChildExitStatus::Exited { code: 1 }), None);
+        assert!(
+            writes.outstanding.is_empty(),
+            "a claimed write leaves nothing behind to retry",
+        );
+    }
+
     /// A child that somehow never gets reaped must not grow the ring.
     #[test]
     fn outstanding_writes_are_bounded() {

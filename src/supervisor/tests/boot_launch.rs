@@ -169,6 +169,57 @@ fn service_launch_pending_setup_does_not_start_until_exec_success() {
     );
 }
 
+/// §8.1: `pid` and `pidfd` land on the record only once exec success is
+/// confirmed by EOF on the error pipe. Until then the job is Created and both
+/// stay null.
+///
+/// No guest can catch this window: it is the microseconds between fork and the
+/// error pipe closing, and a submitter is not answered until the job has left
+/// Created. Here the job is held in pending setup, its record inspected, and
+/// then completed — the pid and pidfd appear only at that second step.
+#[test]
+fn pid_and_pidfd_land_only_on_exec_confirmation() {
+    let app = alive_service("app");
+    let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
+    let mut registry = StaticRegistry::services(vec![app]);
+    let mut clock = ScriptedClock::new([BOOT_NS, APP_LAUNCH_NS]);
+    supervisor
+        .run_phase2_boot(&mut registry, &mut clock)
+        .expect("boot supervisor");
+    let job_id = supervisor.pending_launch_jobs()[0];
+
+    let mut pending_process = process(4242, 9);
+    pending_process.setup_status_fd = Some(55);
+    let mut tokens = TestTokenProvider::default();
+    let mut launcher = TestProcessLauncher::new(vec![pending_process]);
+    supervisor
+        .launch_next_pending_service_job(&mut tokens, &mut launcher, &mut clock)
+        .expect("launch app")
+        .expect("pending launch dispatch");
+
+    // In the setup window: Created, and neither handle has landed, even though
+    // the process was forked and its pid is known to the launcher.
+    let held = supervisor.jobs().get(job_id).expect("job");
+    assert_eq!(held.state, JobState::Created);
+    assert_eq!(held.pid, None, "pid does not land until exec is confirmed");
+    assert_eq!(held.pidfd, None, "nor the pidfd");
+
+    // Exec confirmed by EOF on the error pipe: now both land and the job runs.
+    let mut controller = TestProcessController::default();
+    supervisor
+        .process_pending_process_setup_status(
+            55,
+            ProcessSetupStatus::ExecSucceeded,
+            APP_LAUNCH_NS + 1,
+            &mut controller,
+        )
+        .expect("complete setup");
+    let confirmed = supervisor.jobs().get(job_id).expect("job");
+    assert_eq!(confirmed.state, JobState::Running);
+    assert_eq!(confirmed.pid, Some(4242), "the pid lands on exec confirmation");
+    assert_eq!(confirmed.pidfd, Some(9), "and so does the pidfd");
+}
+
 #[test]
 fn boot_global_environment_is_layered_into_service_launch() {
     let mut app = alive_service("app");
