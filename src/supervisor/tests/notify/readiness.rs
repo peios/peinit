@@ -164,6 +164,66 @@ fn pidfd_mismatch_rejects_authenticated_pid_without_state_change() {
     );
 }
 
+/// §10.5 step 5: a datagram from a job whose activation generation is not the
+/// service's current one is rejected as a previous incarnation's.
+///
+/// This state is unreachable in a running system and by design: `create.rs`
+/// forbids a second live service-main job, so the previous incarnation is
+/// always reaped before a transition to Starting bumps the generation — a live
+/// process at a stale generation cannot exist. It is staged here by pushing the
+/// current main job's generation back by one, which is exactly the skew the
+/// check exists to catch, and the datagram is otherwise perfectly good: correct
+/// pid, Running job, matching pidfd. Only the generation stops it.
+#[test]
+fn a_stale_activation_generation_is_rejected_without_state_change() {
+    let mut supervisor = notify_app_supervisor();
+
+    let job_id = supervisor
+        .jobs()
+        .current_service_main_job("app")
+        .expect("app has a current main job");
+    let current = supervisor.services().runtime("app").expect("runtime").generation;
+    let stale = current.checked_sub(1).unwrap_or(current + 1);
+    supervisor
+        .jobs_mut()
+        .record_mut(job_id)
+        .expect("job record")
+        .activation_generation = stale;
+
+    let operation_id = supervisor
+        .next_readiness_timeout()
+        .expect("readiness timeout")
+        .operation_id;
+
+    let error = apply_notify(&mut supervisor, datagram(8000, b"READY=1"), NOTIFY_NS)
+        .expect_err("reject a stale-generation notification");
+
+    assert!(
+        matches!(
+            error,
+            SupervisorError::Notify(NotifyApplyError::GenerationMismatch {
+                job_generation,
+                runtime_generation,
+                ..
+            }) if job_generation == stale && runtime_generation == current
+        ),
+        "the datagram is refused for its generation, got {error:?}",
+    );
+    // A READY=1 from a previous incarnation cannot mark the replacement ready:
+    // the service stays Starting and its start operation stays Running.
+    assert_eq!(
+        supervisor.service_status("app").expect("app").state,
+        ServiceState::Starting,
+    );
+    assert_eq!(
+        supervisor
+            .operation_status(operation_id)
+            .expect("operation")
+            .state,
+        OperationState::Running,
+    );
+}
+
 #[test]
 fn readiness_timeout_kills_service_cgroup_and_fails_start() {
     let mut supervisor = notify_app_supervisor();

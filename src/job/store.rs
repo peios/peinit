@@ -46,4 +46,12 @@ impl JobStore {
     pub fn get(&self, id: JobId) -> Option<&JobRecord> {
         self.records.get(&id)
     }
+
+    /// Mutate a stored record directly, to stage a state a correct caller
+    /// would not — such as a current main job carrying a stale activation
+    /// generation, which the ordinary invariants make unreachable.
+    #[cfg(test)]
+    pub(crate) fn record_mut(&mut self, id: JobId) -> Option<&mut JobRecord> {
+        self.records.get_mut(&id)
+    }
 }

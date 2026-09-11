@@ -56,6 +56,57 @@ fn received_rights_are_close_on_exec() {
     assert!(fd_has_cloexec(datagram.fds[0].as_raw_fd()));
 }
 
+/// §10.5: a datagram without a kernel-attested `SCM_CREDENTIALS` is rejected
+/// outright — nothing of it reaches authentication, let alone application.
+///
+/// peinit's own socket sets `SO_PASSCRED` before it is polled, so the kernel
+/// attaches credentials to every datagram and the case cannot arise there.
+/// The receive path is the same code whatever socket it reads, so it is driven
+/// here against one that does not ask for credentials: the payload is perfectly
+/// good, and the answer is still a refusal rather than a datagram with a pid of
+/// zero or a payload handed on unauthenticated.
+#[test]
+fn a_datagram_without_credentials_is_rejected() {
+    let (receiver, sender) = UnixDatagram::pair().expect("datagram pair");
+    receiver.set_nonblocking(true).expect("non-blocking receiver");
+
+    sender
+        .send(b"READY=1\nSTATUS=unauthenticated")
+        .expect("send datagram");
+    let refused = super::receive::receive_datagram(receiver.as_raw_fd());
+    assert!(
+        matches!(refused, Err(super::NotifySocketReadError::MissingCredentials)),
+        "a datagram with no SCM_CREDENTIALS must be refused, got {refused:?}",
+    );
+
+    // The refusal consumed it: it is not left queued to be read again, and
+    // the socket itself is still good for the next datagram.
+    assert!(matches!(
+        super::receive::receive_datagram(receiver.as_raw_fd()),
+        Err(super::NotifySocketReadError::WouldBlock)
+    ));
+    set_passcred_for_test(receiver.as_raw_fd());
+    sender.send(b"READY=1").expect("send credentialed datagram");
+    let accepted = super::receive::receive_datagram(receiver.as_raw_fd())
+        .expect("the same receive accepts a credentialed datagram");
+    assert_eq!(accepted.payload, b"READY=1");
+    assert_eq!(accepted.credentials.pid, std::process::id());
+}
+
+fn set_passcred_for_test(fd: RawFd) {
+    let enabled: libc::c_int = 1;
+    let rc = unsafe {
+        libc::setsockopt(
+            fd,
+            libc::SOL_SOCKET,
+            libc::SO_PASSCRED,
+            &enabled as *const _ as *const libc::c_void,
+            size_of::<libc::c_int>() as libc::socklen_t,
+        )
+    };
+    assert_eq!(rc, 0, "SO_PASSCRED: {}", io::Error::last_os_error());
+}
+
 fn temp_socket_path(prefix: &str) -> std::path::PathBuf {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
