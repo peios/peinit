@@ -628,6 +628,134 @@ fn a_dropped_replay_datagram_leaves_the_records_buffered_and_forwarding_on() {
     assert!(pipes.eventd_forwarding_enabled());
 }
 
+/// TRM §11.1: a sink write that would block drops that line for the sink only,
+/// counts it, and reports the first drop — once per job, however many follow.
+///
+/// The sink is a pipe shrunk to one page and filled, so every write the runtime
+/// makes to it would block. Three lines are read: three are counted and the
+/// first drop is reported. The sink is then drained and a fourth line fits: it
+/// is written, the count stands, and nothing is reported. Two more with the
+/// sink full again raise the count to five without a second report. Every line
+/// reaches the record regardless, which is "for the sink only".
+#[test]
+fn a_sink_that_would_block_counts_each_dropped_line_and_reports_the_first() {
+    use std::io::{Read, Write};
+    use std::os::fd::AsRawFd;
+
+    let (stdout_read, mut stdout_write) = pipe_pair();
+    // Non-blocking, as the launcher creates it: the pipe stays open across
+    // reads here, and a blocking read end would wait for more output after
+    // the last line rather than ending the read at EAGAIN.
+    let flags = unsafe { libc::fcntl(stdout_read.as_raw_fd(), libc::F_GETFL) };
+    assert_eq!(
+        unsafe {
+            libc::fcntl(
+                stdout_read.as_raw_fd(),
+                libc::F_SETFL,
+                flags | libc::O_NONBLOCK,
+            )
+        },
+        0,
+    );
+    let (mut sink_read, mut sink_write) = pipe_pair();
+    let page = 4096;
+    assert_eq!(
+        unsafe { libc::fcntl(sink_write.as_raw_fd(), libc::F_SETPIPE_SZ, page) },
+        page,
+        "one-page sink",
+    );
+    sink_write
+        .write_all(&vec![b'f'; page as usize])
+        .expect("fill the sink");
+
+    let event = job_event(JobType::Submitted);
+    let job = event.job_id;
+    let stdout_fd = stdout_read.into_raw_fd();
+    let dispatch = crate::supervisor::SupervisorSubmittedLaunchDispatch {
+        launch: LaunchCreatedJobDispatch {
+            job_id: job,
+            process: LaunchedProcess {
+                pid: 7000,
+                pidfd: 70,
+                stdout_fd: Some(stdout_fd),
+                stderr_fd: None,
+                setup_status_fd: None,
+                cleanup_evidence: Vec::new(),
+            },
+            job_event: event,
+        },
+        output_sink_fd: Some(sink_write.into_raw_fd()),
+    };
+    let mut pipes = RuntimeServiceLogPipes::default();
+    let mut registrar = TestRegistrar::default();
+    let mut registrations = Vec::new();
+    pipes
+        .register_submitted_launch(&dispatch, &mut registrar, &mut registrations)
+        .expect("register submitted launch");
+    assert_eq!(pipes.active_sink_count(), 1, "the sink was adopted");
+
+    let mut read_turn = |pipes: &mut RuntimeServiceLogPipes, lines: &[u8]| {
+        stdout_write.write_all(lines).expect("job output");
+        match pipes.process_pipe_event(stdout_fd, &mut ClockAt(10), &mut registrar) {
+            RuntimeLogPipeTurn::Read { output_dropped, .. } => output_dropped,
+            other => panic!("expected a read, got {other:?}"),
+        }
+    };
+
+    assert_eq!(
+        read_turn(&mut pipes, b"one\ntwo\nthree\n"),
+        Some(job),
+        "the first drop is reported"
+    );
+    assert_eq!(
+        pipes.sinks[&job].dropped, 3,
+        "each line that would block is counted"
+    );
+
+    let mut drained = vec![0_u8; page as usize];
+    sink_read.read_exact(&mut drained).expect("drain the sink");
+    assert_eq!(
+        read_turn(&mut pipes, b"four\n"),
+        None,
+        "a line that fits is not a drop"
+    );
+    assert_eq!(pipes.sinks[&job].dropped, 3, "and does not move the count");
+    let mut written = [0_u8; 5];
+    sink_read
+        .read_exact(&mut written)
+        .expect("the line reached the sink");
+    assert_eq!(&written, b"four\n", "it went to the sink, untagged");
+
+    // Full again: one page of filler written directly to the pipe the
+    // runtime holds a copy of, through the reader's own view of its size.
+    let sink_fd = pipes.sinks[&job].fd.as_raw_fd();
+    let filler = vec![b'f'; page as usize];
+    assert_eq!(
+        unsafe { libc::write(sink_fd, filler.as_ptr().cast(), filler.len()) },
+        page as isize,
+        "refill the sink",
+    );
+    assert_eq!(
+        read_turn(&mut pipes, b"five\nsix\n"),
+        None,
+        "only the first drop for a job is reported"
+    );
+    assert_eq!(
+        pipes.sinks[&job].dropped, 5,
+        "though every dropped line is counted"
+    );
+
+    assert_eq!(
+        pipes
+            .buffered_records()
+            .iter()
+            .map(|record| record.message.as_str())
+            .collect::<Vec<_>>(),
+        vec!["one", "two", "three", "four", "five", "six"],
+        "the record keeps every line, dropped from the sink or not",
+    );
+}
+
 #[derive(Default)]
 struct TestRegistrar {
     calls: Vec<i32>,

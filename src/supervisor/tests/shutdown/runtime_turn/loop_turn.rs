@@ -224,6 +224,168 @@ fn runtime_shutdown_loop_turn_processes_sigchld_child_reaps() {
     );
 }
 
+/// TRM §11.3, event-loop fairness: within one iteration signals are handled
+/// first, the shutdown deadline timer next and every other source after, ties
+/// broken by arrival order — and the power button shares the top priority with
+/// signals rather than sitting above or below them.
+///
+/// The waiter hands the sources over in an order that contradicts all of that.
+/// The turn has to process them in priority order; and the two top-priority
+/// sources have to keep their arrival order whichever of them arrived first,
+/// which is what "shares" means: a button ranked above signals would fail the
+/// second case, one ranked below them the first. The deadline timer's calls
+/// show the order had consequences, not only labels: the SIGTERM that begins
+/// the shutdown is handled before the timer is read, so the timer is armed,
+/// read and re-armed — the same sequence as when the two arrive in order.
+#[test]
+fn runtime_turn_handles_signals_and_the_power_button_first_then_the_deadline_timer() {
+    let (turn, timer_calls) = prioritised_turn([
+        RuntimeEventSource::NotifySocket,
+        RuntimeEventSource::ShutdownDeadlineTimer,
+        RuntimeEventSource::PowerButton { fd: 17 },
+        RuntimeEventSource::Pid1Signal,
+    ]);
+    assert_eq!(
+        turn.sources,
+        vec![
+            RuntimeEventSource::PowerButton { fd: 17 },
+            RuntimeEventSource::Pid1Signal,
+            RuntimeEventSource::ShutdownDeadlineTimer,
+            RuntimeEventSource::NotifySocket,
+        ],
+    );
+    assert!(
+        matches!(
+            turn.turns.as_slice(),
+            [
+                RuntimeShutdownEventTurn::PowerButton { .. },
+                RuntimeShutdownEventTurn::Pid1Signal { .. },
+                RuntimeShutdownEventTurn::ShutdownDeadlineTimer { .. },
+                RuntimeShutdownEventTurn::Notify { .. },
+            ],
+        ),
+        "handled in priority order: {:?}",
+        turn.turns,
+    );
+    assert_eq!(
+        timer_calls,
+        vec![
+            DeadlineTimerCall::Arm(DRAINING_STOP_DEADLINE_NS),
+            DeadlineTimerCall::Read,
+            DeadlineTimerCall::Arm(DRAINING_STOP_DEADLINE_NS),
+        ],
+    );
+
+    let (turn, _) = prioritised_turn([
+        RuntimeEventSource::ShutdownDeadlineTimer,
+        RuntimeEventSource::Pid1Signal,
+        RuntimeEventSource::NotifySocket,
+        RuntimeEventSource::PowerButton { fd: 17 },
+    ]);
+    assert_eq!(
+        turn.sources,
+        vec![
+            RuntimeEventSource::Pid1Signal,
+            RuntimeEventSource::PowerButton { fd: 17 },
+            RuntimeEventSource::ShutdownDeadlineTimer,
+            RuntimeEventSource::NotifySocket,
+        ],
+    );
+    assert!(
+        matches!(
+            turn.turns.as_slice(),
+            [
+                RuntimeShutdownEventTurn::Pid1Signal { .. },
+                RuntimeShutdownEventTurn::PowerButton { .. },
+                RuntimeShutdownEventTurn::ShutdownDeadlineTimer { .. },
+                RuntimeShutdownEventTurn::Notify { .. },
+            ],
+        ),
+        "handled in priority order: {:?}",
+        turn.turns,
+    );
+}
+
+/// One loop turn over `sources`, as the waiter delivers them: a SIGTERM on the
+/// signal source, a power-button event that is not a press, a deadline timer
+/// that has not fired and a notification socket with nothing on it. Returns
+/// the turn and what was done to the deadline timer.
+fn prioritised_turn(
+    sources: [RuntimeEventSource; 4],
+) -> (
+    crate::runtime::RuntimeShutdownLoopTurn,
+    Vec<DeadlineTimerCall>,
+) {
+    let mut supervisor = shutdown_fixture();
+    let mut waiter = FakeWaiter::new(sources);
+    let mut signal = FakeSignalSource::new([LinuxSignalFdRead::Shutdown(ShutdownSignal::Sigterm)]);
+    let mut child_reaper = FakeChildReaper::empty();
+    let mut notify = FakeNotifySource::empty();
+    let mut listener = FakeControlListener::default();
+    let mut connections = ControlConnectionTable::new(4);
+    let mut deadline_timer = FakeDeadlineTimer::would_block();
+    let mut lifecycle_timer = FakeDeadlineTimer::would_block();
+    let mut power_button = super::support::FakePowerButtonSource::new([Ok(
+        crate::boundary::LinuxPowerButtonRead::Ignored,
+    )]);
+    let mut log_pipes = crate::runtime::RuntimeServiceLogPipes::default();
+    let mut filesystem_check_reader =
+        crate::supervisor::tests::TestFilesystemCheckReader::default();
+    let mut clock = ScriptedClock::new([SHUTDOWN_NS]);
+    let mut controller = TestProcessController::default();
+    let mut finalizer = RuntimeFinalizer::default();
+    let mut access = AllowAccessChecker::default();
+    let mut registrar = FakeRegistrar::default();
+    let mut tokens = TestTokenProvider::default();
+    let mut launcher = TestProcessLauncher::new(Vec::new());
+    let mut filesystem_check_launcher =
+        crate::supervisor::tests::TestFilesystemCheckLauncher::default();
+    let mut boot_attempt_counter = FakeBootAttemptCounter::default();
+    let mut jobs_channel = crate::runtime::NoJobsChannel;
+    let mut job_identity_provider = crate::runtime::NoJobIdentityProvider;
+
+    let turn = process_runtime_shutdown_loop_turn(
+        &mut supervisor,
+        &mut waiter,
+        &mut RuntimeShutdownEventSources {
+            signal_source: &mut signal,
+            child_reaper: &mut child_reaper,
+            notify_source: &mut notify,
+            control_listener: &mut listener,
+            control_connections: &mut connections,
+            deadline_timer: &mut deadline_timer,
+            lifecycle_timer: &mut lifecycle_timer,
+            power_button_source: &mut power_button,
+            filesystem_check_reader: &mut filesystem_check_reader,
+            log_pipes: &mut log_pipes,
+            jobs_channel: &mut jobs_channel,
+        },
+        RuntimeShutdownLoopContext {
+            clock: &mut clock,
+            controller: &mut controller,
+            finalizer: &mut finalizer,
+            access_checker: &mut access,
+            registrar: &mut registrar,
+            token_provider: &mut tokens,
+            process_launcher: &mut launcher,
+            filesystem_check_launcher: &mut filesystem_check_launcher,
+            boot_attempt_counter: &mut boot_attempt_counter,
+            control_security: &DEFAULT_CONTROL_SECURITY,
+            max_events: 8,
+            control_limits: RuntimeControlLimits::new(
+                1024,
+                crate::control::socket::DEFAULT_MAX_REQUEST_SIZE_BYTES,
+                crate::control::socket::DEFAULT_CONNECTION_TIMEOUT_SECS,
+            ),
+            work_pump: RuntimeWorkPumpConfig::default(),
+            job_identity_provider: &mut job_identity_provider,
+            jobs_limits: crate::jobs::socket::JobsSocketLimits::default(),
+        },
+    )
+    .expect("loop turn");
+    (turn, deadline_timer.calls)
+}
+
 #[derive(Debug)]
 struct FakeWaiter {
     sources: Vec<RuntimeEventSource>,

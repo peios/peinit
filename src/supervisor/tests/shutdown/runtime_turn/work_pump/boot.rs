@@ -410,6 +410,91 @@ fn runtime_loop_buffers_service_logs_until_eventd_socket_is_configured() {
     ));
 }
 
+/// TRM §11.3: `LogReadBytesPerEvent` bounds one readable event rather than one
+/// loop iteration. Two services' pipes are ready in the same turn, each holding
+/// more than one budget of complete lines and still open, so nothing but the
+/// budget can stop a read. Each is read up to the budget — the turn reads a
+/// budget's worth from both — and neither read stops for any other reason. A
+/// budget spent per iteration would leave the second pipe with nothing.
+#[test]
+fn one_turn_reads_up_to_the_budget_from_each_ready_pipe() {
+    const LINE: usize = 1000;
+    let budget = crate::logging::DEFAULT_LOG_READ_BYTES_PER_EVENT;
+    let lines_per_pipe = budget / LINE + 4;
+    let mut supervisor = boot_supervisor(vec![alive_service("app"), alive_service("web")]);
+    let (a_read, mut a_write) = pipe_pair();
+    let (b_read, mut b_write) = pipe_pair();
+    for (prefix, writer) in [("a", &mut a_write), ("b", &mut b_write)] {
+        for i in 0..lines_per_pipe {
+            let mut line = format!("{prefix}-{i:04}-");
+            line.push_str(&"x".repeat(LINE - 1 - line.len()));
+            line.push('\n');
+            writer
+                .write_all(line.as_bytes())
+                .expect("write service log");
+        }
+    }
+    let a_fd = a_read.into_raw_fd();
+    let b_fd = b_read.into_raw_fd();
+    let with_stdout = |pid, pidfd, stdout_fd| LaunchedProcess {
+        pid,
+        pidfd,
+        stdout_fd: Some(stdout_fd),
+        stderr_fd: None,
+        setup_status_fd: None,
+        cleanup_evidence: Vec::new(),
+    };
+
+    let result = run_loop(
+        &mut supervisor,
+        LoopScript::new(
+            [APP_LAUNCH_NS, APP_LAUNCH_NS + 1],
+            vec![with_stdout(4242, 9, a_fd), with_stdout(4243, 10, b_fd)],
+        )
+        .events([
+            RuntimeEventSource::ServiceLogPipe { fd: a_fd },
+            RuntimeEventSource::ServiceLogPipe { fd: b_fd },
+        ]),
+    );
+
+    let complete_lines_per_budget = budget / LINE;
+    for prefix in ["a-", "b-"] {
+        let read = result
+            .buffered_logs
+            .iter()
+            .filter(|record| record.message.starts_with(prefix))
+            .count();
+        assert_eq!(
+            read, complete_lines_per_budget,
+            "the {prefix} pipe was read up to the budget in this turn",
+        );
+    }
+    assert!(
+        matches!(
+            result.turn.turns.as_slice(),
+            [
+                RuntimeShutdownEventTurn::ServiceLogPipe {
+                    pipe: RuntimeLogPipeTurn::Read {
+                        closed: false,
+                        would_block: false,
+                        ..
+                    }
+                },
+                RuntimeShutdownEventTurn::ServiceLogPipe {
+                    pipe: RuntimeLogPipeTurn::Read {
+                        closed: false,
+                        would_block: false,
+                        ..
+                    }
+                },
+            ]
+        ),
+        "both reads stopped at the budget, with data still in the pipe: {:?}",
+        result.turn.turns,
+    );
+    drop((a_write, b_write));
+}
+
 #[test]
 fn runtime_loop_buffers_service_logs_until_eventd_is_active() {
     let app = alive_service("app");
