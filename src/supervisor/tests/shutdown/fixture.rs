@@ -43,6 +43,40 @@ pub(super) fn shutdown_fixture() -> Supervisor {
     supervisor
 }
 
+/// Two waves, with an already-stopping participant in the second: `front`
+/// requires `back` and `peer`, so the plan puts `front` in wave 0 and both
+/// of the others in wave 1. `back` is Stopping under an in-flight explicit
+/// stop when the shutdown begins; `peer` is Active and keeps wave 1 open
+/// after `back` has gone.
+pub(super) const LATER_WAVE_STOP_DEADLINE_NS: u64 = SHUTDOWN_NS + 30_000_000_000;
+
+pub(super) fn later_wave_stopping_fixture() -> Supervisor {
+    let mut front = alive_service("front");
+    front.requires.push("back".to_string());
+    front.requires.push("peer".to_string());
+    let back = alive_service("back");
+    let peer = alive_service("peer");
+    let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
+    supervisor.services =
+        ServiceTable::from_boot_snapshot(vec![front, back, peer]).expect("service table");
+
+    active_service(&mut supervisor, "front", 7100, 60);
+    active_service(&mut supervisor, "back", 7200, 61);
+    active_service(&mut supervisor, "peer", 7300, 62);
+    supervisor
+        .services
+        .transition_service(
+            "back",
+            ServiceTransition {
+                to: ServiceState::Stopping,
+                cause: TransitionCause::ExplicitStop,
+            },
+        )
+        .expect("back stopping");
+    retain_stop_timeout_evidence(&mut supervisor, "back", LATER_WAVE_STOP_DEADLINE_NS);
+    supervisor
+}
+
 pub(super) fn job_for(supervisor: &Supervisor, service: &str) -> crate::ids::JobId {
     supervisor
         .jobs

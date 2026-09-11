@@ -3,7 +3,8 @@ use std::io;
 use crate::boundary::linux_epoll::{LinuxEpollEvent, LinuxEpollSyscallApi};
 use crate::boundary::linux_signal::{
     LinuxSignalMask, PID1_SIGNALFD_CREATE_FD, PID1_SIGNALFD_FLAGS,
-    Pid1SignalFdRegisteredSetupError, Pid1SignalFdSyscalls, setup_pid1_signalfd_registered,
+    Pid1SignalFdRegisteredSetupError, Pid1SignalFdSetupError, Pid1SignalFdSyscalls,
+    setup_pid1_signalfd_registered,
 };
 
 #[test]
@@ -99,6 +100,81 @@ fn registered_pid1_signalfd_reports_cleanup_failure_after_registration_failure()
     ));
 }
 
+// Peinit TRM §12.3: if any part of the signalfd setup fails — blocking the
+// signals, creating the descriptor, retaining it, registering it with the
+// event loop — peinit fails closed, with no fallback to asynchronous
+// handlers. Each failure point in turn: every one comes back as an error,
+// nothing later in the sequence is attempted, and a descriptor that was
+// created is closed rather than left behind. There is nothing to fall back
+// *to*: the syscall surface this runs on has no way to install a handler, so
+// an error is the only outcome the setup has other than a registered fd.
+#[test]
+fn every_signalfd_setup_failure_fails_closed() {
+    let registered = |calls: &[FakeRegisteredCall]| {
+        calls
+            .iter()
+            .any(|call| matches!(call, FakeRegisteredCall::EpollCtl { .. }))
+    };
+
+    // Blocking.
+    let mut blocking = FakeRegisteredSignalSyscalls {
+        rt_sigprocmask_error: Some(io::ErrorKind::PermissionDenied),
+        ..FakeRegisteredSignalSyscalls::default()
+    };
+    let err = setup_pid1_signalfd_registered(&mut blocking, 30, 700).expect_err("blocking");
+    assert!(matches!(
+        err,
+        Pid1SignalFdRegisteredSetupError::Signal(Pid1SignalFdSetupError::Sigprocmask { .. }),
+    ));
+    assert_eq!(blocking.calls.len(), 1, "nothing followed the failed mask");
+
+    // Creating the descriptor.
+    let mut creating = FakeRegisteredSignalSyscalls {
+        signalfd4_error: Some(io::ErrorKind::Other),
+        ..FakeRegisteredSignalSyscalls::default()
+    };
+    let err = setup_pid1_signalfd_registered(&mut creating, 30, 700).expect_err("creating");
+    assert!(matches!(
+        err,
+        Pid1SignalFdRegisteredSetupError::Signal(Pid1SignalFdSetupError::Signalfd { .. }),
+    ));
+    assert!(!registered(&creating.calls), "nothing was registered");
+
+    // Retaining it: a descriptor that does not fit the fd type is refused.
+    let mut retaining = FakeRegisteredSignalSyscalls {
+        signalfd4_fd: i64::from(i32::MAX) + 1,
+        ..FakeRegisteredSignalSyscalls::default()
+    };
+    let err = setup_pid1_signalfd_registered(&mut retaining, 30, 700).expect_err("retaining");
+    assert!(matches!(
+        err,
+        Pid1SignalFdRegisteredSetupError::Signal(Pid1SignalFdSetupError::FdOutOfRange { .. }),
+    ));
+    assert!(!registered(&retaining.calls), "nothing was registered");
+
+    // Registering it with the event loop.
+    let mut registering = FakeRegisteredSignalSyscalls {
+        epoll_ctl_error: Some(io::ErrorKind::InvalidInput),
+        ..FakeRegisteredSignalSyscalls::default()
+    };
+    let err =
+        setup_pid1_signalfd_registered(&mut registering, 30, 700).expect_err("registering");
+    assert!(matches!(
+        err,
+        Pid1SignalFdRegisteredSetupError::Register {
+            close_error: None,
+            ..
+        },
+    ));
+    assert!(
+        matches!(
+            registering.calls.last(),
+            Some(FakeRegisteredCall::Close { fd: 17 })
+        ),
+        "the descriptor that could not be registered was closed",
+    );
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum FakeRegisteredCall {
     RtSigprocmask {
@@ -123,6 +199,7 @@ enum FakeRegisteredCall {
 
 #[derive(Debug)]
 struct FakeRegisteredSignalSyscalls {
+    rt_sigprocmask_error: Option<io::ErrorKind>,
     signalfd4_fd: i64,
     signalfd4_error: Option<io::ErrorKind>,
     epoll_ctl_error: Option<io::ErrorKind>,
@@ -133,6 +210,7 @@ struct FakeRegisteredSignalSyscalls {
 impl Default for FakeRegisteredSignalSyscalls {
     fn default() -> Self {
         Self {
+            rt_sigprocmask_error: None,
             signalfd4_fd: 17,
             signalfd4_error: None,
             epoll_ctl_error: None,
@@ -146,7 +224,10 @@ impl Pid1SignalFdSyscalls for FakeRegisteredSignalSyscalls {
     fn rt_sigprocmask(&mut self, how: i32, mask: &LinuxSignalMask) -> io::Result<()> {
         self.calls
             .push(FakeRegisteredCall::RtSigprocmask { how, mask: *mask });
-        Ok(())
+        match self.rt_sigprocmask_error {
+            Some(kind) => Err(io::Error::from(kind)),
+            None => Ok(()),
+        }
     }
 
     fn signalfd4(&mut self, fd: i32, mask: &LinuxSignalMask, flags: i32) -> io::Result<i64> {
