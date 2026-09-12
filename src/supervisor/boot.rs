@@ -44,7 +44,6 @@ impl Supervisor {
         )
         .map_err(SupervisorError::Phase2Boot)?;
 
-        let definitions = definitions_from_table(&service_table);
         merge_phase2_service_table(&mut work.services, service_table, &retained_satisfied)
             .map_err(|error| {
                 SupervisorError::Phase2Boot(Phase2BootRunError::ServiceTable(error))
@@ -52,6 +51,10 @@ impl Supervisor {
         apply_blocked_phase2_services(&mut work.services, &plan).map_err(|error| {
             SupervisorError::Phase2Boot(Phase2BootRunError::ServiceTable(error))
         })?;
+        // Taken after the blocks are applied: the boot context has a member
+        // for every blocked service too, and an undecodable one has a
+        // definition only once its placeholder entry exists (PEI-812).
+        let definitions = definitions_from_table(&work.services);
         work.boot_success.configure_phase2(
             &work.services,
             &plan,
@@ -104,15 +107,30 @@ impl Supervisor {
     }
 }
 
+fn blocked_reason_message(reason: &crate::boot::phase2::BlockedReason) -> String {
+    match reason {
+        crate::boot::phase2::BlockedReason::ValidationError { message } => message.clone(),
+        other => format!("{other:?}"),
+    }
+}
+
 fn apply_blocked_phase2_services(
     services: &mut ServiceTable,
     plan: &crate::boot::phase2::Phase2BootPlan,
 ) -> Result<(), ServiceTableError> {
     for blocked in &plan.blocked {
         let Some(runtime) = services.runtime(&blocked.service) else {
-            return Err(ServiceTableError::UnknownService {
-                service: blocked.service.clone(),
-            });
+            // A key that exists but would not decode: the planner blocked it
+            // by name because there is no definition to put in the table.
+            // Give it a placeholder entry, already Failed, so `status` can
+            // report it. Treating the missing entry as an error here is what
+            // sent the whole boot to recovery over one bad key (PEI-812).
+            services.insert_undecodable_placeholder(
+                &blocked.service,
+                blocked.reason.transition_cause(),
+                &blocked_reason_message(&blocked.reason),
+            )?;
+            continue;
         };
         if runtime.state != ServiceState::Inactive {
             continue;

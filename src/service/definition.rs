@@ -295,6 +295,24 @@ impl ServiceDefinition {
         }
     }
 
+    /// The stand-in definition behind a key that exists but will not decode.
+    ///
+    /// Boot fails such a service with `ValidationError` and carries on (§2.5),
+    /// and `status` has to be able to report it — which needs an entry, and
+    /// an entry needs a definition. This one runs nothing: no image, no
+    /// triggers, disabled, and the entry that holds it is marked
+    /// definition-removed so that `start`, `restart` and `reload` are refused
+    /// with `UNKNOWN_SERVICE` until a reload re-reads a repaired key. Until
+    /// PEI-812 the missing entry made the boot's own blocking step fail with
+    /// `UnknownService`, and one undecodable key took the machine to recovery.
+    pub fn undecodable_placeholder(name: &str, message: &str) -> Self {
+        let mut definition = Self::simple_system_boot(name, "");
+        definition.triggers.clear();
+        definition.disabled = true;
+        definition.description = Some(message.to_string());
+        definition
+    }
+
     pub fn compiled_in_registryd() -> Self {
         let mut service =
             Self::simple_system_boot(Self::REGISTRYD_NAME, Self::REGISTRYD_IMAGE_PATH);
