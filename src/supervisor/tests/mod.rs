@@ -19,6 +19,7 @@ mod submitted;
 mod terminal_release;
 mod timer;
 mod tty_arbitration;
+mod undecodable;
 mod watchdog;
 
 use std::collections::{BTreeMap, VecDeque};
@@ -60,6 +61,8 @@ struct StaticRegistry {
     control_limits: ControlSocketLimits,
     shutdown_timeout_secs: Option<u32>,
     eventd_log_socket_path: Option<String>,
+    /// Keys the partial boot read reports as present but undecodable.
+    undecodable: Vec<crate::boundary::UndecodableService>,
 }
 
 impl StaticRegistry {
@@ -71,7 +74,17 @@ impl StaticRegistry {
             control_limits: ControlSocketLimits::default(),
             shutdown_timeout_secs: None,
             eventd_log_socket_path: None,
+            undecodable: Vec::new(),
         }
+    }
+
+    fn with_undecodable(mut self, name: &str, message: &str) -> Self {
+        self.undecodable
+            .push(crate::boundary::UndecodableService {
+                name: name.to_string(),
+                message: message.to_string(),
+            });
+        self
     }
 
     fn services_with_global_environment(
@@ -85,6 +98,7 @@ impl StaticRegistry {
             control_limits: ControlSocketLimits::default(),
             shutdown_timeout_secs: None,
             eventd_log_socket_path: None,
+            undecodable: Vec::new(),
         }
     }
 
@@ -112,6 +126,15 @@ impl StaticRegistry {
 impl RegistryClient for StaticRegistry {
     fn read_service_definitions(&mut self) -> Result<Vec<ServiceDefinition>, BoundaryError> {
         Ok(self.services.clone())
+    }
+
+    fn read_service_definitions_partial(
+        &mut self,
+    ) -> Result<crate::boundary::ServiceDefinitionsRead, BoundaryError> {
+        Ok(crate::boundary::ServiceDefinitionsRead {
+            definitions: self.services.clone(),
+            undecodable: self.undecodable.clone(),
+        })
     }
 
     fn read_global_environment(
