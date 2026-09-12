@@ -5,8 +5,8 @@ use crate::execution::graph::{
     probe_level,
 };
 use crate::execution::start::{
-    GraphPreStartCheckOutcome, StartExecutionDispatch, StartExecutionRequest,
-    begin_graph_pre_start_check, begin_prechecked_ready_start,
+    GraphPreStartCheckOutcome, PrecheckedReadyStartOutcome, StartExecutionDispatch,
+    StartExecutionRequest, begin_graph_pre_start_check, begin_prechecked_ready_start,
 };
 use crate::security::TokenSummary;
 
@@ -56,17 +56,25 @@ impl SupervisorWork {
                     }
                     ReadyGraphOperationAction::Start => {
                         let request = self.start_request(ready, observed_at_ns)?;
-                        let dispatch = begin_prechecked_ready_start(
+                        let outcome = begin_prechecked_ready_start(
                             &mut self.services,
                             &mut self.operations,
+                            &mut self.graph,
                             &mut self.jobs,
                             &mut self.job_ids,
                             &mut self.start,
                             request,
                         )
                         .map_err(SupervisorError::Start)?;
-                        self.queue_start_dispatches(std::slice::from_ref(&dispatch));
-                        dispatches.push(dispatch);
+                        match outcome {
+                            PrecheckedReadyStartOutcome::Job(dispatch) => {
+                                self.queue_start_dispatches(std::slice::from_ref(&dispatch));
+                                dispatches.push(*dispatch);
+                            }
+                            PrecheckedReadyStartOutcome::Terminal(dispatch) => {
+                                context_ids.extend(Self::event_context_ids(&dispatch.graph_events));
+                            }
+                        }
                     }
                 }
             }

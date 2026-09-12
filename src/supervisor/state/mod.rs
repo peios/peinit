@@ -82,6 +82,10 @@ pub struct Supervisor {
     /// last drained them. Failed rather than fatal: see
     /// [`super::SupervisorControlFailureDispatch`].
     pub(super) control_operation_failures: Vec<super::SupervisorControlFailureDispatch>,
+    /// Due restarts peinit could not execute since the deadline timer last
+    /// drained them. Failed rather than fatal: see
+    /// [`super::SupervisorRestartBackoffFailureDispatch`].
+    pub(super) restart_backoff_failures: Vec<super::SupervisorRestartBackoffFailureDispatch>,
     pub(super) retained_service_launches: Vec<LaunchCreatedJobDispatch>,
     pub(super) boot_settle: BootSettleTracker,
     pub(super) boot_success: BootSuccessTracker,
@@ -124,6 +128,7 @@ impl Supervisor {
             stale_launch_entries: 0,
             pending_control_operations: VecDeque::new(),
             control_operation_failures: Vec::new(),
+            restart_backoff_failures: Vec::new(),
             retained_service_launches: Vec::new(),
             boot_settle: BootSettleTracker::default(),
             boot_success: BootSuccessTracker::default(),

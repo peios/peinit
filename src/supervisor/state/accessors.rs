@@ -111,6 +111,14 @@ impl Supervisor {
         std::mem::take(&mut self.control_operation_failures)
     }
 
+    /// Due restarts peinit could not execute since the last call. Reset on
+    /// read; the lifecycle deadline timer reports them for the turn.
+    pub fn take_restart_backoff_failures(
+        &mut self,
+    ) -> Vec<super::super::SupervisorRestartBackoffFailureDispatch> {
+        std::mem::take(&mut self.restart_backoff_failures)
+    }
+
     /// Mutate the job store directly, to stage bookkeeping faults a correct
     /// caller would not create.
     #[cfg(test)]

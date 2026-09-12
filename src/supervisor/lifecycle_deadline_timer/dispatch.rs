@@ -6,8 +6,9 @@ use crate::supervisor::dispatch::{
     SupervisorHealthCheckTimeoutDispatch, SupervisorPostStartHookTimeoutDispatch,
     SupervisorPreStartHookTimeoutDispatch, SupervisorReadinessTimeoutDispatch,
     SupervisorReloadCommandTimeoutDispatch, SupervisorReloadDetectionDispatch,
-    SupervisorRestartBackoffDispatch, SupervisorStopEscalationDispatch,
-    SupervisorSubmittedDeadlineDispatch, SupervisorWatchdogTimeoutDispatch,
+    SupervisorRestartBackoffDispatch, SupervisorRestartBackoffFailureDispatch,
+    SupervisorStopEscalationDispatch, SupervisorSubmittedDeadlineDispatch,
+    SupervisorWatchdogTimeoutDispatch,
 };
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -20,6 +21,8 @@ pub struct SupervisorLifecycleDeadlineDispatch {
     pub reload_detections: Vec<SupervisorReloadDetectionDispatch>,
     pub reload_command_timeouts: Vec<SupervisorReloadCommandTimeoutDispatch>,
     pub restart_backoffs: Vec<SupervisorRestartBackoffDispatch>,
+    /// Due restarts peinit could not execute (PEI-808).
+    pub restart_backoff_failures: Vec<SupervisorRestartBackoffFailureDispatch>,
     pub health_check_intervals: Vec<SupervisorHealthCheckIntervalDispatch>,
     pub health_check_timeouts: Vec<SupervisorHealthCheckTimeoutDispatch>,
     pub watchdog_timeouts: Vec<SupervisorWatchdogTimeoutDispatch>,
@@ -48,6 +51,7 @@ impl SupervisorLifecycleDeadlineDispatch {
             && self.reload_detections.is_empty()
             && self.reload_command_timeouts.is_empty()
             && self.restart_backoffs.is_empty()
+            && self.restart_backoff_failures.is_empty()
             && self.health_check_intervals.is_empty()
             && self.health_check_timeouts.is_empty()
             && self.watchdog_timeouts.is_empty()

@@ -55,6 +55,7 @@ pub(super) fn transition_cause_wire(cause: TransitionCause) -> &'static str {
         TransitionCause::ConditionSkipped => "condition_skipped",
         TransitionCause::TtyUnavailable => "tty_unavailable",
         TransitionCause::ProcessUnkillable => "process_unkillable",
+        TransitionCause::InternalError => "internal_error",
     }
 }
 

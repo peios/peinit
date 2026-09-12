@@ -6,13 +6,29 @@ use crate::service::ServiceTable;
 use crate::service::runtime::{ServiceState, ServiceTransition};
 mod outcome;
 
-use super::checks::{PreStartCheckDecision, evaluate_cacheable_pre_start_checks};
+use super::checks::{
+    PreStartCheckDecision, evaluate_cacheable_pre_start_checks, tty_unavailable,
+};
 use super::deadline::start_operation_deadline_ns;
 use super::initial::{InitialStartJobRequest, create_initial_start_job};
 use super::job_id::job_id_for_request;
 use super::model::{
-    GraphPreStartCheckOutcome, StartExecutionDispatch, StartExecutionError, StartExecutionRequest,
+    GraphPreStartCheckOutcome, GraphPreStartCheckTerminalDispatch, StartExecutionDispatch,
+    StartExecutionError, StartExecutionRequest,
 };
+
+/// What a prechecked graph start turned into when its turn came.
+///
+/// Usually a job. But the pre-start check ran on a table where none of the
+/// services released alongside this one had moved yet, so two boot-plan
+/// services naming one `TTYPath` both passed it; the terminal is asked about
+/// again here, at the moment of the transition, and the loser ends as the
+/// check path would have ended it (PEI-808).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PrecheckedReadyStartOutcome {
+    Job(Box<StartExecutionDispatch>),
+    Terminal(GraphPreStartCheckTerminalDispatch),
+}
 use super::skipped::clear_skipped_for_explicit_start;
 use super::store::StartExecutionStore;
 
@@ -69,11 +85,12 @@ pub fn begin_graph_pre_start_check(
 pub fn begin_prechecked_ready_start(
     services: &mut ServiceTable,
     operations: &mut OperationStore,
+    graph: &mut GraphExecutionStore,
     jobs: &mut JobStore,
     job_ids: &mut JobIdAllocator,
     start_store: &mut StartExecutionStore,
     request: StartExecutionRequest,
-) -> Result<StartExecutionDispatch, StartExecutionError> {
+) -> Result<PrecheckedReadyStartOutcome, StartExecutionError> {
     let mut next_services = services.clone();
     let mut next_operations = operations.clone();
     let mut next_jobs = jobs.clone();
@@ -85,6 +102,29 @@ pub fn begin_prechecked_ready_start(
         .ok_or(StartExecutionError::MissingPrecheckedGraphStart {
             operation_id: request.ready.operation_id,
         })?;
+    // Re-asked rather than carried over from the check: the check ran before
+    // any service released in the same batch had transitioned, so a terminal
+    // two boot-plan services both name looked free to both of them. Now the
+    // earlier one is Starting and holds it.
+    if let Some(reason) = tty_unavailable(
+        &next_services,
+        &request.ready.service,
+        &prechecked.activation.definition,
+    ) {
+        let mut transaction = GraphPreStartCheckTransaction {
+            services: next_services,
+            operations: next_operations,
+            graph: graph.clone(),
+            start_store: next_start_store,
+        };
+        let outcome =
+            outcome::apply_skipped(&mut transaction, request, reason, prechecked.cleared_skipped)?;
+        transaction.commit_to_stores(services, operations, graph, start_store);
+        let GraphPreStartCheckOutcome::Terminal(terminal) = outcome else {
+            unreachable!("a skipped pre-start check is a terminal outcome");
+        };
+        return Ok(PrecheckedReadyStartOutcome::Terminal(terminal));
+    }
     let operation_event = next_operations
         .start_operation(request.ready.operation_id, request.started_at_ns)
         .map_err(StartExecutionError::OperationStore)?;
@@ -132,15 +172,17 @@ pub fn begin_prechecked_ready_start(
     *job_ids = next_job_ids;
     *start_store = next_start_store;
 
-    Ok(StartExecutionDispatch {
-        ready: request.ready,
-        job_id: initial.job_id,
-        operation_event,
-        cleared_skipped: prechecked.cleared_skipped,
-        service_transition,
-        job_event: initial.job_event,
-        job_kind: initial.job_kind,
-    })
+    Ok(PrecheckedReadyStartOutcome::Job(Box::new(
+        StartExecutionDispatch {
+            ready: request.ready,
+            job_id: initial.job_id,
+            operation_event,
+            cleared_skipped: prechecked.cleared_skipped,
+            service_transition,
+            job_event: initial.job_event,
+            job_kind: initial.job_kind,
+        },
+    )))
 }
 
 struct GraphPreStartCheckTransaction {

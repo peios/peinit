@@ -134,10 +134,12 @@ impl Supervisor {
             }
             SupervisorLifecycleDeadlineKind::RestartBackoff { .. } => {
                 let restarts = self.process_due_restart_backoffs(now_ns)?;
-                if restarts.is_empty() {
+                let failures = self.take_restart_backoff_failures();
+                if restarts.is_empty() && failures.is_empty() {
                     return Ok(false);
                 }
                 dispatch.restart_backoffs.extend(restarts);
+                dispatch.restart_backoff_failures.extend(failures);
             }
             SupervisorLifecycleDeadlineKind::HealthCheckInterval { .. } => {
                 let intervals = self.process_due_health_check_intervals(now_ns)?;
