@@ -78,6 +78,10 @@ pub struct Supervisor {
     /// Drained by the work pump so a bookkeeping fault surfaces as a number.
     pub(super) stale_launch_entries: usize,
     pub(super) pending_control_operations: VecDeque<PendingControlOperation>,
+    /// Control operations the boundary refused to begin since the work pump
+    /// last drained them. Failed rather than fatal: see
+    /// [`super::SupervisorControlFailureDispatch`].
+    pub(super) control_operation_failures: Vec<super::SupervisorControlFailureDispatch>,
     pub(super) retained_service_launches: Vec<LaunchCreatedJobDispatch>,
     pub(super) boot_settle: BootSettleTracker,
     pub(super) boot_success: BootSuccessTracker,
@@ -119,6 +123,7 @@ impl Supervisor {
             reaped_before_setup: BTreeMap::new(),
             stale_launch_entries: 0,
             pending_control_operations: VecDeque::new(),
+            control_operation_failures: Vec::new(),
             retained_service_launches: Vec::new(),
             boot_settle: BootSettleTracker::default(),
             boot_success: BootSuccessTracker::default(),

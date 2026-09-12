@@ -15,6 +15,9 @@ pub(crate) fn collect_runtime_work_pump_kmes_events(
     for dispatch in &turn.control_operations {
         collect_control_dispatch(dispatch, out)?;
     }
+    for dispatch in &turn.control_operation_failures {
+        super::event::push_operation(out, &dispatch.operation_event)?;
+    }
     for dispatch in &turn.start_hook_launches {
         collect_start_hook_launch(dispatch, out)?;
     }

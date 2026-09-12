@@ -61,9 +61,12 @@ pub fn admit_lifecycle_command_with_operation_ids(
 /// restart across a set of services got an error for every one that happened
 /// not to be running.
 ///
-/// `Backoff` is deliberately not here. The matrix gives it `Restart`, and a
-/// service in Backoff has a restart already pending, so the stop phase has
-/// something to do.
+/// `Backoff` is deliberately not here either, but not because the stop phase
+/// has something to do — there is no process, and no `Backoff -> Stopping`
+/// edge. A restart in Backoff is admitted as a deferred restart
+/// (`OperationExpectation::DeferredRestart`): it replaces the automatic
+/// restart as the operation the backoff deadline executes, and never reaches
+/// the control boundary at all (PEI-803).
 fn should_plan_on_demand_start(
     command: LifecycleCommand,
     expectation: OperationExpectation,

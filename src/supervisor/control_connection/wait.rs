@@ -8,7 +8,8 @@ use crate::control::wire::{
     control_lifecycle_ack_response_line_with_mode,
 };
 use crate::ids::OperationId;
-use crate::operation::{OperationRecord, OperationType, is_operation_timeout};
+use crate::operation::{OperationRecord, OperationType, is_internal_error, is_operation_timeout};
+use crate::service::runtime::{ServiceState, TransitionCause};
 use crate::supervisor::state::Supervisor;
 
 impl Supervisor {
@@ -119,15 +120,50 @@ impl Supervisor {
             .map_err(SupervisorControlWaitResponseError::from);
         }
 
-        let view = self
-            .service_status(service)
-            .map_err(SupervisorControlWaitResponseError::Query)?;
+        if is_internal_error(operation) {
+            // The operation was admitted and then peinit could not execute it.
+            // That is peinit's fault, not the service's, and an "ok" carrying
+            // an unchanged state would hide it (PEI-803).
+            return control_error_response_line(
+                ControlErrorCode::InternalError,
+                &format!(
+                    "operation {operation_id} failed: {}",
+                    operation.result.as_deref().unwrap_or("internal_error")
+                ),
+            )
+            .map_err(SupervisorControlWaitResponseError::from);
+        }
+
+        let (state, cause, warnings) = match self.service_status(service) {
+            Ok(view) => (view.state, view.cause, view.lifecycle_warnings),
+            // The entry is gone because its definition was removed and this
+            // operation drained it (§3.8): the last transition was into
+            // Inactive, and then the discard. Answer with that rather than
+            // failing the turn — which tore the whole control interface down
+            // under the one client waiting on a documented command (PEI-803).
+            Err(QueryError::UnknownService { .. }) => (
+                ServiceState::Inactive,
+                matches!(
+                    operation.operation_type,
+                    OperationType::Stop | OperationType::Restart
+                )
+                .then_some(TransitionCause::ExplicitStop),
+                Vec::new(),
+            ),
+            Err(error) => {
+                return control_error_response_line(
+                    ControlErrorCode::InternalError,
+                    &format!("operation {operation_id} completed but its status is unavailable: {error:?}"),
+                )
+                .map_err(SupervisorControlWaitResponseError::from);
+            }
+        };
         control_lifecycle_ack_response_line_with_mode(
             Some(operation_id),
             service,
-            view.state,
-            view.cause,
-            &view.lifecycle_warnings,
+            state,
+            cause,
+            &warnings,
             reload_mode(operation),
         )
         .map_err(SupervisorControlWaitResponseError::from)

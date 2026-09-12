@@ -1,3 +1,4 @@
+mod failure;
 mod reload;
 mod restart;
 mod stop;

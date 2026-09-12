@@ -47,12 +47,36 @@ pub(super) fn admit_operation(
     let mut next_operations = operations.clone();
     let command = request.command;
     let service = request.service.clone();
-    let outcome = next_operations
-        .request_operation(operation_request(request))
-        .map_err(LifecycleCommandError::OperationStore)?;
+    let outcome = match deferred_restart_to_merge_into(&next_operations, &service, expectation) {
+        // The conflict table answers Restart × Restart with a queue, which is
+        // right while one is running: the second waits its turn. A deferred
+        // restart is not running, and a second one queued behind it would sit
+        // Pending until the pending-operation timeout failed it. Merge, as a
+        // second deferred start does (§10.3).
+        Some(existing_id) => next_operations
+            .merge_request_into(operation_request(request), existing_id)
+            .map_err(LifecycleCommandError::OperationStore)?,
+        None => next_operations
+            .request_operation(operation_request(request))
+            .map_err(LifecycleCommandError::OperationStore)?,
+    };
     validate_expectation(&outcome.decision, expectation, &service, command)?;
     *operations = next_operations;
     Ok(LifecycleCommandOutcome::OperationAccepted(outcome))
+}
+
+fn deferred_restart_to_merge_into(
+    operations: &OperationStore,
+    service: &str,
+    expectation: OperationExpectation,
+) -> Option<crate::ids::OperationId> {
+    if expectation != OperationExpectation::DeferredRestart {
+        return None;
+    }
+    let existing = operations.current_for_service(service)?;
+    (existing.operation_type == crate::operation::OperationType::Restart
+        && existing.state == crate::operation::OperationState::Pending)
+        .then_some(existing.id)
 }
 
 pub(super) fn operation_request(request: LifecycleCommandRequest) -> OperationRequest {
@@ -103,6 +127,25 @@ fn validate_expectation(
             if matches!(
                 decision,
                 OperationConflictDecision::CreateNew
+                    | OperationConflictDecision::MergeIntoExisting { .. }
+            ) {
+                Ok(())
+            } else {
+                Err(LifecycleCommandError::ExpectedMerge {
+                    service: service.to_string(),
+                    command,
+                })
+            }
+        }
+        OperationExpectation::DeferredRestart => {
+            // Nothing pending: the restart is created and waits for the
+            // deadline. A deferred start pending: cancelled, `superseded_by_
+            // restart`, and the restart takes its place. A deferred restart
+            // pending: merged into, above.
+            if matches!(
+                decision,
+                OperationConflictDecision::CreateNew
+                    | OperationConflictDecision::CancelExistingThenQueue { .. }
                     | OperationConflictDecision::MergeIntoExisting { .. }
             ) {
                 Ok(())

@@ -134,15 +134,17 @@ fn existing_requested_start(
         .get(id)
         .ok_or(crate::operation::store::OperationStoreError::UnknownOperation { id })
         .map_err(OnDemandStartDispatchError::OperationStore)?;
-    if operation.operation_type != OperationType::Start
-        || operation.service != service
+    if !matches!(
+        operation.operation_type,
+        OperationType::Start | OperationType::Restart
+    ) || operation.service != service
         || operation.state != crate::operation::OperationState::Pending
     {
         return Err(OnDemandStartDispatchError::OperationStore(
             crate::operation::store::OperationStoreError::InvalidEventRecord {
                 id,
                 state: operation.state,
-                reason: "deferred backoff start must be a pending start for the requested service",
+                reason: "a deferred backoff operation must be a pending start or restart for the requested service",
             },
         ));
     }

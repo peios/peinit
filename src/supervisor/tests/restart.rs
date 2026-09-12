@@ -1,6 +1,6 @@
 use crate::boundary::{BoundaryError, ShutdownFinalizer};
 use crate::control::lifecycle::LifecycleCommandOutcome;
-use crate::operation::{OperationSource, OperationState};
+use crate::operation::{OperationSource, OperationState, OperationType};
 use crate::service::ErrorControl;
 use crate::service::runtime::{ServiceState, TransitionCause};
 use crate::shutdown::{ShutdownFinalizationState, ShutdownKind};
@@ -640,4 +640,246 @@ fn a_failure_exit_code_before_readiness_still_restarts_under_on_failure() {
         supervisor.service_status("app").expect("app").state,
         ServiceState::Backoff,
     );
+}
+
+/// PEI-803. §10.3, the Backoff column: "`restart` cancels the automatic
+/// restart and queues an administrator-initiated one." Before this the restart
+/// was admitted as an ordinary one, sent to the control boundary, and the
+/// boundary's `MissingCurrentMainJob` ended the runtime loop: PID 1 entered
+/// recovery and unlinked both sockets over a single documented command.
+#[test]
+fn restart_during_backoff_replaces_the_automatic_restart_and_honours_the_delay() {
+    let app = alive_service("app");
+    let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
+    let mut registry = StaticRegistry::services(vec![app]);
+    let mut clock = ScriptedClock::new([BOOT_NS, APP_LAUNCH_NS]);
+    supervisor
+        .run_phase2_boot(&mut registry, &mut clock)
+        .expect("boot supervisor");
+    let mut tokens = TestTokenProvider::default();
+    let mut launcher = TestProcessLauncher::new(vec![process(5000, 20), process(5001, 21)]);
+    supervisor
+        .launch_next_pending_job(&mut tokens, &mut launcher, &mut clock)
+        .expect("launch app")
+        .expect("app launch dispatch");
+    let first_job = supervisor
+        .service_status("app")
+        .expect("active app")
+        .current_job
+        .expect("first app job")
+        .id;
+    supervisor
+        .complete_job(first_job, APP_CRASH_NS, 1)
+        .expect("crash app");
+    let deadline = supervisor
+        .next_restart_backoff_deadline()
+        .expect("restart deadline");
+    let mut command_clock = ScriptedClock::new([APP_CRASH_NS + 10]);
+
+    let restart = supervisor
+        .restart_service("app", None, &mut command_clock)
+        .expect("restart during backoff is admitted");
+
+    // Deferred: an operation the caller can wait on, and nothing for the
+    // control boundary, because there is no process for it to act on.
+    let LifecycleCommandOutcome::OperationAccepted(operation) = restart.outcome else {
+        panic!("expected a deferred restart operation");
+    };
+    let restart_id = operation.returned_operation_id;
+    assert!(restart.pending_control_operation.is_none());
+    assert!(supervisor.pending_control_operations().is_empty());
+    assert!(supervisor.pending_launch_jobs().is_empty());
+    let pending = supervisor
+        .operation_status(restart_id)
+        .expect("deferred restart");
+    assert_eq!(pending.state, OperationState::Pending);
+    assert_eq!(pending.operation_type, OperationType::Restart);
+    assert_eq!(pending.source, OperationSource::Admin);
+    // It is the administrator's operation that status reports as current.
+    let status = supervisor.service_status("app").expect("app in backoff");
+    assert_eq!(status.state, ServiceState::Backoff);
+    assert_eq!(
+        status.current_operation.expect("current operation").id,
+        restart_id
+    );
+
+    // The remaining delay is honoured: nothing happens before the deadline,
+    // and at the deadline it is the restart — not a new automatic start —
+    // that executes.
+    assert!(
+        supervisor
+            .process_due_restart_backoffs(deadline.due_at_ns - 1)
+            .expect("early restart scan")
+            .is_empty()
+    );
+    let relaunches = supervisor
+        .process_due_restart_backoffs(deadline.due_at_ns)
+        .expect("due restart scan");
+    assert_eq!(relaunches.len(), 1);
+    assert_eq!(
+        relaunches[0]
+            .relaunch
+            .admission
+            .requested_operation
+            .returned_operation_id,
+        restart_id,
+    );
+    let starting = supervisor.service_status("app").expect("starting app");
+    assert_eq!(starting.state, ServiceState::Starting);
+    assert_eq!(
+        starting.current_operation.expect("current operation").id,
+        restart_id
+    );
+
+    let mut launch_clock = ScriptedClock::new([RESTART_LAUNCH_NS]);
+    supervisor
+        .launch_next_pending_job(&mut tokens, &mut launcher, &mut launch_clock)
+        .expect("launch restarted app")
+        .expect("restart launch dispatch");
+    assert_eq!(
+        supervisor.service_status("app").expect("app").state,
+        ServiceState::Active
+    );
+    let completed = supervisor
+        .operation_status(restart_id)
+        .expect("completed restart");
+    assert_eq!(completed.state, OperationState::Completed);
+    // The type is kept for observability, as §8.1 asks of every restart that
+    // skips its stop phase.
+    assert_eq!(completed.operation_type, OperationType::Restart);
+}
+
+/// The other half of the same §10.3 rule: a deferred `start` already waiting
+/// out the backoff is superseded by the restart, and the restart is what runs.
+#[test]
+fn restart_during_backoff_supersedes_a_deferred_start() {
+    let app = alive_service("app");
+    let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
+    let mut registry = StaticRegistry::services(vec![app]);
+    let mut clock = ScriptedClock::new([BOOT_NS, APP_LAUNCH_NS]);
+    supervisor
+        .run_phase2_boot(&mut registry, &mut clock)
+        .expect("boot supervisor");
+    let mut tokens = TestTokenProvider::default();
+    let mut launcher = TestProcessLauncher::new(vec![process(5000, 20)]);
+    supervisor
+        .launch_next_pending_job(&mut tokens, &mut launcher, &mut clock)
+        .expect("launch app")
+        .expect("app launch dispatch");
+    let first_job = supervisor
+        .service_status("app")
+        .expect("active app")
+        .current_job
+        .expect("first app job")
+        .id;
+    supervisor
+        .complete_job(first_job, APP_CRASH_NS, 1)
+        .expect("crash app");
+    let deadline = supervisor
+        .next_restart_backoff_deadline()
+        .expect("restart deadline");
+
+    let mut command_clock = ScriptedClock::new([APP_CRASH_NS + 10, APP_CRASH_NS + 20]);
+    let start = supervisor
+        .start_service("app", None, &mut command_clock)
+        .expect("deferred start");
+    let LifecycleCommandOutcome::OperationAccepted(start) = start.outcome else {
+        panic!("expected deferred start");
+    };
+    let start_id = start.returned_operation_id;
+    let restart = supervisor
+        .restart_service("app", None, &mut command_clock)
+        .expect("restart during backoff with a deferred start pending");
+    let LifecycleCommandOutcome::OperationAccepted(restart) = restart.outcome else {
+        panic!("expected deferred restart");
+    };
+    let restart_id = restart.returned_operation_id;
+    assert_ne!(restart_id, start_id);
+
+    let cancelled = supervisor.operation_status(start_id).expect("start");
+    assert_eq!(cancelled.state, OperationState::Cancelled);
+    assert_eq!(cancelled.error.as_deref(), Some("superseded_by_restart"));
+    assert_eq!(
+        supervisor
+            .operation_status(restart_id)
+            .expect("restart")
+            .state,
+        OperationState::Pending
+    );
+    assert!(supervisor.pending_control_operations().is_empty());
+
+    let relaunches = supervisor
+        .process_due_restart_backoffs(deadline.due_at_ns)
+        .expect("due restart scan");
+    assert_eq!(relaunches.len(), 1);
+    assert_eq!(
+        relaunches[0]
+            .relaunch
+            .admission
+            .requested_operation
+            .returned_operation_id,
+        restart_id,
+    );
+}
+
+/// A second restart while the first is still deferred merges into it, as a
+/// second deferred start does. The conflict table's answer for Restart ×
+/// Restart is a queue, which is right for a running restart and would leave
+/// a second Pending record here that nothing ever executed.
+#[test]
+fn a_second_restart_during_backoff_merges_into_the_deferred_one() {
+    let app = alive_service("app");
+    let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
+    let mut registry = StaticRegistry::services(vec![app]);
+    let mut clock = ScriptedClock::new([BOOT_NS, APP_LAUNCH_NS]);
+    supervisor
+        .run_phase2_boot(&mut registry, &mut clock)
+        .expect("boot supervisor");
+    let mut tokens = TestTokenProvider::default();
+    let mut launcher = TestProcessLauncher::new(vec![process(5000, 20)]);
+    supervisor
+        .launch_next_pending_job(&mut tokens, &mut launcher, &mut clock)
+        .expect("launch app")
+        .expect("app launch dispatch");
+    let first_job = supervisor
+        .service_status("app")
+        .expect("active app")
+        .current_job
+        .expect("first app job")
+        .id;
+    supervisor
+        .complete_job(first_job, APP_CRASH_NS, 1)
+        .expect("crash app");
+
+    let mut command_clock = ScriptedClock::new([APP_CRASH_NS + 10, APP_CRASH_NS + 20]);
+    let first = supervisor
+        .restart_service("app", None, &mut command_clock)
+        .expect("first restart");
+    let LifecycleCommandOutcome::OperationAccepted(first) = first.outcome else {
+        panic!("expected deferred restart");
+    };
+    let second = supervisor
+        .restart_service("app", None, &mut command_clock)
+        .expect("second restart");
+    let LifecycleCommandOutcome::OperationAccepted(second) = second.outcome else {
+        panic!("expected merged restart");
+    };
+
+    assert_eq!(second.returned_operation_id, first.returned_operation_id);
+    assert_ne!(second.stored_operation_id, first.returned_operation_id);
+    assert_eq!(
+        supervisor
+            .operation_status(second.stored_operation_id)
+            .expect("merged record")
+            .state,
+        OperationState::Merged
+    );
+    assert_eq!(
+        supervisor
+            .operation_status(first.returned_operation_id)
+            .expect("deferred restart")
+            .state,
+        OperationState::Pending
+    );
+    assert!(supervisor.pending_control_operations().is_empty());
 }

@@ -3,6 +3,8 @@ use std::collections::VecDeque;
 use crate::ids::OperationId;
 use crate::operation::store::{OperationRequestOutcome, OperationStore};
 use crate::operation::{OperationState, OperationType};
+use crate::service::ServiceTable;
+use crate::service::runtime::ServiceState;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PendingControlOperation {
@@ -22,6 +24,7 @@ pub enum PendingControlRequirement {
 pub(super) fn queue_control_boundary(
     queue: &mut VecDeque<PendingControlOperation>,
     operations: &OperationStore,
+    services: &ServiceTable,
     outcome: &OperationRequestOutcome,
 ) -> Option<PendingControlOperation> {
     retain_live_boundaries(queue, operations);
@@ -30,6 +33,17 @@ pub(super) fn queue_control_boundary(
     }
     let record = operations.get(outcome.returned_operation_id)?;
     if record.state != OperationState::Pending {
+        return None;
+    }
+    // Every requirement below acts on a running main process. A service in
+    // Backoff has none: its pending restart is executed by the backoff
+    // deadline, from the operation store, and sending it to the boundary
+    // produced a `MissingCurrentMainJob` that ended the runtime loop
+    // (PEI-803).
+    if services
+        .runtime(&record.service)
+        .is_some_and(|runtime| runtime.state == ServiceState::Backoff)
+    {
         return None;
     }
     let requirement = requirement_for(record.operation_type)?;

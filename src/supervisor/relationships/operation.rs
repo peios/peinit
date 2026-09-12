@@ -29,6 +29,7 @@ pub(super) fn queue_relationship_stop(
     queue_control_boundary(
         &mut work.pending_control_operations,
         &work.operations,
+        &work.services,
         &outcome,
     );
     Ok(())

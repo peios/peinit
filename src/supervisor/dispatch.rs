@@ -18,7 +18,8 @@ pub use boot::{
     SupervisorFilesystemCheckTimeoutDispatch,
 };
 pub use control::{
-    SupervisorControlDispatch, SupervisorControlLaunchDispatch, SupervisorControlLaunchResult,
+    SupervisorControlDispatch, SupervisorControlFailureDispatch, SupervisorControlLaunchDispatch,
+    SupervisorControlLaunchResult,
     SupervisorReloadCommandTerminalDispatch, SupervisorReloadCommandTimeoutDispatch,
     SupervisorReloadDetectionDispatch, SupervisorStopEscalationDispatch,
 };

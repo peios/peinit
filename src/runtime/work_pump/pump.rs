@@ -69,8 +69,11 @@ where
         None
     };
     let pending_control_after = supervisor.pending_control_operations().len();
+    let control_operation_failures = supervisor.take_control_operation_failures();
     let stale_control_operations = if control_operation.is_none() {
-        pending_control_before.saturating_sub(pending_control_after)
+        pending_control_before
+            .saturating_sub(pending_control_after)
+            .saturating_sub(control_operation_failures.len())
     } else {
         0
     };
@@ -217,6 +220,7 @@ where
 
     Ok(RuntimeWorkPumpStep {
         control_operation,
+        control_operation_failures,
         filesystem_check_launch,
         start_hook_launch,
         start_hook_launch_failure,
