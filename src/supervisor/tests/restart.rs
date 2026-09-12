@@ -883,3 +883,138 @@ fn a_second_restart_during_backoff_merges_into_the_deferred_one() {
     );
     assert!(supervisor.pending_control_operations().is_empty());
 }
+
+/// PEI-808. The condition a service was started under can stop holding while
+/// it waits in Backoff. The relaunch re-evaluates it, and the answer is a
+/// skip, not an `InvalidTransition` out of the deadline timer.
+#[test]
+fn a_relaunch_whose_condition_no_longer_holds_skips_the_service() {
+    let mut app = alive_service("app");
+    app.conditions = vec![crate::service::ServiceCheck {
+        kind: crate::service::ServiceCheckKind::Registry,
+        argument: "Machine\\System\\Services\\db".to_string(),
+    }];
+    let mut db = alive_service("db");
+    db.triggers.clear();
+    let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
+    let mut registry = StaticRegistry::services(vec![app.clone(), db]);
+    let mut clock = ScriptedClock::new([BOOT_NS, APP_LAUNCH_NS]);
+    supervisor
+        .run_phase2_boot(&mut registry, &mut clock)
+        .expect("boot supervisor");
+    let mut tokens = TestTokenProvider::default();
+    let mut launcher = TestProcessLauncher::new(vec![process(5000, 20)]);
+    supervisor
+        .launch_next_pending_job(&mut tokens, &mut launcher, &mut clock)
+        .expect("launch app")
+        .expect("app launch dispatch");
+    let first_job = supervisor
+        .service_status("app")
+        .expect("active app")
+        .current_job
+        .expect("first app job")
+        .id;
+    supervisor
+        .complete_job(first_job, APP_CRASH_NS, 1)
+        .expect("crash app");
+    let deadline = supervisor
+        .next_restart_backoff_deadline()
+        .expect("restart deadline");
+
+    // The definition the condition names is withdrawn while app waits.
+    supervisor
+        .services
+        .apply_definition_snapshot(vec![app])
+        .expect("withdraw db");
+
+    let relaunches = supervisor
+        .process_due_restart_backoffs(deadline.due_at_ns)
+        .expect("a skipped relaunch is not an error");
+
+    assert_eq!(relaunches.len(), 1);
+    assert!(relaunches[0].relaunch.start_dispatches.is_empty());
+    let status = supervisor.service_status("app").expect("app");
+    assert_eq!(status.state, ServiceState::Skipped);
+    assert_eq!(status.cause, Some(TransitionCause::ConditionSkipped));
+    assert!(supervisor.pending_launch_jobs().is_empty());
+    assert!(supervisor.next_restart_backoff_deadline().is_none());
+    assert!(supervisor.take_restart_backoff_failures().is_empty());
+}
+
+/// PEI-808. A due restart peinit cannot execute fails the one service, under
+/// `InternalError`, with the operation waiting on it failed too — rather
+/// than the runtime loop. Staged with an operation in a shape the deadline
+/// path cannot admit a start against.
+#[test]
+fn a_relaunch_peinit_cannot_execute_fails_the_service_not_the_loop() {
+    let app = alive_service("app");
+    let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
+    let mut registry = StaticRegistry::services(vec![app]);
+    let mut clock = ScriptedClock::new([BOOT_NS, APP_LAUNCH_NS]);
+    supervisor
+        .run_phase2_boot(&mut registry, &mut clock)
+        .expect("boot supervisor");
+    let mut tokens = TestTokenProvider::default();
+    let mut launcher = TestProcessLauncher::new(vec![process(5000, 20)]);
+    supervisor
+        .launch_next_pending_job(&mut tokens, &mut launcher, &mut clock)
+        .expect("launch app")
+        .expect("app launch dispatch");
+    let first_job = supervisor
+        .service_status("app")
+        .expect("active app")
+        .current_job
+        .expect("first app job")
+        .id;
+    supervisor
+        .complete_job(first_job, APP_CRASH_NS, 1)
+        .expect("crash app");
+    let deadline = supervisor
+        .next_restart_backoff_deadline()
+        .expect("restart deadline");
+    let staged = supervisor
+        .operation_ids
+        .allocate_batch(1, APP_CRASH_NS + 1)
+        .expect("operation id")[0];
+    supervisor
+        .operations
+        .request_operation(crate::operation::store::OperationRequest {
+            id: staged,
+            operation_type: OperationType::Reload,
+            service: "app".to_string(),
+            source: OperationSource::Admin,
+            caller: None,
+            created_at_ns: APP_CRASH_NS + 1,
+        })
+        .expect("stage a pending reload the relaunch cannot admit a start against");
+
+    let relaunches = supervisor
+        .process_due_restart_backoffs(deadline.due_at_ns)
+        .expect("the refusal is contained");
+
+    assert!(relaunches.is_empty());
+    let status = supervisor.service_status("app").expect("app");
+    assert_eq!(status.state, ServiceState::Failed);
+    assert_eq!(status.cause, Some(TransitionCause::InternalError));
+    assert!(supervisor.next_restart_backoff_deadline().is_none());
+    assert!(supervisor.pending_launch_jobs().is_empty());
+    let failed = supervisor.operation_status(staged).expect("staged operation");
+    assert_eq!(failed.state, OperationState::Failed);
+    assert!(
+        failed
+            .error
+            .as_deref()
+            .is_some_and(crate::operation::is_internal_error_result),
+        "{:?}",
+        failed.error
+    );
+    let failures = supervisor.take_restart_backoff_failures();
+    assert_eq!(failures.len(), 1);
+    assert_eq!(failures[0].due.service, "app");
+    assert_eq!(
+        failures[0].service_transition.event.to,
+        ServiceState::Failed
+    );
+    assert!(failures[0].operation_event.is_some());
+    assert!(supervisor.take_restart_backoff_failures().is_empty());
+}

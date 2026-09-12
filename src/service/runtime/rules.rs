@@ -65,6 +65,16 @@ pub(super) fn is_allowed_transition(
         (ServiceState::Active, ServiceState::Inactive) => cause == TransitionCause::CleanExit,
         (ServiceState::Backoff, ServiceState::Starting) => cause == TransitionCause::RestartPolicy,
         (ServiceState::Backoff, ServiceState::Inactive) => cause == TransitionCause::ExplicitStop,
+        // A relaunch runs the pre-start checks like any other start, and the
+        // machine can have changed while the service waited: its terminal
+        // taken, a condition no longer met. Without these two edges the check's
+        // correct answer was an `InvalidTransition` that ended the runtime
+        // loop (PEI-808).
+        (ServiceState::Backoff, ServiceState::Skipped) => matches!(
+            cause,
+            TransitionCause::ConditionSkipped | TransitionCause::TtyUnavailable
+        ),
+        (ServiceState::Backoff, ServiceState::Failed) => cause == TransitionCause::InternalError,
         (ServiceState::Reloading, ServiceState::Active) => {
             matches!(cause, TransitionCause::ExplicitReload)
         }

@@ -140,6 +140,15 @@ pub enum TransitionCause {
     /// condition they never wrote did not hold.
     TtyUnavailable,
     ProcessUnkillable,
+    /// peinit could not execute a restart it had scheduled: the relaunch a
+    /// backoff deadline began was refused by peinit's own bookkeeping.
+    ///
+    /// Its own cause because the service did nothing: the process that put it
+    /// in Backoff is already recorded, and what ended the restart was peinit.
+    /// Failed, so that `start` and `reset` work as they do after any other
+    /// failure, rather than a Backoff whose deadline will never fire. Until
+    /// PEI-808 such a refusal ended the runtime loop instead.
+    InternalError,
 }
 
 impl TransitionCause {
@@ -172,7 +181,8 @@ impl TransitionCause {
             | Self::DependencyFailure
             | Self::AssertionError
             | Self::ConditionSkipped
-            | Self::TtyUnavailable => RestartConsultation::Never,
+            | Self::TtyUnavailable
+            | Self::InternalError => RestartConsultation::Never,
         }
     }
 
@@ -186,6 +196,7 @@ impl TransitionCause {
                 | Self::AssertionError
                 | Self::ConditionSkipped
                 | Self::TtyUnavailable
+                | Self::InternalError
         )
     }
 }

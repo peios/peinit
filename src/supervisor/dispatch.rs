@@ -65,7 +65,10 @@ pub use submitted::{
     SupervisorSubmittedLaunchFailureDispatch, SupervisorSubmittedLaunchResult,
     SupervisorSubmittedNotifyDispatch, SupervisorSubmittedStopDispatch,
 };
-pub use terminal::{SupervisorRestartBackoffDispatch, SupervisorTerminalDispatch};
+pub use terminal::{
+    SupervisorRestartBackoffDispatch, SupervisorRestartBackoffFailureDispatch,
+    SupervisorTerminalDispatch,
+};
 pub use timer::{SupervisorTimerAction, SupervisorTimerDispatch};
 pub use watchdog::{
     SupervisorWatchdogNotifyDispatch, SupervisorWatchdogNotifyOutcome,

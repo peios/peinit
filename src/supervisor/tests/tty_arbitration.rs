@@ -315,3 +315,44 @@ fn a_holder_that_deleted_its_own_definition_still_hands_the_console_on() {
     );
     assert_eq!(state(&supervisor, "login-console"), ServiceState::Starting);
 }
+
+/// PEI-808. Two boot-triggered services naming one terminal. The boot plan
+/// admits both, and its pre-start check ran for both before either had moved,
+/// so both passed it; the loser was exec'd and died in `TIOCSCTTY`, went to
+/// Backoff, and its relaunch's correct skip was an `InvalidTransition` that
+/// ended the runtime loop. Now the terminal is asked about again at the
+/// moment of the transition, and the loser is skipped exactly as a demand
+/// start would be — in plan order, not precedence order (§11.6).
+#[test]
+fn two_boot_plan_services_naming_one_terminal_start_one_and_skip_the_other() {
+    let mut first = alive_service("pt-aaa");
+    first.console_path = Some("/dev/tty2".to_string());
+    let mut second = alive_service("pt-zzz");
+    second.console_path = Some("/dev/tty2".to_string());
+    second.console_precedence = 99;
+    let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
+    let mut registry = StaticRegistry::services(vec![first, second]);
+    let mut clock = ScriptedClock::new([BOOT_NS]);
+
+    supervisor
+        .run_phase2_boot(&mut registry, &mut clock)
+        .expect("a boot with two claimants on one terminal is not an error");
+
+    assert_eq!(state(&supervisor, "pt-aaa"), ServiceState::Starting);
+    assert_eq!(state(&supervisor, "pt-zzz"), ServiceState::Skipped);
+    assert_eq!(
+        supervisor.service_status("pt-zzz").expect("status").cause,
+        Some(TransitionCause::TtyUnavailable),
+    );
+    assert_eq!(
+        supervisor.pending_launch_jobs().len(),
+        1,
+        "only the winner has a process to launch",
+    );
+    // The loser's operation completed as a skip, so nothing waits on it.
+    let skipped = supervisor
+        .service_status("pt-zzz")
+        .expect("status")
+        .current_operation;
+    assert!(skipped.is_none(), "{skipped:?}");
+}

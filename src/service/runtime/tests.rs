@@ -198,3 +198,81 @@ fn skipped_start_clears_to_inactive_before_re_evaluation() {
     assert_eq!(snapshot.state, ServiceState::Inactive);
     assert_eq!(snapshot.cause, Some(TransitionCause::ExplicitStart));
 }
+
+/// PEI-808. A relaunch from Backoff runs the pre-start checks like any other
+/// start, and the machine can have changed while the service waited: its
+/// terminal taken, a condition no longer met. The check's correct answer used
+/// to be an `InvalidTransition` that ended the runtime loop.
+#[test]
+fn backoff_can_be_skipped_by_a_pre_start_check() {
+    for cause in [
+        TransitionCause::ConditionSkipped,
+        TransitionCause::TtyUnavailable,
+    ] {
+        let mut snapshot = ServiceRuntimeSnapshot::inactive("svc");
+        snapshot
+            .transition(ServiceTransition {
+                to: ServiceState::Starting,
+                cause: TransitionCause::ExplicitStart,
+            })
+            .expect("start");
+        snapshot
+            .transition(ServiceTransition {
+                to: ServiceState::Backoff,
+                cause: TransitionCause::ProcessCrash,
+            })
+            .expect("backoff");
+        let event = snapshot
+            .transition(ServiceTransition {
+                to: ServiceState::Skipped,
+                cause,
+            })
+            .expect("a relaunch may be skipped");
+        assert_eq!(event.from, ServiceState::Backoff);
+        assert_eq!(event.to, ServiceState::Skipped);
+        assert_eq!(event.cause, cause);
+    }
+}
+
+/// PEI-808. A relaunch peinit cannot execute fails the service under
+/// `InternalError`, and only under that cause: a process failure in Backoff is
+/// recorded, not transitioned (§6.2).
+#[test]
+fn backoff_fails_only_under_internal_error() {
+    let mut snapshot = ServiceRuntimeSnapshot::inactive("svc");
+    snapshot
+        .transition(ServiceTransition {
+            to: ServiceState::Starting,
+            cause: TransitionCause::ExplicitStart,
+        })
+        .expect("start");
+    snapshot
+        .transition(ServiceTransition {
+            to: ServiceState::Backoff,
+            cause: TransitionCause::ProcessCrash,
+        })
+        .expect("backoff");
+    let before = snapshot.clone();
+
+    snapshot
+        .transition(ServiceTransition {
+            to: ServiceState::Failed,
+            cause: TransitionCause::ProcessCrash,
+        })
+        .expect_err("a crash does not take Backoff to Failed");
+    assert_eq!(snapshot, before);
+
+    let event = snapshot
+        .transition(ServiceTransition {
+            to: ServiceState::Failed,
+            cause: TransitionCause::InternalError,
+        })
+        .expect("an internal error does");
+    assert_eq!(event.from, ServiceState::Backoff);
+    assert_eq!(event.to, ServiceState::Failed);
+    assert_eq!(
+        TransitionCause::InternalError.restart_consultation(),
+        RestartConsultation::Never
+    );
+    assert!(!TransitionCause::InternalError.triggers_on_failure());
+}

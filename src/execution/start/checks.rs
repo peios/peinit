@@ -67,7 +67,7 @@ impl SkipReason {
 /// terminal is a fact about the machine right now, and evaluating conditions
 /// first would mean running a filesystem helper for a start that was never
 /// going to happen.
-fn tty_unavailable(
+pub(super) fn tty_unavailable(
     services: &ServiceTable,
     service: &str,
     definition: &ServiceDefinition,

@@ -70,6 +70,22 @@ pub(super) fn collect_lifecycle_deadline_dispatch_console_messages(
     for timeout in &dispatch.reload_command_timeouts {
         collect_reload_command_timeout_dispatch_console_messages(timeout, out);
     }
+    for failure in &dispatch.restart_backoff_failures {
+        // The transition line says the service failed with InternalError;
+        // this one says what peinit could not do, which is the part an
+        // operator cannot recover from the service's own state.
+        crate::runtime::console::push_error(
+            out,
+            format!(
+                "peinit: service {}: restart could not be executed: {:?}\n",
+                failure.due.service, failure.error
+            ),
+        );
+        crate::runtime::console::collect_service_transition_console_message(
+            &failure.service_transition,
+            out,
+        );
+    }
     for timeout in &dispatch.health_check_timeouts {
         collect_health_check_terminal_console_messages(&timeout.terminal, out);
     }

@@ -20,3 +20,19 @@ pub struct SupervisorRestartBackoffDispatch {
     pub due: RestartBackoffDeadline,
     pub relaunch: RestartPolicyRelaunchDispatch,
 }
+
+/// A due restart that peinit could not execute.
+///
+/// The relaunch was refused by peinit's own bookkeeping — an operation in a
+/// shape the deadline path does not expect, a plan it cannot build. That is
+/// not the service's doing, and until PEI-808 it ended the runtime loop over
+/// one service's restart. Now the service goes `Backoff -> Failed` under
+/// `InternalError`, any operation waiting on the restart fails with the
+/// `internal_error` result, and this dispatch carries the evidence.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SupervisorRestartBackoffFailureDispatch {
+    pub due: RestartBackoffDeadline,
+    pub service_transition: crate::service::ServiceTableTransition,
+    pub operation_event: Option<crate::operation::store::OperationEvent>,
+    pub error: crate::execution::restart_policy::RestartPolicyRelaunchError,
+}

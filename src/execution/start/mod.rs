@@ -21,7 +21,9 @@ mod timeout;
 mod tests;
 
 pub use dispatch::begin_ready_start;
-pub use graph_precheck::{begin_graph_pre_start_check, begin_prechecked_ready_start};
+pub use graph_precheck::{
+    PrecheckedReadyStartOutcome, begin_graph_pre_start_check, begin_prechecked_ready_start,
+};
 pub use model::{
     GraphPreStartCheckOutcome, GraphPreStartCheckPassedDispatch, GraphPreStartCheckPendingDispatch,
     GraphPreStartCheckTerminalDispatch, PostStartHookTerminalDispatch,

@@ -41,6 +41,11 @@ pub(in crate::runtime::kmes) fn collect_lifecycle_deadline_dispatch(
     for backoff in &dispatch.restart_backoffs {
         collect_restart_backoff(backoff, out)?;
     }
+    for failure in &dispatch.restart_backoff_failures {
+        if let Some(event) = &failure.operation_event {
+            super::super::event::push_operation(out, event)?;
+        }
+    }
     for interval in &dispatch.health_check_intervals {
         collect_health_check_interval(interval, out)?;
     }
