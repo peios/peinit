@@ -14,7 +14,14 @@ pub enum ServiceState {
 
 impl ServiceState {
     pub fn satisfies_dependents(self) -> bool {
-        matches!(self, Self::Active | Self::Completed | Self::Skipped)
+        // Reloading satisfies because the process is still there and still
+        // serving (§6.1). A reload is not an outage, so it must not clear the
+        // RestartWindow stamp or a published level, and must not look to a
+        // BindsTo dependent like its target going away.
+        matches!(
+            self,
+            Self::Active | Self::Reloading | Self::Completed | Self::Skipped
+        )
     }
 
     pub fn process_presence(self) -> ProcessPresence {

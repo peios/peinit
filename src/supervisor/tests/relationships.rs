@@ -91,6 +91,72 @@ fn conflict_start_stops_active_reverse_declared_conflict_before_winner_launches(
     assert_eq!(supervisor.pending_launch_jobs().len(), 1);
 }
 
+/// §6.1 and §7.1: Reloading satisfies dependents, so reloading a `BindsTo`
+/// target is not the target going away. Before PEI-1079 the move into
+/// Reloading read as losing satisfaction and queued a `BindsToPropagation`
+/// stop of every bound dependent, and the return to Active then "recovered"
+/// them.
+#[test]
+fn reloading_a_binds_to_target_leaves_its_dependent_alone() {
+    let mut app = alive_service("app");
+    app.binds_to.push("db".to_string());
+    let mut db = alive_service("db");
+    db.exec_reload = Some("/bin/reload".to_string());
+    let mut supervisor =
+        boot_and_launch(vec![app, db], [BOOT_NS, APP_LAUNCH_NS, APP_LAUNCH_NS + 1]);
+
+    let mut controller = TestProcessController::default();
+    let mut tokens = TestTokenProvider::default();
+    let mut launcher = TestProcessLauncher::new(vec![process(9200, 93)]);
+    let mut clock = ScriptedClock::new([
+        LIFECYCLE_COMMAND_NS,
+        CONTROL_NS,
+        CONTROL_NS + 1,
+        CONTROL_NS + 2,
+    ]);
+    supervisor
+        .reload_service("db", None, &mut clock)
+        .expect("reload db");
+    let execution = supervisor
+        .execute_next_pending_control_operation(&mut controller, &mut clock)
+        .expect("execute reload")
+        .expect("reload execution");
+    let crate::execution::control::ControlExecutionDetail::ReloadCommand { job_id, .. } =
+        execution.execution.detail
+    else {
+        panic!("expected a reload command");
+    };
+    supervisor
+        .launch_next_pending_control_job(&mut tokens, &mut launcher, &mut clock)
+        .expect("launch reload command")
+        .expect("reload command launch");
+    assert_eq!(
+        supervisor.service_status("db").expect("db").state,
+        ServiceState::Reloading,
+    );
+    assert!(
+        supervisor.pending_control_operations().is_empty(),
+        "no stop was queued for the bound dependent",
+    );
+    assert!(controller.signals.is_empty(), "and nothing was signalled");
+
+    supervisor
+        .complete_reload_command_job(job_id, STOPPED_NS, 0, &mut controller)
+        .expect("reload command succeeds");
+    assert_eq!(
+        supervisor.service_status("db").expect("db").state,
+        ServiceState::Active,
+    );
+    let app = supervisor.service_status("app").expect("app");
+    assert_eq!(app.state, ServiceState::Active);
+    assert_ne!(app.cause, Some(TransitionCause::BindsToPropagation));
+    assert!(supervisor.pending_control_operations().is_empty());
+    assert!(
+        supervisor.pending_launch_jobs().is_empty(),
+        "and nothing was started to recover it",
+    );
+}
+
 #[test]
 fn binds_to_stop_propagates_and_recovery_restarts_failed_dependent() {
     let mut app = alive_service("app");

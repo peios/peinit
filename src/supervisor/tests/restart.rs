@@ -173,6 +173,110 @@ fn start_during_backoff_waits_for_deadline_and_uses_same_operation() {
     );
 }
 
+/// §6.4 and PEI-1079: a reload that straddles the window boundary defers the
+/// reset to the return to Active rather than losing it. Reloading satisfies
+/// dependents (§6.1), so the move into it keeps the stamp the window is
+/// measured from; the reset is only scheduled for an Active service, so it
+/// waits out the reload and fires as soon as the service is back.
+#[test]
+fn a_reload_across_the_window_boundary_defers_the_reset_to_the_return_to_active() {
+    let mut app = alive_service("app");
+    app.restart_window_secs = 2;
+    app.exec_reload = Some("/bin/reload".to_string());
+    let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
+    let mut registry = StaticRegistry::services(vec![app]);
+    let mut clock = ScriptedClock::new([BOOT_NS, APP_LAUNCH_NS, RESTART_LAUNCH_NS]);
+    supervisor
+        .run_phase2_boot(&mut registry, &mut clock)
+        .expect("boot supervisor");
+
+    let mut tokens = TestTokenProvider::default();
+    let mut launcher = TestProcessLauncher::new(vec![
+        process(5000, 20),
+        process(5001, 21),
+        process(5002, 22),
+    ]);
+    supervisor
+        .launch_next_pending_job(&mut tokens, &mut launcher, &mut clock)
+        .expect("launch app")
+        .expect("app launch dispatch");
+    let first_job = supervisor
+        .service_status("app")
+        .expect("active app")
+        .current_job
+        .expect("first app job")
+        .id;
+    supervisor
+        .complete_job(first_job, APP_CRASH_NS, 1)
+        .expect("crash app");
+    let deadline = supervisor
+        .next_restart_backoff_deadline()
+        .expect("restart deadline");
+    supervisor
+        .process_due_restart_backoffs(deadline.due_at_ns)
+        .expect("due restart scan");
+    supervisor
+        .launch_next_pending_job(&mut tokens, &mut launcher, &mut clock)
+        .expect("launch restart")
+        .expect("restart launch dispatch");
+    let failures = |supervisor: &Supervisor| {
+        supervisor
+            .services()
+            .runtime("app")
+            .expect("runtime")
+            .consecutive_restart_failures
+    };
+    assert_eq!(failures(&supervisor), 1);
+
+    // Into Reloading a second before the boundary.
+    let reset_due_ns = RESTART_LAUNCH_NS + 2_000_000_000;
+    let reload_ns = RESTART_LAUNCH_NS + 1_000_000_000;
+    let mut controller = super::TestProcessController::default();
+    let mut clock = ScriptedClock::new([reload_ns, reload_ns + 1, reload_ns + 2, reload_ns + 3]);
+    supervisor
+        .reload_service("app", None, &mut clock)
+        .expect("reload app");
+    let execution = supervisor
+        .execute_next_pending_control_operation(&mut controller, &mut clock)
+        .expect("execute reload")
+        .expect("reload execution");
+    let crate::execution::control::ControlExecutionDetail::ReloadCommand { job_id, .. } =
+        execution.execution.detail
+    else {
+        panic!("expected a reload command");
+    };
+    supervisor
+        .launch_next_pending_control_job(&mut tokens, &mut launcher, &mut clock)
+        .expect("launch reload command")
+        .expect("reload command launch");
+    assert_eq!(
+        supervisor.service_status("app").expect("app").state,
+        ServiceState::Reloading,
+    );
+
+    // The boundary passes mid-reload: no reset is due for a service that is
+    // not Active, and none is lost either.
+    let mid = supervisor
+        .process_due_operation_maintenance(reset_due_ns)
+        .expect("maintenance mid-reload");
+    assert!(mid.restart_window_resets.is_empty());
+    assert_eq!(failures(&supervisor), 1);
+
+    // Back to Active: the overdue reset fires at once.
+    supervisor
+        .complete_reload_command_job(job_id, reset_due_ns + 1, 0, &mut controller)
+        .expect("reload command succeeds");
+    assert_eq!(
+        supervisor.service_status("app").expect("app").state,
+        ServiceState::Active,
+    );
+    let back = supervisor
+        .process_due_operation_maintenance(reset_due_ns + 2)
+        .expect("maintenance after the reload");
+    assert_eq!(back.restart_window_resets.len(), 1);
+    assert_eq!(failures(&supervisor), 0);
+}
+
 #[test]
 fn active_restart_window_resets_consecutive_failure_counter() {
     let mut app = alive_service("app");

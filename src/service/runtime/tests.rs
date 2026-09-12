@@ -6,13 +6,13 @@ use super::{
 #[test]
 fn states_report_dependent_satisfaction() {
     assert!(ServiceState::Active.satisfies_dependents());
+    assert!(ServiceState::Reloading.satisfies_dependents());
     assert!(ServiceState::Completed.satisfies_dependents());
     assert!(ServiceState::Skipped.satisfies_dependents());
 
     for state in [
         ServiceState::Inactive,
         ServiceState::Starting,
-        ServiceState::Reloading,
         ServiceState::Stopping,
         ServiceState::Backoff,
         ServiceState::Failed,
@@ -127,6 +127,44 @@ fn dependent_satisfaction_timestamp_is_cleared_when_state_no_longer_satisfies() 
         .expect("stop");
 
     assert_eq!(snapshot.dependent_satisfied_since_ns, None);
+}
+
+/// §6.1: Reloading satisfies dependents, so a reload is not an outage. The
+/// RestartWindow stamp and a published level survive it in both directions.
+/// PEI-1079: clearing the stamp here lost the budget reset for the rest of
+/// the activation.
+#[test]
+fn a_reload_keeps_the_satisfaction_stamp_and_the_published_level() {
+    let mut snapshot = ServiceRuntimeSnapshot::inactive("svc");
+    for (to, cause) in [
+        (ServiceState::Starting, TransitionCause::ExplicitStart),
+        (ServiceState::Active, TransitionCause::ExplicitStart),
+    ] {
+        snapshot
+            .transition(ServiceTransition { to, cause })
+            .expect("start");
+    }
+    snapshot.mark_dependent_satisfied_since(55);
+    snapshot.level = Some("ready".to_string());
+
+    for to in [ServiceState::Reloading, ServiceState::Active] {
+        snapshot
+            .transition(ServiceTransition {
+                to,
+                cause: TransitionCause::ExplicitReload,
+            })
+            .expect("reload leg");
+        assert_eq!(
+            snapshot.dependent_satisfied_since_ns,
+            Some(55),
+            "the stamp survives the move to {to:?}",
+        );
+        assert_eq!(
+            snapshot.level.as_deref(),
+            Some("ready"),
+            "and so does the level"
+        );
+    }
 }
 
 #[test]
