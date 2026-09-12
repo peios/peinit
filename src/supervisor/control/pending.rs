@@ -1,10 +1,11 @@
 use crate::boundary::{Clock, ProcessController};
 use crate::execution::control::{
-    ControlExecutionContext, ControlExecutionDetail, ControlOperationKind, ControlOperationRequest,
-    begin_control_operation,
+    ControlExecutionContext, ControlExecutionDetail, ControlExecutionError, ControlOperationKind,
+    ControlOperationRequest, begin_control_operation,
 };
+use crate::operation::internal_error_result;
 
-use super::super::dispatch::SupervisorControlDispatch;
+use super::super::dispatch::{SupervisorControlDispatch, SupervisorControlFailureDispatch};
 use super::super::health::apply_health_scheduling_after_transitions;
 use super::super::relationships::apply_relationship_reactions_after_transitions;
 use super::super::state::{Supervisor, SupervisorError};
@@ -23,6 +24,7 @@ impl Supervisor {
     {
         let observed_at_ns = clock.monotonic_ns().map_err(SupervisorError::Clock)?;
         let mut work = SupervisorWork::from_supervisor(self);
+        let mut failures = Vec::new();
 
         while let Some(pending) = work.pending_control_operations.pop_front() {
             if work
@@ -33,7 +35,7 @@ impl Supervisor {
                 continue;
             }
 
-            let execution = begin_control_operation(
+            let execution = match begin_control_operation(
                 &mut ControlExecutionContext {
                     services: &mut work.services,
                     operations: &mut work.operations,
@@ -46,8 +48,34 @@ impl Supervisor {
                     operation_id: pending.operation_id,
                     observed_at_ns,
                 },
-            )
-            .map_err(SupervisorError::Control)?;
+            ) {
+                Ok(execution) => execution,
+                Err(error) => {
+                    // Execution is transactional and touched nothing. The
+                    // operation was admitted against a service that turned out
+                    // to have nothing for it to act on, so it fails — and only
+                    // it. Propagating this ended the runtime loop and cost the
+                    // machine its control sockets (PEI-803).
+                    let operation_event = work
+                        .operations
+                        .fail_operation(
+                            pending.operation_id,
+                            observed_at_ns,
+                            internal_error_result(format!("{error:?}")),
+                        )
+                        .map_err(|error| {
+                            SupervisorError::Control(ControlExecutionError::OperationStore(error))
+                        })?;
+                    failures.push(SupervisorControlFailureDispatch {
+                        operation_id: pending.operation_id,
+                        service: pending.service,
+                        operation_type: pending.operation_type,
+                        operation_event,
+                        error,
+                    });
+                    continue;
+                }
+            };
             if let ControlExecutionDetail::ReloadCommand { job_id, .. } = &execution.detail {
                 work.pending_control_launches.push_back(*job_id);
             }
@@ -87,10 +115,12 @@ impl Supervisor {
                 self.settings().phase2.max_parallel_starts,
             )?;
             work.commit(self);
+            self.control_operation_failures.extend(failures);
             return Ok(Some(SupervisorControlDispatch { execution }));
         }
 
         work.commit(self);
+        self.control_operation_failures.extend(failures);
         Ok(None)
     }
 }

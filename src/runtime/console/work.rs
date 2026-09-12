@@ -10,6 +10,18 @@ pub(super) fn collect_runtime_work_pump_console_messages(
     turn: &RuntimeWorkPumpTurn,
     out: &mut Vec<ConsoleMessage>,
 ) {
+    for dispatch in &turn.control_operation_failures {
+        // The service kept its state, so no transition says anything went
+        // wrong. Without this line an operator whose command failed this way
+        // has a Failed operation to find and nothing on the console.
+        super::push_error(
+            out,
+            format!(
+                "peinit: service {}: {:?} operation {} failed before it began: {:?}\n",
+                dispatch.service, dispatch.operation_type, dispatch.operation_id, dispatch.error
+            ),
+        );
+    }
     for dispatch in &turn.service_launches {
         push_service_started(out, &dispatch.started.job_event);
         collect_start_dispatches_console_messages(&dispatch.start_dispatches, out);

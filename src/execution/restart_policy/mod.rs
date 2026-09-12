@@ -133,7 +133,7 @@ fn admit_restart_backoff_start(
     service: &str,
     observed_at_ns: u64,
 ) -> Result<OnDemandStartDispatch, RestartPolicyRelaunchError> {
-    if let Some(operation_id) = pending_deferred_start(operations, service) {
+    if let Some(operation_id) = pending_deferred_operation(operations, service) {
         ensure_due_restart_backoff(services, service, observed_at_ns)
             .map_err(RestartPolicyRelaunchError::Admission)?;
         let plan = plan_restart_policy_start(services, service).map_err(|error| {
@@ -153,12 +153,21 @@ fn admit_restart_backoff_start(
         .map_err(RestartPolicyRelaunchError::Admission)
 }
 
-fn pending_deferred_start(
+/// The administrator's operation waiting out this backoff, if there is one.
+///
+/// A `start` in Backoff is deferred, and a `restart` in Backoff replaces the
+/// automatic restart (§10.3). Either way the operation the deadline executes
+/// is the administrator's, so the identifier they hold is the one that runs;
+/// the type is kept — a Restart stays a Restart for observability.
+fn pending_deferred_operation(
     operations: &OperationStore,
     service: &str,
 ) -> Option<crate::ids::OperationId> {
     let operation = operations.current_for_service(service)?;
-    (operation.operation_type == OperationType::Start && operation.state == OperationState::Pending)
+    (matches!(
+        operation.operation_type,
+        OperationType::Start | OperationType::Restart
+    ) && operation.state == OperationState::Pending)
         .then_some(operation.id)
 }
 

@@ -76,8 +76,8 @@ pub use control_connection::{
 pub use critical_budget::SupervisorCriticalBudgetRebootDispatch;
 pub use dispatch::{
     SupervisedSubmittedTerminalDispatch, SupervisorBootDispatch, SupervisorBootSuccessDispatch,
-    SupervisorControlDispatch, SupervisorControlLaunchDispatch, SupervisorControlLaunchResult,
-    SupervisorFdStoreRejectionDispatch, SupervisorFilesystemCheckCompletionDispatch,
+    SupervisorControlDispatch, SupervisorControlFailureDispatch, SupervisorControlLaunchDispatch,
+    SupervisorControlLaunchResult, SupervisorFdStoreRejectionDispatch, SupervisorFilesystemCheckCompletionDispatch,
     SupervisorFilesystemCheckLaunchDispatch, SupervisorFilesystemCheckTimeoutDispatch,
     SupervisorHealthCheckIntervalAction, SupervisorHealthCheckIntervalDispatch,
     SupervisorHealthCheckLaunchCancelledDispatch, SupervisorHealthCheckLaunchDispatch,

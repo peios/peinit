@@ -46,6 +46,7 @@ pub(in crate::supervisor::lifecycle) fn finish_lifecycle_outcome(
             let pending_control_operation = queue_control_boundary(
                 &mut work.pending_control_operations,
                 &work.operations,
+                &work.services,
                 operation,
             );
             work.commit(supervisor);

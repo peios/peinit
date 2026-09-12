@@ -206,11 +206,15 @@ fn restart_on_a_service_with_no_running_process_plans_a_start() {
     }
 }
 
-/// Backoff is deliberately *not* rerouted: the matrix gives it `Restart`, and a
-/// service in Backoff has a restart pending, so the stop phase has something to
-/// do. Without this the fix would quietly change a fifth state too.
+/// Backoff is deliberately *not* rerouted either, but not onto the running
+/// restart path: a service in Backoff has no process, so the restart is
+/// admitted as a deferred operation that the backoff deadline executes in
+/// place of the automatic restart (§10.3, PEI-803). It is not planned as an
+/// immediate start, and it is not sent to the control boundary.
 #[test]
-fn restart_in_backoff_still_takes_the_restart_path() {
+fn restart_in_backoff_is_admitted_as_a_deferred_restart() {
+    use crate::operation::conflict::OperationConflictDecision;
+    use crate::operation::{OperationSource, OperationState, OperationType};
     use crate::service::runtime::ServiceState;
 
     let mut services = service_table();
@@ -233,8 +237,18 @@ fn restart_in_backoff_still_takes_the_restart_path() {
     )
     .expect("restart from Backoff admitted");
 
-    assert!(
-        matches!(outcome, LifecycleCommandOutcome::OperationAccepted(_)),
-        "Backoff must keep the restart path, got {outcome:?}"
+    let LifecycleCommandOutcome::OperationAccepted(accepted) = outcome else {
+        panic!("Backoff must defer the restart, got {outcome:?}");
+    };
+    assert_eq!(accepted.decision, OperationConflictDecision::CreateNew);
+    assert_eq!(accepted.returned_operation_id, requested_id);
+    let record = operations.get(requested_id).expect("deferred restart");
+    assert_eq!(record.state, OperationState::Pending);
+    assert_eq!(record.operation_type, OperationType::Restart);
+    assert_eq!(record.source, OperationSource::Admin);
+    assert_eq!(
+        services.runtime("svc").expect("svc").state,
+        ServiceState::Backoff,
+        "nothing about the service changed at admission"
     );
 }

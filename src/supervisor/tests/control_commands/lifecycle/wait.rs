@@ -309,3 +309,224 @@ fn stale_pending_wait_flushes_unknown_operation_and_clears_wait() {
             .contains(&operation_id.to_canonical_string())
     );
 }
+
+fn turn_context<'a>(
+    access: &'a mut TestAccessChecker,
+    controller: &'a mut TestProcessController,
+    clock: &'a mut ScriptedClock,
+    observed_at_ns: u64,
+) -> SupervisorControlConnectionTurnContext<
+    'a,
+    'a,
+    ScriptedClock,
+    TestProcessController,
+    TestAccessChecker,
+> {
+    SupervisorControlConnectionTurnContext {
+        control_security: &DEFAULT_CONTROL_SECURITY,
+        access_checker: access,
+        controller,
+        clock,
+        registry: None,
+        max_read_bytes: 1024,
+        max_request_bytes: crate::control::socket::DEFAULT_MAX_REQUEST_SIZE_BYTES,
+        observed_at_ns,
+    }
+}
+
+/// An Active `app` launched at boot, with a control connection holding a
+/// `stop app` wait against it and the stop's SIGTERM already sent.
+fn active_app_with_a_waiting_stop(
+    clock: &mut ScriptedClock,
+    access: &mut TestAccessChecker,
+    controller: &mut TestProcessController,
+    withdraw_definition: bool,
+) -> (
+    crate::supervisor::Supervisor,
+    ControlConnectionTable<ControlConnectionRecord<FakeConnectionIo>>,
+    crate::ids::JobId,
+) {
+    let mut supervisor = booted_supervisor(vec![crate::supervisor::tests::alive_service("app")]);
+    let mut tokens = TestTokenProvider::default();
+    let mut launcher = TestProcessLauncher::new(vec![process(9000, 90)]);
+    supervisor
+        .launch_next_pending_job(&mut tokens, &mut launcher, clock)
+        .expect("launch app")
+        .expect("app launch dispatch");
+    let job = supervisor
+        .service_status("app")
+        .expect("active app")
+        .current_job
+        .expect("app job")
+        .id;
+    if withdraw_definition {
+        supervisor
+            .services
+            .apply_definition_snapshot(Vec::new())
+            .expect("withdraw the definition");
+        assert!(
+            supervisor
+                .service_status("app")
+                .expect("still supervised")
+                .definition_removed
+        );
+    }
+
+    let mut connections = ControlConnectionTable::new(4);
+    connections
+        .admit(
+            44,
+            ControlConnectionRecord::new(
+                FakeConnectionIo::scripted_reads([ControlSocketRead::Bytes(
+                    b"{\"command\":\"stop\",\"service\":\"app\"}\n".to_vec(),
+                )]),
+                control_peer(),
+            ),
+        )
+        .expect("admit connection");
+    let turn = supervisor
+        .process_control_connection_table_turn(
+            &mut connections,
+            44,
+            turn_context(access, controller, clock, 123),
+        )
+        .expect("connection turn");
+    assert!(matches!(
+        turn.turn.frame.expect("frame").frame,
+        SupervisorControlFrameTurn::CommandAccepted {
+            response_line: None,
+            wait: Some(_),
+            ..
+        }
+    ));
+    (supervisor, connections, job)
+}
+
+fn drain(
+    supervisor: &mut crate::supervisor::Supervisor,
+    clock: &mut ScriptedClock,
+    controller: &mut TestProcessController,
+) {
+    let mut tokens = TestTokenProvider::default();
+    let mut launcher = TestProcessLauncher::new(Vec::new());
+    let mut filesystem_check_launcher =
+        crate::supervisor::tests::TestFilesystemCheckLauncher::default();
+    drain_runtime_work_queues(
+        supervisor,
+        &mut RuntimeWorkPumpContext {
+            clock,
+            controller,
+            token_provider: &mut tokens,
+            process_launcher: &mut launcher,
+            filesystem_check_launcher: &mut filesystem_check_launcher,
+            config: RuntimeWorkPumpConfig::default(),
+        },
+    )
+    .expect("drain work");
+}
+
+/// PEI-803. `stop` is the one lifecycle command a definition-removed service
+/// accepts (§3.8), and the stopped instance's exit discards the entry. The
+/// wait's answer then looked the service up, found nothing, and the query
+/// error failed the runtime loop: the client saw its connection dropped
+/// mid-answer and PID 1 unlinked both sockets.
+#[test]
+fn stop_wait_on_a_definition_removed_service_is_answered_after_the_discard() {
+    let mut access = TestAccessChecker::allow_all();
+    let mut controller = TestProcessController::default();
+    let mut clock = ScriptedClock::new([
+        LIFECYCLE_COMMAND_NS,
+        LIFECYCLE_COMMAND_NS + 1,
+        LIFECYCLE_COMMAND_NS + 2,
+        LIFECYCLE_COMMAND_NS + 3,
+        LIFECYCLE_COMMAND_NS + 4,
+    ]);
+    let (mut supervisor, mut connections, job) =
+        active_app_with_a_waiting_stop(&mut clock, &mut access, &mut controller, true);
+    drain(&mut supervisor, &mut clock, &mut controller);
+    assert_eq!(controller.signals.len(), 1, "the stop was executed");
+    let wait = connections
+        .get(44)
+        .expect("connection")
+        .state()
+        .pending_wait()
+        .and_then(|wait| wait.operation().cloned())
+        .expect("operation wait");
+
+    supervisor
+        .complete_job(job, LIFECYCLE_COMMAND_NS + 10, 0)
+        .expect("the stopped instance exits");
+    assert!(
+        supervisor.service_status("app").is_err(),
+        "the entry took the ordinary removal discard"
+    );
+
+    let flush = supervisor
+        .flush_terminal_control_waits(&mut connections, LIFECYCLE_COMMAND_NS + 11, 0)
+        .expect("a discarded entry does not fail the flush");
+
+    assert_eq!(flush.completed.len(), 1);
+    let record = connections.get(44).expect("connection");
+    assert!(record.state().pending_wait().is_none());
+    let writes = record.io().writes.borrow();
+    assert_eq!(writes.len(), 1);
+    let json = response_json(&writes[0]);
+    assert_eq!(json["status"], "ok");
+    assert_eq!(json["service"], "app");
+    assert_eq!(json["state"], "inactive");
+    assert_eq!(json["cause"], "explicit_stop");
+    assert_eq!(
+        json["operation_id"],
+        wait.operation_id.to_canonical_string()
+    );
+}
+
+/// PEI-803. A waited operation that failed because peinit could not execute
+/// it is answered with INTERNAL_ERROR, not an "ok" carrying an unchanged
+/// state: the service did nothing wrong, and the client should not be told
+/// its command succeeded.
+#[test]
+fn wait_on_an_operation_that_failed_before_it_began_is_answered_internal_error() {
+    let mut access = TestAccessChecker::allow_all();
+    let mut controller = TestProcessController::default();
+    let mut clock = ScriptedClock::new([
+        LIFECYCLE_COMMAND_NS,
+        LIFECYCLE_COMMAND_NS + 1,
+        LIFECYCLE_COMMAND_NS + 2,
+        LIFECYCLE_COMMAND_NS + 3,
+        LIFECYCLE_COMMAND_NS + 4,
+    ]);
+    let (mut supervisor, mut connections, job) =
+        active_app_with_a_waiting_stop(&mut clock, &mut access, &mut controller, false);
+    // The job finishes under the pending stop, bypassing the supervisor, so
+    // the boundary finds no current main job to act on.
+    supervisor
+        .jobs_mut()
+        .complete_job(job, LIFECYCLE_COMMAND_NS + 1, 0)
+        .expect("finish the job under the pending stop");
+    drain(&mut supervisor, &mut clock, &mut controller);
+    assert!(controller.signals.is_empty(), "nothing was signalled");
+
+    let flush = supervisor
+        .flush_terminal_control_waits(&mut connections, LIFECYCLE_COMMAND_NS + 11, 0)
+        .expect("flush waits");
+
+    assert_eq!(flush.completed.len(), 1);
+    let record = connections.get(44).expect("connection");
+    let writes = record.io().writes.borrow();
+    assert_eq!(writes.len(), 1);
+    let json = response_json(&writes[0]);
+    assert_eq!(json["status"], "error");
+    assert_eq!(json["code"], "INTERNAL_ERROR");
+    assert!(
+        json["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("MissingCurrentMainJob")),
+        "{json}"
+    );
+    assert_eq!(
+        supervisor.service_status("app").expect("app").state,
+        crate::service::runtime::ServiceState::Active,
+        "the service kept its state"
+    );
+}

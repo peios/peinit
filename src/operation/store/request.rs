@@ -70,6 +70,37 @@ impl OperationStore {
         }
     }
 
+    /// Merge `request` into `existing_id` regardless of what the conflict
+    /// table would have decided.
+    ///
+    /// For the one pair the table gets wrong for a service with no process:
+    /// a second restart while a deferred restart waits out a backoff. The
+    /// table queues Restart behind Restart, which is the right answer while
+    /// one is running and leaves an orphaned Pending record when it is not.
+    pub fn merge_request_into(
+        &mut self,
+        request: OperationRequest,
+        existing_id: OperationId,
+    ) -> Result<OperationRequestOutcome, OperationStoreError> {
+        self.ensure_unused_id(request.id)?;
+        let existing = self
+            .records
+            .get(&existing_id)
+            .ok_or(OperationStoreError::UnknownOperation { id: existing_id })?;
+        if existing.state.is_terminal() {
+            return Err(OperationStoreError::InvalidEventRecord {
+                id: existing_id,
+                state: existing.state,
+                reason: "a request can only merge into an operation that is still live",
+            });
+        }
+        self.merge_request(
+            request,
+            OperationConflictDecision::MergeIntoExisting { existing_id },
+            existing_id,
+        )
+    }
+
     fn resolve_request(
         &self,
         request: &OperationRequest,

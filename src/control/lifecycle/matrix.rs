@@ -20,6 +20,12 @@ pub(super) enum CommandAdmission {
 pub(super) enum OperationExpectation {
     Any,
     DeferredStart,
+    /// A restart of a service in Backoff: the administrator's Restart replaces
+    /// the automatic restart as the operation the backoff deadline executes.
+    /// It honours the remaining delay like a deferred start does, cancels a
+    /// deferred start already pending, and merges into a deferred restart
+    /// already pending (PEI-803).
+    DeferredRestart,
     Merge,
     Queue,
 }
@@ -99,10 +105,16 @@ fn classify_restart(state: ServiceState) -> CommandAdmission {
         | ServiceState::Active
         | ServiceState::Reloading
         | ServiceState::Completed
-        | ServiceState::Backoff
         | ServiceState::Failed
         | ServiceState::Skipped => CommandAdmission::Operation {
             expectation: OperationExpectation::Any,
+        },
+        // A service in Backoff has no process to stop and no `Backoff ->
+        // Stopping` edge to travel. Admitting this as an ordinary restart sent
+        // a Pending Restart to the control boundary, which looked for a main
+        // job that does not exist and took PID 1 to recovery (PEI-803).
+        ServiceState::Backoff => CommandAdmission::Operation {
+            expectation: OperationExpectation::DeferredRestart,
         },
         ServiceState::Starting | ServiceState::Stopping => CommandAdmission::Operation {
             expectation: OperationExpectation::Queue,

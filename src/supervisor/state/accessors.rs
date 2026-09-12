@@ -103,6 +103,14 @@ impl Supervisor {
         std::mem::take(&mut self.stale_launch_entries)
     }
 
+    /// Control operations that failed before they began since the last call.
+    /// Reset on read; the work pump reports them for the turn.
+    pub fn take_control_operation_failures(
+        &mut self,
+    ) -> Vec<super::super::SupervisorControlFailureDispatch> {
+        std::mem::take(&mut self.control_operation_failures)
+    }
+
     /// Mutate the job store directly, to stage bookkeeping faults a correct
     /// caller would not create.
     #[cfg(test)]
