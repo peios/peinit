@@ -82,8 +82,9 @@ pub(crate) fn requires_authority(definition: &ServiceDefinition) -> bool {
 ///
 /// Applied to a whole set rather than one definition at a time, because
 /// resolving a role needs to know who fills it. Idempotent: a definition that
-/// already carries the edge — declared by hand, or synthesised by an earlier
-/// pass over the same set — gains nothing.
+/// already carries a hard edge to the provider — declared by hand as
+/// `Requires` or `BindsTo`, or synthesised by an earlier pass over the same
+/// set — gains nothing.
 ///
 /// A provider never gains a dependency on its own role. Without that, an
 /// authority declaring a non-SYSTEM identity would require itself, and a
@@ -107,9 +108,13 @@ pub fn synthesise_role_dependencies(
         if !requires_authority(definition) || definition.provides.iter().any(|r| r == AUTHN_ROLE) {
             continue;
         }
+        // Every hard edge already orders against the provider. `BindsTo`
+        // requires its target as well as binding to it, so a derived
+        // `Requires` beside it would be a second edge saying less.
         let declared: BTreeSet<String> = definition
             .requires
             .iter()
+            .chain(&definition.binds_to)
             .map(|entry| super::split_target(entry).0)
             .collect();
         let additions: Vec<String> = providers
@@ -324,6 +329,28 @@ mod tests {
             requires_of(&synthesised, "resolvd"),
             vec!["authd:ready".to_string()]
         );
+    }
+
+    /// PEI-1081. `BindsTo` requires its target as well as binding to it, so a
+    /// declared one already orders against the authority. A derived
+    /// `Requires` beside it would be a second hard edge to the same service.
+    #[test]
+    fn a_declared_binds_to_edge_is_not_duplicated() {
+        let mut resolvd = local_service("resolvd");
+        resolvd.binds_to = vec!["authd".to_string()];
+
+        let synthesised = synthesise_role_dependencies(vec![authority(), resolvd]);
+
+        let resolvd = synthesised
+            .iter()
+            .find(|definition| definition.name == "resolvd")
+            .expect("service");
+        assert!(
+            resolvd.requires.is_empty(),
+            "no Requires is derived beside the declared BindsTo: {:?}",
+            resolvd.requires,
+        );
+        assert_eq!(resolvd.binds_to, vec!["authd".to_string()]);
     }
 
     /// Reload runs this over a set that already went through it once.
