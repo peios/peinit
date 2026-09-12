@@ -55,8 +55,13 @@ pub(super) const DEFAULT_MOUNTINFO_PATH: &str = "/proc/self/mountinfo";
 /// created object, and carried onward down each container, so a service owns
 /// what it makes without anything else gaining a right to it.
 ///
-/// Written as the literal SID because neither SDDL vocabulary has a `CO`
-/// alias — the same reason `S-1-5-6` is spelled out on the boot path.
+/// Written as the literal SID. This no longer has to be: libpeios and
+/// libp-go both resolve `CO` since PEI-562, so `(A;OICIIO;GA;;;CO)` would
+/// parse on either side once the pinned libpeios rev above catches up.
+/// The literal stays for now because this string is hand-copied into the
+/// live root's mount hook and peios-install's `ROOT_SDDL`, and the three
+/// have to match character for character — switching them is one change,
+/// not three.
 ///
 /// This MUST stay in step with the descriptor the live root's mount hook
 /// stamps (`pkgs/live-boot/src/mount-root.sh`) and with peios-install's
