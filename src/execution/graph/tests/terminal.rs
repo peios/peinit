@@ -233,6 +233,87 @@ fn a_terminal_operation_settles_the_holds_on_its_service_in_other_contexts() {
     assert_eq!(ready[0].service, "ui", "the soft dependent proceeds");
 }
 
+/// The lifetime exemption is drawn edge by edge (PEI-830): a start held on
+/// a target in Backoff, or on a member held only on such a target, has no
+/// clock; a start held on a target that is itself starting keeps its
+/// lifetime, because that wait is bounded by the target's own timeout.
+#[test]
+fn a_start_is_held_without_a_clock_only_when_every_wait_is_undecided() {
+    let ids = operation_ids(5);
+    let jobs = job_ids(5);
+    let backoff = service("backoff");
+    let mut middle = service("middle");
+    middle.requires.push("backoff".to_string());
+    let mut chained = service("chained");
+    chained.requires.push("middle".to_string());
+    let slow = service("slow");
+    let mut mixed = service("mixed");
+    mixed.requires.push("backoff".to_string());
+    mixed.requires.push("slow".to_string());
+    let plan = boot_plan(vec![
+        prepared_start("backoff", ids[0], jobs[0], StartCause::ExplicitStart),
+        prepared_start("middle", ids[1], jobs[1], StartCause::DependencyStart),
+        prepared_start("chained", ids[2], jobs[2], StartCause::DependencyStart),
+        prepared_start("slow", ids[3], jobs[3], StartCause::ExplicitStart),
+        prepared_start("mixed", ids[4], jobs[4], StartCause::DependencyStart),
+    ]);
+    let mut store = GraphExecutionStore::new();
+    let context_id = store
+        .create_boot_context(&plan, &[backoff, middle, chained, slow, mixed])
+        .expect("boot context");
+    // Every precheck passes; the two roots are released to start.
+    loop {
+        let ready = store
+            .release_ready(context_id, 10, &no_levels)
+            .expect("release");
+        let checks = ready
+            .iter()
+            .filter(|ready| ready.action == ReadyGraphOperationAction::PreStartCheck)
+            .map(|ready| ready.operation_id)
+            .collect::<Vec<_>>();
+        if checks.is_empty() {
+            assert_eq!(
+                ready
+                    .iter()
+                    .map(|ready| ready.service.as_str())
+                    .collect::<Vec<_>>(),
+                vec!["backoff", "slow"]
+            );
+            break;
+        }
+        for id in checks {
+            store
+                .apply_pre_start_check_passed(id)
+                .expect("precheck passed");
+        }
+    }
+    store
+        .apply_operation_awaiting_restart(ids[0])
+        .expect("backoff held for restart");
+    let context = store.context(context_id).expect("context");
+
+    assert!(
+        context.waits_without_clock("middle"),
+        "held on a target in Backoff: no clock"
+    );
+    assert!(
+        context.waits_without_clock("chained"),
+        "held on a member itself held without a clock: no clock"
+    );
+    assert!(
+        !context.waits_without_clock("mixed"),
+        "one edge to a starting target is a clock, whatever the other edge waits on"
+    );
+    assert!(
+        !context.waits_without_clock("backoff") && !context.waits_without_clock("slow"),
+        "a released member is not held at all"
+    );
+    assert!(store.is_operation_held(ids[1]));
+    assert!(store.is_operation_held(ids[2]));
+    assert!(!store.is_operation_held(ids[4]));
+    assert!(!store.is_operation_held(ids[3]));
+}
+
 #[test]
 fn unassociated_terminal_operation_does_not_emit_graph_events() {
     let id = operation_ids(1)[0];
