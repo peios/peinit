@@ -76,21 +76,29 @@ fn finalize_shutdown_unmounts_deepest_first_remounts_failures_syncs_and_reboots(
     );
 }
 
+// PEI-1088. TRM §12.4: a failed final action is retried no more than once a
+// second. The second runs from the attempt — the finalizer's clock after
+// reboot(2) returned — not from the start of the finalising turn, which is
+// the seed write and the unmounts earlier.
 #[test]
 fn failed_final_action_enters_retry_state_and_retries_only_sync_and_reboot_when_due() {
     let mut supervisor = ready_supervisor(ShutdownKind::Poweroff);
+    // The turn began at +100; the attempt returned 20 ms later.
+    let attempt_returned_at_ns = SHUTDOWN_NS + 20_000_100;
     let mut finalizer = TestShutdownFinalizer::new(["/", "/run"])
-        .with_reboot_results([Err("first reboot failed"), Ok(())]);
+        .with_reboot_results([Err("first reboot failed"), Ok(())])
+        .with_clock_after_attempt(attempt_returned_at_ns);
 
     let failed = supervisor
         .finalize_shutdown(&mut finalizer, SHUTDOWN_NS + 100)
         .expect("first finalization attempt");
 
+    let next_retry_at_ns = attempt_returned_at_ns + 1_000_000_000;
     assert_eq!(
         failed.finalization,
         ShutdownFinalizationState::Failed {
             message: "Shutdown(\"first reboot failed\")".to_string(),
-            next_retry_at_ns: SHUTDOWN_NS + 1_000_000_100,
+            next_retry_at_ns,
         },
     );
     assert_eq!(
@@ -98,17 +106,22 @@ fn failed_final_action_enters_retry_state_and_retries_only_sync_and_reboot_when_
         CleanupActionResult::Failed("Shutdown(\"first reboot failed\")".to_string()),
     );
 
-    let retry_not_due = supervisor
-        .finalize_shutdown(&mut finalizer, SHUTDOWN_NS + 1_000_000_099)
-        .expect_err("retry not due");
-    assert!(matches!(
-        retry_not_due,
-        SupervisorError::Shutdown(crate::shutdown::ShutdownError::FinalActionRetryNotDue { .. })
-    ));
+    // A second after the turn began is not yet a second after the attempt.
+    for not_due_ns in [SHUTDOWN_NS + 1_000_000_100, next_retry_at_ns - 1] {
+        let retry_not_due = supervisor
+            .finalize_shutdown(&mut finalizer, not_due_ns)
+            .expect_err("retry not due");
+        assert!(matches!(
+            retry_not_due,
+            SupervisorError::Shutdown(
+                crate::shutdown::ShutdownError::FinalActionRetryNotDue { .. }
+            )
+        ));
+    }
     let calls_before_retry = finalizer.calls.len();
 
     let retry = supervisor
-        .finalize_shutdown(&mut finalizer, SHUTDOWN_NS + 1_000_000_100)
+        .finalize_shutdown(&mut finalizer, next_retry_at_ns)
         .expect("retry final action");
 
     assert_eq!(retry.finalization, ShutdownFinalizationState::Completed);
@@ -172,6 +185,9 @@ struct TestShutdownFinalizer {
     failed_unmounts: BTreeSet<String>,
     fail_random_seed_save: bool,
     reboot_results: VecDeque<Result<(), &'static str>>,
+    /// What the finalizer's clock reads after an attempt; `None` is a
+    /// finalizer without a clock.
+    clock_after_attempt_ns: Option<u64>,
     calls: Vec<FinalizerCall>,
 }
 
@@ -182,8 +198,14 @@ impl TestShutdownFinalizer {
             failed_unmounts: BTreeSet::new(),
             fail_random_seed_save: false,
             reboot_results: VecDeque::from([Ok(())]),
+            clock_after_attempt_ns: None,
             calls: Vec::new(),
         }
+    }
+
+    fn with_clock_after_attempt(mut self, now_ns: u64) -> Self {
+        self.clock_after_attempt_ns = Some(now_ns);
+        self
     }
 
     fn fail_unmount(mut self, mount_point: &str) -> Self {
@@ -251,5 +273,13 @@ impl ShutdownFinalizer for TestShutdownFinalizer {
             Ok(()) => Ok(()),
             Err(message) => Err(BoundaryError::Shutdown(message.to_string())),
         }
+    }
+
+    fn monotonic_now_ns(&mut self) -> Option<u64> {
+        assert!(
+            matches!(self.calls.last(), Some(FinalizerCall::Reboot(_))),
+            "the clock is read after the attempt, not before it",
+        );
+        self.clock_after_attempt_ns
     }
 }

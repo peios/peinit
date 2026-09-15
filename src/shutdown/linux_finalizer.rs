@@ -12,7 +12,9 @@ use peios::file::{FileAccess, OpenOptions};
 
 #[cfg(feature = "peios-boundary")]
 use crate::boundary::read_fd_to_string;
-use crate::boundary::{BoundaryError, ShutdownFinalizer, save_linux_random_seed};
+use crate::boundary::{
+    BoundaryError, Clock, LinuxMonotonicClock, ShutdownFinalizer, save_linux_random_seed,
+};
 
 use super::ShutdownKind;
 use super::mountinfo::{mountinfo_contains_mount_point, parse_mountinfo_mount_points};
@@ -135,6 +137,10 @@ impl ShutdownFinalizer for LinuxShutdownFinalizer {
                 io::Error::last_os_error(),
             ))
         }
+    }
+
+    fn monotonic_now_ns(&mut self) -> Option<u64> {
+        LinuxMonotonicClock::new().monotonic_ns().ok()
     }
 }
 
