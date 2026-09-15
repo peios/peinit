@@ -161,7 +161,7 @@ fn push_critical_budget_reboot(
     out: &mut Vec<ConsoleMessage>,
 ) {
     if let Some(reboot) = dispatch {
-        crate::runtime::console::push_critical_budget_reboot_message(out, &reboot.service);
+        crate::runtime::console::push_critical_budget_reboot_messages(out, reboot);
     }
 }
 

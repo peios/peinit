@@ -47,13 +47,14 @@ pub(crate) use turn::{
     NoRuntimeRegistryClient, process_registry_watch_event, process_runtime_control_connection_event,
 };
 pub use turn::{
-    RuntimeCalendarTimerTurn, RuntimeEventRegistrar, RuntimeEventRegistrationError,
-    RuntimeFilesystemCheckHelperTurn, RuntimeLifecycleDeadlineTimer, RuntimeNotifyDatagram,
-    RuntimeNotifyRead, RuntimeNotifyRejection, RuntimeNotifySource, RuntimeNotifySupervisorTurn,
-    RuntimePid1SignalSource, RuntimePowerButtonSource, RuntimePowerButtonTurn,
-    RuntimeProcessSetupTurn, RuntimeRegistryWatchTurn, RuntimeShutdownDeadlineTimer,
-    RuntimeShutdownEventContext, RuntimeShutdownEventSources, RuntimeShutdownEventTurn,
-    RuntimeShutdownEventTurnError, process_runtime_shutdown_event,
+    RuntimeCalendarTimerTurn, RuntimeCriticalBudgetRebootTurn, RuntimeEventRegistrar,
+    RuntimeEventRegistrationError, RuntimeFilesystemCheckHelperTurn, RuntimeLifecycleDeadlineTimer,
+    RuntimeNotifyDatagram, RuntimeNotifyRead, RuntimeNotifyRejection, RuntimeNotifySource,
+    RuntimeNotifySupervisorTurn, RuntimePid1SignalSource, RuntimePowerButtonSource,
+    RuntimePowerButtonTurn, RuntimeProcessSetupTurn, RuntimeRegistryWatchTurn,
+    RuntimeShutdownDeadlineTimer, RuntimeShutdownEventContext, RuntimeShutdownEventSources,
+    RuntimeShutdownEventTurn, RuntimeShutdownEventTurnError, process_due_critical_budget_reboot,
+    process_runtime_shutdown_event,
 };
 pub use work_pump::{
     RuntimeWorkPumpConfig, RuntimeWorkPumpContext, RuntimeWorkPumpError, RuntimeWorkPumpTurn,

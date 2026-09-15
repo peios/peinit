@@ -34,9 +34,17 @@ where
         }
         let next_wave = shutdown.current_wave.saturating_add(1);
         if next_wave >= shutdown.plan.stop_waves.len() {
+            // Only a shutdown still waiting for its services becomes ready.
+            // A forced reboot installs an empty plan already in the Failed
+            // finalisation state, and the reaps of the services it SIGKILLed
+            // arrive here afterwards; overwriting Failed with Ready made the
+            // next drive run the full graceful finalisation — seed write,
+            // unmounts, remounts — instead of retrying sync and reboot, the
+            // action that failed (PEI-1087).
             if shutdown.stop_deadlines.is_empty()
                 && shutdown.post_kill_deadlines.is_empty()
                 && !live_submitted_jobs_remain(work)
+                && shutdown.finalization == ShutdownFinalizationState::WaitingForServices
             {
                 shutdown.finalization = ShutdownFinalizationState::Ready;
             }

@@ -5,12 +5,11 @@ use crate::control::connection::{
 #[cfg(feature = "peios-registry")]
 use crate::runtime::RuntimeRegistryWatchTurn;
 use crate::runtime::{
-    RuntimeCalendarTimerTurn, RuntimeShutdownEventTurn, RuntimeShutdownLoopError,
-    RuntimeShutdownLoopTurn, RuntimeWorkPumpTurn, collect_runtime_loop_kmes_events,
+    RuntimeCalendarTimerTurn, RuntimeCriticalBudgetRebootTurn, RuntimeShutdownEventTurn,
+    RuntimeShutdownLoopError, RuntimeShutdownLoopTurn, RuntimeWorkPumpTurn,
+    collect_runtime_loop_kmes_events, process_due_critical_budget_reboot,
 };
-use crate::supervisor::{
-    Supervisor, SupervisorCriticalBudgetRebootDispatch, SupervisorOperationMaintenanceTurn,
-};
+use crate::supervisor::{Supervisor, SupervisorOperationMaintenanceTurn};
 #[cfg(feature = "peios-registry")]
 use crate::supervisor::{SupervisorControlCommandDispatch, SupervisorControlFrameTurn};
 
@@ -58,13 +57,16 @@ pub(in crate::runtime::linux::turn) fn process_due_operation_maintenance_at(
 /// raise the reboot inline have already set the shutdown state by then, so
 /// this is a no-op for them; it is here for the paths that do not, which is
 /// every way a service can exhaust its budget without ever running.
+///
+/// The deadline timer is re-synced afterwards, as on every other path that
+/// finalises: a `reboot(2)` that returned leaves a retry to arm (PEI-1087).
 pub(in crate::runtime::linux::turn) fn process_due_critical_budget_reboot_at(
     supervisor: &mut Supervisor,
     finalizer: &mut dyn crate::boundary::ShutdownFinalizer,
+    deadline_timer: &mut dyn crate::boundary::ShutdownDeadlineTimer,
     now_ns: u64,
-) -> Result<Option<SupervisorCriticalBudgetRebootDispatch>, RuntimeShutdownLoopError> {
-    supervisor
-        .process_due_critical_budget_reboot(finalizer, now_ns)
+) -> Result<Option<RuntimeCriticalBudgetRebootTurn>, RuntimeShutdownLoopError> {
+    process_due_critical_budget_reboot(supervisor, finalizer, deadline_timer, now_ns)
         .map_err(RuntimeShutdownLoopError::OperationMaintenance)
 }
 
