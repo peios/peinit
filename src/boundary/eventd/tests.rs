@@ -113,7 +113,135 @@ fn a_full_receive_buffer_is_a_drop_and_anything_else_is_a_failure() {
     ] {
         assert!(
             !super::is_receiver_full(&Error::from_raw_os_error(errno)),
-            "errno {errno} is a transport failure, not a drop",
+            "errno {errno} is not a full receiver",
         );
     }
+}
+
+// PEI-807. EMSGSIZE is neither a full receiver nor a broken connection: the
+// datagram is too big for the socket, and sending the same one again can
+// only fail the same way. Classed as a transport failure, the batch was kept
+// and replayed identically every turn for the rest of the boot.
+#[test]
+fn a_datagram_too_large_for_the_socket_is_oversized_and_nothing_else_is() {
+    use std::io::Error;
+
+    assert!(super::is_oversized(&Error::from_raw_os_error(
+        libc::EMSGSIZE
+    )));
+    for errno in [
+        libc::EAGAIN,
+        libc::ENOBUFS,
+        libc::ECONNREFUSED,
+        libc::ENOENT,
+        libc::EPIPE,
+        libc::EACCES,
+    ] {
+        assert!(
+            !super::is_oversized(&Error::from_raw_os_error(errno)),
+            "errno {errno} is not an oversized datagram",
+        );
+    }
+}
+
+/// `SO_SNDBUF` as the kernel reports it on the sink's connected socket.
+fn reported_send_buffer(sink: &LinuxEventdLogSink) -> usize {
+    let fd = sink
+        .connected
+        .as_ref()
+        .expect("connected sender")
+        .socket
+        .as_raw_fd();
+    let mut value: libc::c_int = 0;
+    let mut len = std::mem::size_of::<libc::c_int>() as libc::socklen_t;
+    let rc = unsafe {
+        libc::getsockopt(
+            fd,
+            libc::SOL_SOCKET,
+            libc::SO_SNDBUF,
+            (&mut value as *mut libc::c_int).cast(),
+            &mut len,
+        )
+    };
+    assert_eq!(rc, 0, "getsockopt SO_SNDBUF");
+    usize::try_from(value).expect("non-negative SO_SNDBUF")
+}
+
+// PEI-807. The batches are built to the 262144-byte portable ceiling, and a
+// Unix datagram socket's default send buffer does not carry that: a full
+// batch failed with EMSGSIZE. The sink asks for the ceiling when it connects
+// and reports back what the socket will actually carry, so the caller can
+// bound its batches by it.
+#[test]
+fn the_sink_raises_its_send_buffer_and_reports_the_ceiling_it_got() {
+    let path = std::env::temp_dir().join(format!(
+        "peinit2-eventd-log-sndbuf-{}-{}.sock",
+        std::process::id(),
+        SOCKET_ID.fetch_add(1, Ordering::Relaxed),
+    ));
+    let _ = std::fs::remove_file(&path);
+    let receiver = match UnixDatagram::bind(&path) {
+        Ok(receiver) => receiver,
+        Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => return,
+        Err(error) => panic!("bind receiver: {error}"),
+    };
+    let path = path.to_str().expect("utf8 path");
+    let mut sink = LinuxEventdLogSink::new();
+
+    let ceiling = sink
+        .eventd_datagram_ceiling(path)
+        .expect("connect")
+        .expect("a connected sink knows its ceiling");
+
+    let reported = reported_send_buffer(&sink);
+    assert_eq!(
+        ceiling,
+        reported - super::UNIX_DATAGRAM_SNDBUF_RESERVE,
+        "the ceiling is what the kernel granted, less its own reserve",
+    );
+    // The kernel doubles a granted request and caps it at wmem_max; either
+    // way the buffer must have moved past the stock default, which is what
+    // could not carry a full batch.
+    assert!(
+        reported > 212_992 || reported >= 2 * crate::logging::DEFAULT_EVENTD_LOG_DATAGRAM_BYTES,
+        "SO_SNDBUF {reported} was not raised",
+    );
+
+    // A batch built to the portable ceiling now goes through in one datagram
+    // wherever wmem_max allows the request; where it does not, the ceiling
+    // reported above is what keeps the caller from ever building one.
+    if ceiling >= crate::logging::DEFAULT_EVENTD_LOG_DATAGRAM_BYTES {
+        let message = "x".repeat(4000);
+        let records = (0..60)
+            .map(|_| ServiceLogRecord::new("app", LogStream::Stdout, &message, 42, None))
+            .collect::<Vec<_>>();
+        let batch_len = crate::logging::eventd_log_batch_prefix_len(
+            records.iter(),
+            crate::logging::DEFAULT_EVENTD_LOG_DATAGRAM_BYTES,
+        );
+        assert_eq!(
+            batch_len,
+            records.len(),
+            "the batch fits the portable ceiling"
+        );
+        let encoded: usize = records
+            .iter()
+            .map(crate::logging::encoded_eventd_log_record_len)
+            .sum();
+        assert!(
+            encoded > 212_992,
+            "the batch exceeds a stock default send buffer"
+        );
+
+        let outcome = sink
+            .send_eventd_log_records(path, &records)
+            .expect("send the full batch");
+        assert_eq!(outcome, super::EventdSendOutcome::Sent);
+        let mut buffer = vec![0_u8; 2 * crate::logging::DEFAULT_EVENTD_LOG_DATAGRAM_BYTES];
+        let len = receiver.recv(&mut buffer).expect("receive datagram");
+        assert!(len > 212_992, "the whole batch arrived as one datagram");
+    }
+
+    drop(receiver);
+    let _ = std::fs::remove_file(path);
 }

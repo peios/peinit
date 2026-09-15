@@ -24,6 +24,12 @@ pub struct RuntimeEventdLogFlush {
     pub attempted_records: usize,
     pub sent_records: usize,
     pub buffered_records: usize,
+    /// Records given up on because they cannot fit one eventd datagram --
+    /// oversized for the socket, or a single record over the ceiling. Not
+    /// buffered and not retried: retrying reproduces the same refusal, and
+    /// doing so every turn stopped log delivery for the rest of the boot
+    /// (PEI-807). The runtime says so on the console once per flush.
+    pub discarded_records: usize,
     pub error: Option<String>,
 }
 
@@ -43,6 +49,7 @@ impl RuntimeEventdLogFlush {
             attempted_records: 0,
             sent_records: 0,
             buffered_records,
+            discarded_records: 0,
             error: None,
         }
     }

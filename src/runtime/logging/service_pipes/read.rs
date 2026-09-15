@@ -113,17 +113,28 @@ impl RuntimeServiceLogPipes {
             return;
         };
 
-        let mut index = 0usize;
-        while index < records.len() {
-            let batch_len = eventd_log_batch_prefix_len(
-                records[index..].iter(),
-                self.config.eventd_log_datagram_bytes,
-            );
-            if batch_len == 0 {
-                for unsent in &records[index..] {
+        // Bounded by the socket's own send buffer as well as the portable
+        // ceiling: a batch built to the ceiling alone did not fit a default
+        // buffer (PEI-807). Not knowing the bound is a transport failure like
+        // any other -- the sink could not reach the socket.
+        let ceiling = match self.eventd_batch_ceiling(&socket_path, sink) {
+            Ok(ceiling) => ceiling,
+            Err(_) => {
+                for unsent in records {
                     self.pre_eventd.push(unsent.clone());
                 }
                 return;
+            }
+        };
+        let mut index = 0usize;
+        while index < records.len() {
+            let batch_len = eventd_log_batch_prefix_len(records[index..].iter(), ceiling);
+            if batch_len == 0 {
+                // A single record over the ceiling can never be delivered;
+                // buffering it only moved the same dead end into the replay.
+                self.eventd_oversized_records = self.eventd_oversized_records.saturating_add(1);
+                index += 1;
+                continue;
             }
             match sink.send_eventd_log_records(&socket_path, &records[index..index + batch_len]) {
                 // A drop is the designed outcome of a busy eventd, not a
@@ -135,6 +146,13 @@ impl RuntimeServiceLogPipes {
                 Ok(crate::boundary::EventdSendOutcome::Dropped) => {
                     self.eventd_dropped_records =
                         self.eventd_dropped_records.saturating_add(batch_len);
+                }
+                // Refused as too large despite the bound above. Retrying the
+                // same batch cannot end differently, so it is given up here
+                // and counted for the console (PEI-807).
+                Ok(crate::boundary::EventdSendOutcome::Oversized) => {
+                    self.eventd_oversized_records =
+                        self.eventd_oversized_records.saturating_add(batch_len);
                 }
                 Ok(crate::boundary::EventdSendOutcome::Sent) => {}
                 Err(_) => {
