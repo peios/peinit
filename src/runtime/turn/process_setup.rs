@@ -24,6 +24,20 @@ where
     L: ProcessLauncher + ?Sized,
     R: RuntimeEventRegistrar + ?Sized,
 {
+    if !supervisor.has_pending_process_setup(fd) {
+        // The readiness is for a setup the supervisor no longer holds: a
+        // shutdown earlier in this same turn cancelled the job and closed
+        // the descriptor with it (PEI-826), and the event was already in
+        // the batch epoll returned. Reading it now fails with EBADF -- or
+        // reads whatever the number has since been reused for -- and the
+        // failure ended the runtime loop. Nothing to read, nothing to
+        // close: just make sure the registration is gone.
+        let _ = registrar.unregister_source(fd);
+        return Ok(RuntimeShutdownEventTurn::ProcessSetup {
+            fd,
+            turn: RuntimeProcessSetupTurn::Stale { fd },
+        });
+    }
     let status = launcher.read_process_setup_status(fd).map_err(|error| {
         RuntimeShutdownEventTurnError::Supervisor(crate::supervisor::SupervisorError::Launch(
             crate::execution::launch::LaunchCreatedJobError::Boundary(error),

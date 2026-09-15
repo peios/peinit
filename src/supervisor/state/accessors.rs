@@ -104,6 +104,11 @@ impl Supervisor {
         self.pending_process_setups.keys().copied().collect()
     }
 
+    /// Whether a launch is still waiting on this setup-status descriptor.
+    pub fn has_pending_process_setup(&self, setup_status_fd: i32) -> bool {
+        self.pending_process_setups.contains_key(&setup_status_fd)
+    }
+
     /// Queued launch ids dropped since the last call because their job record
     /// had gone. Reset on read; the work pump reports it for the turn.
     pub fn take_stale_launch_entries(&mut self) -> usize {
