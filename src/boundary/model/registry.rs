@@ -3,7 +3,7 @@ use crate::control::system::ControlSecurityDescriptor;
 use crate::jobs::socket::JobsSocketLimits;
 use crate::provisioning::ProvisionedPathRegistrySnapshot;
 use crate::registry::SUPPORTED_SERVICES_SCHEMA_VERSION;
-use crate::service::{ServiceDefinition, ServiceEnvironmentVariable};
+use crate::service::{ServiceDefinition, ServiceEnvironmentVariable, ServiceSecurityDescriptor};
 use crate::timer::state::TimerLastRunStorage;
 
 use super::error::BoundaryError;
@@ -74,6 +74,15 @@ pub struct UndecodableService {
 pub struct ServiceDefinitionsRead {
     pub definitions: Vec<ServiceDefinition>,
     pub undecodable: Vec<UndecodableService>,
+    /// The `ServiceSecurity` on `Machine\System\Services` itself, if any.
+    ///
+    /// Already applied to every definition above that carries none of its
+    /// own (§4.6). Carried out separately for the one service the registry
+    /// does not define — the compiled-in registryd — which has to inherit
+    /// it the same way once Phase 2 has read it, or narrowing the Services
+    /// key reaches every service except the Critical one whose stop takes
+    /// the machine down (PEI-1072).
+    pub inherited_service_security: Option<ServiceSecurityDescriptor>,
 }
 
 pub trait RegistryClient {
@@ -96,6 +105,7 @@ pub trait RegistryClient {
         Ok(ServiceDefinitionsRead {
             definitions: self.read_service_definitions()?,
             undecodable: Vec::new(),
+            inherited_service_security: None,
         })
     }
 

@@ -6,7 +6,9 @@ use crate::control::system::ControlSecurityDescriptor;
 use crate::logging::RuntimeLogConfig;
 use crate::operation::store::{OperationStoreError, Phase2BootDispatch};
 use crate::registry::RegistryConfigWarning;
-use crate::service::{ServiceEnvironmentVariable, ServiceTable, ServiceTableError};
+use crate::service::{
+    ServiceEnvironmentVariable, ServiceSecurityDescriptor, ServiceTable, ServiceTableError,
+};
 use crate::shutdown::ShutdownSettings;
 
 pub const DEFAULT_MAX_PARALLEL_STARTS: u32 = 10;
@@ -46,6 +48,9 @@ pub struct Phase2BootRun {
     pub jobs_limits: crate::jobs::socket::JobsSocketLimits,
     pub log_config: RuntimeLogConfig,
     pub service_table: ServiceTable,
+    /// The Services-key `ServiceSecurity`, for the retained services the
+    /// registry does not define (PEI-1072).
+    pub inherited_service_security: Option<ServiceSecurityDescriptor>,
     pub global_environment: Vec<ServiceEnvironmentVariable>,
     pub eventd_log_socket_path: Option<String>,
     pub plan: Phase2BootPlan,

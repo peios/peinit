@@ -50,11 +50,12 @@ pub(super) fn read_lcs_service_definitions() -> Result<ServiceDefinitionsRead, L
             }),
         }
     }
-    apply_inherited_service_security(&mut definitions, inherited_security);
+    apply_inherited_service_security(&mut definitions, inherited_security.clone());
 
     Ok(ServiceDefinitionsRead {
         definitions,
         undecodable,
+        inherited_service_security: inherited_security,
     })
 }
 

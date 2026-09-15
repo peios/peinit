@@ -1,4 +1,4 @@
-use crate::boundary::RegistryClient;
+use crate::boundary::{BoundaryError, RegistryClient};
 use crate::logging::RuntimeLogConfig;
 use crate::registry::services_schema_warnings;
 use crate::registry::{RegistryConfigWarning, read_log_config_from_registry};
@@ -17,9 +17,26 @@ where
     let services_schema_version = registry
         .read_services_schema_version()
         .map_err(ReloadConfigError::Registry)?;
-    let definitions = registry
-        .read_service_definitions()
+    let definitions_read = registry
+        .read_service_definitions_partial()
         .map_err(ReloadConfigError::Registry)?;
+    // The strict view, until PEI-621: any undecodable key fails the whole
+    // reload, so the transaction aborts and the running configuration stands.
+    if let Some(first) = definitions_read.undecodable.first() {
+        return Err(ReloadConfigError::Registry(BoundaryError::Registry(
+            format!("service {} failed to decode: {}", first.name, first.message),
+        )));
+    }
+    let mut definitions = definitions_read.definitions;
+    // The compiled-in registryd is absent from every registry snapshot, and a
+    // reload that changes the Services-key descriptor has to reach it as it
+    // reaches every other service without a descriptor of its own (§4.6,
+    // PEI-1072). Carried in explicitly, inheriting, so the snapshot applies
+    // to it like any other entry rather than skipping it as compiled-in.
+    definitions.extend(services.compiled_in_definitions_absent_from(
+        &definitions,
+        definitions_read.inherited_service_security.as_ref(),
+    ));
     let control_security = registry
         .read_control_security()
         .map_err(ReloadConfigError::Registry)?;

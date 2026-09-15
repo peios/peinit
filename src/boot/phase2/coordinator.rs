@@ -72,6 +72,7 @@ where
         .map_err(Phase2BootRunError::RecoveryRequired)?;
     let services = services_read.definitions;
     let undecodable = services_read.undecodable;
+    let inherited_service_security = services_read.inherited_service_security;
     let services_schema_version = registry
         .read_services_schema_version()
         .map_err(Phase2RecoveryReason::RegistryRead)
@@ -139,6 +140,7 @@ where
         jobs_limits,
         log_config,
         service_table,
+        inherited_service_security,
         global_environment,
         eventd_log_socket_path,
         plan,
