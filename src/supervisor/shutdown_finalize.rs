@@ -57,6 +57,7 @@ impl Supervisor {
         let root_remount = cleanup_result(finalizer.remount_readonly("/"));
         let sync_result = cleanup_result(finalizer.sync_filesystems());
         let reboot_result = cleanup_result(finalizer.reboot(kind));
+        let attempted_at_ns = time_after_attempt(finalizer, now_ns);
         let report = ShutdownFinalizationReport {
             random_seed,
             snapshot_mounts,
@@ -65,7 +66,7 @@ impl Supervisor {
             sync_result,
             reboot_result: reboot_result.clone(),
         };
-        let finalization = finalization_after_reboot_result(reboot_result, now_ns);
+        let finalization = finalization_after_reboot_result(reboot_result, attempted_at_ns);
         self.shutdown_runtime_mut()?.finalization = finalization.clone();
 
         Ok(SupervisorShutdownFinalizationDispatch {
@@ -85,6 +86,7 @@ impl Supervisor {
         let kind = self.shutdown_runtime()?.kind;
         let sync_result = cleanup_result(finalizer.sync_filesystems());
         let reboot_result = cleanup_result(finalizer.reboot(kind));
+        let attempted_at_ns = time_after_attempt(finalizer, now_ns);
         let report = ShutdownFinalizationReport {
             random_seed: CleanupActionResult::Ok,
             snapshot_mounts: CleanupActionResult::Ok,
@@ -93,7 +95,7 @@ impl Supervisor {
             sync_result,
             reboot_result: reboot_result.clone(),
         };
-        let finalization = finalization_after_reboot_result(reboot_result, now_ns);
+        let finalization = finalization_after_reboot_result(reboot_result, attempted_at_ns);
         self.shutdown_runtime_mut()?.finalization = finalization.clone();
 
         Ok(SupervisorShutdownFinalizationDispatch {
@@ -166,15 +168,28 @@ fn cleanup_mounts(
         .collect()
 }
 
+/// When the final action returned, for timing its retry.
+///
+/// The turn's `now_ns` predates the seed write, the unmounts and the remount,
+/// so a retry timed from it came before a second had passed since the
+/// attempt (PEI-1088). The finalizer's clock, read after `reboot(2)`
+/// returned, is used where it has one; the turn's time is the floor either
+/// way, so a clock that went backwards cannot bring the retry forward.
+fn time_after_attempt(finalizer: &mut (impl ShutdownFinalizer + ?Sized), now_ns: u64) -> u64 {
+    finalizer
+        .monotonic_now_ns()
+        .map_or(now_ns, |after_ns| after_ns.max(now_ns))
+}
+
 fn finalization_after_reboot_result(
     reboot_result: CleanupActionResult,
-    now_ns: u64,
+    attempted_at_ns: u64,
 ) -> ShutdownFinalizationState {
     match reboot_result {
         CleanupActionResult::Ok => ShutdownFinalizationState::Completed,
         CleanupActionResult::Failed(message) => ShutdownFinalizationState::Failed {
             message,
-            next_retry_at_ns: now_ns.saturating_add(FINAL_ACTION_RETRY_INTERVAL_NS),
+            next_retry_at_ns: attempted_at_ns.saturating_add(FINAL_ACTION_RETRY_INTERVAL_NS),
         },
     }
 }
