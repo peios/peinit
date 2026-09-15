@@ -10,6 +10,7 @@ use crate::service::runtime::{
 use crate::shutdown::{ShutdownError, ShutdownPlan, ShutdownStopDeadline};
 
 use super::dispatch::SupervisorShutdownStopDispatch;
+use super::shutdown_progress::service_done_for_shutdown;
 use super::work::SupervisorWork;
 
 use deadline::{retained_stop_deadline, stop_deadline_ns};
@@ -45,6 +46,18 @@ where
     let mut dispatches = Vec::with_capacity(wave.services.len());
 
     for participant in &wave.services {
+        // The plan was fixed when the shutdown began, and a participant can
+        // leave the running states before its wave comes round — crash, or
+        // exit cleanly, while an earlier wave was still draining. There is
+        // nothing left to stop: no process to signal, no deadline to hold
+        // the wave open for. Skipped here by the same test `wave_complete`
+        // applies, so the two agree on who is still in the wave. Asking
+        // `process_target` for its process instead raised
+        // MissingRunningService, and that ended PID 1's runtime loop in the
+        // middle of the shutdown (PEI-1086).
+        if participant_done(work, &participant.service) {
+            continue;
+        }
         if participant.already_stopping {
             let retained = retained_stop_deadline(work, &participant.service, wave_index, now_ns)?;
             stop_deadlines.push(retained.deadline.clone());
@@ -113,4 +126,10 @@ where
     }
 
     Ok(dispatches)
+}
+
+fn participant_done(work: &SupervisorWork, service: &str) -> bool {
+    work.services
+        .runtime(service)
+        .is_some_and(|runtime| service_done_for_shutdown(runtime.state))
 }

@@ -77,6 +77,25 @@ pub(super) fn later_wave_stopping_fixture() -> Supervisor {
     supervisor
 }
 
+/// Two waves with two Active participants in the second: `front` requires
+/// `left` and `right`, so the plan puts `front` in wave 0 and both of the
+/// others in wave 1.
+pub(super) fn later_wave_pair_fixture() -> Supervisor {
+    let mut front = alive_service("front");
+    front.requires.push("left".to_string());
+    front.requires.push("right".to_string());
+    let left = alive_service("left");
+    let right = alive_service("right");
+    let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
+    supervisor.services =
+        ServiceTable::from_boot_snapshot(vec![front, left, right]).expect("service table");
+
+    active_service(&mut supervisor, "front", 7400, 70);
+    active_service(&mut supervisor, "left", 7500, 71);
+    active_service(&mut supervisor, "right", 7600, 72);
+    supervisor
+}
+
 pub(super) fn job_for(supervisor: &Supervisor, service: &str) -> crate::ids::JobId {
     supervisor
         .jobs
