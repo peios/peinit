@@ -81,11 +81,34 @@ impl Supervisor {
                 service: service.to_string(),
             }
         })?;
+        self.check_service_access_with_descriptor(
+            peer,
+            access_checker,
+            service,
+            &entry.definition.service_security,
+            desired_access,
+        )
+    }
+
+    /// The service access check against a descriptor the caller already
+    /// holds — for a target that is no longer in the table, where the
+    /// descriptor is the one recorded on the operation (PEI-1076).
+    pub(super) fn check_service_access_with_descriptor<A>(
+        &self,
+        peer: &ControlPeer,
+        access_checker: &mut A,
+        service: &str,
+        descriptor: &crate::service::ServiceSecurityDescriptor,
+        desired_access: ServiceAccess,
+    ) -> Result<(), SupervisorControlCommandBodyError>
+    where
+        A: ServiceAccessChecker + ?Sized,
+    {
         let decision = access_checker
             .check_service_access(ServiceAccessCheckRequest {
                 token_fd: peer.token_fd(),
                 service,
-                descriptor: &entry.definition.service_security,
+                descriptor,
                 desired_access,
             })
             .map_err(SupervisorControlCommandBodyError::ServiceAuthorization)?;

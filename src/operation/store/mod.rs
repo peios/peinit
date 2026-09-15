@@ -65,4 +65,24 @@ impl OperationStore {
     pub fn get(&self, id: OperationId) -> Option<&OperationRecord> {
         self.records.get(&id)
     }
+
+    /// Stamp every record that has not yet recorded its target's
+    /// `ServiceSecurity` with the descriptor the table holds for it now.
+    ///
+    /// Requests are made in code that has no view of the service table, so
+    /// the record is created without the descriptor and the supervisor
+    /// fills it in when it commits the transaction that created it — the
+    /// same moment, as far as anything outside the transaction can tell. A
+    /// record whose service is already gone keeps `None`; the query path
+    /// treats that as the built-in default (PEI-1076).
+    pub fn adopt_service_security(&mut self, services: &crate::service::ServiceTable) {
+        for record in self.records.values_mut() {
+            if record.service_security.is_some() {
+                continue;
+            }
+            if let Some(definition) = services.definition(&record.service) {
+                record.service_security = Some(definition.service_security.clone());
+            }
+        }
+    }
 }

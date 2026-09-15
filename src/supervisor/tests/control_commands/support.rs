@@ -74,6 +74,10 @@ pub(super) fn response_json(line: &[u8]) -> serde_json::Value {
 pub(super) struct TestAccessChecker {
     allowed_services: Option<BTreeSet<String>>,
     system_allowed: bool,
+    /// Every descriptor a service check was asked to decide against, in
+    /// order — so a test can prove *which* descriptor a query was checked
+    /// against, not only whether it passed.
+    pub(super) observed_descriptors: Vec<crate::service::ServiceSecurityDescriptor>,
 }
 
 impl TestAccessChecker {
@@ -81,6 +85,7 @@ impl TestAccessChecker {
         Self {
             allowed_services: None,
             system_allowed: true,
+            observed_descriptors: Vec::new(),
         }
     }
 
@@ -88,6 +93,7 @@ impl TestAccessChecker {
         Self {
             allowed_services: Some(BTreeSet::new()),
             system_allowed: true,
+            observed_descriptors: Vec::new(),
         }
     }
 
@@ -95,6 +101,7 @@ impl TestAccessChecker {
         Self {
             allowed_services: Some(services.into_iter().map(ToString::to_string).collect()),
             system_allowed: true,
+            observed_descriptors: Vec::new(),
         }
     }
 
@@ -102,6 +109,7 @@ impl TestAccessChecker {
         Self {
             allowed_services: None,
             system_allowed: false,
+            observed_descriptors: Vec::new(),
         }
     }
 }
@@ -127,6 +135,7 @@ impl ServiceAccessChecker for TestAccessChecker {
         &mut self,
         request: ServiceAccessCheckRequest<'_>,
     ) -> Result<ServiceAccessDecision, ServiceAccessCheckError> {
+        self.observed_descriptors.push(request.descriptor.clone());
         let allowed = self
             .allowed_services
             .as_ref()

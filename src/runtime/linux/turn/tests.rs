@@ -193,6 +193,7 @@ fn operation_completed(service: &str) -> OperationEvent {
         caller: None,
         result: Some("timed out".to_string()),
         merged_into: None,
+        service_security: None,
     })
     .expect("completed operation")
 }

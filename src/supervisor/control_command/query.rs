@@ -78,12 +78,33 @@ impl Supervisor {
         let view = self
             .operation_status(operation_id)
             .map_err(SupervisorControlCommandBodyError::Query)?;
-        self.check_service_access(
-            peer,
-            access_checker,
-            &view.service,
-            ServiceAccess::QUERY_STATUS,
-        )?;
+        if self.services.get(&view.service).is_some() {
+            self.check_service_access(
+                peer,
+                access_checker,
+                &view.service,
+                ServiceAccess::QUERY_STATUS,
+            )?;
+        } else {
+            // The operation is known; only its service is gone (§3.8
+            // discarded it once its definition was withdrawn and it
+            // drained). A retained operation is meant to be queryable for
+            // its retention window, so the right is checked against the
+            // descriptor the service had when the operation was created
+            // rather than answering UNKNOWN_SERVICE (PEI-1076).
+            let descriptor = self
+                .operations
+                .get(operation_id)
+                .and_then(|record| record.service_security.clone())
+                .unwrap_or_default();
+            self.check_service_access_with_descriptor(
+                peer,
+                access_checker,
+                &view.service,
+                &descriptor,
+                ServiceAccess::QUERY_STATUS,
+            )?;
+        }
         Ok(SupervisorControlCommandBodyResponse::accepted_response(
             control_operation_status_response_line(&view, response_time_projection(clock)?)
                 .map_err(SupervisorControlCommandBodyError::serialize)?,
