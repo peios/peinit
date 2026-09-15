@@ -1,5 +1,6 @@
 mod blocked;
 mod modes;
+mod roles;
 mod success;
 mod validation;
 
