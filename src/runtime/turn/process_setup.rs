@@ -3,7 +3,9 @@ use crate::runtime::{
     RuntimeEventRegistrar, RuntimeEventRegistrationError, RuntimeEventSource,
     RuntimeProcessSetupTurn, RuntimeServiceLogPipes, RuntimeShutdownEventTurn,
 };
-use crate::supervisor::{Supervisor, SupervisorProcessSetupDispatch};
+use crate::supervisor::{
+    Supervisor, SupervisorCancelledProcessSetupDispatch, SupervisorProcessSetupDispatch,
+};
 
 use super::model::RuntimeShutdownEventTurnError;
 
@@ -86,6 +88,24 @@ where
         registrations.push(source);
     }
     Ok(registrations)
+}
+
+/// Take the setups a shutdown cancelled out of epoll and close them.
+///
+/// The supervisor dropped these with their jobs (PEI-826); their descriptors
+/// are still registered, and a readiness on one would be read against a job
+/// that no longer exists. Removal is best effort, as on the other removal
+/// paths: a descriptor that was never registered still has to be closed.
+pub(super) fn release_cancelled_process_setups<R>(
+    cancelled: &[SupervisorCancelledProcessSetupDispatch],
+    registrar: &mut R,
+) where
+    R: RuntimeEventRegistrar + ?Sized,
+{
+    for setup in cancelled {
+        let _ = registrar.unregister_source(setup.setup_status_fd);
+        close_fd(setup.setup_status_fd);
+    }
 }
 
 fn register_setup_completion_log_pipes<R>(

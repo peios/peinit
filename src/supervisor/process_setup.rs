@@ -265,7 +265,12 @@ where
     }
 }
 
-fn cleanup_pending_setup_process<P>(
+/// Kill and release a launched process whose setup will never complete.
+///
+/// The setup status descriptor is not closed here: it is registered with
+/// epoll, and the runtime unregisters and closes it when it learns the setup
+/// is gone.
+pub(super) fn cleanup_pending_setup_process<P>(
     process: &LaunchedProcess,
     cgroup_id: &str,
     controller: &mut P,

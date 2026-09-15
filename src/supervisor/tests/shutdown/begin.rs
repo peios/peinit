@@ -1,4 +1,4 @@
-use crate::boundary::ProcessSignal;
+use crate::boundary::{ProcessSetupStatus, ProcessSignal};
 use crate::job::{JobRecord, JobState, ProcessHandle, ServiceMainJobSpec};
 use crate::notify::{NotifyCredentials, NotifyDatagram};
 use crate::operation::store::OperationRequest;
@@ -9,9 +9,15 @@ use crate::service::runtime::{
     ServiceState, ServiceStoppingTimeoutEvidence, ServiceTransition, TransitionCause,
 };
 use crate::shutdown::{ShutdownFinalizationState, ShutdownKind};
-use crate::supervisor::{Supervisor, SupervisorSettings};
+use crate::supervisor::{
+    Supervisor, SupervisorCancelledProcessSetupDispatch, SupervisorProcessSetupDispatch,
+    SupervisorServiceLaunchDispatch, SupervisorSettings,
+};
 
-use super::super::{ScriptedClock, TestProcessController, alive_service, settings};
+use super::super::{
+    APP_LAUNCH_NS, BOOT_NS, ScriptedClock, StaticRegistry, TestProcessController,
+    TestProcessLauncher, TestTokenProvider, alive_service, process, settings,
+};
 use super::SHUTDOWN_NS;
 use super::fixture::{DRAINING_STOP_DEADLINE_NS, shutdown_fixture};
 
@@ -297,6 +303,86 @@ fn starting_services_fail_unforked_jobs_without_post_kill_retention() {
     );
     assert!(supervisor.jobs().get(job_id).is_none());
     assert!(supervisor.pending_launch_jobs().is_empty());
+}
+
+// PEI-826. A job stays Created from its launch until its setup status is read,
+// and a shutdown that arrives in that window cancels the job — removing its
+// record — while the launched process's setup descriptor stayed in
+// `pending_process_setups` and in epoll. Its next readiness then reached
+// `process_pending_process_setup_status` with a job that no longer existed, and
+// that UnknownJob took PID 1 to recovery in the middle of the shutdown.
+//
+// Now the setup goes with the job, and the runtime is told which descriptor to
+// take out of epoll.
+#[test]
+fn a_starting_services_pending_process_setup_is_dropped_with_its_cancelled_job() {
+    let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
+    let mut registry = StaticRegistry::services(vec![alive_service("booting")]);
+    let mut clock = ScriptedClock::new([BOOT_NS, APP_LAUNCH_NS]);
+    supervisor
+        .run_phase2_boot(&mut registry, &mut clock)
+        .expect("boot supervisor");
+    let job_id = supervisor.pending_launch_jobs()[0];
+    // A negative pidfd so releasing the setup closes nothing this test
+    // process owns; the launch records it as data.
+    let mut pending = process(4242, -1);
+    pending.setup_status_fd = Some(55);
+    let mut tokens = TestTokenProvider::default();
+    let mut launcher = TestProcessLauncher::new(vec![pending]);
+    let mut clock = ScriptedClock::new([APP_LAUNCH_NS]);
+    let launch = supervisor
+        .launch_next_pending_service_job(&mut tokens, &mut launcher, &mut clock)
+        .expect("launch booting")
+        .expect("launch dispatch");
+    assert!(matches!(
+        launch,
+        SupervisorServiceLaunchDispatch::PendingSetup(_)
+    ));
+    assert_eq!(supervisor.pending_process_setup_fds(), vec![55]);
+    assert_eq!(
+        supervisor.jobs().get(job_id).expect("job").state,
+        JobState::Created,
+        "the job must not yet have started — that is the window",
+    );
+    let mut controller = TestProcessController::default();
+
+    let dispatch = supervisor
+        .begin_shutdown(ShutdownKind::Reboot, &mut controller, SHUTDOWN_NS)
+        .expect("begin shutdown");
+
+    assert_eq!(
+        dispatch.cancelled_setups,
+        vec![SupervisorCancelledProcessSetupDispatch {
+            job_id,
+            service: "booting".to_string(),
+            setup_status_fd: 55,
+        }],
+    );
+    assert_eq!(dispatch.startup_job_events.len(), 1);
+    assert_eq!(dispatch.startup_job_events[0].state, JobState::Failed);
+    assert!(supervisor.jobs().get(job_id).is_none());
+    assert!(supervisor.pending_process_setup_fds().is_empty());
+    assert_eq!(
+        dispatch.runtime.finalization,
+        ShutdownFinalizationState::Ready,
+    );
+
+    // The status that used to arrive for the orphaned setup. Stale, not an
+    // error: the descriptor belongs to nothing any more.
+    let late = supervisor
+        .process_pending_process_setup_status(
+            55,
+            ProcessSetupStatus::ExecSucceeded,
+            SHUTDOWN_NS + 1,
+            &mut controller,
+        )
+        .expect("a late status for a cancelled setup must not be an error");
+    assert!(matches!(
+        late,
+        SupervisorProcessSetupDispatch::Stale {
+            setup_status_fd: 55
+        }
+    ));
 }
 
 // PEI-349. peinit still refuses to guess a deadline it cannot substantiate —

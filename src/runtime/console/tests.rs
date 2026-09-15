@@ -398,6 +398,7 @@ fn shutdown_signal_emits_shutdown_progress() {
                     }],
                     startup_operation_events: Vec::new(),
                     startup_job_events: Vec::new(),
+                    cancelled_setups: Vec::new(),
                 }),
             },
         )),

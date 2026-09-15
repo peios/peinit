@@ -6,6 +6,7 @@ use crate::control::service_security::ServiceAccessChecker;
 use crate::control::system::SystemAccessChecker;
 use crate::supervisor::{
     Supervisor, SupervisorChildReapDispatch, SupervisorChildReapTurn, SupervisorPid1SignalFdTurn,
+    SupervisorShutdownSignalAction,
 };
 
 use super::deadline::sync_deadline_timer;
@@ -13,6 +14,7 @@ use super::model::{
     RuntimeEventRegistrar, RuntimePid1SignalSource, RuntimeShutdownDeadlineTimer,
     RuntimeShutdownEventContext, RuntimeShutdownEventTurn, RuntimeShutdownEventTurnError,
 };
+use super::process_setup::release_cancelled_process_setups;
 
 pub(super) fn process_pid1_signal_event<S, H, D, C, P, F, A, R>(
     supervisor: &mut Supervisor,
@@ -41,6 +43,11 @@ where
     let supervisor_turn = supervisor
         .handle_pid1_signal_fd_read(read, context.clock, context.controller, context.finalizer)
         .map_err(RuntimeShutdownEventTurnError::Supervisor)?;
+    if let SupervisorPid1SignalFdTurn::Shutdown(dispatch) = &supervisor_turn
+        && let SupervisorShutdownSignalAction::Graceful(shutdown) = &dispatch.action
+    {
+        release_cancelled_process_setups(&shutdown.cancelled_setups, context.registrar);
+    }
     let reaps = if matches!(read, LinuxSignalFdRead::Other { signal } if signal == libc::SIGCHLD) {
         process_sigchld_reaps(
             supervisor,
