@@ -11,6 +11,9 @@ use crate::supervisor::state::SupervisorError;
 use crate::supervisor::watchdog::apply_watchdog_scheduling_after_transitions;
 use crate::supervisor::work::SupervisorWork;
 
+use super::SupervisorLeakedCgroupDispatch;
+use super::process::record_leaked_cgroup;
+
 const STOP_POST_KILL_TIMEOUT_RESULT: &str = "service cgroup remained populated after SIGKILL";
 
 pub(super) fn apply_stop_main_abandoned(
@@ -20,6 +23,7 @@ pub(super) fn apply_stop_main_abandoned(
     operation_id: OperationId,
     now_ns: u64,
     max_parallel_starts: u32,
+    leaks: &mut Vec<SupervisorLeakedCgroupDispatch>,
 ) -> Result<(), SupervisorError> {
     let Some(runtime) = work.services.runtime(service) else {
         return Ok(());
@@ -31,18 +35,19 @@ pub(super) fn apply_stop_main_abandoned(
         .operations
         .get(operation_id)
         .is_some_and(explicit_stop_record_clears_fd_store);
-    work.services
-        .record_leaked_cgroup(
-            service,
-            root_cgroup_id,
-            LeakedCgroupKind::ServiceTree,
-            now_ns,
-        )
-        .map_err(|error| {
-            SupervisorError::Control(
-                crate::execution::control::ControlExecutionError::ServiceTable(error),
-            )
-        })?;
+    // Through the same helper as every other leak path, so the tree given up
+    // here is pushed -- a `cgroup.leaked` event and a console line -- and not
+    // only queryable through `status`. It used to be recorded on the runtime
+    // alone, so the one leak that also abandons the service was the one nobody
+    // was told about (TRM §5.7, PEI-818).
+    record_leaked_cgroup(
+        work,
+        service,
+        root_cgroup_id,
+        LeakedCgroupKind::ServiceTree,
+        now_ns,
+        leaks,
+    )?;
     let transition = work
         .services
         .transition_service(

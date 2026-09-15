@@ -120,6 +120,7 @@ fn process_populated_cgroup_cleanup(
             operation_id,
             now_ns,
             max_parallel_starts,
+            leaks,
         ),
     }
 }
@@ -215,7 +216,7 @@ fn busy_cgroup_kind(cgroup_id: &str) -> LeakedCgroupKind {
     }
 }
 
-fn record_leaked_cgroup(
+pub(super) fn record_leaked_cgroup(
     work: &mut SupervisorWork,
     service: &str,
     cgroup_id: String,

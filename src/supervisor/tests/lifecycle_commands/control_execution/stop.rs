@@ -183,6 +183,52 @@ fn post_kill_stop_cleanup_populated_cgroup_marks_abandoned_and_fails_stop() {
     assert!(controller.cgroup_removes.is_empty());
 }
 
+// PEI-818. Giving a service up is also a leak of its tree, and TRM §5.7 wants
+// a leak both queryable and pushed. The Abandoned path recorded it on the
+// runtime alone -- `status.warnings` showed it, but no `cgroup.leaked` event
+// and no console line were ever produced, because it never built the dispatch
+// every other leak path builds.
+#[test]
+fn post_kill_abandonment_dispatches_the_tree_it_gives_up_as_a_leak() {
+    let mut supervisor = active_app_supervisor();
+    stop_app(&mut supervisor);
+    let mut controller = TestProcessController::default();
+    let mut clock = ScriptedClock::new([CONTROL_NS]);
+    supervisor
+        .execute_next_pending_control_operation(&mut controller, &mut clock)
+        .expect("execute stop")
+        .expect("stop dispatch");
+    let due_at_ns = supervisor
+        .next_stop_timeout_deadline()
+        .expect("deadline")
+        .due_at_ns;
+    supervisor
+        .process_next_due_stop_timeout(&mut controller, due_at_ns)
+        .expect("process timeout")
+        .expect("escalation");
+
+    let cleanup_due = due_at_ns + 5_000_000_000;
+    let leaks = supervisor
+        .process_due_cgroup_cleanups(&mut controller, cleanup_due)
+        .expect("cleanup")
+        .expect("a cleanup deadline was due");
+
+    assert_eq!(
+        supervisor.service_status("app").expect("app").state,
+        ServiceState::Abandoned,
+    );
+    assert_eq!(
+        leaks,
+        vec![crate::supervisor::SupervisorLeakedCgroupDispatch {
+            service: "app".to_string(),
+            path: "/sys/fs/cgroup/peinit/app".to_string(),
+            kind: crate::service::runtime::LeakedCgroupKind::ServiceTree,
+            detected_at_ns: cleanup_due,
+        }],
+        "the abandoned tree is pushed as a leak, not only recorded for status",
+    );
+}
+
 // PEI-531. Post-kill cleanup abandons a service whose cgroup is still
 // populated, and deliberately leaves the main job open: the process is still
 // there, so there is nothing to reap yet. When it finally does die — the
