@@ -175,6 +175,89 @@ fn a_boot_wants_level_waiter_is_released_when_its_publisher_stops() {
     assert_eq!(supervisor.pending_launch_jobs().len(), 1);
 }
 
+/// The lostdep shape: a dependent blocked on a dependency that is itself
+/// starting fails on its own clock. `slow` is pulled in and stays Starting
+/// under a long `StartTimeout`; `wait` requires it and carries a short one,
+/// and its start fails with `operation_timeout` when that one runs out —
+/// the wait is bounded by the dependency's clock, so it is not a hold.
+#[test]
+fn a_dependent_blocked_on_a_starting_dependency_fails_on_its_own_clock() {
+    let mut slow = ServiceDefinition::simple_system_boot("slow", "/sbin/slow");
+    slow.triggers.clear();
+    slow.start_timeout_secs = 200;
+    let mut wait = oneshot_service("wait");
+    wait.triggers.clear();
+    wait.requires.push("slow".to_string());
+    wait.start_timeout_secs = 8;
+
+    let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
+    let mut registry = StaticRegistry::services(vec![slow, wait]);
+    let mut clock = ScriptedClock::new([BOOT_NS, super::ADMIN_START_NS, super::DB_LAUNCH_NS]);
+    supervisor
+        .run_phase2_boot(&mut registry, &mut clock)
+        .expect("boot supervisor");
+    let start = supervisor
+        .start_service("wait", None, &mut clock)
+        .expect("start wait");
+    let crate::control::lifecycle::LifecycleCommandOutcome::OnDemandStart(dispatch) =
+        &start.outcome
+    else {
+        panic!("expected an on-demand start");
+    };
+    let wait_operation = dispatch.requested_operation.returned_operation_id;
+    let mut tokens = TestTokenProvider::default();
+    let mut launcher = TestProcessLauncher::new(vec![process(4242, 9)]);
+    supervisor
+        .launch_next_pending_job(&mut tokens, &mut launcher, &mut clock)
+        .expect("launch slow")
+        .expect("slow launch dispatch");
+    assert_eq!(
+        supervisor.service_status("slow").expect("slow").state,
+        ServiceState::Starting
+    );
+    assert_eq!(
+        supervisor.service_status("wait").expect("wait").state,
+        ServiceState::Inactive
+    );
+    assert!(
+        !supervisor.graph().is_operation_held(wait_operation),
+        "a wait bounded by the dependency's own StartTimeout is clocked"
+    );
+
+    let own_lifetime_ns = super::ADMIN_START_NS + 8 * NANOS_PER_SEC;
+    assert_eq!(
+        supervisor.next_operation_maintenance_deadline_ns(),
+        Some(own_lifetime_ns),
+        "the deadline is the dependent's own, from when its operation was created"
+    );
+    assert!(!supervisor.operation_timeout_expired(wait_operation, own_lifetime_ns - 1));
+    assert!(supervisor.operation_timeout_expired(wait_operation, own_lifetime_ns));
+    let maintenance = supervisor
+        .process_due_operation_maintenance(own_lifetime_ns)
+        .expect("maintenance");
+    assert_eq!(
+        maintenance
+            .operation_timeouts
+            .iter()
+            .map(|event| (event.service.as_str(), event.state))
+            .collect::<Vec<_>>(),
+        vec![("wait", OperationState::Failed)]
+    );
+    assert!(
+        supervisor
+            .operation_status(wait_operation)
+            .expect("wait operation")
+            .error
+            .as_deref()
+            .is_some_and(crate::operation::is_operation_timeout_result)
+    );
+    assert_eq!(
+        supervisor.service_status("slow").expect("slow").state,
+        ServiceState::Starting,
+        "the dependency is untouched by the dependent's lifetime"
+    );
+}
+
 /// A queued operation is not a held one: the lifetime still runs against a
 /// start that is Pending behind another operation rather than in the
 /// graph's hands.
