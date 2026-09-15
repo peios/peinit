@@ -8,6 +8,7 @@ mod notify;
 mod on_demand_start;
 mod operation_maintenance;
 mod phase1_registryd;
+mod pidfd_release;
 mod post_start_hooks;
 mod queued_operations;
 mod reaped_before_setup;
@@ -252,6 +253,7 @@ struct TestProcessController {
     cgroup_populated_checks: Vec<String>,
     cgroup_removes: Vec<String>,
     cgroup_remove_results: BTreeMap<String, CgroupRemoveOutcome>,
+    closed_pidfds: Vec<i32>,
 }
 
 impl ProcessController for TestProcessController {
@@ -262,6 +264,11 @@ impl ProcessController for TestProcessController {
             .get(&(pidfd, pid))
             .copied()
             .unwrap_or(true))
+    }
+
+    fn close_pidfd(&mut self, pidfd: i32) -> Result<(), BoundaryError> {
+        self.closed_pidfds.push(pidfd);
+        Ok(())
     }
 
     fn signal_main(
