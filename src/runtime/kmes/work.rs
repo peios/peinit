@@ -12,6 +12,12 @@ pub(crate) fn collect_runtime_work_pump_kmes_events(
     turn: &RuntimeWorkPumpTurn,
     out: &mut Vec<KmesEvent>,
 ) -> Result<(), BoundaryError> {
+    for dispatch in &turn.promoted_operations {
+        for event in &dispatch.operation_events {
+            super::event::push_operation(out, event)?;
+        }
+        super::job::collect_start_dispatches(&dispatch.start_dispatches, out)?;
+    }
     for dispatch in &turn.control_operations {
         collect_control_dispatch(dispatch, out)?;
     }

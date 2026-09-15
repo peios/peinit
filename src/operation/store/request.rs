@@ -35,7 +35,12 @@ impl OperationStore {
                 self.insert_requested(request, decision, InsertPosition::Back)
             }
             OperationConflictDecision::QueueNew => {
-                self.insert_requested(request, decision, InsertPosition::Back)
+                let head = self.current_for_service(&request.service).map(|head| head.id);
+                let outcome = self.insert_requested(request, decision, InsertPosition::Back)?;
+                if let Some(head) = head {
+                    self.queued_behind.insert(outcome.stored_operation_id, head);
+                }
+                Ok(outcome)
             }
             OperationConflictDecision::MergeIntoExisting { existing_id } => {
                 self.merge_request(request, decision, existing_id)
@@ -56,14 +61,24 @@ impl OperationStore {
                     ExistingTermination::Abort("superseded_by_later_operation"),
                     InsertPosition::Front,
                 ),
-            OperationConflictDecision::CancelExistingThenQueue { existing_id } => self
-                .replace_existing(
+            OperationConflictDecision::CancelExistingThenQueue { existing_id } => {
+                let outcome = self.replace_existing(
                     request,
                     decision,
                     existing_id,
                     ExistingTermination::Cancel("superseded_by_restart"),
                     InsertPosition::Back,
-                ),
+                )?;
+                let queued = outcome.stored_operation_id;
+                let head = self
+                    .current_for_service(&self.records[&queued].service)
+                    .map(|head| head.id)
+                    .filter(|head| *head != queued);
+                if let Some(head) = head {
+                    self.queued_behind.insert(queued, head);
+                }
+                Ok(outcome)
+            }
             OperationConflictDecision::Reject(rejection) => {
                 Err(OperationStoreError::ConflictRejected(rejection))
             }

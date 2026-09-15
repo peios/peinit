@@ -48,6 +48,13 @@ pub enum OperationStoreError {
 pub struct OperationStore {
     records: BTreeMap<OperationId, OperationRecord>,
     active_by_service: BTreeMap<String, Vec<OperationId>>,
+    /// Operations the conflict table queued behind another (§8.3), keyed by
+    /// the queued operation and naming the one it waits for. A queued
+    /// operation is not handed to the control boundary until its
+    /// predecessor is terminal; before this existed a queued restart ran
+    /// against a service still mid-stop and took PID 1 to recovery
+    /// (PEI-824).
+    queued_behind: BTreeMap<OperationId, OperationId>,
 }
 
 impl OperationStore {

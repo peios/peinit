@@ -157,10 +157,22 @@ fn validate_expectation(
             }
         }
         OperationExpectation::Merge => {
-            if matches!(
-                decision,
-                OperationConflictDecision::MergeIntoExisting { .. }
-            ) {
+            // A stop while a restart's stop leg is draining is the one pair
+            // where "Stopping" does not mean "a stop is running": §8.3 aborts
+            // the restart and creates the stop, which then adopts the leg in
+            // flight (PEI-824). The matrix cannot see which operation is
+            // running; the conflict table can, so its answer stands.
+            let abort_for_stop = command == LifecycleCommand::Stop
+                && matches!(
+                    decision,
+                    OperationConflictDecision::AbortExistingThenCreate { .. }
+                );
+            if abort_for_stop
+                || matches!(
+                    decision,
+                    OperationConflictDecision::MergeIntoExisting { .. }
+                )
+            {
                 Ok(())
             } else {
                 Err(LifecycleCommandError::ExpectedMerge {
@@ -170,11 +182,21 @@ fn validate_expectation(
             }
         }
         OperationExpectation::Queue => {
-            if matches!(
-                decision,
-                OperationConflictDecision::QueueNew
-                    | OperationConflictDecision::CancelExistingThenQueue { .. }
-            ) {
+            // A start while a restart is running merges: the restart already
+            // includes one (§8.3). Only the conflict table knows the running
+            // operation is a restart rather than a stop (PEI-824).
+            let merge_into_restart = command == LifecycleCommand::Start
+                && matches!(
+                    decision,
+                    OperationConflictDecision::MergeIntoExisting { .. }
+                );
+            if merge_into_restart
+                || matches!(
+                    decision,
+                    OperationConflictDecision::QueueNew
+                        | OperationConflictDecision::CancelExistingThenQueue { .. }
+                )
+            {
                 Ok(())
             } else {
                 Err(LifecycleCommandError::ExpectedQueue {

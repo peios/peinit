@@ -25,6 +25,9 @@ pub(in crate::runtime::kmes) fn collect_control_dispatch(
     if let ControlExecutionDetail::ReloadCommand { job_event, .. } = &execution.detail {
         push_job(out, job_event)?;
     }
+    for job_event in &execution.cancelled_reload_jobs {
+        push_job(out, job_event)?;
+    }
     Ok(())
 }
 

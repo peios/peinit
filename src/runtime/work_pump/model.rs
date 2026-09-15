@@ -8,9 +8,9 @@ use crate::supervisor::{
     SupervisorHealthCheckLaunchDispatch, SupervisorHealthCheckLaunchFailureDispatch,
     SupervisorLaunchDispatch, SupervisorLaunchFailureDispatch,
     SupervisorPendingProcessSetupDispatch, SupervisorPostStartHookLaunchDispatch,
-    SupervisorPostStartHookLaunchFailureDispatch, SupervisorStartHookLaunchDispatch,
-    SupervisorStartHookLaunchFailureDispatch, SupervisorSubmittedLaunchDispatch,
-    SupervisorSubmittedLaunchFailureDispatch,
+    SupervisorPostStartHookLaunchFailureDispatch, SupervisorPromotedOperationDispatch,
+    SupervisorStartHookLaunchDispatch, SupervisorStartHookLaunchFailureDispatch,
+    SupervisorSubmittedLaunchDispatch, SupervisorSubmittedLaunchFailureDispatch,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -33,6 +33,8 @@ impl Default for RuntimeWorkPumpConfig {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RuntimeWorkPumpTurn {
     pub iterations: usize,
+    /// Queued operations admitted once their predecessor finished (PEI-824).
+    pub promoted_operations: Vec<SupervisorPromotedOperationDispatch>,
     pub control_operations: Vec<SupervisorControlDispatch>,
     /// Control operations that failed before they began (PEI-803).
     pub control_operation_failures: Vec<SupervisorControlFailureDispatch>,
@@ -58,6 +60,7 @@ pub struct RuntimeWorkPumpTurn {
 impl RuntimeWorkPumpTurn {
     pub fn is_empty(&self) -> bool {
         self.iterations == 0
+            && self.promoted_operations.is_empty()
             && self.control_operations.is_empty()
             && self.control_operation_failures.is_empty()
             && self.filesystem_check_launches.is_empty()
@@ -80,6 +83,7 @@ impl RuntimeWorkPumpTurn {
 
     pub(super) fn extend(&mut self, step: RuntimeWorkPumpStep) {
         self.iterations += 1;
+        self.promoted_operations.extend(step.promoted_operations);
         self.control_operations.extend(step.control_operation);
         self.control_operation_failures
             .extend(step.control_operation_failures);
@@ -112,6 +116,7 @@ impl RuntimeWorkPumpTurn {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct RuntimeWorkPumpStep {
+    pub promoted_operations: Vec<SupervisorPromotedOperationDispatch>,
     pub control_operation: Option<SupervisorControlDispatch>,
     pub control_operation_failures: Vec<SupervisorControlFailureDispatch>,
     pub filesystem_check_launch: Option<SupervisorFilesystemCheckLaunchDispatch>,
@@ -135,7 +140,8 @@ pub(super) struct RuntimeWorkPumpStep {
 
 impl RuntimeWorkPumpStep {
     pub(super) fn progressed(&self) -> bool {
-        self.control_operation.is_some()
+        !self.promoted_operations.is_empty()
+            || self.control_operation.is_some()
             || !self.control_operation_failures.is_empty()
             || self.filesystem_check_launch.is_some()
             || self.start_hook_launch.is_some()

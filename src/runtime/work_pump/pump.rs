@@ -60,6 +60,21 @@ where
     L: ProcessLauncher + ?Sized,
     F: FilesystemCheckHelperLauncher + ?Sized,
 {
+    // An operation queued behind one that has since finished is admitted now,
+    // against the service's current state, before the boundary drains
+    // (PEI-824).
+    let promoted_operations = if supervisor.has_ready_queued_operations() {
+        let now_ns = context
+            .clock
+            .monotonic_ns()
+            .map_err(|error| RuntimeWorkPumpError::Supervisor(SupervisorError::Clock(error)))?;
+        supervisor
+            .promote_queued_operations(now_ns)
+            .map_err(RuntimeWorkPumpError::Supervisor)?
+    } else {
+        Vec::new()
+    };
+
     let pending_control_before = supervisor.pending_control_operations().len();
     let control_operation = if pending_control_before > 0 {
         supervisor
@@ -219,6 +234,7 @@ where
     .collect();
 
     Ok(RuntimeWorkPumpStep {
+        promoted_operations,
         control_operation,
         control_operation_failures,
         filesystem_check_launch,
@@ -241,7 +257,8 @@ where
 }
 
 fn has_pending_runtime_work(supervisor: &Supervisor) -> bool {
-    !supervisor.pending_control_operations().is_empty()
+    supervisor.has_ready_queued_operations()
+        || !supervisor.pending_control_operations().is_empty()
         || !supervisor.pending_pre_start_check_launches().is_empty()
         || !supervisor.pending_start_hook_launch_jobs().is_empty()
         || !supervisor.pending_post_hook_launch_jobs().is_empty()

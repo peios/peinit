@@ -79,6 +79,16 @@ impl Supervisor {
             if let ControlExecutionDetail::ReloadCommand { job_id, .. } = &execution.detail {
                 work.pending_control_launches.push_back(*job_id);
             }
+            // A reload command the stop cancelled before it launched must not
+            // launch afterwards (PEI-824).
+            if !execution.cancelled_reload_jobs.is_empty() {
+                work.pending_control_launches.retain(|job_id| {
+                    !execution
+                        .cancelled_reload_jobs
+                        .iter()
+                        .any(|job| job.job_id == *job_id)
+                });
+            }
             // A stop that lands while the service's ExecStartPost hooks are
             // still running supersedes them: the sequence will never complete,
             // and its deadline must not fire later against a hooks cgroup the
@@ -100,17 +110,17 @@ impl Supervisor {
             }
             apply_health_scheduling_after_transitions(
                 &mut work,
-                std::slice::from_ref(&execution.service_transition),
+                execution.service_transition.as_slice(),
                 observed_at_ns,
             );
             apply_watchdog_scheduling_after_transitions(
                 &mut work,
-                std::slice::from_ref(&execution.service_transition),
+                execution.service_transition.as_slice(),
                 observed_at_ns,
             );
             apply_relationship_reactions_after_transitions(
                 &mut work,
-                std::slice::from_ref(&execution.service_transition),
+                execution.service_transition.as_slice(),
                 observed_at_ns,
                 self.settings().phase2.max_parallel_starts,
             )?;
