@@ -481,9 +481,11 @@ where
         );
     }
     // Configuration warnings next: they explain why the effective config is
-    // not what the registry says, which is context for anything below.
+    // not what the registry says, which is context for anything below. A
+    // warning, and tagged as one: the boot goes on with a fallback value, so
+    // `[FAILED]` would overstate it (PEI-809).
     for warning in &dispatch.config_warnings {
-        log_console_error(platform, &format!("peinit warning: {warning}\n"));
+        log_console_warn(platform, &format!("peinit warning: {warning}\n"));
     }
     for blocked in &dispatch.plan.blocked {
         log_console_error(
