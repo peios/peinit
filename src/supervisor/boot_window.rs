@@ -42,15 +42,18 @@ pub struct DeferredRegistryReload {
 
 impl Supervisor {
     /// The boot plan is still executing: the Phase 2 graph context has a
-    /// member that is not yet terminal.
+    /// member whose launch has not been attempted yet.
     ///
     /// A retired context — dropped once drained, at a maintenance sweep —
-    /// counts as drained, as does never having booted.
+    /// counts as drained, as does never having booted. So does a plan whose
+    /// only live members are a service in Backoff and the dependents held
+    /// for its restart (PEI-821): the boot has done its part, and the retry
+    /// cycle must not hold every reload open.
     pub fn boot_plan_in_progress(&self) -> bool {
         self.boot_plan_context.is_some_and(|context_id| {
             self.graph
                 .context(context_id)
-                .is_some_and(|context| !context.is_drained())
+                .is_some_and(|context| !context.has_attempted_every_launch())
         })
     }
 

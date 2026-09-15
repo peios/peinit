@@ -117,6 +117,51 @@ impl GraphExecutionContext {
             .values()
             .all(|member| member.status.is_terminal())
     }
+
+    /// Every launch this context planned has been attempted or decided
+    /// against: each member is terminal, is awaiting a restart (PEI-821),
+    /// or is held only on members that are. The boot window (§3.7) closes
+    /// on this rather than on `is_drained`: a boot service in Backoff and
+    /// the dependents held for it are the restart policy's business, and
+    /// holding every reload for the length of a retry cycle would be the
+    /// cost of a crash loop, not of the boot.
+    pub fn has_attempted_every_launch(&self) -> bool {
+        let mut settled: std::collections::BTreeSet<&str> = self
+            .members
+            .values()
+            .filter(|member| {
+                member.status.is_terminal() || member.status == GraphMemberStatus::AwaitingRestart
+            })
+            .map(|member| member.service.as_str())
+            .collect();
+        loop {
+            let mut grew = false;
+            for member in self.members.values() {
+                if settled.contains(member.service.as_str()) {
+                    continue;
+                }
+                let held = matches!(
+                    member.status,
+                    GraphMemberStatus::Dormant | GraphMemberStatus::WaitingForDependencies
+                );
+                let waits_only_on_settled = held
+                    && self
+                        .dependencies
+                        .iter()
+                        .filter(|edge| edge.dependent == member.service)
+                        .filter(|edge| self.members.contains_key(&edge.target))
+                        .all(|edge| settled.contains(edge.target.as_str()));
+                if waits_only_on_settled {
+                    settled.insert(member.service.as_str());
+                    grew = true;
+                }
+            }
+            if !grew {
+                break;
+            }
+        }
+        settled.len() == self.members.len()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
