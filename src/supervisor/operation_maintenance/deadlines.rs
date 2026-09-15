@@ -192,7 +192,7 @@ impl Supervisor {
         let definition = self.services.definition(&operation.service)?;
         Some(
             operation
-                .created_at_ns
+                .lifetime_from_ns
                 .saturating_add(operation_lifetime_ns(operation.operation_type, definition)),
         )
     }

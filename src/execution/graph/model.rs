@@ -62,6 +62,11 @@ pub struct GraphMember {
     pub transition_cause: TransitionCause,
     pub sequence: usize,
     pub status: GraphMemberStatus,
+    /// Whether the last look at this member, while it waited, found it
+    /// held only on facts with no clock (§7.5, `waits_without_clock`).
+    /// Read when it is released: such a start's lifetime runs from the
+    /// release, since it had none while held (PEI-821).
+    pub held_without_clock: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -226,6 +231,9 @@ pub struct ReadyGraphOperation {
     pub reserved_job_id: Option<JobId>,
     pub transition_cause: TransitionCause,
     pub action: ReadyGraphOperationAction,
+    /// The start was held on facts with no clock (§7.5) and is released
+    /// now: its operation lifetime starts here (PEI-821).
+    pub released_from_hold: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

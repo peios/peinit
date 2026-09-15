@@ -184,7 +184,7 @@ fn clamped_deadline(
     let cap_base_ns = if operation.operation_type == OperationType::Restart {
         operation.started_at_ns.unwrap_or(observed_at_ns)
     } else {
-        operation.created_at_ns
+        operation.lifetime_from_ns
     };
     let cap_ns = cap_base_ns.saturating_add(
         phase

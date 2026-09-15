@@ -49,8 +49,14 @@ impl GraphExecutionStore {
                 reserved_job_id: member.reserved_job_id,
                 transition_cause: member.transition_cause,
                 action,
+                // What the last pass found while it still waited: a hold
+                // with no clock ends here, and the lifetime starts here.
+                released_from_hold: member.held_without_clock,
             });
         }
+        // What the members still waiting are held on, for the pass that
+        // releases them.
+        context.note_holds_without_clock();
 
         Ok(operations)
     }

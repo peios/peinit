@@ -19,6 +19,7 @@ impl OperationRecord {
             service: service.into(),
             state: OperationState::Pending,
             created_at_ns,
+            lifetime_from_ns: created_at_ns,
             started_at_ns: None,
             completed_at_ns: None,
             source,

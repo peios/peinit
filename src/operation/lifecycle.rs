@@ -5,6 +5,15 @@ use super::model::{
 };
 
 impl OperationRecord {
+    /// Start the maximum lifetime over from `at_ns`: the start was held on
+    /// a fact with no clock (§7.5) and has just been released. Only a
+    /// Pending operation can have been held.
+    pub fn restart_lifetime_clock(&mut self, at_ns: u64) -> Result<(), OperationTransitionError> {
+        self.ensure_state(OperationState::Pending, OperationTransitionAction::Start)?;
+        self.lifetime_from_ns = at_ns.max(self.created_at_ns);
+        Ok(())
+    }
+
     pub fn start(&mut self, started_at_ns: u64) -> Result<(), OperationTransitionError> {
         self.ensure_state(OperationState::Pending, OperationTransitionAction::Start)?;
         if started_at_ns < self.created_at_ns {

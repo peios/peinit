@@ -117,6 +117,31 @@ impl GraphExecutionContext {
     }
 }
 
+impl GraphExecutionContext {
+    /// Record, on every member still waiting, whether it is held only on
+    /// facts with no clock. Read back when the member is released, so the
+    /// release knows the lifetime was stopped and starts it over. Run on
+    /// every release pass and whenever a hold begins.
+    pub(super) fn note_holds_without_clock(&mut self) {
+        let holds = self
+            .members
+            .values()
+            .filter(|member| member.status == GraphMemberStatus::WaitingForDependencies)
+            .map(|member| {
+                (
+                    member.service.clone(),
+                    self.waits_without_clock(&member.service),
+                )
+            })
+            .collect::<Vec<_>>();
+        for (service, held_without_clock) in holds {
+            if let Some(member) = self.members.get_mut(&service) {
+                member.held_without_clock = held_without_clock;
+            }
+        }
+    }
+}
+
 impl GraphExecutionStore {
     /// Whether `operation_id` is a start held on facts with no clock of
     /// their own, in some live context — the one case in which its

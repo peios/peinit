@@ -42,6 +42,13 @@ pub fn begin_ready_start(
     let activation = next_services
         .prepare_activation_snapshot(&request.ready.service)
         .map_err(StartExecutionError::ServiceTable)?;
+    if request.ready.released_from_hold {
+        // Held on a fact with no clock until now (§7.5): the lifetime
+        // starts at the release, not at a creation the hold outlasted.
+        next_operations
+            .restart_lifetime_clock(request.ready.operation_id, request.started_at_ns)
+            .map_err(StartExecutionError::OperationStore)?;
+    }
     let operation_event = next_operations
         .start_operation(request.ready.operation_id, request.started_at_ns)
         .map_err(StartExecutionError::OperationStore)?;

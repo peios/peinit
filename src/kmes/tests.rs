@@ -101,6 +101,7 @@ fn encodes_operation_terminal_payload() {
         service: "app".to_string(),
         state: OperationState::Completed,
         created_at_ns: 10,
+        lifetime_from_ns: 10,
         started_at_ns: Some(12),
         completed_at_ns: Some(45),
         source: OperationSource::Boot,
