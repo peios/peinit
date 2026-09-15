@@ -31,6 +31,12 @@ impl Supervisor {
         operation_id: OperationId,
         now_ns: u64,
     ) -> bool {
+        // The same exemption the maintenance sweep applies: a held start has
+        // not run out of time, so a client waiting on it is not told that it
+        // has while `svctl status` shows it still pending.
+        if self.graph.is_operation_held(operation_id) {
+            return false;
+        }
         self.operations
             .get(operation_id)
             .and_then(|operation| self.operation_timeout_deadline_ns(operation))
@@ -66,9 +72,25 @@ impl Supervisor {
         self.operations
             .active_records()
             .into_iter()
-            .filter(|operation| operation.state == OperationState::Pending)
+            .filter(|operation| self.pending_operation_lifetime_applies(operation))
             .filter_map(|operation| self.operation_timeout_deadline_ns(operation))
             .min()
+    }
+
+    /// Whether the maximum lifetime (§8.2) runs against this Pending
+    /// operation.
+    ///
+    /// A start the graph is holding — on a readiness level, or on a target
+    /// in Backoff — is Pending for as long as the fact it waits on is
+    /// undecided, and §7.5 says so: a held start does not time out. The
+    /// lifetime timing it out anyway is what made a held start's operation
+    /// vanish from `svctl status` (Failed with `operation_timeout`, the
+    /// service left Inactive with no cause) and, on the boot graph, killed a
+    /// `Wants` level waiter before its publisher went away, so the release
+    /// found nothing to release (PEI-830). Queue time still counts: an
+    /// operation queued behind another is not held by the graph.
+    fn pending_operation_lifetime_applies(&self, operation: &OperationRecord) -> bool {
+        operation.state == OperationState::Pending && !self.graph.is_operation_held(operation.id)
     }
 
     fn next_running_service_main_start_timeout_deadline_ns(&self) -> Option<u64> {
@@ -84,7 +106,7 @@ impl Supervisor {
         self.operations
             .active_records()
             .into_iter()
-            .filter(|operation| operation.state == OperationState::Pending)
+            .filter(|operation| self.pending_operation_lifetime_applies(operation))
             .filter(|operation| {
                 self.operation_timeout_deadline_ns(operation)
                     .is_some_and(|deadline_ns| deadline_ns <= now_ns)
