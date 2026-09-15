@@ -1,4 +1,4 @@
-use crate::boundary::EventdLogSink;
+use crate::boundary::{EventdLogSink, EventdSendOutcome};
 use crate::logging::eventd_log_batch_prefix_len;
 
 use super::{RuntimeEventdLogFlush, RuntimeServiceLogPipes};
@@ -41,7 +41,12 @@ impl RuntimeServiceLogPipes {
             return RuntimeEventdLogFlush::unavailable(true, false, self.pre_eventd.len());
         };
 
-        let flush = self.flush_to_eventd(socket_path, sink);
+        let mut flush = self.flush_to_eventd(socket_path, sink);
+        // Live forwarding discards oversized records as it meets them; they
+        // are reported with the flush so the console line covers both routes.
+        flush.discarded_records = flush
+            .discarded_records
+            .saturating_add(std::mem::take(&mut self.eventd_oversized_records));
         if flush.error.is_some() {
             self.eventd_socket_path = None;
         } else if self.eventd_socket_path.as_deref() != Some(socket_path) {
@@ -54,26 +59,22 @@ impl RuntimeServiceLogPipes {
     where
         S: EventdLogSink + ?Sized,
     {
-        let mut attempted_records = 0;
-        let mut sent_records = 0;
+        let mut progress = FlushProgress::default();
+        let ceiling = match self.eventd_batch_ceiling(socket_path, sink) {
+            Ok(ceiling) => ceiling,
+            Err(error) => return progress.report(self, Some(format!("{error:?}"))),
+        };
         while !self.pre_eventd.is_empty() {
-            let batch_len = eventd_log_batch_prefix_len(
-                self.pre_eventd.iter(),
-                self.config.eventd_log_datagram_bytes,
-            );
+            let batch_len = eventd_log_batch_prefix_len(self.pre_eventd.iter(), ceiling);
             if batch_len == 0 {
-                attempted_records += 1;
-                return RuntimeEventdLogFlush {
-                    eventd_active: true,
-                    socket_path_configured: true,
-                    attempted_records,
-                    sent_records,
-                    buffered_records: self.pre_eventd.len(),
-                    error: Some(format!(
-                        "front log record exceeds eventd datagram ceiling of {} bytes",
-                        self.config.eventd_log_datagram_bytes
-                    )),
-                };
+                // The front record alone is over the ceiling. Reporting that
+                // as a transport failure kept it at the front, and every
+                // later record behind it, for the rest of the boot: give it
+                // up and carry on (PEI-807).
+                progress.attempted_records += 1;
+                progress.discarded_records += 1;
+                self.pre_eventd.discard_front(1);
+                continue;
             }
 
             let batch = self
@@ -82,10 +83,10 @@ impl RuntimeServiceLogPipes {
                 .take(batch_len)
                 .cloned()
                 .collect::<Vec<_>>();
-            attempted_records += batch_len;
+            progress.attempted_records += batch_len;
             match sink.send_eventd_log_records(socket_path, &batch) {
-                Ok(crate::boundary::EventdSendOutcome::Sent) => {
-                    sent_records += batch_len;
+                Ok(EventdSendOutcome::Sent) => {
+                    progress.sent_records += batch_len;
                     self.pre_eventd.discard_front(batch_len);
                 }
                 // Replay is the one place where waiting beats dropping: these
@@ -93,35 +94,44 @@ impl RuntimeServiceLogPipes {
                 // next turn will try again. Crucially this is not an error, so
                 // the socket path is not cleared and forwarding stays on
                 // (PEI-357).
-                Ok(crate::boundary::EventdSendOutcome::Dropped) => {
-                    return RuntimeEventdLogFlush {
-                        eventd_active: true,
-                        socket_path_configured: true,
-                        attempted_records,
-                        sent_records,
-                        buffered_records: self.pre_eventd.len(),
-                        error: None,
-                    };
+                Ok(EventdSendOutcome::Dropped) => return progress.report(self, None),
+                // The socket refused the batch as too large although it was
+                // built to the socket's own ceiling. Retrying it reproduces
+                // the refusal exactly, so the batch is discarded rather than
+                // kept: an identical replay every turn is what stopped log
+                // delivery machine-wide (PEI-807).
+                Ok(EventdSendOutcome::Oversized) => {
+                    progress.discarded_records += batch_len;
+                    self.pre_eventd.discard_front(batch_len);
                 }
-                Err(error) => {
-                    return RuntimeEventdLogFlush {
-                        eventd_active: true,
-                        socket_path_configured: true,
-                        attempted_records,
-                        sent_records,
-                        buffered_records: self.pre_eventd.len(),
-                        error: Some(format!("{error:?}")),
-                    };
-                }
+                Err(error) => return progress.report(self, Some(format!("{error:?}"))),
             }
         }
+        progress.report(self, None)
+    }
+}
+
+#[derive(Default)]
+struct FlushProgress {
+    attempted_records: usize,
+    sent_records: usize,
+    discarded_records: usize,
+}
+
+impl FlushProgress {
+    fn report(
+        &self,
+        pipes: &RuntimeServiceLogPipes,
+        error: Option<String>,
+    ) -> RuntimeEventdLogFlush {
         RuntimeEventdLogFlush {
             eventd_active: true,
             socket_path_configured: true,
-            attempted_records,
-            sent_records,
-            buffered_records: 0,
-            error: None,
+            attempted_records: self.attempted_records,
+            sent_records: self.sent_records,
+            buffered_records: pipes.pre_eventd.len(),
+            discarded_records: self.discarded_records,
+            error,
         }
     }
 }

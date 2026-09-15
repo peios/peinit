@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::os::fd::OwnedFd;
 
-use crate::boundary::LinuxEventdLogSink;
+use crate::boundary::{EventdLogSink, LinuxEventdLogSink};
 use crate::ids::JobId;
 use crate::logging::{PreEventdLogBuffer, RuntimeLogConfig, ServiceLogRecord};
 
@@ -33,6 +33,12 @@ pub struct RuntimeServiceLogPipes {
     /// cannot exert backpressure on senders, and the count is the only trace a
     /// dropped datagram leaves.
     pub(in crate::runtime::logging) eventd_dropped_records: usize,
+    /// Records discarded because they could not fit one eventd datagram at
+    /// all -- a set the socket refused as oversized, or a single record
+    /// larger than the ceiling. Retrying those is pointless by construction,
+    /// so they are counted here and reported by the next flush rather than
+    /// replayed (PEI-807).
+    pub(in crate::runtime::logging) eventd_oversized_records: usize,
     pub(in crate::runtime::logging) eventd_sink: LinuxEventdLogSink,
     pub(in crate::runtime::logging) sinks: BTreeMap<JobId, OutputSink>,
 }
@@ -43,6 +49,7 @@ impl RuntimeServiceLogPipes {
             pre_eventd: PreEventdLogBuffer::new(config.pre_eventd_buffer_bytes),
             eventd_socket_path: None,
             eventd_dropped_records: 0,
+            eventd_oversized_records: 0,
             eventd_sink: LinuxEventdLogSink::new(),
             config,
             pipes: BTreeMap::new(),
@@ -53,6 +60,23 @@ impl RuntimeServiceLogPipes {
     /// How many records eventd's receive buffer has discarded since boot.
     pub fn eventd_dropped_records(&self) -> usize {
         self.eventd_dropped_records
+    }
+
+    /// The datagram ceiling for this socket: the portable ceiling, or the
+    /// socket's own if the sink reports a tighter one. A batch built to the
+    /// portable ceiling alone did not fit a default send buffer (PEI-807).
+    pub(in crate::runtime::logging) fn eventd_batch_ceiling<S>(
+        &self,
+        socket_path: &str,
+        sink: &mut S,
+    ) -> Result<usize, crate::boundary::BoundaryError>
+    where
+        S: EventdLogSink + ?Sized,
+    {
+        let configured = self.config.eventd_log_datagram_bytes;
+        Ok(sink
+            .eventd_datagram_ceiling(socket_path)?
+            .map_or(configured, |socket| socket.min(configured)))
     }
 
     pub fn active_sink_count(&self) -> usize {

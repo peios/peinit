@@ -270,6 +270,158 @@ fn failed_eventd_flush_keeps_unsent_records_buffered() {
     );
 }
 
+// PEI-807. The batches were built to the 262144-byte portable ceiling, but a
+// Unix datagram socket's default send buffer is smaller than that, so a full
+// batch failed with EMSGSIZE -- and, classed as a transport failure, was kept
+// and replayed identically every turn for the rest of the boot. Each batch is
+// now also bounded by what the socket itself reports it can carry.
+#[test]
+fn eventd_flush_bounds_each_batch_by_the_sockets_own_ceiling() {
+    let mut pipes = RuntimeServiceLogPipes::default();
+    pipes.pre_eventd.push(service_record("one"));
+    pipes.pre_eventd.push(service_record("two"));
+    pipes.pre_eventd.push(service_record("three"));
+    let one_record = 1 + pipes
+        .pre_eventd
+        .iter()
+        .map(crate::logging::encoded_eventd_log_record_len)
+        .max()
+        .expect("buffered records");
+    // The configured ceiling would take all three in one datagram; the
+    // socket says it carries one.
+    let mut sink = FakeEventdSink::with_ceiling(one_record);
+
+    let flush = pipes.flush_to_eventd("/run/services/eventd/eventd-log.sock", &mut sink);
+
+    assert_eq!(flush.sent_records, 3);
+    assert_eq!(flush.discarded_records, 0);
+    assert!(flush.error.is_none());
+    assert_eq!(sink.batch_sizes, vec![1, 1, 1]);
+}
+
+#[test]
+fn an_oversized_batch_is_discarded_and_the_flush_carries_on() {
+    let mut pipes = RuntimeServiceLogPipes::default();
+    pipes.pre_eventd.push(service_record("one"));
+    pipes.pre_eventd.push(service_record("two"));
+    pipes.pre_eventd.push(service_record("three"));
+    force_single_record_datagrams(&mut pipes);
+    let mut sink = FakeEventdSink::oversized_on_call(1);
+
+    let flush = pipes.sync_eventd_forwarding_with_sink(
+        true,
+        Some("/run/services/eventd/eventd-log.sock"),
+        &mut sink,
+    );
+
+    assert_eq!(flush.attempted_records, 3);
+    assert_eq!(flush.sent_records, 2);
+    assert_eq!(flush.discarded_records, 1);
+    assert_eq!(flush.buffered_records, 0);
+    assert!(
+        flush.error.is_none(),
+        "the socket is fine; the batch was not"
+    );
+    assert_eq!(
+        sink.sent
+            .iter()
+            .map(|(_, record)| record.message.as_str())
+            .collect::<Vec<_>>(),
+        vec!["two", "three"],
+    );
+    assert!(pipes.buffered_records().is_empty());
+    assert!(
+        pipes.eventd_forwarding_enabled(),
+        "an undeliverable batch must not switch forwarding off",
+    );
+}
+
+#[test]
+fn a_record_over_the_ceiling_is_discarded_instead_of_blocking_the_buffer() {
+    let mut pipes = RuntimeServiceLogPipes::default();
+    pipes
+        .pre_eventd
+        .push(service_record("a message far too long for this datagram"));
+    pipes.pre_eventd.push(service_record("two"));
+    pipes.config.eventd_log_datagram_bytes =
+        1 + crate::logging::encoded_eventd_log_record_len(&service_record("two"));
+    let mut sink = FakeEventdSink::default();
+
+    let flush = pipes.flush_to_eventd("/run/services/eventd/eventd-log.sock", &mut sink);
+
+    assert_eq!(flush.discarded_records, 1);
+    assert_eq!(flush.sent_records, 1);
+    assert_eq!(flush.buffered_records, 0);
+    assert!(flush.error.is_none());
+    assert_eq!(
+        sink.sent
+            .iter()
+            .map(|(_, record)| record.message.as_str())
+            .collect::<Vec<_>>(),
+        vec!["two"],
+    );
+}
+
+#[test]
+fn a_live_oversized_record_is_given_up_and_reported_by_the_next_flush() {
+    let (read, mut write) = pipe_pair();
+    use std::io::Write;
+    write.write_all(b"one\ntwo\n").expect("write logs");
+    drop(write);
+
+    let mut pipes = RuntimeServiceLogPipes::default();
+    let mut registrar = TestRegistrar::default();
+    let event = job_event(JobType::ServiceMain);
+    let fd = read.into_raw_fd();
+    pipes
+        .register_pipe(
+            fd,
+            "app".to_string(),
+            LogStream::Stdout,
+            &event,
+            &mut registrar,
+        )
+        .expect("register pipe");
+    let mut setup_sink = FakeEventdSink::default();
+    pipes.sync_eventd_forwarding_with_sink(
+        true,
+        Some("/run/services/eventd/eventd.sock"),
+        &mut setup_sink,
+    );
+    let mut sink = FakeEventdSink::oversized_on_call(1);
+    pipes.config.eventd_log_datagram_bytes = 1 + [service_record("one"), service_record("two")]
+        .iter()
+        .map(crate::logging::encoded_eventd_log_record_len)
+        .max()
+        .expect("records");
+
+    pipes.process_pipe_event_with_sink(fd, &mut ClockAt(20), &mut registrar, &mut sink);
+
+    assert_eq!(
+        sink.sent
+            .iter()
+            .map(|(_, record)| record.message.as_str())
+            .collect::<Vec<_>>(),
+        vec!["two"],
+        "the batch after the refused one still goes out live",
+    );
+    assert!(pipes.buffered_records().is_empty(), "nothing is rebuffered");
+    assert!(pipes.eventd_forwarding_enabled());
+
+    let flush = pipes.sync_eventd_forwarding_with_sink(
+        true,
+        Some("/run/services/eventd/eventd.sock"),
+        &mut sink,
+    );
+    assert_eq!(flush.discarded_records, 1);
+    let again = pipes.sync_eventd_forwarding_with_sink(
+        true,
+        Some("/run/services/eventd/eventd.sock"),
+        &mut sink,
+    );
+    assert_eq!(again.discarded_records, 0, "reported once");
+}
+
 #[test]
 fn eventd_forwarding_waits_for_supervised_active_state() {
     let mut pipes = RuntimeServiceLogPipes::default();
@@ -804,6 +956,10 @@ struct FakeEventdSink {
     /// Calls that report the receive buffer full — the designed drop, not a
     /// transport failure.
     drop_on_call: Option<usize>,
+    /// Calls the socket refuses as too large (EMSGSIZE).
+    oversized_on_call: Option<usize>,
+    /// The socket's own datagram ceiling, when the fake reports one.
+    ceiling: Option<usize>,
     calls: usize,
 }
 
@@ -818,6 +974,20 @@ impl FakeEventdSink {
     fn drop_on_call(call: usize) -> Self {
         Self {
             drop_on_call: Some(call),
+            ..Self::default()
+        }
+    }
+
+    fn oversized_on_call(call: usize) -> Self {
+        Self {
+            oversized_on_call: Some(call),
+            ..Self::default()
+        }
+    }
+
+    fn with_ceiling(ceiling: usize) -> Self {
+        Self {
+            ceiling: Some(ceiling),
             ..Self::default()
         }
     }
@@ -837,6 +1007,10 @@ impl EventdLogSink for FakeEventdSink {
             self.batch_sizes.push(records.len());
             return Ok(crate::boundary::EventdSendOutcome::Dropped);
         }
+        if self.oversized_on_call == Some(self.calls) {
+            self.batch_sizes.push(records.len());
+            return Ok(crate::boundary::EventdSendOutcome::Oversized);
+        }
         self.batch_sizes.push(records.len());
         self.sent.extend(
             records
@@ -845,6 +1019,13 @@ impl EventdLogSink for FakeEventdSink {
                 .map(|record| (socket_path.to_string(), record)),
         );
         Ok(crate::boundary::EventdSendOutcome::Sent)
+    }
+
+    fn eventd_datagram_ceiling(
+        &mut self,
+        _socket_path: &str,
+    ) -> Result<Option<usize>, BoundaryError> {
+        Ok(self.ceiling)
     }
 }
 

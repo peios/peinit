@@ -298,6 +298,17 @@ impl LinuxShutdownRuntime {
                 &reboot.service,
             );
         }
+        // Records that could not fit one eventd datagram are gone for good,
+        // and a lossy design still owes the operator the fact (PEI-807).
+        if turn.eventd_flush.discarded_records > 0 {
+            crate::runtime::console::push_error(
+                &mut console_messages,
+                format!(
+                    "peinit warning: discarded {} log record(s) too large for an eventd datagram\n",
+                    turn.eventd_flush.discarded_records,
+                ),
+            );
+        }
         // Every job that finished anywhere in this turn -- reaped, timed out,
         // abandoned -- has released its pidfd from the store; close them here,
         // once, after all of the turn's supervisor work has committed. PID 1
