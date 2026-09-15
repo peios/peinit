@@ -107,9 +107,11 @@ mod tests {
     /// default beside it (PEI-804).
     #[test]
     fn linux_runtime_config_for_settings_carries_the_notify_socket_and_quiet_level() {
-        let mut settings = SupervisorSettings::default();
-        settings.notify_socket_path = "/run/alt/notify.sock".to_string();
-        settings.quiet = crate::init::QuietLevel::Blackout;
+        let settings = SupervisorSettings {
+            notify_socket_path: "/run/alt/notify.sock".to_string(),
+            quiet: crate::init::QuietLevel::Blackout,
+            ..Default::default()
+        };
 
         let config = LinuxRuntimeConfig::for_settings(&settings);
 
