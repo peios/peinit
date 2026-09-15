@@ -7,7 +7,7 @@ use crate::control::system::SystemAccessChecker;
 use crate::supervisor::{
     Supervisor, SupervisorControlCommandDispatch, SupervisorControlConnectionTableTurn,
     SupervisorControlConnectionTableTurnError, SupervisorControlConnectionTurnContext,
-    SupervisorControlFrameTurn,
+    SupervisorControlFrameTurn, SupervisorShutdownDispatch,
 };
 
 use super::deadline::sync_deadline_timer;
@@ -15,6 +15,7 @@ use super::model::{
     RuntimeEventRegistrar, RuntimeShutdownDeadlineTimer, RuntimeShutdownEventContext,
     RuntimeShutdownEventTurn, RuntimeShutdownEventTurnError,
 };
+use super::process_setup::release_cancelled_process_setups;
 
 pub(super) fn process_control_connection_event<I, D, C, P, F, A, R, G>(
     supervisor: &mut Supervisor,
@@ -65,6 +66,9 @@ where
         }
         Err(error) => return Err(RuntimeShutdownEventTurnError::ControlConnection(error)),
     };
+    if let Some(shutdown) = control_connection_shutdown(&turn) {
+        release_cancelled_process_setups(&shutdown.cancelled_setups, context.registrar);
+    }
     let deadline_timer_turn = if control_connection_started_shutdown(&turn) {
         Some(sync_deadline_timer(supervisor, deadline_timer)?)
     } else {
@@ -76,6 +80,23 @@ where
         supervisor: Box::new(turn),
         deadline_timer: deadline_timer_turn,
     })
+}
+
+/// The graceful shutdown this connection's frame began, if it began one.
+fn control_connection_shutdown(
+    turn: &SupervisorControlConnectionTableTurn,
+) -> Option<&SupervisorShutdownDispatch> {
+    match turn.turn.frame.as_ref().map(|frame| &frame.frame)? {
+        SupervisorControlFrameTurn::ShutdownAccepted { dispatch, .. } => Some(&dispatch.shutdown),
+        SupervisorControlFrameTurn::CommandAccepted {
+            dispatch: Some(dispatch),
+            ..
+        } => match &**dispatch {
+            SupervisorControlCommandDispatch::Shutdown(dispatch) => Some(&dispatch.shutdown),
+            _ => None,
+        },
+        _ => None,
+    }
 }
 
 fn control_connection_started_shutdown(turn: &SupervisorControlConnectionTableTurn) -> bool {

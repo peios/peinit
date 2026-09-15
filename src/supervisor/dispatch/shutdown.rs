@@ -18,6 +18,24 @@ pub struct SupervisorShutdownDispatch {
     pub startup_job_events: Vec<JobEvent>,
     /// Every live submitted job, signalled to stop at once (PSPU §7.10).
     pub submitted_stops: Vec<super::submitted::SupervisorSubmittedStopDispatch>,
+    /// Process setups of the Starting services' cancelled jobs, for the
+    /// runtime to unregister and close. The supervisor has dropped them; the
+    /// descriptors are registered with epoll and only the runtime can take
+    /// them out.
+    pub cancelled_setups: Vec<SupervisorCancelledProcessSetupDispatch>,
+}
+
+/// A launched process whose job the shutdown cancelled before its setup
+/// status was read (PEI-826).
+///
+/// Its job record is gone, so a status arriving later would find nothing to
+/// apply it to; the setup is dropped with the job, and the runtime removes the
+/// descriptor from epoll so no such status is ever read.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SupervisorCancelledProcessSetupDispatch {
+    pub job_id: crate::ids::JobId,
+    pub service: String,
+    pub setup_status_fd: i32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

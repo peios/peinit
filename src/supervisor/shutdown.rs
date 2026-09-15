@@ -90,6 +90,7 @@ impl Supervisor {
             submitted_stops,
             startup_operation_events: starting_kills.operation_events,
             startup_job_events: starting_kills.job_events,
+            cancelled_setups: starting_kills.cancelled_setups,
         })
     }
 }

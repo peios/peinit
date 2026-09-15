@@ -8,6 +8,8 @@ use crate::runtime::{
 };
 use crate::supervisor::{Supervisor, SupervisorPowerButtonAction};
 
+use super::process_setup::release_cancelled_process_setups;
+
 pub(super) fn process_power_button_event<D, C, P, F, A, R>(
     supervisor: &mut Supervisor,
     fd: i32,
@@ -36,6 +38,9 @@ where
             let dispatch = supervisor
                 .handle_power_button(context.controller, observed_at_ns)
                 .map_err(RuntimeShutdownEventTurnError::Supervisor)?;
+            if let SupervisorPowerButtonAction::Graceful(shutdown) = &dispatch.action {
+                release_cancelled_process_setups(&shutdown.cancelled_setups, context.registrar);
+            }
             let deadline_timer =
                 if matches!(dispatch.action, SupervisorPowerButtonAction::Graceful(_)) {
                     Some(

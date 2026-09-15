@@ -43,14 +43,14 @@ pub use relationship::{
     SupervisorOnFailureLoopSuppressedDispatch, SupervisorOnFailureLoopSuppressionReason,
 };
 pub use shutdown::{
-    SupervisorImmediateShutdownDispatch, SupervisorPowerButtonAction,
-    SupervisorPowerButtonDispatch, SupervisorShutdownAbandonedDispatch,
-    SupervisorShutdownCgroupKillDispatch, SupervisorShutdownDispatch,
-    SupervisorShutdownDriveDispatch, SupervisorShutdownFinalizationDispatch,
-    SupervisorShutdownKillDispatch, SupervisorShutdownSignalAction,
-    SupervisorShutdownSignalDispatch, SupervisorShutdownStopDispatch,
-    SupervisorShutdownTerminalDispatch, SupervisorShutdownTimeoutDispatch,
-    SupervisorSystemShutdownDispatch,
+    SupervisorCancelledProcessSetupDispatch, SupervisorImmediateShutdownDispatch,
+    SupervisorPowerButtonAction, SupervisorPowerButtonDispatch,
+    SupervisorShutdownAbandonedDispatch, SupervisorShutdownCgroupKillDispatch,
+    SupervisorShutdownDispatch, SupervisorShutdownDriveDispatch,
+    SupervisorShutdownFinalizationDispatch, SupervisorShutdownKillDispatch,
+    SupervisorShutdownSignalAction, SupervisorShutdownSignalDispatch,
+    SupervisorShutdownStopDispatch, SupervisorShutdownTerminalDispatch,
+    SupervisorShutdownTimeoutDispatch, SupervisorSystemShutdownDispatch,
 };
 pub use start::{
     SupervisorFdStoreRejectionDispatch, SupervisorNotifyDispatch,
