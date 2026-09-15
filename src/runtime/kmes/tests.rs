@@ -147,7 +147,7 @@ fn runtime_loop_collector_emits_access_denial_audit_events() {
             fd: 44,
             turn: SupervisorControlConnectionTurn {
                 read: ControlConnectionReadTurn::WouldBlock { buffered_bytes: 0 },
-                frame: Some(SupervisorControlConnectionFrameTurn {
+                frames: vec![SupervisorControlConnectionFrameTurn {
                     frame: SupervisorControlFrameTurn::CommandRejected {
                         response_line: b"{\"status\":\"error\",\"code\":\"ACCESS_DENIED\"}\n"
                             .to_vec(),
@@ -156,7 +156,7 @@ fn runtime_loop_collector_emits_access_denial_audit_events() {
                     },
                     pending_write_bytes: 0,
                     close_after_write: false,
-                }),
+                }],
                 write: ControlConnectionWriteTurn::Idle {
                     close_after_write: false,
                 },

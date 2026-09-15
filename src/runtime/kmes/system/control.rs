@@ -21,7 +21,7 @@ pub(in crate::runtime::kmes) fn collect_control_connection_table_turn(
     turn: &SupervisorControlConnectionTableTurn,
     out: &mut Vec<KmesEvent>,
 ) -> Result<(), BoundaryError> {
-    if let Some(frame) = &turn.turn.frame {
+    for frame in &turn.turn.frames {
         collect_control_frame_turn(&frame.frame, out)?;
     }
     Ok(())

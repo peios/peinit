@@ -14,9 +14,10 @@ use self::support::{
 use crate::boundary::{Clock, ConsoleSink, ProcessController, RealtimeClock};
 use crate::runtime::{
     RuntimeEventRegistrationError, RuntimeEventSource, RuntimeEventWaiter,
-    RuntimeShutdownEventSources, RuntimeShutdownLoopContext, RuntimeShutdownLoopError,
-    RuntimeShutdownLoopTurn, collect_runtime_loop_console_messages,
-    prepare_runtime_shutdown_loop_turn, process_runtime_shutdown_sources_with_registry,
+    RuntimeShutdownEventContext, RuntimeShutdownEventSources, RuntimeShutdownEventTurn,
+    RuntimeShutdownLoopContext, RuntimeShutdownLoopError, RuntimeShutdownLoopTurn,
+    collect_runtime_loop_console_messages, prepare_runtime_shutdown_loop_turn,
+    process_runtime_shutdown_sources_with_registry, resume_buffered_control_frames,
 };
 use crate::supervisor::{
     Supervisor, SupervisorError, SupervisorLifecycleDeadlineTimerTurn,
@@ -59,6 +60,54 @@ impl LinuxShutdownRuntime {
         }
     }
 
+    /// Answer the control waits that are ready, then drive a turn for every
+    /// connection that answer unblocked a buffered request on (PEI-1073).
+    fn flush_operation_waits_and_resume_at(
+        &mut self,
+        supervisor: &mut Supervisor,
+        now_ns: u64,
+        realtime_now_ns: u64,
+    ) -> Result<Vec<RuntimeShutdownEventTurn>, RuntimeShutdownLoopError> {
+        flush_operation_waits_at(
+            supervisor,
+            &mut self.control_connections,
+            now_ns,
+            realtime_now_ns,
+        )?;
+        if self
+            .control_connections
+            .fds_with_runnable_frames()
+            .is_empty()
+        {
+            return Ok(Vec::new());
+        }
+        let control_security = supervisor.control_security().clone();
+        let control_limits = self.runtime_control_limits(supervisor);
+        #[cfg(feature = "peios-registry")]
+        let control_registry = Some(&mut self.registry);
+        #[cfg(not(feature = "peios-registry"))]
+        let control_registry = None::<&mut crate::runtime::NoRuntimeRegistryClient>;
+        resume_buffered_control_frames(
+            supervisor,
+            &mut self.control_connections,
+            control_registry,
+            &mut self.deadline_timer,
+            RuntimeShutdownEventContext {
+                clock: &mut self.clock,
+                controller: &mut self.controller,
+                process_launcher: Some(&mut self.process_launcher),
+                finalizer: &mut self.finalizer,
+                access_checker: &mut self.access_checker,
+                registrar: &mut self.epoll,
+                boot_attempt_counter: &mut self.boot_attempt_counter,
+                control_security: &control_security,
+                control_limits,
+                job_identity_provider: &mut self.job_identity_provider,
+                jobs_limits: supervisor.jobs_limits(),
+            },
+        )
+    }
+
     pub fn run_turn(
         &mut self,
         supervisor: &mut Supervisor,
@@ -70,7 +119,7 @@ impl LinuxShutdownRuntime {
         // cannot be judged against a different state than the one beside it.
         self.quiet_policy =
             crate::runtime::console::QuietPolicy::evaluate(self.quiet, supervisor.services());
-        let pre_work = {
+        let prepared = {
             let control_security = supervisor.control_security().clone();
             let control_limits = self.runtime_control_limits(supervisor);
             let mut event_sources = RuntimeShutdownEventSources {
@@ -103,7 +152,16 @@ impl LinuxShutdownRuntime {
                 job_identity_provider: &mut self.job_identity_provider,
                 jobs_limits: supervisor.jobs_limits(),
             };
-            prepare_runtime_shutdown_loop_turn(supervisor, &mut event_sources, &mut context)?
+            #[cfg(feature = "peios-registry")]
+            let control_registry = Some(&mut self.registry);
+            #[cfg(not(feature = "peios-registry"))]
+            let control_registry = None::<&mut crate::runtime::NoRuntimeRegistryClient>;
+            prepare_runtime_shutdown_loop_turn(
+                supervisor,
+                &mut event_sources,
+                control_registry,
+                &mut context,
+            )?
         };
         let before_wait_ns = self
             .clock
@@ -115,9 +173,8 @@ impl LinuxShutdownRuntime {
             .map_err(RuntimeShutdownLoopError::Clock)?;
         let maintenance_before_wait =
             process_due_operation_maintenance_at(supervisor, &mut self.controller, before_wait_ns)?;
-        flush_operation_waits_at(
+        let resumed_before_wait = self.flush_operation_waits_and_resume_at(
             supervisor,
-            &mut self.control_connections,
             before_wait_ns,
             before_wait_realtime_ns,
         )?;
@@ -180,6 +237,13 @@ impl LinuxShutdownRuntime {
         )?;
         prepend_idle_closure_turn(&mut turn, idle_closed_before_wait);
         prepend_idle_jobs_closure_turn(&mut turn, idle_jobs_closed_before_wait);
+        turn.turns.splice(
+            0..0,
+            prepared
+                .resumed_control_turns
+                .into_iter()
+                .chain(resumed_before_wait),
+        );
         let after_sources_ns = self
             .clock
             .monotonic_ns()
@@ -225,12 +289,12 @@ impl LinuxShutdownRuntime {
             &mut self.finalizer,
             after_sources_ns,
         )?;
-        flush_operation_waits_at(
+        let resumed_after_sources = self.flush_operation_waits_and_resume_at(
             supervisor,
-            &mut self.control_connections,
             after_sources_ns,
             after_sources_realtime_ns,
         )?;
+        turn.turns.extend(resumed_after_sources);
         append_idle_closure_turn(
             &mut turn,
             self.close_idle_control_connections(after_sources_ns),
@@ -261,7 +325,7 @@ impl LinuxShutdownRuntime {
         let calendar_turns = self.process_calendar_timer_sources(supervisor, &calendar_sources)?;
         emit_runtime_loop_kmes_events(
             &mut self.kmes_sink,
-            &pre_work,
+            &prepared.pre_work,
             &maintenance_before_wait,
             &turn.turns,
             &turn.post_work,
@@ -272,7 +336,7 @@ impl LinuxShutdownRuntime {
         let failed_last_run_writes = self.claim_timer_last_run_write_exits(&turn.turns);
         let mut console_messages = Vec::new();
         collect_runtime_loop_console_messages(
-            &pre_work,
+            &prepared.pre_work,
             &turn.turns,
             &turn.post_work,
             &calendar_turns,
@@ -330,7 +394,7 @@ impl LinuxShutdownRuntime {
             .extend(calendar_turns.into_iter().map(|(fd, turn)| {
                 crate::runtime::RuntimeShutdownEventTurn::CalendarTimer { fd, turn }
             }));
-        turn.pre_work = pre_work;
+        turn.pre_work = prepared.pre_work;
         Ok(turn)
     }
 

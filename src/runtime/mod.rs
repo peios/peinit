@@ -17,6 +17,8 @@ pub(crate) use console::collect_runtime_loop_console_messages;
 pub(crate) use event_loop::prepare_runtime_shutdown_loop_turn;
 #[cfg(any(test, feature = "peios-boundary"))]
 pub(crate) use event_loop::process_runtime_shutdown_sources_with_registry;
+#[cfg(any(test, feature = "peios-boundary"))]
+pub(crate) use event_loop::resume_buffered_control_frames;
 #[cfg(feature = "peios-boundary")]
 pub(crate) use kmes::collect_runtime_loop_kmes_events;
 pub(crate) use turn::{register_filesystem_check_helper_sources, register_process_setup_sources};

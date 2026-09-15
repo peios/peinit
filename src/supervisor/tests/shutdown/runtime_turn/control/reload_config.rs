@@ -124,8 +124,8 @@ fn runtime_sources_reject_reload_config_during_shutdown() {
         ..
     } = connection_turn
         .turn
-        .frame
-        .as_ref()
+        .frames
+        .first()
         .expect("frame")
         .frame
         .clone()

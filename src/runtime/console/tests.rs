@@ -49,7 +49,7 @@ fn a_reset_that_leaves_the_abandoned_cgroup_leaked_warns_on_the_console() {
                 read: crate::control::connection::ControlConnectionReadTurn::WouldBlock {
                     buffered_bytes: 0,
                 },
-                frame: Some(crate::supervisor::SupervisorControlConnectionFrameTurn {
+                frames: vec![crate::supervisor::SupervisorControlConnectionFrameTurn {
                     frame: crate::supervisor::SupervisorControlFrameTurn::CommandAccepted {
                         response_line: None,
                         dispatch: Some(Box::new(
@@ -64,7 +64,7 @@ fn a_reset_that_leaves_the_abandoned_cgroup_leaked_warns_on_the_console() {
                     },
                     pending_write_bytes: 0,
                     close_after_write: false,
-                }),
+                }],
                 write: crate::control::connection::ControlConnectionWriteTurn::Idle {
                     close_after_write: false,
                 },
