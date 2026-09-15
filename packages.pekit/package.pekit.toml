@@ -72,7 +72,13 @@ format = "peipkg"
 # 0.0.5-5 (2026-09-15): two follow-ups the full run found — a readiness for
 # a setup a shutdown cancelled is stale, not EBADF (PEI-826); a fraction in
 # any calendar time field is fractional seconds (PEI-845).
-version      = "{{version}}-5"
+# 0.0.5-6 (2026-09-15): the ruled batch — internal errors contained to one
+# service (PEI-1125), bounded job.ended and a 32 KiB jobs message (PEI-1082),
+# the boot window and its coalesced reload (PEI-350), per-key reload
+# decoding (PEI-621), registryd inherits ServiceSecurity (PEI-1072), an
+# operation keeps its target's descriptor (PEI-1076), held starts across
+# Backoff and readiness levels (PEI-821, PEI-830).
+version      = "{{version}}-6"
 architecture = "x86_64"
 license      = "MIT"
 license_class = "free"
