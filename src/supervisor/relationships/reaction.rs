@@ -54,6 +54,14 @@ pub(in crate::supervisor) fn apply_relationship_reactions_after_transitions(
     }
 
     apply_binds_to_propagation(work, transitions, observed_at_ns)?;
+    // A service held for a restart (§6.1) whose state has now decided it —
+    // stopped, withdrawn, failed without a start operation — settles its
+    // dependents here, so every route that moves a service reaches them.
+    crate::supervisor::held_starts::settle_held_restarts(
+        work,
+        observed_at_ns,
+        max_parallel_starts,
+    )?;
 
     let mut start_dispatches = Vec::new();
     start_dispatches.extend(apply_on_failure_starts(

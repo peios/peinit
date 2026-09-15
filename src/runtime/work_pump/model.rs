@@ -3,9 +3,9 @@ use crate::boundary::{
 };
 use crate::supervisor::{
     SupervisorControlDispatch, SupervisorControlFailureDispatch, SupervisorControlLaunchDispatch,
-    SupervisorError,
-    SupervisorFilesystemCheckLaunchDispatch, SupervisorHealthCheckLaunchCancelledDispatch,
-    SupervisorHealthCheckLaunchDispatch, SupervisorHealthCheckLaunchFailureDispatch,
+    SupervisorError, SupervisorFilesystemCheckLaunchDispatch,
+    SupervisorHealthCheckLaunchCancelledDispatch, SupervisorHealthCheckLaunchDispatch,
+    SupervisorHealthCheckLaunchFailureDispatch, SupervisorHeldRestartSettlementDispatch,
     SupervisorLaunchDispatch, SupervisorLaunchFailureDispatch,
     SupervisorPendingProcessSetupDispatch, SupervisorPostStartHookLaunchDispatch,
     SupervisorPostStartHookLaunchFailureDispatch, SupervisorPromotedOperationDispatch,
@@ -38,6 +38,8 @@ pub struct RuntimeWorkPumpTurn {
     pub control_operations: Vec<SupervisorControlDispatch>,
     /// Control operations that failed before they began (PEI-803).
     pub control_operation_failures: Vec<SupervisorControlFailureDispatch>,
+    /// Holds on services in Backoff settled by the service's state (PEI-821).
+    pub held_restart_settlements: Vec<SupervisorHeldRestartSettlementDispatch>,
     pub filesystem_check_launches: Vec<SupervisorFilesystemCheckLaunchDispatch>,
     pub start_hook_launches: Vec<SupervisorStartHookLaunchDispatch>,
     pub start_hook_launch_failures: Vec<SupervisorStartHookLaunchFailureDispatch>,
@@ -63,6 +65,7 @@ impl RuntimeWorkPumpTurn {
             && self.promoted_operations.is_empty()
             && self.control_operations.is_empty()
             && self.control_operation_failures.is_empty()
+            && self.held_restart_settlements.is_empty()
             && self.filesystem_check_launches.is_empty()
             && self.start_hook_launches.is_empty()
             && self.start_hook_launch_failures.is_empty()
@@ -87,6 +90,8 @@ impl RuntimeWorkPumpTurn {
         self.control_operations.extend(step.control_operation);
         self.control_operation_failures
             .extend(step.control_operation_failures);
+        self.held_restart_settlements
+            .extend(step.held_restart_settlements);
         self.filesystem_check_launches
             .extend(step.filesystem_check_launch);
         self.start_hook_launches.extend(step.start_hook_launch);
@@ -119,6 +124,8 @@ pub(super) struct RuntimeWorkPumpStep {
     pub promoted_operations: Vec<SupervisorPromotedOperationDispatch>,
     pub control_operation: Option<SupervisorControlDispatch>,
     pub control_operation_failures: Vec<SupervisorControlFailureDispatch>,
+    /// Holds on services in Backoff settled by the service's state (PEI-821).
+    pub held_restart_settlements: Vec<SupervisorHeldRestartSettlementDispatch>,
     pub filesystem_check_launch: Option<SupervisorFilesystemCheckLaunchDispatch>,
     pub start_hook_launch: Option<SupervisorStartHookLaunchDispatch>,
     pub start_hook_launch_failure: Option<SupervisorStartHookLaunchFailureDispatch>,
@@ -143,6 +150,7 @@ impl RuntimeWorkPumpStep {
         !self.promoted_operations.is_empty()
             || self.control_operation.is_some()
             || !self.control_operation_failures.is_empty()
+            || !self.held_restart_settlements.is_empty()
             || self.filesystem_check_launch.is_some()
             || self.start_hook_launch.is_some()
             || self.start_hook_launch_failure.is_some()

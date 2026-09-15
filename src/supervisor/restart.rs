@@ -11,6 +11,7 @@ use crate::security::TokenSummary;
 use crate::service::runtime::{ServiceState, ServiceTransition, TransitionCause};
 
 use super::dispatch::{SupervisorRestartBackoffDispatch, SupervisorRestartBackoffFailureDispatch};
+use super::held_starts::settle_held_restarts;
 
 /// The abort reason §8.1 names, verbatim.
 pub(super) const RESTART_DEFINITION_REMOVED: &str = "definition_removed_during_restart_stop_leg";
@@ -53,6 +54,14 @@ impl Supervisor {
                     failures.push(fail_relaunch_after_internal_error(
                         &mut work, deadline, now_ns, error,
                     )?);
+                    // `Backoff -> Failed` with no start operation through
+                    // the graph: the dependents held for this restart are
+                    // settled from the state (PEI-821).
+                    settle_held_restarts(
+                        &mut work,
+                        now_ns,
+                        self.settings.phase2.max_parallel_starts,
+                    )?;
                     continue;
                 }
             };
@@ -102,18 +111,17 @@ fn fail_relaunch_after_internal_error(
         .current_for_service(&due.service)
         .filter(|operation| operation.state == OperationState::Pending)
         .map(|operation| operation.id);
-    let operation_event = match pending {
-        Some(id) => Some(
-            work.operations
-                .fail_operation(id, now_ns, reason)
-                .map_err(|error| {
+    let operation_event =
+        match pending {
+            Some(id) => Some(work.operations.fail_operation(id, now_ns, reason).map_err(
+                |error| {
                     SupervisorError::Control(
                         crate::execution::control::ControlExecutionError::OperationStore(error),
                     )
-                })?,
-        ),
-        None => None,
-    };
+                },
+            )?),
+            None => None,
+        };
     Ok(SupervisorRestartBackoffFailureDispatch {
         due,
         service_transition,

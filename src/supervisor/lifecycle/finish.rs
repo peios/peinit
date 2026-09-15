@@ -3,6 +3,7 @@ use crate::control::lifecycle::LifecycleCommandOutcome;
 use super::super::control_boundary::{PendingControlOperation, queue_control_boundary};
 use super::super::dispatch::SupervisorLifecycleDispatch;
 use super::super::fd_store_lifecycle::synchronous_clear_fd_store_service;
+use super::super::held_starts::settle_held_restarts;
 use super::super::relationships::gate_start_context;
 use super::super::state::{Supervisor, SupervisorError};
 use super::super::work::SupervisorWork;
@@ -56,6 +57,10 @@ pub(in crate::supervisor::lifecycle) fn finish_lifecycle_outcome(
             if let Some(service) = synchronous_clear_fd_store_service(&outcome) {
                 work.fd_store.clear_service(service);
             }
+            // A `stop` of a service in Backoff is synchronous and passes
+            // through no operation of the graph's, so the dependents held
+            // for its restart are settled here: it is not coming back.
+            settle_held_restarts(&mut work, observed_at_ns, max_parallel_starts)?;
             work.commit(supervisor);
             Ok(empty_lifecycle_dispatch(outcome, None))
         }

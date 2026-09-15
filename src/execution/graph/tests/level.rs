@@ -3,7 +3,7 @@ use super::*;
 /// A dispatch whose plan starts only the requested service — the shape the
 /// planner produces when every dependency is already active, which is
 /// exactly when a level edge's target is not a member.
-fn single_start_dispatch(requested: &str, id: OperationId) -> OnDemandStartDispatch {
+pub(super) fn single_start_dispatch(requested: &str, id: OperationId) -> OnDemandStartDispatch {
     OnDemandStartDispatch {
         plan: OnDemandStartPlan {
             requested: requested.to_string(),

@@ -26,6 +26,7 @@ use super::boot_settle::BootSettleTracker;
 use super::boot_success::BootSuccessTracker;
 use super::cgroup_cleanup::CgroupCleanupStore;
 use super::control_boundary::PendingControlOperation;
+use super::dispatch::SupervisorHeldRestartSettlementDispatch;
 use super::health::HealthCheckStore;
 use super::relationships::RelationshipStore;
 use super::state::Supervisor;
@@ -66,6 +67,11 @@ pub(super) struct SupervisorWork {
     pub boot_success: BootSuccessTracker,
     pub shutdown: Option<ShutdownRuntime>,
     pub shutdown_signals: ShutdownSignalTracker,
+    /// Holds on services in Backoff that this transaction settled by state
+    /// (PEI-821). Appended to the supervisor's on commit, for the work pump
+    /// to report; starts empty because a snapshot must not re-report what
+    /// an earlier transaction already committed.
+    pub held_restart_settlements: Vec<SupervisorHeldRestartSettlementDispatch>,
 }
 
 impl SupervisorWork {
@@ -104,6 +110,7 @@ impl SupervisorWork {
             boot_success: supervisor.boot_success.clone(),
             shutdown: supervisor.shutdown.clone(),
             shutdown_signals: supervisor.shutdown_signals.clone(),
+            held_restart_settlements: Vec::new(),
         }
     }
 
@@ -148,6 +155,9 @@ impl SupervisorWork {
         supervisor.boot_success = self.boot_success;
         supervisor.shutdown = self.shutdown;
         supervisor.shutdown_signals = self.shutdown_signals;
+        supervisor
+            .held_restart_settlements
+            .extend(self.held_restart_settlements);
     }
 
     pub fn shutdown(&self) -> Result<&ShutdownRuntime, ShutdownError> {

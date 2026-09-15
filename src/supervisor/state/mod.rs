@@ -86,6 +86,10 @@ pub struct Supervisor {
     /// drained them. Failed rather than fatal: see
     /// [`super::SupervisorRestartBackoffFailureDispatch`].
     pub(super) restart_backoff_failures: Vec<super::SupervisorRestartBackoffFailureDispatch>,
+    /// Holds on services in Backoff settled by the service's state since the
+    /// work pump last drained them (PEI-821). See
+    /// [`super::SupervisorHeldRestartSettlementDispatch`].
+    pub(super) held_restart_settlements: Vec<super::SupervisorHeldRestartSettlementDispatch>,
     pub(super) retained_service_launches: Vec<LaunchCreatedJobDispatch>,
     pub(super) boot_settle: BootSettleTracker,
     pub(super) boot_success: BootSuccessTracker,
@@ -139,6 +143,7 @@ impl Supervisor {
             pending_control_operations: VecDeque::new(),
             control_operation_failures: Vec::new(),
             restart_backoff_failures: Vec::new(),
+            held_restart_settlements: Vec::new(),
             retained_service_launches: Vec::new(),
             boot_settle: BootSettleTracker::default(),
             boot_success: BootSuccessTracker::default(),

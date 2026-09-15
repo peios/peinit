@@ -33,6 +33,16 @@ pub enum GraphMemberStatus {
     WaitingForPreStartCheck,
     WaitingForDependencies,
     Running,
+    /// The start operation failed but the service went to Backoff: it is
+    /// *going* to start again, under an operation this context does not
+    /// own. Not terminal, so the context stays live and every dependent
+    /// waiting on this member stays held (§6.1) — a held dependent looks
+    /// exactly like a start held on a readiness level, Inactive with its
+    /// operation Pending. The hold ends when the service next reaches a
+    /// dependent-satisfying state (`Satisfied`) or gives up — restart
+    /// budget exhausted, stopped, withdrawn — (`Failed`), through
+    /// `settle_awaiting_restart` (PEI-821).
+    AwaitingRestart,
     Satisfied,
     Failed,
     Pruned,

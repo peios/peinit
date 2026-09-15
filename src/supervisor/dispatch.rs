@@ -19,9 +19,9 @@ pub use boot::{
 };
 pub use control::{
     SupervisorControlDispatch, SupervisorControlFailureDispatch, SupervisorControlLaunchDispatch,
-    SupervisorControlLaunchResult,
-    SupervisorReloadCommandTerminalDispatch, SupervisorReloadCommandTimeoutDispatch,
-    SupervisorReloadDetectionDispatch, SupervisorStopEscalationDispatch,
+    SupervisorControlLaunchResult, SupervisorReloadCommandTerminalDispatch,
+    SupervisorReloadCommandTimeoutDispatch, SupervisorReloadDetectionDispatch,
+    SupervisorStopEscalationDispatch,
 };
 pub use health::{
     SupervisorHealthCheckIntervalAction, SupervisorHealthCheckIntervalDispatch,
@@ -40,7 +40,9 @@ pub use launch::{
 };
 pub use lifecycle::SupervisorLifecycleDispatch;
 pub use relationship::{
-    SupervisorOnFailureLoopSuppressedDispatch, SupervisorOnFailureLoopSuppressionReason,
+    SupervisorHeldRestartAbandonReason, SupervisorHeldRestartOutcome,
+    SupervisorHeldRestartSettlementDispatch, SupervisorOnFailureLoopSuppressedDispatch,
+    SupervisorOnFailureLoopSuppressionReason,
 };
 pub use shutdown::{
     SupervisorCancelledProcessSetupDispatch, SupervisorImmediateShutdownDispatch,

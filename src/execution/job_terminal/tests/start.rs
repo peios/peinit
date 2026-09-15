@@ -100,5 +100,9 @@ fn starting_simple_process_exit_fails_start_operation() {
     );
     assert_eq!(dispatch.operation_events.len(), 1);
     assert_eq!(dispatch.service_transitions.len(), 1);
-    assert_eq!(dispatch.graph_events.len(), 1);
+    // Backoff holds the graph member rather than failing it: the service is
+    // going to start again, so nothing terminal has happened to its
+    // dependents (§6.1, PEI-821).
+    assert!(dispatch.graph_events.is_empty());
+    assert!(fixture.graph.is_awaiting_restart("app"));
 }

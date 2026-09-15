@@ -85,6 +85,19 @@ where
     };
     let pending_control_after = supervisor.pending_control_operations().len();
     let control_operation_failures = supervisor.take_control_operation_failures();
+    // A hold on a service in Backoff that its state has decided but no
+    // transition funnel has settled — a definition withdrawn on reload has
+    // no other hook — is settled here, with a clock (PEI-821).
+    if supervisor.has_settleable_held_restarts() {
+        let now_ns = context
+            .clock
+            .monotonic_ns()
+            .map_err(|error| RuntimeWorkPumpError::Supervisor(SupervisorError::Clock(error)))?;
+        supervisor
+            .settle_held_restarts_now(now_ns)
+            .map_err(RuntimeWorkPumpError::Supervisor)?;
+    }
+    let held_restart_settlements = supervisor.take_held_restart_settlements();
     let stale_control_operations = if control_operation.is_none() {
         pending_control_before
             .saturating_sub(pending_control_after)
@@ -237,6 +250,7 @@ where
         promoted_operations,
         control_operation,
         control_operation_failures,
+        held_restart_settlements,
         filesystem_check_launch,
         start_hook_launch,
         start_hook_launch_failure,
