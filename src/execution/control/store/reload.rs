@@ -88,6 +88,10 @@ impl ReloadDeadlineStore {
         self.commands.insert(deadline.operation_id, deadline);
     }
 
+    pub(super) fn command(&self, operation_id: OperationId) -> Option<ReloadCommandDeadline> {
+        self.commands.get(&operation_id).cloned()
+    }
+
     pub(super) fn due_commands(&self, now_ns: u64) -> Vec<ReloadCommandDeadline> {
         self.commands
             .values()

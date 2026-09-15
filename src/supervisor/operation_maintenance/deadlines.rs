@@ -155,13 +155,58 @@ impl Supervisor {
         })
     }
 
+    /// When the operation is considered to have run out of time.
+    ///
+    /// Once the transition is under way this is the phase deadline the
+    /// service itself is held to — the one `EXTEND_TIMEOUT_USEC` moves — so a
+    /// `wait=true` caller is told OPERATION_TIMEOUT when the service fails
+    /// its deadline, not while it is still running against an extension it
+    /// was granted (PEI-838). Before the phase deadline exists, the lifetime
+    /// the definition allows from the request.
     fn operation_timeout_deadline_ns(&self, operation: &OperationRecord) -> Option<u64> {
+        if let Some(due_at_ns) = self.operation_phase_deadline_ns(operation) {
+            return Some(due_at_ns);
+        }
         let definition = self.services.definition(&operation.service)?;
         Some(
             operation
                 .created_at_ns
                 .saturating_add(operation_lifetime_ns(operation.operation_type, definition)),
         )
+    }
+
+    /// The deadline of the phase the operation is currently in, if it has
+    /// reached one that keeps its own: readiness for a start, the stop
+    /// timeout for a stop, and the command or detection deadline for a
+    /// reload. A restart passes through its stop deadline and then its
+    /// readiness deadline; the later phase wins when both are recorded.
+    fn operation_phase_deadline_ns(&self, operation: &OperationRecord) -> Option<u64> {
+        let operation_id = operation.id;
+        match operation.operation_type {
+            OperationType::Start | OperationType::Restart => self
+                .start
+                .readiness_deadline(operation_id)
+                .map(|deadline| deadline.due_at_ns)
+                .or_else(|| {
+                    self.control
+                        .stop_timeout(operation_id)
+                        .map(|deadline| deadline.due_at_ns)
+                }),
+            OperationType::Stop => self
+                .control
+                .stop_timeout(operation_id)
+                .map(|deadline| deadline.due_at_ns),
+            OperationType::Reload => self
+                .control
+                .reload_command_deadline(operation_id)
+                .map(|deadline| deadline.due_at_ns)
+                .or_else(|| {
+                    self.control
+                        .reload_detection_deadline(operation_id)
+                        .map(|deadline| deadline.due_at_ns)
+                }),
+            OperationType::Reset => None,
+        }
     }
 }
 

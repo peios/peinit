@@ -24,6 +24,10 @@ impl StartExecutionStore {
         self.readiness_deadlines.remove(&operation_id)
     }
 
+    pub fn readiness_deadline(&self, operation_id: OperationId) -> Option<ReadinessDeadline> {
+        self.readiness_deadlines.get(&operation_id).cloned()
+    }
+
     pub fn readiness_deadline_for_service(&self, service: &str) -> Option<ReadinessDeadline> {
         self.readiness_deadlines
             .values()

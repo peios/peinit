@@ -46,6 +46,63 @@ fn starting_extend_timeout_resets_readiness_deadline_and_clamps_to_start_cap() {
     );
 }
 
+/// The waiter's deadline is the service's: an extension that moves the
+/// readiness deadline moves when a `wait=true` caller is told
+/// OPERATION_TIMEOUT too, instead of leaving it at the definition's
+/// StartTimeout while the service runs on against its extension (PEI-838).
+#[test]
+fn starting_extend_timeout_moves_the_waiters_deadline_with_the_services() {
+    let mut supervisor = notify_app_supervisor();
+    let old_deadline = supervisor
+        .next_readiness_timeout()
+        .expect("readiness timeout");
+    let operation_id = old_deadline.operation_id;
+    assert!(!supervisor.operation_timeout_expired(operation_id, old_deadline.due_at_ns - 1));
+    assert!(supervisor.operation_timeout_expired(operation_id, old_deadline.due_at_ns));
+
+    apply_notify(
+        &mut supervisor,
+        datagram(8000, b"EXTEND_TIMEOUT_USEC=1000000000"),
+        NOTIFY_NS,
+    )
+    .expect("extend start timeout");
+
+    let extended_deadline_ns = old_deadline.due_at_ns + START_CAP_EXTENSION_NS;
+    assert!(!supervisor.operation_timeout_expired(operation_id, old_deadline.due_at_ns));
+    assert!(!supervisor.operation_timeout_expired(operation_id, extended_deadline_ns - 1));
+    assert!(supervisor.operation_timeout_expired(operation_id, extended_deadline_ns));
+}
+
+#[test]
+fn command_reload_extend_timeout_moves_the_waiters_deadline_with_the_services() {
+    let mut supervisor = active_command_reload_supervisor();
+    let operation_id = reload_app(&mut supervisor);
+    let mut controller = TestProcessController::default();
+    let mut clock = ScriptedClock::new([CONTROL_NS]);
+    supervisor
+        .execute_next_pending_control_operation(&mut controller, &mut clock)
+        .expect("execute reload")
+        .expect("reload dispatch");
+    let old_deadline = supervisor
+        .next_reload_command_timeout()
+        .expect("reload command timeout");
+    assert_eq!(old_deadline.operation_id, operation_id);
+    assert!(!supervisor.operation_timeout_expired(operation_id, old_deadline.due_at_ns - 1));
+    assert!(supervisor.operation_timeout_expired(operation_id, old_deadline.due_at_ns));
+
+    apply_notify(
+        &mut supervisor,
+        datagram(8000, b"EXTEND_TIMEOUT_USEC=1000000000"),
+        RELOAD_NOTIFY_NS,
+    )
+    .expect("extend reload timeout");
+
+    let extended_deadline_ns = old_deadline.due_at_ns + RELOAD_COMMAND_CAP_EXTENSION_NS;
+    assert!(!supervisor.operation_timeout_expired(operation_id, old_deadline.due_at_ns));
+    assert!(!supervisor.operation_timeout_expired(operation_id, extended_deadline_ns - 1));
+    assert!(supervisor.operation_timeout_expired(operation_id, extended_deadline_ns));
+}
+
 #[test]
 fn normal_stopping_extend_timeout_resets_stop_deadline_and_clamps_to_stop_cap() {
     let mut supervisor = active_app_supervisor();
