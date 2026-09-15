@@ -9,3 +9,4 @@ mod notify;
 mod stop;
 mod submit;
 mod support;
+mod view;

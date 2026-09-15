@@ -2,7 +2,6 @@
 //! has happened — run once per turn, like the control channel's waits.
 
 use crate::control::wire::ControlResponseTimeProjection;
-use crate::ids::JobId;
 use crate::jobs::connection::{
     JobsConnectionIo, JobsConnectionRecord, JobsConnectionTable, JobsPendingWait,
 };
@@ -32,8 +31,7 @@ impl Supervisor {
             if !self.jobs_pending_wait_ready(wait) {
                 continue;
             }
-            let job_id = wait.job_id();
-            self.answer_jobs_wait(connection, job_id, time, observed_at_ns)?;
+            self.answer_jobs_wait(connection, wait, time, observed_at_ns)?;
             completed.push(SupervisorJobsWaitFlush { fd, wait });
         }
         Ok(SupervisorJobsWaitFlushTurn { completed })
@@ -54,17 +52,26 @@ impl Supervisor {
     fn answer_jobs_wait<I>(
         &self,
         connection: &mut JobsConnectionRecord<I>,
-        job_id: JobId,
+        wait: JobsPendingWait,
         time: ControlResponseTimeProjection,
         observed_at_ns: u64,
     ) -> Result<(), SupervisorJobsWaitFlushError>
     where
         I: JobsConnectionIo,
     {
+        let job_id = wait.job_id();
+        // Only the submit answer carries the process handle (TRM §10.7); a
+        // wait or stop that resolves later is answered with the bare view.
+        let frame = match wait {
+            JobsPendingWait::Submit { .. } => self.jobs_view_frame_with_handle(job_id, time),
+            JobsPendingWait::Wait { .. } | JobsPendingWait::Stop { .. } => {
+                self.jobs_view_frame(job_id, time)
+            }
+        };
         // Whatever went wrong answering this wait is this connection's
         // answer — an error record — never a reason to leave every other
         // wait unanswered.
-        let (bytes, fd) = match self.jobs_view_frame(job_id, time) {
+        let (bytes, fd) = match frame {
             Ok(frame) => (frame.bytes, frame.fd),
             Err(error) => (
                 jobs_error_response(error.code(), &error.message())
