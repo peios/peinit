@@ -22,6 +22,11 @@ impl ProcessController for LinuxProcessController {
         })
     }
 
+    fn close_pidfd(&mut self, pidfd: i32) -> Result<(), BoundaryError> {
+        pidfd::close_pidfd(pidfd)
+            .map_err(|error| BoundaryError::Process(format!("close pidfd {pidfd} failed: {error}")))
+    }
+
     fn signal_main(
         &mut self,
         target: &ProcessTarget,

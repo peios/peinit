@@ -11,7 +11,7 @@ use self::support::{
     flush_operation_waits_at, prepend_idle_closure_turn, prepend_idle_jobs_closure_turn,
     process_due_critical_budget_reboot_at, process_due_operation_maintenance_at,
 };
-use crate::boundary::{Clock, ConsoleSink, RealtimeClock};
+use crate::boundary::{Clock, ConsoleSink, ProcessController, RealtimeClock};
 use crate::runtime::{
     RuntimeEventRegistrationError, RuntimeEventSource, RuntimeEventWaiter,
     RuntimeShutdownEventSources, RuntimeShutdownLoopContext, RuntimeShutdownLoopError,
@@ -297,6 +297,21 @@ impl LinuxShutdownRuntime {
                 &mut console_messages,
                 &reboot.service,
             );
+        }
+        // Every job that finished anywhere in this turn -- reaped, timed out,
+        // abandoned -- has released its pidfd from the store; close them here,
+        // once, after all of the turn's supervisor work has committed. PID 1
+        // cannot be restarted to clear its descriptor table, so a pidfd left
+        // open per activation was a leak for the life of the boot (PEI-816).
+        for pidfd in supervisor.take_released_pidfds() {
+            if let Err(error) = self.controller.close_pidfd(pidfd) {
+                crate::runtime::console::push_error(
+                    &mut console_messages,
+                    format!(
+                        "peinit warning: releasing the pidfd of a finished job failed: {error:?}\n"
+                    ),
+                );
+            }
         }
         self.write_console_messages(console_messages);
         turn.sources.extend(calendar_sources);

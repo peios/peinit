@@ -29,6 +29,13 @@ impl Supervisor {
         &self.jobs
     }
 
+    /// The pidfds of every job that finished since the last take, for the
+    /// runtime to close. Committed work only: a transition that failed never
+    /// reaches the supervisor's store, so its releases are never handed out.
+    pub fn take_released_pidfds(&mut self) -> Vec<i32> {
+        self.jobs.take_released_pidfds()
+    }
+
     pub fn graph(&self) -> &crate::execution::graph::GraphExecutionStore {
         &self.graph
     }

@@ -40,6 +40,10 @@ pub enum CgroupRemoveOutcome {
 pub trait ProcessController {
     fn pidfd_matches_pid(&mut self, pidfd: i32, pid: u32) -> Result<bool, BoundaryError>;
 
+    /// Close a pidfd the job store has released: its job has finished and left
+    /// the store, and nothing else holds the descriptor (PEI-816).
+    fn close_pidfd(&mut self, pidfd: i32) -> Result<(), BoundaryError>;
+
     fn signal_main(
         &mut self,
         target: &ProcessTarget,
@@ -63,6 +67,10 @@ pub trait ProcessController {
 impl<T: ProcessController + ?Sized> ProcessController for &mut T {
     fn pidfd_matches_pid(&mut self, pidfd: i32, pid: u32) -> Result<bool, BoundaryError> {
         (**self).pidfd_matches_pid(pidfd, pid)
+    }
+
+    fn close_pidfd(&mut self, pidfd: i32) -> Result<(), BoundaryError> {
+        (**self).close_pidfd(pidfd)
     }
 
     fn signal_main(

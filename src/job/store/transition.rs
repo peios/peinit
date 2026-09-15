@@ -94,7 +94,14 @@ impl JobStore {
             finish(record).map_err(JobStoreError::Transition)?;
             JobEvent::ended(record)?
         };
-        self.records.remove(&id);
+        // The record owned the process's pidfd from `start`; a job that never
+        // started has none. Nothing else keeps the descriptor -- signalling
+        // targets copy it from the record for the duration of one call, and
+        // the jobs socket hands submitters a duplicate -- so leaving the store
+        // is the moment it becomes closeable (PEI-816).
+        if let Some(pidfd) = self.records.remove(&id).and_then(|record| record.pidfd) {
+            self.released_pidfds.push(pidfd);
+        }
         if let Some(service) = &event.service {
             self.remove_active(service, id);
         }

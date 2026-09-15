@@ -1,5 +1,6 @@
 use crate::job::{
-    JobEventDetail, JobRecord, JobState, JobStore, JobStoreError, ProcessHandle, ServiceMainJobSpec,
+    JobEventDetail, JobExit, JobRecord, JobState, JobStore, JobStoreError, ProcessHandle,
+    ServiceMainJobSpec,
 };
 
 use super::{job_ids, operation_ids, service, service_main_job, token_summary};
@@ -152,4 +153,80 @@ fn store_drops_failed_before_start_job_after_terminal_event() {
     );
     assert!(store.get(id).is_none());
     assert!(store.active_for_service("app").is_empty());
+}
+
+fn started_store(pidfd: i32) -> (JobStore, crate::ids::JobId) {
+    let mut store = JobStore::new();
+    let job = service_main_job();
+    let id = job.id;
+    store.create_job(job).expect("create");
+    store
+        .start_job(id, ProcessHandle { pid: 1234, pidfd }, 1_100)
+        .expect("start");
+    (store, id)
+}
+
+// PEI-816: the record owns the pidfd from `start`, so every path out of the
+// store releases it exactly once -- before this, the descriptor went away with
+// the dropped record and PID 1 held one more `anon_inode:[pidfd]` per
+// activation for the rest of the boot.
+#[test]
+fn store_releases_pidfd_when_a_running_job_completes() {
+    let (mut store, id) = started_store(9);
+    assert!(store.take_released_pidfds().is_empty());
+
+    store.complete_job(id, 1_500, 0).expect("complete");
+
+    assert_eq!(store.take_released_pidfds(), vec![9]);
+    assert!(store.take_released_pidfds().is_empty(), "handed out once");
+}
+
+#[test]
+fn store_releases_pidfd_when_a_running_job_fails() {
+    let (mut store, id) = started_store(11);
+
+    store
+        .fail_running_job(id, 1_500, Some(JobExit::Signal(9)), "watchdog timed out")
+        .expect("fail running");
+
+    assert_eq!(store.take_released_pidfds(), vec![11]);
+}
+
+#[test]
+fn store_releases_pidfd_when_a_running_job_is_abandoned() {
+    let (mut store, id) = started_store(13);
+
+    store
+        .abandon_job(id, 1_500, "ProcessUnkillable")
+        .expect("abandon");
+
+    assert_eq!(store.take_released_pidfds(), vec![13]);
+}
+
+#[test]
+fn store_releases_nothing_for_a_job_that_never_started() {
+    let mut store = JobStore::new();
+    let job = service_main_job();
+    let id = job.id;
+    store.create_job(job).expect("create");
+
+    store
+        .fail_job_before_start(id, 1_020, "ParentSetupFailure: pipe2")
+        .expect("fail before start");
+
+    assert!(store.take_released_pidfds().is_empty());
+}
+
+#[test]
+fn store_carries_released_pidfds_through_a_clone() {
+    // The supervisor finishes jobs on a clone and commits the clone; a release
+    // recorded there must survive the commit and not be duplicated by it.
+    let (store, id) = started_store(17);
+    let mut work = store.clone();
+    work.complete_job(id, 1_500, 0).expect("complete");
+    let mut committed = work;
+
+    assert_eq!(committed.take_released_pidfds(), vec![17]);
+    let mut original = store;
+    assert!(original.take_released_pidfds().is_empty());
 }

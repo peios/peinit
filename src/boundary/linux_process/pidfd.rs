@@ -30,6 +30,20 @@ pub(super) fn pidfd_send_signal(pidfd: i32, signal: libc::c_int) -> io::Result<(
     }
 }
 
+/// Close a pidfd whose job has left the store. A negative number was never a
+/// descriptor and is not an error: the launcher reports one when it could not
+/// obtain a pidfd, and there is nothing to release.
+pub(super) fn close_pidfd(pidfd: i32) -> io::Result<()> {
+    if pidfd < 0 {
+        return Ok(());
+    }
+    if unsafe { libc::close(pidfd) } == 0 {
+        Ok(())
+    } else {
+        Err(io::Error::last_os_error())
+    }
+}
+
 pub(super) fn pidfd_matches_pid(pidfd: i32, pid: u32) -> io::Result<bool> {
     if pidfd < 0 {
         return Ok(false);
