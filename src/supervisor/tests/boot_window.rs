@@ -7,6 +7,7 @@
 //! whose launch has not been attempted on the plan's definition with the
 //! new one pending; the reload after the window applies it.
 
+use crate::service::ServiceDefinition;
 use crate::service::runtime::ServiceState;
 use crate::supervisor::{DeferredRegistryReload, Supervisor, SupervisorSettings};
 
@@ -298,4 +299,44 @@ fn a_supervisor_that_never_booted_has_no_boot_window() {
     assert!(!supervisor.boot_plan_in_progress());
     assert!(supervisor.frozen_boot_plan_members().is_empty());
     assert!(supervisor.take_due_deferred_registry_reload().is_none());
+}
+
+/// A member that has launched but is still Starting — a Notify service that
+/// has not yet said READY — has read the definition it starts from, so a
+/// reload during the window treats it like any running service: pinned,
+/// not frozen. The window closes with it, whatever its readiness still owes
+/// (PEI-350; found on the image, where a slow Notify service kept every
+/// reload's ServiceSecurity change from reaching it).
+#[test]
+fn a_launched_member_still_starting_is_attempted_not_frozen() {
+    let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
+    let notify = ServiceDefinition::simple_system_boot("app", "/sbin/app");
+    let mut registry = StaticRegistry::services(vec![notify]);
+    let mut clock = ScriptedClock::new([BOOT_NS, APP_LAUNCH_NS]);
+    supervisor
+        .run_phase2_boot(&mut registry, &mut clock)
+        .expect("boot");
+    assert!(supervisor.boot_plan_in_progress());
+
+    let mut tokens = TestTokenProvider::default();
+    let mut launcher = TestProcessLauncher::new(vec![process(4242, 9)]);
+    supervisor
+        .launch_next_pending_job(&mut tokens, &mut launcher, &mut clock)
+        .expect("launch app")
+        .expect("app launch");
+    assert_eq!(
+        supervisor.service_status("app").expect("app").state,
+        ServiceState::Starting,
+        "a Notify service is Starting until it reports ready"
+    );
+    assert!(supervisor.frozen_boot_plan_members().is_empty());
+    assert!(!supervisor.boot_plan_in_progress());
+
+    let mut changed = ServiceDefinition::simple_system_boot("app", "/sbin/app");
+    changed.description = Some("renamed while starting".to_string());
+    let outcome = supervisor
+        .reload_config_from_registry(&mut StaticRegistry::services(vec![changed]))
+        .expect("reload");
+    assert!(outcome.summary.deferred.is_empty());
+    assert_eq!(outcome.summary.updated, vec!["app".to_string()]);
 }
