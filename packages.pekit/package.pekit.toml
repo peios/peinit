@@ -78,7 +78,12 @@ format = "peipkg"
 # decoding (PEI-621), registryd inherits ServiceSecurity (PEI-1072), an
 # operation keeps its target's descriptor (PEI-1076), held starts across
 # Backoff and readiness levels (PEI-821, PEI-830).
-version      = "{{version}}-6"
+# 0.0.5-7 (2026-09-15): what the full run on -6 taught — a reload during the
+# boot window runs and defers only the unlaunched members rather than being
+# refused (PEI-350); a held start is exempt from the lifetime only while
+# every wait is undecided, and a released one gets its StartTimeout from the
+# release (PEI-830, PEI-821).
+version      = "{{version}}-7"
 architecture = "x86_64"
 license      = "MIT"
 license_class = "free"
