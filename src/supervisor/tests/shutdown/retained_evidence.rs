@@ -118,8 +118,11 @@ fn retained_evidence_failing_any_condition_gets_no_graceful_period() {
 
     // Belongs to a service actually in Stopping. Only a later wave can meet
     // a participant planned as already stopping that has since left
-    // Stopping: `back` finishes its stop while wave 0 is still running, and
-    // evidence is then found for it when wave 1 begins.
+    // Stopping: `back` finishes its stop while wave 0 is still running. A
+    // Stopping service only ever leaves for a done state, and a participant
+    // already done is skipped when its wave begins (PEI-1086) — so `back`'s
+    // stale evidence is never consulted, and it gets neither a deadline nor
+    // a kill for a process that has already gone.
     let mut supervisor = later_wave_stopping_fixture();
     let mut controller = TestProcessController::default();
     let back_job = job_for(&supervisor, "back");
@@ -171,19 +174,21 @@ fn retained_evidence_failing_any_condition_gets_no_graceful_period() {
     let front_done = supervisor
         .complete_shutdown_job(front_job, SHUTDOWN_NS + 2, 0, &mut controller)
         .expect("front finishes, wave 1 begins");
-    let back = front_done
-        .next_wave
-        .iter()
-        .find(|stop| stop.service == "back")
-        .expect("back in wave 1");
-    assert_eq!(
-        back.unsubstantiated_deadline,
-        Some("retained timeout but the service is not Stopping"),
+    assert!(
+        !front_done
+            .next_wave
+            .iter()
+            .any(|stop| stop.service == "back"),
+        "back has already stopped, so wave 1 records nothing for it",
     );
-    assert_eq!(
-        back.deadline.as_ref().expect("a deadline").due_at_ns,
-        SHUTDOWN_NS + 2,
-        "no graceful period: the substituted deadline is already due",
+    assert!(
+        !supervisor
+            .shutdown()
+            .expect("shutdown")
+            .stop_deadlines
+            .iter()
+            .any(|deadline| deadline.service == "back"),
+        "and holds no deadline for it",
     );
     let peer = front_done
         .next_wave
