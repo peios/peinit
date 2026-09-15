@@ -1,6 +1,7 @@
 mod control;
 mod deadline;
 mod finalize;
+mod internal_error;
 mod lifecycle_boot_success;
 mod lifecycle_deadline;
 mod loop_turn;

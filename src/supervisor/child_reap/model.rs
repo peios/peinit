@@ -22,6 +22,12 @@ pub enum SupervisorChildReapTurn {
     DeferredUntilSetup {
         child: ChildReap,
     },
+    /// Applying the exit raised an internal error, contained to the job's
+    /// service: the service is failed and the loop carries on (PEI-1125).
+    InternalError {
+        child: ChildReap,
+        dispatch: Box<super::super::SupervisorInternalErrorDispatch>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

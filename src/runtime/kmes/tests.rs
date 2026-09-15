@@ -272,3 +272,70 @@ fn operation_id(sequence: u64) -> crate::ids::OperationId {
         .allocate_batch(1, 1_717_171_717_123_456_789)
         .expect("operation id")[0]
 }
+
+/// PEI-1125: a contained internal error leaves a complete trail — the job it
+/// retired, the operation it failed, and a `service.internal_error` saying
+/// what peinit could not do — so the failure does not read as the service's.
+#[test]
+fn runtime_loop_collector_records_a_contained_internal_error() {
+    let dispatch = crate::supervisor::SupervisorInternalErrorDispatch {
+        step: "lifecycle deadline",
+        subject: crate::supervisor::SupervisorInternalErrorSubject {
+            service: Some("app".to_string()),
+            job_id: None,
+        },
+        error: "InvalidTransition".to_string(),
+        observed_at_ns: 40,
+        job_event: None,
+        service_job_event: None,
+        operation_event: Some(completed_operation(operation_id(7), "app")),
+        service_transition: Some(ServiceTableTransition {
+            event: ServiceTransitionEvent {
+                service: "app".to_string(),
+                from: ServiceState::Starting,
+                to: ServiceState::Failed,
+                cause: TransitionCause::InternalError,
+                generation: 2,
+            },
+            discarded_definition_removed: false,
+            released_tty: None,
+        }),
+        start_dispatches: Vec::new(),
+    };
+    let turn = RuntimeShutdownEventTurn::LifecycleDeadlineTimer {
+        read: LinuxTimerFdRead::Expired { expirations: 1 },
+        drive: Some(Box::new(
+            crate::supervisor::SupervisorLifecycleDeadlineDispatch {
+                internal_errors: vec![dispatch],
+                ..crate::supervisor::SupervisorLifecycleDeadlineDispatch::default()
+            },
+        )),
+        deadline_timer: crate::supervisor::SupervisorLifecycleDeadlineTimerTurn::Disarmed,
+    };
+
+    let mut events = Vec::new();
+    collect_runtime_loop_kmes_events(
+        &RuntimeWorkPumpTurn::default(),
+        &SupervisorOperationMaintenanceTurn::default(),
+        &[turn],
+        &RuntimeWorkPumpTurn::default(),
+        &SupervisorOperationMaintenanceTurn::default(),
+        &[],
+        &mut events,
+    )
+    .expect("collected KMES events");
+
+    assert_eq!(
+        events
+            .iter()
+            .map(|event| event.event_type.as_str())
+            .collect::<Vec<_>>(),
+        vec!["operation.completed", "service.internal_error"],
+    );
+    assert_eq!(
+        crate::kmes::kmes_event_subject(&events[1].payload)
+            .0
+            .as_deref(),
+        Some("app")
+    );
+}

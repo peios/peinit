@@ -1,5 +1,5 @@
 #[cfg(any(test, feature = "peios-boundary"))]
-mod console;
+pub(crate) mod console;
 mod event_loop;
 mod jobs;
 #[cfg(feature = "peios-boundary")]
@@ -23,6 +23,8 @@ pub(crate) use event_loop::resume_buffered_control_frames;
 pub(crate) use kmes::{
     collect_runtime_loop_kmes_events, collect_runtime_shutdown_finalization_kmes_events,
 };
+#[cfg(feature = "peios-boundary")]
+pub(crate) use turn::apply_reaped_child_contained;
 pub(crate) use turn::{register_filesystem_check_helper_sources, register_process_setup_sources};
 
 pub use event_loop::{

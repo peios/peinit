@@ -13,6 +13,7 @@ mod critical_budget;
 mod dispatch;
 mod fd_store_lifecycle;
 mod health;
+mod internal_error;
 mod launch;
 mod lifecycle;
 mod lifecycle_deadline_timer;
@@ -116,6 +117,7 @@ pub use dispatch::{
     SupervisorWatchdogNotifyOutcome, SupervisorWatchdogTimeoutDispatch,
     SupervisorWatchdogTimeoutOutcome,
 };
+pub use internal_error::{SupervisorInternalErrorDispatch, SupervisorInternalErrorSubject};
 pub use lifecycle_deadline_timer::{
     SupervisorLifecycleDeadline, SupervisorLifecycleDeadlineDispatch,
     SupervisorLifecycleDeadlineKind, SupervisorLifecycleDeadlineTimerTurn,

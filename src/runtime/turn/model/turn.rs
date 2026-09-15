@@ -184,4 +184,11 @@ pub enum RuntimeProcessSetupTurn {
         supervisor: Box<SupervisorProcessSetupDispatch>,
         log_registrations: Vec<RuntimeEventSource>,
     },
+    /// Reading or applying the setup status raised an internal error,
+    /// contained to the launching service (PEI-1125). The descriptor is
+    /// unregistered and closed; the job is retired.
+    InternalError {
+        fd: i32,
+        dispatch: Box<crate::supervisor::SupervisorInternalErrorDispatch>,
+    },
 }

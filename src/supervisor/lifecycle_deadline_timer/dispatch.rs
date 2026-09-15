@@ -30,6 +30,9 @@ pub struct SupervisorLifecycleDeadlineDispatch {
     pub boot_settles: Vec<SupervisorBootSettleDispatch>,
     pub cgroup_leaks: Vec<SupervisorLeakedCgroupDispatch>,
     pub submitted_jobs: Vec<SupervisorSubmittedDeadlineDispatch>,
+    /// Deadline actions that raised an internal error on one service, each
+    /// contained to that service (PEI-1125).
+    pub internal_errors: Vec<crate::supervisor::SupervisorInternalErrorDispatch>,
     /// The immediate reboot owed to a Critical service that exhausted its
     /// restart budget during this turn by a route with no reboot check of its
     /// own — a readiness timeout, a pre-start hook or check timeout.
@@ -59,6 +62,7 @@ impl SupervisorLifecycleDeadlineDispatch {
             && self.boot_settles.is_empty()
             && self.cgroup_leaks.is_empty()
             && self.submitted_jobs.is_empty()
+            && self.internal_errors.is_empty()
             && self.critical_budget_reboot.is_none()
     }
 }

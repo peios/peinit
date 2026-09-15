@@ -196,8 +196,6 @@ pub enum RuntimeShutdownLoopError {
     EventRegistration(RuntimeEventRegistrationError),
     CalendarTimerReconfigure(String),
     OperationMaintenance(crate::supervisor::SupervisorError),
-    /// Applying an exit that was reaped before its job carried a pid.
-    DeferredChildReap(crate::supervisor::SupervisorError),
     /// The final action at the end of the turn: a shutdown's, or the reboot
     /// for a Critical service out of restart budget.
     Finalization(crate::supervisor::SupervisorError),

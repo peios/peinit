@@ -119,13 +119,51 @@ where
     })?;
     let child_reaps = children
         .into_iter()
-        .map(|child: ChildReap| supervisor.apply_reaped_child(child, ended_at_ns, controller, None))
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(RuntimeShutdownEventTurnError::Supervisor)?;
+        .map(|child: ChildReap| {
+            apply_reaped_child_contained(supervisor, child, ended_at_ns, controller)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
     Ok(SigchldReaps {
         child_reaps,
         ended_at_ns: Some(ended_at_ns),
     })
+}
+
+/// Apply one reaped exit, containing an internal error to the job it belongs
+/// to (PEI-1125).
+///
+/// The exit has already been collected by `waitpid`; nothing will deliver it
+/// again. So a supervisor error here can neither be retried nor left for
+/// later, and until PEI-1125 it ended the runtime loop over one service's
+/// bookkeeping. The subject is resolved before the call, because the store
+/// the call was about to touch is no longer the way to find out afterwards.
+pub(crate) fn apply_reaped_child_contained<P>(
+    supervisor: &mut Supervisor,
+    child: ChildReap,
+    ended_at_ns: u64,
+    controller: &mut P,
+) -> Result<SupervisorChildReapTurn, RuntimeShutdownEventTurnError>
+where
+    P: ProcessController + ?Sized,
+{
+    let subject = supervisor.internal_error_subject_for_pid(child.pid);
+    match supervisor.apply_reaped_child(child, ended_at_ns, controller, None) {
+        Ok(turn) => Ok(turn),
+        Err(error) if subject.is_attributable() => {
+            let dispatch = supervisor.fail_after_internal_error(
+                subject,
+                "job terminal",
+                format!("{error:?}"),
+                ended_at_ns,
+                controller,
+            );
+            Ok(SupervisorChildReapTurn::InternalError {
+                child,
+                dispatch: Box::new(dispatch),
+            })
+        }
+        Err(error) => Err(RuntimeShutdownEventTurnError::Supervisor(error)),
+    }
 }
 
 fn child_reaps_advanced_shutdown(child_reaps: &[SupervisorChildReapTurn]) -> bool {

@@ -3,6 +3,7 @@ use crate::boundary::{BootAttemptCounter, ProcessController, ShutdownFinalizer};
 use super::critical_reboot::annotate_critical_reboot_if_due;
 use super::{SupervisorLifecycleDeadlineDispatch, SupervisorLifecycleDeadlineKind};
 use crate::control::lifecycle::LifecycleCommand;
+use crate::supervisor::SupervisorInternalErrorSubject;
 use crate::supervisor::dispatch::{
     SupervisorBootSettleDispatch, SupervisorBootSettleFailure, SupervisorBootSettleStart,
 };
@@ -43,17 +44,45 @@ impl Supervisor {
         }
 
         let mut dispatch = SupervisorLifecycleDeadlineDispatch::default();
+        let mut contained = std::collections::BTreeSet::new();
         while let Some(deadline) = self.next_lifecycle_deadline() {
             if deadline.due_at_ns > now_ns {
                 break;
             }
-            let progressed = self.process_due_lifecycle_deadline(
+            let subject = SupervisorInternalErrorSubject {
+                service: Some(deadline.kind.service().to_string()).filter(|s| !s.is_empty()),
+                job_id: deadline.kind.job_id(),
+            };
+            let key = (deadline.kind.rank(), subject.clone());
+            let progressed = match self.process_due_lifecycle_deadline(
                 deadline.kind,
                 controller,
                 boot_attempt_counter,
                 now_ns,
                 &mut dispatch,
-            )?;
+            ) {
+                Ok(progressed) => progressed,
+                // A deadline about one service that peinit could not act on
+                // fails that service, not the loop (PEI-1125). Containment
+                // clears the service's deadlines; if the same one is still
+                // there afterwards, stop rather than spin on it — the next
+                // timer turn will see it again, and the operator has been
+                // told.
+                Err(error) if subject.is_attributable() && !contained.contains(&key) => {
+                    contained.insert(key);
+                    let failure = self.fail_after_internal_error(
+                        subject,
+                        "lifecycle deadline",
+                        format!("{error:?}"),
+                        now_ns,
+                        controller,
+                    );
+                    dispatch.internal_errors.push(failure);
+                    true
+                }
+                Err(_) if subject.is_attributable() => false,
+                Err(error) => return Err(error),
+            };
             if !progressed {
                 break;
             }

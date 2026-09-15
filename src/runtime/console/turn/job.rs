@@ -18,8 +18,14 @@ pub(super) fn collect_child_reap_turn_console_messages(
     turn: &SupervisorChildReapTurn,
     out: &mut Vec<ConsoleMessage>,
 ) {
-    let SupervisorChildReapTurn::Tracked { dispatch, .. } = turn else {
-        return;
+    let dispatch = match turn {
+        SupervisorChildReapTurn::Tracked { dispatch, .. } => dispatch,
+        SupervisorChildReapTurn::InternalError { dispatch, .. } => {
+            crate::runtime::console::push_internal_error_messages(out, dispatch);
+            return;
+        }
+        SupervisorChildReapTurn::Untracked { .. }
+        | SupervisorChildReapTurn::DeferredUntilSetup { .. } => return,
     };
     match dispatch {
         SupervisorChildReapDispatch::Runtime(dispatch) => {
@@ -88,6 +94,9 @@ pub(super) fn collect_lifecycle_deadline_dispatch_console_messages(
     }
     for timeout in &dispatch.health_check_timeouts {
         collect_health_check_terminal_console_messages(&timeout.terminal, out);
+    }
+    for failure in &dispatch.internal_errors {
+        crate::runtime::console::push_internal_error_messages(out, failure);
     }
     for timeout in &dispatch.watchdog_timeouts {
         collect_watchdog_timeout_console_messages(timeout, out);

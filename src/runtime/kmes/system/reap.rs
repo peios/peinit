@@ -12,8 +12,13 @@ pub(in crate::runtime::kmes) fn collect_child_reap_turn(
     turn: &SupervisorChildReapTurn,
     out: &mut Vec<KmesEvent>,
 ) -> Result<(), BoundaryError> {
-    let SupervisorChildReapTurn::Tracked { dispatch, .. } = turn else {
-        return Ok(());
+    let dispatch = match turn {
+        SupervisorChildReapTurn::Tracked { dispatch, .. } => dispatch,
+        SupervisorChildReapTurn::InternalError { dispatch, .. } => {
+            return super::super::event::push_internal_error(out, dispatch);
+        }
+        SupervisorChildReapTurn::Untracked { .. }
+        | SupervisorChildReapTurn::DeferredUntilSetup { .. } => return Ok(()),
     };
     match dispatch {
         SupervisorChildReapDispatch::Runtime(dispatch) => collect_terminal_dispatch(dispatch, out)?,

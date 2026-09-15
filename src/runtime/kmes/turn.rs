@@ -159,8 +159,14 @@ fn collect_process_setup_turn(
     turn: &RuntimeProcessSetupTurn,
     out: &mut Vec<KmesEvent>,
 ) -> Result<(), BoundaryError> {
-    let RuntimeProcessSetupTurn::Completed { supervisor, .. } = turn else {
-        return Ok(());
+    let supervisor = match turn {
+        RuntimeProcessSetupTurn::Completed { supervisor, .. } => supervisor,
+        RuntimeProcessSetupTurn::InternalError { dispatch, .. } => {
+            return super::event::push_internal_error(out, dispatch);
+        }
+        RuntimeProcessSetupTurn::Pending { .. } | RuntimeProcessSetupTurn::Stale { .. } => {
+            return Ok(());
+        }
     };
     match &**supervisor {
         crate::supervisor::SupervisorProcessSetupDispatch::ServiceMainLaunched(dispatch) => {
@@ -240,6 +246,9 @@ fn collect_notify_supervisor_turn(
         RuntimeNotifySupervisorTurn::Applied(dispatch) => collect_notify_dispatch(dispatch, out),
         RuntimeNotifySupervisorTurn::AppliedToJob(dispatch) => {
             super::submitted::collect_submitted_notify(dispatch, out)
+        }
+        RuntimeNotifySupervisorTurn::InternalError(dispatch) => {
+            super::event::push_internal_error(out, dispatch)
         }
         RuntimeNotifySupervisorTurn::Rejected(rejection) => {
             let sender_pid = notify_sender_pid(read);

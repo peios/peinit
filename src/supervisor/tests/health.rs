@@ -1,5 +1,5 @@
 mod critical;
 mod interval;
-mod support;
+pub(in crate::supervisor::tests) mod support;
 mod terminal;
 mod timeout;

@@ -49,6 +49,10 @@ pub(super) fn collect_runtime_shutdown_turn_console_messages(
             supervisor: Some(RuntimeNotifySupervisorTurn::Applied(dispatch)),
             ..
         } => control::collect_notify_dispatch_console_messages(dispatch, out),
+        RuntimeShutdownEventTurn::Notify {
+            supervisor: Some(RuntimeNotifySupervisorTurn::InternalError(dispatch)),
+            ..
+        } => crate::runtime::console::push_internal_error_messages(out, dispatch),
         RuntimeShutdownEventTurn::CalendarTimer { turn, .. } => {
             control::collect_runtime_calendar_timer_console_messages(turn, out);
         }
@@ -87,8 +91,13 @@ fn collect_process_setup_turn_console_messages(
     turn: &RuntimeProcessSetupTurn,
     out: &mut Vec<ConsoleMessage>,
 ) {
-    let RuntimeProcessSetupTurn::Completed { supervisor, .. } = turn else {
-        return;
+    let supervisor = match turn {
+        RuntimeProcessSetupTurn::Completed { supervisor, .. } => supervisor,
+        RuntimeProcessSetupTurn::InternalError { dispatch, .. } => {
+            crate::runtime::console::push_internal_error_messages(out, dispatch);
+            return;
+        }
+        RuntimeProcessSetupTurn::Pending { .. } | RuntimeProcessSetupTurn::Stale { .. } => return,
     };
     match &**supervisor {
         crate::supervisor::SupervisorProcessSetupDispatch::ServiceMainLaunched(dispatch) => {

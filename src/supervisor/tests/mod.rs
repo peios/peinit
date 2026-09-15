@@ -81,11 +81,10 @@ impl StaticRegistry {
     }
 
     fn with_undecodable(mut self, name: &str, message: &str) -> Self {
-        self.undecodable
-            .push(crate::boundary::UndecodableService {
-                name: name.to_string(),
-                message: message.to_string(),
-            });
+        self.undecodable.push(crate::boundary::UndecodableService {
+            name: name.to_string(),
+            message: message.to_string(),
+        });
         self
     }
 
@@ -249,6 +248,9 @@ struct TestProcessController {
     pidfd_matches: BTreeMap<(i32, u32), bool>,
     signals: Vec<ObservedSignal>,
     cgroup_kills: Vec<String>,
+    /// Cgroups whose kill is scripted to fail, to stage a boundary fault on
+    /// one service's path (PEI-1125).
+    cgroup_kill_errors: BTreeMap<String, String>,
     cgroup_populated: BTreeMap<String, bool>,
     cgroup_populated_checks: Vec<String>,
     cgroup_removes: Vec<String>,
@@ -285,7 +287,10 @@ impl ProcessController for TestProcessController {
 
     fn kill_cgroup(&mut self, cgroup_id: &str) -> Result<(), BoundaryError> {
         self.cgroup_kills.push(cgroup_id.to_string());
-        Ok(())
+        match self.cgroup_kill_errors.get(cgroup_id) {
+            Some(message) => Err(BoundaryError::Process(message.clone())),
+            None => Ok(()),
+        }
     }
 
     fn cgroup_populated(&mut self, cgroup_id: &str) -> Result<bool, BoundaryError> {
@@ -310,6 +315,11 @@ impl ProcessController for TestProcessController {
 impl TestProcessController {
     fn set_pidfd_match(&mut self, pidfd: i32, pid: u32, matches: bool) {
         self.pidfd_matches.insert((pidfd, pid), matches);
+    }
+
+    fn set_cgroup_kill_error(&mut self, cgroup_id: impl Into<String>, message: impl Into<String>) {
+        self.cgroup_kill_errors
+            .insert(cgroup_id.into(), message.into());
     }
 
     fn set_cgroup_populated(&mut self, cgroup_id: impl Into<String>, populated: bool) {

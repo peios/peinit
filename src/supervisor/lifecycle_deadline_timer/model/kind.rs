@@ -65,7 +65,7 @@ pub enum SupervisorLifecycleDeadlineKind {
 }
 
 impl SupervisorLifecycleDeadlineKind {
-    pub(super) fn rank(&self) -> u8 {
+    pub(in crate::supervisor::lifecycle_deadline_timer) fn rank(&self) -> u8 {
         match self {
             Self::PreStartCheckTimeout { .. } => 0,
             Self::PreStartHookTimeout { .. } => 1,
@@ -85,7 +85,7 @@ impl SupervisorLifecycleDeadlineKind {
         }
     }
 
-    pub(super) fn service(&self) -> &str {
+    pub(in crate::supervisor::lifecycle_deadline_timer) fn service(&self) -> &str {
         match self {
             Self::PreStartCheckTimeout { service, .. }
             | Self::PreStartHookTimeout { service, .. }
@@ -121,7 +121,7 @@ impl SupervisorLifecycleDeadlineKind {
         }
     }
 
-    pub(super) fn job_id(&self) -> Option<JobId> {
+    pub(in crate::supervisor::lifecycle_deadline_timer) fn job_id(&self) -> Option<JobId> {
         match self {
             Self::PreStartHookTimeout { job_id, .. }
             | Self::PostStartHookTimeout { job_id, .. }

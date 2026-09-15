@@ -7,19 +7,19 @@ use self::support::{
     CalendarTimerMaintenanceStep, calendar_timer_maintenance_steps, reload_config_succeeded,
 };
 use self::support::{
-    append_idle_closure_turn, append_idle_jobs_closure_turn, emit_runtime_loop_kmes_events,
-    emit_runtime_shutdown_finalization_kmes_events, finalize_due_shutdown_at,
-    flush_operation_waits_at, prepend_idle_closure_turn, prepend_idle_jobs_closure_turn,
-    process_due_operation_maintenance_at,
+    RuntimeKmesEmitter, append_idle_closure_turn, append_idle_jobs_closure_turn,
+    emit_runtime_loop_kmes_events, emit_runtime_shutdown_finalization_kmes_events,
+    finalize_due_shutdown_at, flush_operation_waits_at, prepend_idle_closure_turn,
+    prepend_idle_jobs_closure_turn, process_due_operation_maintenance_at,
 };
 use crate::boundary::{Clock, ConsoleSink, ProcessController, RealtimeClock};
 use crate::runtime::{
     RuntimeEventRegistrationError, RuntimeEventSource, RuntimeEventWaiter,
     RuntimeShutdownEventContext, RuntimeShutdownEventSources, RuntimeShutdownEventTurn,
     RuntimeShutdownLoopContext, RuntimeShutdownLoopError, RuntimeShutdownLoopTurn,
-    collect_runtime_loop_console_messages, pending_shutdown_finalization,
-    prepare_runtime_shutdown_loop_turn, process_runtime_shutdown_sources_with_registry,
-    resume_buffered_control_frames,
+    apply_reaped_child_contained, collect_runtime_loop_console_messages,
+    pending_shutdown_finalization, prepare_runtime_shutdown_loop_turn,
+    process_runtime_shutdown_sources_with_registry, resume_buffered_control_frames,
 };
 use crate::supervisor::{
     Supervisor, SupervisorError, SupervisorLifecycleDeadlineTimerTurn,
@@ -262,9 +262,16 @@ impl LinuxShutdownRuntime {
             let mut child_reaps = Vec::with_capacity(deferred_reaps.len());
             for child in deferred_reaps {
                 child_reaps.push(
-                    supervisor
-                        .apply_reaped_child(child, after_sources_ns, &mut self.controller, None)
-                        .map_err(RuntimeShutdownLoopError::DeferredChildReap)?,
+                    apply_reaped_child_contained(
+                        supervisor,
+                        child,
+                        after_sources_ns,
+                        &mut self.controller,
+                    )
+                    .map_err(|error| RuntimeShutdownLoopError::Event {
+                        source: RuntimeEventSource::Pid1Signal,
+                        error,
+                    })?,
                 );
             }
             turn.turns.push(
@@ -313,8 +320,11 @@ impl LinuxShutdownRuntime {
         };
         #[cfg(not(feature = "peios-registry"))]
         let calendar_turns = self.process_calendar_timer_sources(supervisor, &calendar_sources)?;
-        emit_runtime_loop_kmes_events(
-            &mut self.kmes_sink,
+        let dropped_events = emit_runtime_loop_kmes_events(
+            RuntimeKmesEmitter {
+                sink: &mut self.kmes_sink,
+                dropped_events: &mut self.dropped_kmes_events,
+            },
             &prepared.pre_work,
             &maintenance_before_wait,
             &turn.turns,
@@ -332,6 +342,12 @@ impl LinuxShutdownRuntime {
             &calendar_turns,
             &mut console_messages,
         );
+        // An event the ring refused is gone from the trail; the operator is
+        // told here and the trail itself carries an `event.oversized` in
+        // its place (PEI-1082).
+        for dropped in &dropped_events {
+            crate::runtime::console::push_warn(&mut console_messages, dropped.console_message());
+        }
         for failed in &failed_last_run_writes {
             // The write is best-effort by design, so this is a warning rather
             // than a failure — but it has to be *said*. A persistent timer
@@ -398,12 +414,21 @@ impl LinuxShutdownRuntime {
             finalization_now_ns,
         )?;
         if let Some(finalization) = &turn.finalization {
-            emit_runtime_shutdown_finalization_kmes_events(&mut self.kmes_sink, finalization)?;
+            let dropped_events = emit_runtime_shutdown_finalization_kmes_events(
+                RuntimeKmesEmitter {
+                    sink: &mut self.kmes_sink,
+                    dropped_events: &mut self.dropped_kmes_events,
+                },
+                finalization,
+            )?;
             let mut after_action = Vec::new();
             crate::runtime::console::collect_shutdown_finalization_turn_console_messages(
                 finalization,
                 &mut after_action,
             );
+            for dropped in &dropped_events {
+                crate::runtime::console::push_warn(&mut after_action, dropped.console_message());
+            }
             self.write_console_messages(after_action);
         }
         turn.sources.extend(calendar_sources);

@@ -1,6 +1,7 @@
 mod access;
 mod cgroup;
 mod graph;
+mod internal_error;
 mod on_failure;
 mod recovery;
 mod reload;
@@ -11,6 +12,10 @@ pub use cgroup::encode_leaked_cgroup_event;
 pub use graph::{
     encode_boot_blocked_service_event, encode_graph_validation_error_event,
     encode_graph_validation_warning_event, encode_safe_mode_downgrade_event,
+};
+pub use internal_error::{
+    OversizedEvent, OversizedEventAction, encode_event_oversized_event,
+    encode_service_internal_error_event, kmes_event_subject, oversized_event_message,
 };
 pub use on_failure::encode_on_failure_loop_suppressed_event;
 pub use recovery::encode_init_recovery_events;

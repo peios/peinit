@@ -42,3 +42,5 @@ pub use model::{
 pub(crate) use pre_start_check::register_filesystem_check_helper_sources;
 pub(crate) use process_setup::register_process_setup_sources;
 pub(crate) use registry_watch::process_registry_watch_event;
+#[cfg(feature = "peios-boundary")]
+pub(crate) use signal::apply_reaped_child_contained;

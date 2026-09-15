@@ -614,3 +614,72 @@ fn ready_and_reloading_are_still_not_separately_recorded() {
 
     assert!(events.is_empty());
 }
+
+/// PEI-1125, PEI-1082: the two audit records that keep a contained failure
+/// from reading as the service's own, and a cut or dropped event from
+/// leaving a silent gap.
+#[test]
+fn encodes_internal_error_and_oversized_event_payloads() {
+    let dispatch = crate::supervisor::SupervisorInternalErrorDispatch {
+        step: "process setup",
+        subject: crate::supervisor::SupervisorInternalErrorSubject {
+            service: Some("app".to_string()),
+            job_id: Some(job_id()),
+        },
+        error: "Process(\"EBADF\")".to_string(),
+        observed_at_ns: OBSERVED_AT_NS,
+        job_event: None,
+        service_job_event: None,
+        operation_event: None,
+        service_transition: None,
+        start_dispatches: Vec::new(),
+    };
+    let encoded =
+        crate::kmes::encode_service_internal_error_event(&dispatch).expect("encoded event");
+    assert_eq!(encoded.event_type, "service.internal_error");
+    assert_eq!(read_str(&encoded.payload, "service"), "app");
+    assert_eq!(read_str(&encoded.payload, "job_id"), job_id().to_string());
+    assert_eq!(read_str(&encoded.payload, "step"), "process setup");
+    assert_eq!(read_str(&encoded.payload, "error"), "Process(\"EBADF\")");
+    assert_eq!(read_str(&encoded.payload, "service_failed"), "false");
+    assert_eq!(
+        read_uint(&encoded.payload, "observed_at_ns"),
+        OBSERVED_AT_NS
+    );
+    assert_eq!(
+        read_str(&encoded.payload, "message"),
+        "peinit: service app: internal error at process setup: Process(\"EBADF\"); the service keeps its state",
+    );
+
+    let job = job_id().to_string();
+    let oversized = crate::kmes::OversizedEvent {
+        event_type: "job.ended",
+        action: crate::kmes::OversizedEventAction::Dropped,
+        service: None,
+        job_id: Some(&job),
+        size_bytes: 66_000,
+        limit_bytes: None,
+        dropped_total: Some(3),
+        error: Some("No space left on device (os error 28)"),
+    };
+    let encoded = crate::kmes::encode_event_oversized_event(&oversized).expect("encoded event");
+    assert_eq!(encoded.event_type, "event.oversized");
+    assert_eq!(read_str(&encoded.payload, "event"), "job.ended");
+    assert_eq!(read_str(&encoded.payload, "action"), "dropped");
+    assert_nil(&encoded.payload, "service");
+    assert_eq!(read_str(&encoded.payload, "job_id"), job);
+    assert_eq!(read_uint(&encoded.payload, "size_bytes"), 66_000);
+    assert_nil(&encoded.payload, "limit_bytes");
+    assert_eq!(read_uint(&encoded.payload, "dropped_total"), 3);
+    assert_eq!(
+        read_str(&encoded.payload, "message"),
+        format!(
+            "event job.ended for job {job} (66000 bytes) was refused by the event ring and dropped: No space left on device (os error 28)"
+        ),
+    );
+    assert_eq!(
+        crate::kmes::kmes_event_subject(&encoded.payload),
+        (None, Some(job)),
+        "the subject of any event can be read back from its payload",
+    );
+}

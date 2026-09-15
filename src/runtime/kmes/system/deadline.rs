@@ -61,6 +61,9 @@ pub(in crate::runtime::kmes) fn collect_lifecycle_deadline_dispatch(
     for dispatch in &dispatch.submitted_jobs {
         super::super::submitted::collect_submitted_deadline(dispatch, out)?;
     }
+    for failure in &dispatch.internal_errors {
+        super::super::event::push_internal_error(out, failure)?;
+    }
     Ok(())
 }
 
