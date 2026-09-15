@@ -203,6 +203,82 @@ fn phase1_tags_match_what_happened() {
     assert_eq!(tag_of("real root · PID 1"), ConsoleTag::Bare);
 }
 
+/// `peios.quiet=2` drops ordinary progress everywhere it applies (TRM §2.6),
+/// which is every Phase 1 step after the command line has been read. Only
+/// the first "phase1 starting" line escapes, because the level is not known
+/// yet when it is written; warnings and errors are never dropped (PEI-799).
+#[test]
+fn blackout_drops_phase1_progress_after_the_command_line_is_read() {
+    let report = DeviceNodePolicyReport {
+        applied: vec!["/dev/zero".to_string()],
+        missing: vec!["/dev/full".to_string()],
+        failures: vec![DeviceNodePolicyFailure {
+            name: "DevNull".to_string(),
+            path: "/dev/null".to_string(),
+            message: "boom".to_string(),
+        }],
+    };
+    let mut platform = Platform::new()
+        .command_line(KernelCommandLine {
+            recovery: false,
+            safe_mode: false,
+            boot_attempt_threshold: None,
+            notify_socket_path: None,
+            quiet: QuietLevel::Blackout,
+            dumb_terminal: false,
+        })
+        .device_policy_report(report)
+        .random_seed_restored()
+        .machine_id_status(MachineIdStatus::Generated);
+    let mut registry = Registry::with_services([service("app")]);
+    let mut clock = ClockAt(10);
+    let mut runtime = Runtime::default();
+
+    run_init(
+        InitConfig::default(),
+        &mut platform,
+        &mut registry,
+        &mut clock,
+        &mut runtime,
+    )
+    .expect("runtime");
+
+    for dropped in [
+        "peinit: phase1 mounting virtual filesystems",
+        "peinit: phase1 virtual filesystems mounted",
+        "peinit: phase1 device node /dev/full absent",
+        "peinit: phase1 device node policy applied",
+        "peinit: phase1 restored random seed",
+        "peinit: phase1 generated machine-id",
+        "peinit: phase1 starting registryd",
+        "peinit: phase2 boot starting",
+    ] {
+        assert!(
+            !platform
+                .console_messages
+                .iter()
+                .any(|message| message.starts_with(dropped)),
+            "{dropped:?} should be dropped at peios.quiet=2: {:?}",
+            platform.console_messages
+        );
+    }
+    assert!(
+        platform
+            .console_messages
+            .iter()
+            .any(|message| message == "peinit: phase1 starting\n"),
+        "the first line is written before the level is known"
+    );
+    assert!(
+        platform
+            .console_messages
+            .iter()
+            .any(|message| message.starts_with("peinit warning: device node /dev/null")),
+        "a warning is never dropped: {:?}",
+        platform.console_messages
+    );
+}
+
 /// A configuration warning is a boot that went on with a fallback value, so
 /// it renders as `[ WARN ]`. It used the error helper, and so read as
 /// `[FAILED]` for something that had not failed (PEI-809).

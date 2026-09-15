@@ -107,9 +107,13 @@ where
         );
     }
 
+    // From here on the command line has been read, so `peios.quiet` applies
+    // to ordinary progress (TRM §2.6): level 2 drops these lines and keeps
+    // the warnings and errors around them (PEI-799).
+    let quiet = command_line.quiet;
     log_console(
         platform,
-        QuietLevel::Verbose,
+        quiet,
         "peinit: phase1 mounting virtual filesystems\n",
     );
     if let Err(error) = platform.mount_virtual_filesystems() {
@@ -121,7 +125,7 @@ where
     }
     log_console_tagged(
         platform,
-        QuietLevel::Verbose,
+        quiet,
         ConsoleTag::Ok,
         "peinit: phase1 virtual filesystems mounted\n",
     );
@@ -143,14 +147,14 @@ where
             for path in &report.missing {
                 log_console(
                     platform,
-                    QuietLevel::Verbose,
+                    quiet,
                     &format!("peinit: phase1 device node {path} absent; nothing to stamp\n"),
                 );
             }
             if !report.applied.is_empty() {
                 log_console_tagged(
                     platform,
-                    QuietLevel::Verbose,
+                    quiet,
                     ConsoleTag::Ok,
                     &format!(
                         "peinit: phase1 device node policy applied to {} node(s)\n",
@@ -168,7 +172,7 @@ where
     match platform.restore_random_seed() {
         Ok(true) => log_console_tagged(
             platform,
-            QuietLevel::Verbose,
+            quiet,
             ConsoleTag::Ok,
             "peinit: phase1 restored random seed\n",
         ),
@@ -183,7 +187,7 @@ where
         Ok(MachineIdStatus::Existing) => {}
         Ok(MachineIdStatus::Generated) => log_console_tagged(
             platform,
-            QuietLevel::Verbose,
+            quiet,
             ConsoleTag::Ok,
             "peinit: phase1 generated machine-id\n",
         ),
@@ -206,7 +210,6 @@ where
         }
     }
 
-    let quiet = command_line.quiet;
     // Settled here rather than after the boot-attempt checks, so that a
     // recovery entered from one of them starts its registryd with the settings
     // this boot asked for. The socket in particular has to be settled before
