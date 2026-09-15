@@ -308,6 +308,9 @@ fn a_target_withdrawn_in_backoff_is_settled_by_the_reconciliation_pass() {
     let mut supervisor = boot_and_crash_target(target, hard_dependent(), &mut clock);
     let held_operation = assert_held(&supervisor, "dependent");
     assert!(!supervisor.has_settleable_held_restarts());
+    // The boot did its part: a target in Backoff and the dependent held for
+    // it do not keep the boot window (§3.7) open, so the reload is admitted.
+    assert!(!supervisor.boot_plan_in_progress());
 
     // The reload refuses a graph with a dangling hard edge, so the dependent
     // is re-declared without it. Its start was planned against the old
