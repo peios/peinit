@@ -187,6 +187,7 @@ fn operation_completed(service: &str) -> OperationEvent {
         service: service.to_string(),
         state: OperationState::Completed,
         created_at_ns: 1,
+        lifetime_from_ns: 1,
         started_at_ns: Some(2),
         completed_at_ns: Some(3),
         source: OperationSource::Admin,

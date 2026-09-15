@@ -49,6 +49,9 @@ impl GraphExecutionStore {
                 .service
                 .clone();
             mark_awaiting_restart(context, &service)?;
+            // The hold begins here, with no release pass to notice it:
+            // record what the dependents are now held on.
+            context.note_holds_without_clock();
             held.push(context_id);
         }
         Ok(held)

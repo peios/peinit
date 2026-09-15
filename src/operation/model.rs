@@ -55,6 +55,16 @@ pub struct OperationRecord {
     pub service: String,
     pub state: OperationState,
     pub created_at_ns: u64,
+    /// Where the operation's maximum lifetime (§8.2) is measured from.
+    ///
+    /// Creation, including queue time — except that a start the graph held
+    /// on a fact with no clock of its own (§7.5) had no lifetime while it
+    /// was held, so the clock starts again when the hold ends: a start
+    /// released after a long hold gets its `StartTimeout` from the
+    /// release, not a deadline that expired while it was not allowed to
+    /// run (PEI-821). `created_at_ns` stays what it was: when the operator
+    /// asked.
+    pub lifetime_from_ns: u64,
     pub started_at_ns: Option<u64>,
     pub completed_at_ns: Option<u64>,
     pub source: OperationSource,

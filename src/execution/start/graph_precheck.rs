@@ -6,9 +6,7 @@ use crate::service::ServiceTable;
 use crate::service::runtime::{ServiceState, ServiceTransition};
 mod outcome;
 
-use super::checks::{
-    PreStartCheckDecision, evaluate_cacheable_pre_start_checks, tty_unavailable,
-};
+use super::checks::{PreStartCheckDecision, evaluate_cacheable_pre_start_checks, tty_unavailable};
 use super::deadline::start_operation_deadline_ns;
 use super::initial::{InitialStartJobRequest, create_initial_start_job};
 use super::job_id::job_id_for_request;
@@ -117,13 +115,24 @@ pub fn begin_prechecked_ready_start(
             graph: graph.clone(),
             start_store: next_start_store,
         };
-        let outcome =
-            outcome::apply_skipped(&mut transaction, request, reason, prechecked.cleared_skipped)?;
+        let outcome = outcome::apply_skipped(
+            &mut transaction,
+            request,
+            reason,
+            prechecked.cleared_skipped,
+        )?;
         transaction.commit_to_stores(services, operations, graph, start_store);
         let GraphPreStartCheckOutcome::Terminal(terminal) = outcome else {
             unreachable!("a skipped pre-start check is a terminal outcome");
         };
         return Ok(PrecheckedReadyStartOutcome::Terminal(terminal));
+    }
+    if request.ready.released_from_hold {
+        // Held on a fact with no clock until now (§7.5): the lifetime
+        // starts at the release, not at a creation the hold outlasted.
+        next_operations
+            .restart_lifetime_clock(request.ready.operation_id, request.started_at_ns)
+            .map_err(StartExecutionError::OperationStore)?;
     }
     let operation_event = next_operations
         .start_operation(request.ready.operation_id, request.started_at_ns)

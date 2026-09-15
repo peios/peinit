@@ -342,3 +342,146 @@ fn a_target_withdrawn_in_backoff_is_settled_by_the_reconciliation_pass() {
         SupervisorHeldRestartOutcome::Abandoned(SupervisorHeldRestartAbandonReason::Withdrawn)
     );
 }
+
+/// TRM 7.1: a `Wants` target that fails does not stop its dependent. A
+/// Oneshot that exits non-zero on every attempt goes to Backoff and, once
+/// its budget is spent, Failed; the soft dependent held through the
+/// retries must then proceed — from the boot graph, with nothing to prime
+/// it.
+#[test]
+fn a_wants_dependent_proceeds_when_its_target_fails_for_good() {
+    let mut clock = ScriptedClock::new([BOOT_NS, APP_LAUNCH_NS, RELAUNCH_NS]);
+    let mut target = oneshot_service("target");
+    target.restart_max_retries = 1;
+    let mut dependent = oneshot_service("dependent");
+    dependent.wants.push("target".to_string());
+    let mut supervisor = boot_and_crash_target(target, dependent, &mut clock);
+    let held_operation = assert_held(&supervisor, "dependent");
+
+    let deadline = supervisor
+        .next_restart_backoff_deadline()
+        .expect("restart deadline");
+    supervisor
+        .process_due_restart_backoffs(deadline.due_at_ns)
+        .expect("due restart scan");
+    let mut tokens = TestTokenProvider::default();
+    let mut launcher = TestProcessLauncher::new(vec![process(4243, 10)]);
+    supervisor
+        .launch_next_pending_job(&mut tokens, &mut launcher, &mut clock)
+        .expect("launch relaunch")
+        .expect("relaunch dispatch");
+    assert_eq!(assert_held(&supervisor, "dependent"), held_operation);
+    let relaunch_job = supervisor
+        .service_status("target")
+        .expect("target")
+        .current_job
+        .expect("relaunch job")
+        .id;
+    let terminal = supervisor
+        .complete_job(relaunch_job, RELAUNCH_NS + 1_000, 1)
+        .expect("relaunch failed");
+    assert_eq!(
+        terminal
+            .start_dispatches
+            .iter()
+            .map(|dispatch| dispatch.ready.service.as_str())
+            .collect::<Vec<_>>(),
+        vec!["dependent"],
+        "the give-up releases the soft dependent on the same terminal"
+    );
+
+    let target = supervisor.service_status("target").expect("target");
+    assert_eq!(target.state, ServiceState::Failed);
+    assert_eq!(target.cause, Some(TransitionCause::RestartBudgetExhausted));
+    let dependent = supervisor.service_status("dependent").expect("dependent");
+    assert_eq!(dependent.state, ServiceState::Starting);
+    assert_eq!(
+        dependent
+            .current_operation
+            .map(|operation| (operation.id, operation.state)),
+        Some((held_operation, OperationState::Running))
+    );
+    assert_eq!(supervisor.pending_launch_jobs().len(), 1);
+}
+
+/// A start released from a hold gets its `StartTimeout` from the release.
+/// It had no lifetime while held (§7.5), so a deadline measured from its
+/// creation would already have expired for any hold longer than the
+/// timeout — and the service-main start timeout then failed the released
+/// start on the spot, before it had run, and sent it to Backoff. That is
+/// how a `Wants` dependent released by its target's give-up never started
+/// (PEI-821).
+#[test]
+fn a_start_released_from_a_hold_gets_its_start_timeout_from_the_release() {
+    const NANOS_PER_SEC: u64 = 1_000_000_000;
+    let mut clock = ScriptedClock::new([BOOT_NS, APP_LAUNCH_NS, RELAUNCH_NS]);
+    let mut target = oneshot_service("target");
+    target.restart_max_retries = 1;
+    let mut dependent = oneshot_service("dependent");
+    dependent.wants.push("target".to_string());
+    let mut supervisor = boot_and_crash_target(target, dependent, &mut clock);
+    let held_operation = assert_held(&supervisor, "dependent");
+    let deadline = supervisor
+        .next_restart_backoff_deadline()
+        .expect("restart deadline");
+    supervisor
+        .process_due_restart_backoffs(deadline.due_at_ns)
+        .expect("due restart scan");
+    let mut tokens = TestTokenProvider::default();
+    let mut launcher = TestProcessLauncher::new(vec![process(4243, 10)]);
+    supervisor
+        .launch_next_pending_job(&mut tokens, &mut launcher, &mut clock)
+        .expect("launch relaunch")
+        .expect("relaunch dispatch");
+    let relaunch_job = supervisor
+        .service_status("target")
+        .expect("target")
+        .current_job
+        .expect("relaunch job")
+        .id;
+
+    // The give-up, and the release, come well past the dependent's own
+    // StartTimeout measured from the boot plan.
+    let released_at_ns = RELAUNCH_NS + 1_000;
+    assert!(released_at_ns > BOOT_NS + 30 * NANOS_PER_SEC);
+    supervisor
+        .complete_job(relaunch_job, released_at_ns, 1)
+        .expect("relaunch failed for good");
+    assert_eq!(
+        supervisor
+            .service_status("dependent")
+            .expect("dependent")
+            .state,
+        ServiceState::Starting
+    );
+    let operation = supervisor
+        .operation_status(held_operation)
+        .expect("dependent operation");
+    assert_eq!(operation.state, OperationState::Running);
+    assert_eq!(
+        operation.created_at_ns, BOOT_NS,
+        "when the operator asked is still when the operator asked"
+    );
+
+    // The released start is not timed out on the spot: its clock started
+    // at the release, and runs a full StartTimeout from there.
+    let mut controller = TestProcessController::default();
+    let maintenance = supervisor
+        .process_due_operation_maintenance_with_controller(&mut controller, released_at_ns + 1)
+        .expect("maintenance");
+    assert!(maintenance.operation_timeouts.is_empty());
+    assert!(maintenance.service_main_start_timeouts.is_empty());
+    assert_eq!(
+        supervisor
+            .service_status("dependent")
+            .expect("dependent")
+            .state,
+        ServiceState::Starting
+    );
+    assert!(
+        !supervisor.operation_timeout_expired(held_operation, released_at_ns + 29 * NANOS_PER_SEC)
+    );
+    assert!(
+        supervisor.operation_timeout_expired(held_operation, released_at_ns + 30 * NANOS_PER_SEC)
+    );
+}

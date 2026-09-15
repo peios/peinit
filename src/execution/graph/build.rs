@@ -29,6 +29,7 @@ pub(super) fn boot_context(
                 transition_cause: transition_cause_for_phase2_start(start.cause),
                 sequence,
                 status: GraphMemberStatus::Dormant,
+                held_without_clock: false,
             },
         )?;
     }
@@ -42,6 +43,7 @@ pub(super) fn boot_context(
                 transition_cause: blocked.reason.transition_cause(),
                 sequence: plan.starts.len() + offset,
                 status: GraphMemberStatus::Failed,
+                held_without_clock: false,
             },
         )?;
     }
@@ -92,6 +94,7 @@ pub(super) fn on_demand_context(
                 transition_cause: start.transition_cause,
                 sequence,
                 status,
+                held_without_clock: false,
             },
         )?;
     }
@@ -106,6 +109,7 @@ pub(super) fn on_demand_context(
                 transition_cause: TransitionCause::DependencyFailure,
                 sequence: 0,
                 status: blocked_requested_status(dispatch),
+                held_without_clock: false,
             },
         )?;
     }

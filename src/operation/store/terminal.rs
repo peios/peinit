@@ -5,6 +5,19 @@ use super::{OperationEvent, OperationStore, OperationStoreError};
 pub const DEFAULT_TERMINAL_OPERATION_RETENTION_NS: u64 = 60_000_000_000;
 
 impl OperationStore {
+    /// A held start (§7.5) is being released: its lifetime runs from now.
+    pub fn restart_lifetime_clock(
+        &mut self,
+        id: OperationId,
+        at_ns: u64,
+    ) -> Result<(), OperationStoreError> {
+        self.records
+            .get_mut(&id)
+            .ok_or(OperationStoreError::UnknownOperation { id })?
+            .restart_lifetime_clock(at_ns)
+            .map_err(OperationStoreError::Transition)
+    }
+
     pub fn start_operation(
         &mut self,
         id: OperationId,

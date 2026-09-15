@@ -69,10 +69,13 @@ pub(super) fn start_operation_deadline_ns(
     definition: &ServiceDefinition,
     started_at_ns: u64,
 ) -> u64 {
+    // From the operation's lifetime origin, not its creation: the two differ
+    // only for a start released from a hold (§7.5), whose clock starts at
+    // the release (PEI-821).
     let start_leg_deadline_ns = start_deadline_ns(started_at_ns, definition.start_timeout_secs);
     match operation.operation_type {
         OperationType::Restart => start_leg_deadline_ns.min(
-            operation.created_at_ns.saturating_add(
+            operation.lifetime_from_ns.saturating_add(
                 definition
                     .stop_timeout_secs
                     .saturating_add(definition.start_timeout_secs)
@@ -80,7 +83,7 @@ pub(super) fn start_operation_deadline_ns(
             ),
         ),
         _ => operation
-            .created_at_ns
+            .lifetime_from_ns
             .saturating_add(definition.start_timeout_secs.saturating_mul(NANOS_PER_SEC)),
     }
 }
