@@ -123,13 +123,14 @@ impl GraphExecutionContext {
             .all(|member| member.status.is_terminal())
     }
 
-    /// Every launch this context planned has been attempted or decided
-    /// against: each member is terminal, is awaiting a restart (PEI-821),
-    /// or is held only on members that are. The boot window (§3.7) closes
-    /// on this rather than on `is_drained`: a boot service in Backoff and
-    /// the dependents held for it are the restart policy's business, and
-    /// holding every reload for the length of a retry cycle would be the
-    /// cost of a crash loop, not of the boot.
+    /// Every launch this context planned has been decided against: each
+    /// member is terminal, is awaiting a restart (PEI-821), or is held only
+    /// on members that are. The boot window (§3.7) closes on this — plus
+    /// the launched members the supervisor knows about — rather than on
+    /// `is_drained`: a boot service in Backoff and the dependents held for
+    /// it are the restart policy's business, and holding every reload for
+    /// the length of a retry cycle would be the cost of a crash loop, not
+    /// of the boot.
     pub fn has_attempted_every_launch(&self) -> bool {
         self.settled_launches().len() == self.members.len()
     }
@@ -163,8 +164,14 @@ impl GraphExecutionContext {
     /// The members that are terminal, awaiting a restart, or held only on
     /// members that are — closed over the dependency edges, so a dependent
     /// waiting on nothing that can still launch is settled too.
+    ///
+    /// A `Running` member is dispatched, not necessarily launched: its job
+    /// may still be queued, and its activation snapshot is taken at the
+    /// launch. Whether it has launched is the job store's knowledge, so the
+    /// supervisor adds that half (`boot_window.rs`); here it stays
+    /// unsettled, and so does anything held on it.
     fn settled_launches(&self) -> std::collections::BTreeSet<&str> {
-        let mut settled: std::collections::BTreeSet<&str> = self
+        let mut decided: std::collections::BTreeSet<&str> = self
             .members
             .values()
             .filter(|member| {
@@ -175,22 +182,22 @@ impl GraphExecutionContext {
         loop {
             let mut grew = false;
             for member in self.members.values() {
-                if settled.contains(member.service.as_str()) {
+                if decided.contains(member.service.as_str()) {
                     continue;
                 }
                 let held = matches!(
                     member.status,
                     GraphMemberStatus::Dormant | GraphMemberStatus::WaitingForDependencies
                 );
-                let waits_only_on_settled = held
+                let waits_only_on_decided = held
                     && self
                         .dependencies
                         .iter()
                         .filter(|edge| edge.dependent == member.service)
                         .filter(|edge| self.members.contains_key(&edge.target))
-                        .all(|edge| settled.contains(edge.target.as_str()));
-                if waits_only_on_settled {
-                    settled.insert(member.service.as_str());
+                        .all(|edge| decided.contains(edge.target.as_str()));
+                if waits_only_on_decided {
+                    decided.insert(member.service.as_str());
                     grew = true;
                 }
             }
@@ -198,7 +205,7 @@ impl GraphExecutionContext {
                 break;
             }
         }
-        settled
+        decided
     }
 }
 

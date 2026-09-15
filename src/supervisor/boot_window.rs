@@ -49,19 +49,42 @@ impl Supervisor {
     /// for its restart (PEI-821): the boot has done its part, and the retry
     /// cycle must not hold the window open.
     pub fn boot_plan_in_progress(&self) -> bool {
-        self.boot_plan_context.is_some_and(|context_id| {
-            self.graph
-                .context(context_id)
-                .is_some_and(|context| !context.has_attempted_every_launch())
-        })
+        !self.frozen_boot_plan_members().is_empty()
     }
 
     /// The boot-plan members a reload must not replace: those whose launch
     /// has not been attempted (§3.7). Empty once the window has closed.
+    ///
+    /// The graph knows which members are decided (terminal, awaiting a
+    /// restart, or held only on members that are); it does not know which
+    /// dispatched members have actually launched, because a dispatched
+    /// job can still be queued and the activation snapshot is taken at the
+    /// launch. That half is the job store's: a member whose reserved job
+    /// has left `Created` — or is gone altogether — has been attempted,
+    /// whatever happens to it next.
     pub fn frozen_boot_plan_members(&self) -> Vec<String> {
-        self.boot_plan_context
-            .map(|context_id| self.graph.unattempted_launches(context_id))
-            .unwrap_or_default()
+        let Some(context_id) = self.boot_plan_context else {
+            return Vec::new();
+        };
+        let Some(context) = self.graph.context(context_id) else {
+            return Vec::new();
+        };
+        self.graph
+            .unattempted_launches(context_id)
+            .into_iter()
+            .filter(|service| {
+                let launched = context
+                    .members
+                    .get(service)
+                    .and_then(|member| member.reserved_job_id)
+                    .is_none_or(|job_id| {
+                        self.jobs
+                            .get(job_id)
+                            .is_none_or(|job| job.state != crate::job::JobState::Created)
+                    });
+                !launched
+            })
+            .collect()
     }
 
     pub(super) fn note_boot_plan_context(&mut self, context_id: GraphContextId) {
