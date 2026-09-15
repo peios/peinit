@@ -203,6 +203,37 @@ fn phase1_tags_match_what_happened() {
     assert_eq!(tag_of("real root · PID 1"), ConsoleTag::Bare);
 }
 
+/// A configuration warning is a boot that went on with a fallback value, so
+/// it renders as `[ WARN ]`. It used the error helper, and so read as
+/// `[FAILED]` for something that had not failed (PEI-809).
+#[test]
+fn configuration_warnings_are_tagged_warn_not_failed() {
+    use crate::console_style::ConsoleTag;
+
+    let mut platform = Platform::new();
+    let mut registry = Registry::with_services([service("app")])
+        .with_services_schema_version(crate::registry::SUPPORTED_SERVICES_SCHEMA_VERSION + 1);
+    let mut clock = ClockAt(10);
+    let mut runtime = Runtime::default();
+
+    run_init(
+        InitConfig::default(),
+        &mut platform,
+        &mut registry,
+        &mut clock,
+        &mut runtime,
+    )
+    .expect("runtime");
+
+    let (tag, message) = platform
+        .console_tags
+        .iter()
+        .find(|(_, message)| message.contains("services schema version"))
+        .expect("the schema warning reached the console");
+    assert!(message.starts_with("peinit warning: "), "{message}");
+    assert_eq!(*tag, ConsoleTag::Warn);
+}
+
 #[test]
 fn device_node_policy_failures_are_warnings_not_recovery() {
     let report = DeviceNodePolicyReport {

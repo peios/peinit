@@ -284,6 +284,7 @@ impl InitPlatform for Platform {
 pub(super) struct Registry {
     services: Vec<ServiceDefinition>,
     provisioned_paths: Result<ProvisionedPathRegistrySnapshot, BoundaryError>,
+    services_schema_version: u32,
 }
 
 impl Registry {
@@ -291,7 +292,15 @@ impl Registry {
         Self {
             services: services.into_iter().collect(),
             provisioned_paths: Ok(ProvisionedPathRegistrySnapshot::empty()),
+            services_schema_version: crate::registry::SUPPORTED_SERVICES_SCHEMA_VERSION,
         }
+    }
+
+    /// A schema version the boot has to warn about: the one configuration
+    /// warning the double can raise without a registry behind it.
+    pub(super) fn with_services_schema_version(mut self, version: u32) -> Self {
+        self.services_schema_version = version;
+        self
     }
 
     pub(super) fn with_provisioned_paths(
@@ -320,6 +329,10 @@ impl RegistryClient for Registry {
 
     fn read_provisioned_paths(&mut self) -> Result<ProvisionedPathRegistrySnapshot, BoundaryError> {
         self.provisioned_paths.clone()
+    }
+
+    fn read_services_schema_version(&mut self) -> Result<u32, BoundaryError> {
+        Ok(self.services_schema_version)
     }
 }
 
