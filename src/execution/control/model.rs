@@ -40,9 +40,16 @@ pub struct ControlExecutionDispatch {
     pub service: String,
     pub kind: ControlOperationKind,
     pub operation_event: OperationEvent,
-    pub service_transition: ServiceTableTransition,
+    /// `None` when the operation adopted a stop leg already in flight -- a
+    /// stop that aborted a running restart (§8.3) -- and the service was
+    /// therefore already Stopping (PEI-824).
+    pub service_transition: Option<ServiceTableTransition>,
     pub detail: ControlExecutionDetail,
     pub deadline_ns: u64,
+    /// Reload command jobs this stop cancelled, already failed in the job
+    /// store so their terminals never route as reload completions against a
+    /// service that is no longer Reloading (PEI-824).
+    pub cancelled_reload_jobs: Vec<JobEvent>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

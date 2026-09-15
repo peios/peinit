@@ -101,11 +101,12 @@ where
         service: target.service.clone(),
         kind: ControlOperationKind::ReloadCommand,
         operation_event,
-        service_transition,
+        service_transition: Some(service_transition),
         detail: ControlExecutionDetail::ReloadCommand {
             job_id,
             job_event: Box::new(job_event),
         },
         deadline_ns,
+        cancelled_reload_jobs: Vec::new(),
     })
 }

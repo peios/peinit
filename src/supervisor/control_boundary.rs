@@ -27,11 +27,23 @@ pub(super) fn queue_control_boundary(
     services: &ServiceTable,
     outcome: &OperationRequestOutcome,
 ) -> Option<PendingControlOperation> {
-    retain_live_boundaries(queue, operations);
     if outcome.returned_operation_id != outcome.stored_operation_id {
+        retain_live_boundaries(queue, operations);
         return None;
     }
-    let record = operations.get(outcome.returned_operation_id)?;
+    queue_control_boundary_for(queue, operations, services, outcome.returned_operation_id)
+}
+
+/// Hand the Pending operation `operation_id` to the control boundary, if it is
+/// one the boundary executes (stop, reload, restart of a running service).
+pub(super) fn queue_control_boundary_for(
+    queue: &mut VecDeque<PendingControlOperation>,
+    operations: &OperationStore,
+    services: &ServiceTable,
+    operation_id: OperationId,
+) -> Option<PendingControlOperation> {
+    retain_live_boundaries(queue, operations);
+    let record = operations.get(operation_id)?;
     if record.state != OperationState::Pending {
         return None;
     }
@@ -44,6 +56,15 @@ pub(super) fn queue_control_boundary(
         .runtime(&record.service)
         .is_some_and(|runtime| runtime.state == ServiceState::Backoff)
     {
+        return None;
+    }
+    // §8.3 queues this operation behind one still running. It reaches the
+    // boundary when its predecessor finishes, through
+    // `Supervisor::promote_queued_operations`, admitted against the state the
+    // service is in by then. Sent now, a restart queued behind a stop ran its
+    // own stop leg against a service already Stopping and the InvalidTransition
+    // ended the runtime loop (PEI-824).
+    if operations.is_queued_behind_live(record.id) {
         return None;
     }
     let requirement = requirement_for(record.operation_type)?;

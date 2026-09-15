@@ -70,9 +70,10 @@ where
         service: target.service.clone(),
         kind: ControlOperationKind::ReloadSignal,
         operation_event,
-        service_transition,
+        service_transition: Some(service_transition),
         detail: ControlExecutionDetail::Signal { target, signal },
         deadline_ns,
+        cancelled_reload_jobs: Vec::new(),
     })
 }
 
