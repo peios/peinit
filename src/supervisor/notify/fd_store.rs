@@ -16,6 +16,12 @@ pub(super) fn apply_fd_store_notify_fields(
 ) -> Result<Vec<SupervisorFdStoreRejectionDispatch>, NotifyApplyError> {
     let directive = FdStoreDirective::from_message(message);
     if directive.remove {
+        // §10.6: an unnamed FDSTOREREMOVE=1 aborts the whole fd-store step
+        // for the datagram, so an FDSTORE=1 beside it is not performed
+        // either. The guard asks whether the *message* named a descriptor,
+        // not whether the directive ended up with a name: the store default
+        // used to be filled in first, and the pairing then did both
+        // operations instead of neither (PEI-836).
         let Some(name) = directive.name.as_deref() else {
             return Ok(Vec::new());
         };
@@ -64,6 +70,9 @@ pub(super) fn apply_fd_store_notify_fields(
 struct FdStoreDirective {
     store: bool,
     remove: bool,
+    /// The `FDNAME` the message carried, if any. A store without one falls
+    /// back to [`FdStore::DEFAULT_NAME`] in [`Self::effective_name`], at the
+    /// point of storing, so that this stays a record of what was supplied.
     name: Option<String>,
     poll: bool,
 }
@@ -86,9 +95,6 @@ impl FdStoreDirective {
                 NotifyField::FdPoll(value) if value == "0" => directive.poll = false,
                 _ => {}
             }
-        }
-        if directive.store && directive.name.is_none() {
-            directive.name = Some(FdStore::DEFAULT_NAME.to_string());
         }
         directive
     }

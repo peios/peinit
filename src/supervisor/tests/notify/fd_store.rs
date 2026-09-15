@@ -138,6 +138,44 @@ fn fdstore_remove_deletes_all_matching_named_fds() {
     assert_eq!(store.entries()[0].name, "cache");
 }
 
+/// PEI-836. §10.6: FDSTOREREMOVE=1 without FDNAME aborts the fd-store step
+/// for that datagram, "so a datagram carrying both an unnamed remove and an
+/// FDSTORE=1 performs neither, and the attached descriptors are dropped and
+/// closed". The store used to fill in its default name before the remove
+/// guard looked, so the pairing removed the default-named entries *and*
+/// stored the attached descriptor under the same name.
+#[test]
+fn an_unnamed_remove_beside_a_store_performs_neither() {
+    let mut supervisor = fd_store_app_supervisor(4);
+    apply_notify(
+        &mut supervisor,
+        datagram_with_fds(8000, b"FDSTORE=1", vec![test_fd()]),
+        NOTIFY_NS,
+    )
+    .expect("store under the default name");
+    let (attached, mut peer) = test_fd_with_peer();
+
+    let dispatch = apply_notify(
+        &mut supervisor,
+        datagram_with_fds(8000, b"FDSTORE=1\nFDSTOREREMOVE=1", vec![attached]),
+        NOTIFY_NS + 1,
+    )
+    .expect("apply unnamed remove beside a store");
+
+    assert!(dispatch.fd_store_rejections.is_empty());
+    let store = supervisor.fd_store().service("app").expect("app fd store");
+    assert_eq!(store.len(), 1, "the unnamed remove was performed");
+    assert_eq!(store.entries()[0].name, "stored");
+    assert!(
+        store.entries()[0].fd.duplicate().is_ok(),
+        "the previously stored descriptor was replaced",
+    );
+    assert!(
+        peer_observes_closed(&mut peer),
+        "the attached descriptor was stored rather than dropped",
+    );
+}
+
 #[test]
 fn unauthenticated_fdstore_notify_is_rejected_without_storing_fd() {
     let mut supervisor = fd_store_app_supervisor(2);
