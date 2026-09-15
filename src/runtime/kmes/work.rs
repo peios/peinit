@@ -24,6 +24,11 @@ pub(crate) fn collect_runtime_work_pump_kmes_events(
     for dispatch in &turn.control_operation_failures {
         super::event::push_operation(out, &dispatch.operation_event)?;
     }
+    for settlement in &turn.held_restart_settlements {
+        super::event::push_graphs(out, &settlement.graph_events)?;
+        super::event::push_operations(out, &settlement.operation_events)?;
+        super::job::collect_start_dispatches(&settlement.start_dispatches, out)?;
+    }
     for dispatch in &turn.start_hook_launches {
         collect_start_hook_launch(dispatch, out)?;
     }

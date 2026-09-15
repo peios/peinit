@@ -131,6 +131,14 @@ impl Supervisor {
         std::mem::take(&mut self.restart_backoff_failures)
     }
 
+    /// Holds on services in Backoff settled by state since the last call
+    /// (PEI-821). Reset on each call.
+    pub fn take_held_restart_settlements(
+        &mut self,
+    ) -> Vec<super::super::SupervisorHeldRestartSettlementDispatch> {
+        std::mem::take(&mut self.held_restart_settlements)
+    }
+
     /// Mutate the job store directly, to stage bookkeeping faults a correct
     /// caller would not create.
     #[cfg(test)]
