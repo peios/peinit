@@ -106,6 +106,7 @@ fn a_reload_that_fails_an_undecodable_service_says_so_on_the_console() {
             marked_removed: Vec::new(),
             discarded: Vec::new(),
             undecodable: vec!["broken".to_string()],
+            deferred: Vec::new(),
         },
         services_schema_version: 1,
         config_warnings: Vec::new(),
@@ -144,44 +145,29 @@ fn a_reload_that_fails_an_undecodable_service_says_so_on_the_console() {
     );
 }
 
-/// PEI-350: the boot window's deferral is said once per batch, and the
-/// coalesced reload that follows the drain reports what it did.
+/// PEI-350: a reload during the boot window names the members it deferred,
+/// and the coalesced reload that follows the window reports what it did.
 #[test]
 fn the_boot_window_deferral_and_the_coalesced_reload_are_said_on_the_console() {
+    let mut deferring = reload_outcome();
+    deferring.summary.added = vec!["fresh".to_string()];
+    deferring.summary.deferred = vec!["app".to_string(), "db".to_string()];
     let deferred = RuntimeShutdownEventTurn::RegistryWatch {
         fd: 91,
-        turn: crate::runtime::RuntimeRegistryWatchTurn::DeferredUntilBootDrains {
-            fd: 91,
+        turn: crate::runtime::RuntimeRegistryWatchTurn::ReloadConfig {
             events: vec![crate::boundary::RegistryWatchEvent {
                 root: crate::boundary::RegistryWatchRoot::Services,
                 kind: crate::boundary::RegistryWatchEventKind::ValueSet,
                 name: "ImagePath".to_string(),
-                path: vec!["fresh".to_string()],
+                path: vec!["app".to_string()],
             }],
             overflow: false,
+            outcome: Box::new(Ok(deferring)),
         },
     };
-    let mut outcome = crate::control::reload_config::ReloadConfigOutcome {
-        summary: crate::service::ServiceReloadSummary {
-            added: vec!["fresh".to_string()],
-            updated: vec!["app".to_string()],
-            restored: Vec::new(),
-            marked_removed: Vec::new(),
-            discarded: Vec::new(),
-            undecodable: Vec::new(),
-        },
-        services_schema_version: 1,
-        config_warnings: Vec::new(),
-        control_security: crate::control::system::ControlSecurityDescriptor::Default,
-        control_limits: crate::control::socket::ControlSocketLimits::default(),
-        jobs_limits: crate::jobs::socket::JobsSocketLimits::default(),
-        log_config: crate::logging::RuntimeLogConfig::default(),
-        shutdown_settings: crate::shutdown::ShutdownSettings::default(),
-        global_environment: Vec::new(),
-        eventd_log_socket_path: None,
-        warnings: Vec::new(),
-        undecodable: Vec::new(),
-    };
+    let mut outcome = reload_outcome();
+    outcome.summary.added = vec!["fresh".to_string()];
+    outcome.summary.updated = vec!["app".to_string()];
     outcome.summary.undecodable.push("broken".to_string());
     outcome
         .undecodable
@@ -193,10 +179,7 @@ fn the_boot_window_deferral_and_the_coalesced_reload_are_said_on_the_console() {
     let coalesced = RuntimeShutdownEventTurn::DeferredRegistryReload {
         turn: crate::runtime::RuntimeDeferredRegistryReloadTurn {
             deferred: crate::supervisor::DeferredRegistryReload {
-                watch_fd: Some(91),
-                watch_events: 2,
-                overflow: false,
-                explicit_requests: 1,
+                services: vec!["app".to_string(), "db".to_string()],
             },
             outcome: Box::new(Ok(outcome)),
         },
@@ -211,11 +194,57 @@ fn the_boot_window_deferral_and_the_coalesced_reload_are_said_on_the_console() {
     assert_eq!(
         messages,
         vec![
-            "peinit: registry changed during the boot window; configuration reload deferred until the boot plan drains\n",
-            "peinit: configuration reloaded after the boot plan drained (2 registry event(s) and 1 reload request(s) deferred): added 1, updated 1, restored 0, marked removed 0, discarded 0, undecodable 1\n",
+            "peinit: registry changed during the boot window; 2 definition(s) deferred until the boot plan drains: app, db\n",
+            "peinit: configuration reloaded after the boot plan drained (2 definition(s) deferred): added 1, updated 1, restored 0, marked removed 0, discarded 0, undecodable 1\n",
             "peinit: service broken failed: ValidationError (Service definition failed to decode: MissingImagePath)\n",
         ],
     );
+}
+
+/// A reload that deferred nothing says nothing about the boot window.
+#[test]
+fn a_reload_that_defers_nothing_is_silent_about_the_boot_window() {
+    let turn = RuntimeShutdownEventTurn::RegistryWatch {
+        fd: 91,
+        turn: crate::runtime::RuntimeRegistryWatchTurn::ReloadConfig {
+            events: Vec::new(),
+            overflow: false,
+            outcome: Box::new(Ok(reload_outcome())),
+        },
+    };
+
+    let messages = collect_messages(
+        &RuntimeWorkPumpTurn::default(),
+        &[turn],
+        &RuntimeWorkPumpTurn::default(),
+    );
+
+    assert!(messages.is_empty(), "{messages:?}");
+}
+
+fn reload_outcome() -> crate::control::reload_config::ReloadConfigOutcome {
+    crate::control::reload_config::ReloadConfigOutcome {
+        summary: crate::service::ServiceReloadSummary {
+            added: Vec::new(),
+            updated: Vec::new(),
+            restored: Vec::new(),
+            marked_removed: Vec::new(),
+            discarded: Vec::new(),
+            undecodable: Vec::new(),
+            deferred: Vec::new(),
+        },
+        services_schema_version: 1,
+        config_warnings: Vec::new(),
+        control_security: crate::control::system::ControlSecurityDescriptor::Default,
+        control_limits: crate::control::socket::ControlSocketLimits::default(),
+        jobs_limits: crate::jobs::socket::JobsSocketLimits::default(),
+        log_config: crate::logging::RuntimeLogConfig::default(),
+        shutdown_settings: crate::shutdown::ShutdownSettings::default(),
+        global_environment: Vec::new(),
+        eventd_log_socket_path: None,
+        warnings: Vec::new(),
+        undecodable: Vec::new(),
+    }
 }
 
 fn control_dispatch_turn(

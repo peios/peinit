@@ -98,13 +98,27 @@ fn collect_control_command_dispatch_console_messages(
     }
 }
 
-/// The reload failed a service over a key that would not decode: said on the
-/// console as a boot says it for a blocked service, because the reload's own
-/// answer went to one svctl and this is what everyone else sees (PEI-621).
+/// What a reload has to say beyond its answer to one svctl, because this is
+/// what everyone else sees: a service failed over a key that would not
+/// decode, said as a boot says it for a blocked service (PEI-621); and the
+/// boot-plan members the reload could not touch yet, so an operator watching
+/// the boot knows why a `reg apply` from an install script has not reached
+/// them (PEI-350).
 pub(super) fn collect_reload_config_console_messages(
     outcome: &crate::control::reload_config::ReloadConfigOutcome,
     out: &mut Vec<ConsoleMessage>,
 ) {
+    if !outcome.summary.deferred.is_empty() {
+        crate::runtime::console::push_message(
+            out,
+            format!(
+                "peinit: registry changed during the boot window; {} definition(s) deferred \
+                 until the boot plan drains: {}\n",
+                outcome.summary.deferred.len(),
+                outcome.summary.deferred.join(", "),
+            ),
+        );
+    }
     for service in &outcome.undecodable {
         crate::runtime::console::push_error(
             out,
@@ -180,11 +194,10 @@ pub(super) fn collect_deferred_registry_reload_console_messages(
                 out,
                 format!(
                     "peinit: configuration reloaded after the boot plan drained \
-                     ({} registry event(s) and {} reload request(s) deferred): \
+                     ({} definition(s) deferred): \
                      added {}, updated {}, restored {}, marked removed {}, discarded {}, \
                      undecodable {}\n",
-                    turn.deferred.watch_events,
-                    turn.deferred.explicit_requests,
+                    turn.deferred.services.len(),
                     summary.added.len(),
                     summary.updated.len(),
                     summary.restored.len(),

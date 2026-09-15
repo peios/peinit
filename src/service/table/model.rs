@@ -84,6 +84,11 @@ pub struct ServiceReloadSummary {
     /// `ValidationError` as the boot path fails it (§2.5), or, if it was
     /// running, left running with its definition marked removed (PEI-621).
     pub undecodable: Vec<String>,
+    /// Boot-plan members whose launch has not been attempted yet, and whose
+    /// definition therefore stayed as the plan had it with the change
+    /// recorded as pending (§3.7). The reload after the boot window applies
+    /// them (PEI-350).
+    pub deferred: Vec<String>,
 }
 
 impl ServiceReloadSummary {
@@ -94,6 +99,7 @@ impl ServiceReloadSummary {
             && self.marked_removed.is_empty()
             && self.discarded.is_empty()
             && self.undecodable.is_empty()
+            && self.deferred.is_empty()
     }
 }
 

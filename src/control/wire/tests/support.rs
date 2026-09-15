@@ -73,6 +73,7 @@ pub(super) fn reload_config_outcome() -> ReloadConfigOutcome {
             marked_removed: Vec::new(),
             discarded: Vec::new(),
             undecodable: Vec::new(),
+            deferred: Vec::new(),
         },
         services_schema_version: 2,
         config_warnings: vec![RegistryConfigWarning::NewerServicesSchemaVersion {

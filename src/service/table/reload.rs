@@ -36,6 +36,25 @@ impl ServiceTable {
         definitions: Vec<ServiceDefinition>,
         undecodable: &[UndecodableService],
     ) -> Result<ServiceReloadSummary, ServiceTableError> {
+        self.apply_definition_snapshot_with(definitions, undecodable, &[])
+    }
+
+    /// Apply a registry snapshot, leaving `frozen` entries' definitions as
+    /// they are.
+    ///
+    /// For the boot window (§3.7): a boot-plan member whose launch has not
+    /// been attempted must start from the plan's definition, so a change to
+    /// it — a new definition, its removal, or a key that no longer decodes —
+    /// is recorded rather than applied. A new definition goes to
+    /// `pending_definition`, exactly as for a running service, and the entry
+    /// is otherwise untouched; the name is listed under `deferred`. The
+    /// reload after the window, with nothing frozen, applies it (PEI-350).
+    pub fn apply_definition_snapshot_with(
+        &mut self,
+        definitions: Vec<ServiceDefinition>,
+        undecodable: &[UndecodableService],
+        frozen: &[String],
+    ) -> Result<ServiceReloadSummary, ServiceTableError> {
         let incoming = map_definitions(definitions)?;
         let mut summary = ServiceReloadSummary {
             added: Vec::new(),
@@ -44,10 +63,22 @@ impl ServiceTable {
             marked_removed: Vec::new(),
             discarded: Vec::new(),
             undecodable: Vec::new(),
+            deferred: Vec::new(),
         };
+        let frozen = frozen.iter().map(String::as_str).collect::<BTreeSet<_>>();
 
         for (name, definition) in &incoming {
             match self.entries.get_mut(name) {
+                Some(entry) if frozen.contains(name.as_str()) => {
+                    if desired_definition(entry) != definition {
+                        summary.deferred.push(name.clone());
+                    }
+                    entry.pending_definition = if &entry.definition == definition {
+                        None
+                    } else {
+                        Some(definition.clone())
+                    };
+                }
                 Some(entry) => {
                     if desired_definition(entry) != definition {
                         summary.updated.push(name.clone());
@@ -81,6 +112,12 @@ impl ServiceTable {
         let existing_names = self.entries.keys().cloned().collect::<Vec<_>>();
         for name in existing_names {
             if incoming_names.contains(&name) || undecodable_names.contains(name.as_str()) {
+                continue;
+            }
+            if frozen.contains(name.as_str()) {
+                // Withdrawn during the boot window: the member still starts
+                // from the plan, and the reload after the window removes it.
+                summary.deferred.push(name);
                 continue;
             }
             let Some(entry) = self.entries.get_mut(&name) else {
@@ -118,6 +155,13 @@ impl ServiceTable {
             if incoming_names.contains(&service.name) {
                 // The read cannot report a key as both; if it ever does, the
                 // definition that decoded wins and the entry above stands.
+                continue;
+            }
+            if frozen.contains(service.name.as_str()) && self.entries.contains_key(&service.name) {
+                // The key stopped decoding during the boot window: the
+                // member still starts from the plan, and the reload after
+                // the window fails it (or restores it, if repaired by then).
+                summary.deferred.push(service.name.clone());
                 continue;
             }
             self.apply_undecodable(service)?;

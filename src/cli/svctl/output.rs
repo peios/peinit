@@ -267,6 +267,7 @@ fn write_reload_config(out: &mut dyn Write, value: &Value) -> io::Result<()> {
             "marked_removed",
             "discarded",
             "undecodable",
+            "deferred",
         ] {
             let count = summary
                 .get(key)

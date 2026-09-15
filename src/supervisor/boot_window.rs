@@ -12,32 +12,31 @@
 //! running as a boot-triggered Oneshot writes service definitions, and so
 //! does any first-boot provisioning service.
 //!
-//! The reload is therefore gated on the boot plan having drained — every
-//! member of the Phase 2 graph context terminal — and whatever arrived
-//! during the boot is coalesced into ONE reload afterwards, which reaches the
-//! same end state a reload at the time would have, without mutating a boot
-//! in flight. The plan always drains: a member that never starts is failed
-//! by the pending-operation timeout.
+//! The spec asks only that the in-progress boot be unaffected, and refusing
+//! every reload for the length of the window turned out to be the wrong
+//! trade: the window closes in seconds on a real image, and install scripts
+//! and operators alike reload or write the registry in exactly those
+//! seconds. So a reload during the window RUNS, and applies as any reload
+//! does, except to a boot-plan member whose launch has not been attempted
+//! yet: that entry keeps the plan's definition and takes the new one as
+//! pending — the same mechanism that pins a running service — so the boot
+//! start is made from the snapshot. Those names are reported as `deferred`,
+//! and once every planned launch has been attempted one more reload applies
+//! them (a plain re-read: by then nothing is frozen), announced as the
+//! coalesced reload so an observer can tell when the snapshot was let go of.
 
 use crate::execution::graph::GraphContextId;
 
 use super::Supervisor;
 
-/// What arrived while the boot plan was still draining, for the one reload
-/// that follows it.
+/// The definitions a reload during the boot window left pending on
+/// not-yet-launched boot-plan members, for the one reload that follows the
+/// window and applies them.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct DeferredRegistryReload {
-    /// The registry watch descriptor the last deferred batch came in on, if
-    /// any came in on one.
-    pub watch_fd: Option<i32>,
-    /// Registry watch events deferred, across every batch.
-    pub watch_events: usize,
-    /// Whether any deferred batch reported an overflow. Immaterial to the
-    /// reload, which is always a full re-read, but part of the record.
-    pub overflow: bool,
-    /// Explicit `reload-config` requests refused during the window. Their
-    /// intent is honoured by the coalesced reload.
-    pub explicit_requests: usize,
+    /// Every service deferred by any reload during the window, sorted,
+    /// each once.
+    pub services: Vec<String>,
 }
 
 impl Supervisor {
@@ -48,7 +47,7 @@ impl Supervisor {
     /// counts as drained, as does never having booted. So does a plan whose
     /// only live members are a service in Backoff and the dependents held
     /// for its restart (PEI-821): the boot has done its part, and the retry
-    /// cycle must not hold every reload open.
+    /// cycle must not hold the window open.
     pub fn boot_plan_in_progress(&self) -> bool {
         self.boot_plan_context.is_some_and(|context_id| {
             self.graph
@@ -57,46 +56,42 @@ impl Supervisor {
         })
     }
 
+    /// The boot-plan members a reload must not replace: those whose launch
+    /// has not been attempted (§3.7). Empty once the window has closed.
+    pub fn frozen_boot_plan_members(&self) -> Vec<String> {
+        self.boot_plan_context
+            .map(|context_id| self.graph.unattempted_launches(context_id))
+            .unwrap_or_default()
+    }
+
     pub(super) fn note_boot_plan_context(&mut self, context_id: GraphContextId) {
         self.boot_plan_context = Some(context_id);
     }
 
-    /// Record a registry watch batch that arrived during the boot window.
-    pub fn defer_registry_watch_reload(&mut self, watch_fd: i32, events: usize, overflow: bool) {
+    /// Record the definitions a reload left pending on frozen members.
+    pub(super) fn record_deferred_definitions(&mut self, services: &[String]) {
+        if services.is_empty() {
+            return;
+        }
         let deferred = self.deferred_registry_reload.get_or_insert_default();
-        deferred.watch_fd = Some(watch_fd);
-        deferred.watch_events += events;
-        deferred.overflow |= overflow;
+        deferred.services.extend(services.iter().cloned());
+        deferred.services.sort();
+        deferred.services.dedup();
     }
 
-    fn defer_explicit_reload(&mut self) {
-        self.deferred_registry_reload
-            .get_or_insert_default()
-            .explicit_requests += 1;
-    }
-
-    /// Whether a reload is waiting on the boot plan.
+    /// Whether a reload during the window deferred something that the
+    /// reload after it still has to apply.
     pub fn has_deferred_registry_reload(&self) -> bool {
         self.deferred_registry_reload.is_some()
     }
 
-    /// The deferred reload, once the boot plan has drained; `None` while it
-    /// is still draining or when nothing was deferred. Taking it clears it,
-    /// so the caller owns the one reload it stands for.
+    /// What was deferred, once the boot window has closed; `None` while it
+    /// is open or when nothing was deferred. Taking it clears it, so the
+    /// caller owns the one reload it stands for.
     pub fn take_due_deferred_registry_reload(&mut self) -> Option<DeferredRegistryReload> {
         if self.boot_plan_in_progress() {
             return None;
         }
         self.deferred_registry_reload.take()
-    }
-
-    /// Refuse a reload during the boot window, recording that one was asked
-    /// for so the coalesced reload afterwards is not skipped.
-    pub(super) fn refuse_reload_during_boot_window(&mut self) -> bool {
-        if !self.boot_plan_in_progress() {
-            return false;
-        }
-        self.defer_explicit_reload();
-        true
     }
 }

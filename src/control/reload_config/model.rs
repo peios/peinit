@@ -44,10 +44,6 @@ pub enum ReloadConfigError {
     Registry(BoundaryError),
     Validation(ServiceGraphValidationFailure),
     ServiceTable(ServiceTableError),
-    /// The boot plan has not drained, and a boot executes against its
-    /// snapshot (§3.7). The registry is re-read once, after it has
-    /// (PEI-350).
-    BootInProgress,
 }
 
 fn service_graph_warning_message(warning: &ServiceGraphWarning) -> String {

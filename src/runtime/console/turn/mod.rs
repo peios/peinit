@@ -67,17 +67,12 @@ pub(super) fn collect_runtime_shutdown_turn_console_messages(
             collect_power_button_turn_console_messages(turn, out);
         }
         RuntimeShutdownEventTurn::RegistryWatch {
-            turn: crate::runtime::RuntimeRegistryWatchTurn::DeferredUntilBootDrains { .. },
+            turn: crate::runtime::RuntimeRegistryWatchTurn::ReloadConfig { outcome, .. },
             ..
         } => {
-            // Once per batch. Said so that an operator watching the boot
-            // knows why a `reg apply` from an install script has not taken
-            // effect yet (PEI-350).
-            crate::runtime::console::push_message(
-                out,
-                "peinit: registry changed during the boot window; configuration reload \
-                 deferred until the boot plan drains\n",
-            );
+            if let Ok(outcome) = outcome.as_ref() {
+                control::collect_reload_config_console_messages(outcome, out);
+            }
         }
         RuntimeShutdownEventTurn::DeferredRegistryReload { turn } => {
             control::collect_deferred_registry_reload_console_messages(turn, out);

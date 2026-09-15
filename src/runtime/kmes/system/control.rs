@@ -151,6 +151,13 @@ pub(in crate::runtime::kmes) fn collect_reload_config_warnings(
     outcome: &ReloadConfigOutcome,
     out: &mut Vec<KmesEvent>,
 ) -> Result<(), BoundaryError> {
+    // A boot-plan member the reload could not touch yet: the audit trail
+    // records that the change is pending on the boot window (PEI-350).
+    if !outcome.summary.deferred.is_empty() {
+        out.push(crate::kmes::encode_registry_reload_deferred_event(
+            &outcome.summary.deferred,
+        )?);
+    }
     // A key that would not decode has failed its service (§2.5), and that
     // is a validation error for the audit trail exactly as it is at boot
     // (PEI-621).

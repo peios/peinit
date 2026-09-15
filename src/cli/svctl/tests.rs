@@ -517,7 +517,7 @@ fn human_reload_config_lists_undecodable_definitions() {
         |request| {
             assert_eq!(request["command"], "reload-config");
         },
-        r#"{"status":"ok","summary":{"added":["new"],"updated":[],"restored":[],"marked_removed":[],"discarded":[],"undecodable":["broken","worse"]},"undecodable":[{"service":"broken","field":"ImagePath","message":"MalformedString { field: \"ImagePath\", reason: MissingTerminator }"},{"service":"worse","field":null,"message":"MissingImagePath"}],"warnings":[]}"#,
+        r#"{"status":"ok","summary":{"added":["new"],"updated":[],"restored":[],"marked_removed":[],"discarded":[],"undecodable":["broken","worse"],"deferred":["app"]},"undecodable":[{"service":"broken","field":"ImagePath","message":"MalformedString { field: \"ImagePath\", reason: MissingTerminator }"},{"service":"worse","field":null,"message":"MissingImagePath"}],"warnings":[]}"#,
     ) else {
         return;
     };
@@ -540,6 +540,7 @@ fn human_reload_config_lists_undecodable_definitions() {
     assert!(out.starts_with("configuration reloaded\n"), "{out}");
     assert!(out.contains("added: 1\n"), "{out}");
     assert!(out.contains("undecodable: 2\n"), "{out}");
+    assert!(out.contains("deferred: 1\n"), "{out}");
     assert!(
         out.contains(
             "undecodable definitions:\n  broken (ImagePath): MalformedString { field: \"ImagePath\", reason: MissingTerminator }\n  worse: MissingImagePath\n"
