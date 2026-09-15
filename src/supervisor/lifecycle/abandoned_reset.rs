@@ -2,7 +2,7 @@ use crate::boundary::{Clock, ProcessController};
 use crate::control::lifecycle::{LifecycleCommand, LifecycleCommandError, LifecycleCommandRequest};
 use crate::job::{ServiceCgroupKind, service_cgroup_root_path, service_job_cgroup_path};
 use crate::security::TokenSummary;
-use crate::service::runtime::ServiceState;
+use crate::service::runtime::{LeakedCgroupKind, ServiceState};
 
 use super::super::cgroup_cleanup::cleanup_service_cgroup_tree;
 use super::super::dispatch::SupervisorLifecycleDispatch;
@@ -108,6 +108,19 @@ pub(in crate::supervisor::lifecycle) fn service_is_abandoned(
     Ok(entry.runtime.state == ServiceState::Abandoned)
 }
 
+/// The cgroup generation the abandoned tree actually lives under.
+///
+/// Going Abandoned records the tree as a `ServiceTree` leak, and recording a
+/// leak in the current tree advances `cgroup_generation` so the next start
+/// builds elsewhere. So by the time a reset arrives the runtime's generation
+/// names a tree that has never existed, and probing `<svc>%genN+1/main` found
+/// it empty every time: the §6.2 "still populated" warning never fired and the
+/// tree cleanup ran against the wrong root (PEI-817). The leak record is the
+/// one place the abandoned root is written down, so read it back from there:
+/// the newest `ServiceTree` leak whose path is one of this service's roots.
+///
+/// A service abandoned without a leak record -- nothing in the supervisor
+/// produces one -- still has its tree at the current generation.
 fn abandoned_generation(
     services: &crate::service::ServiceTable,
     service: &str,
@@ -126,7 +139,19 @@ fn abandoned_generation(
             },
         ));
     }
-    Ok(entry.runtime.cgroup_generation)
+    let current = entry.runtime.cgroup_generation;
+    let leaked_tree_generation = entry
+        .runtime
+        .leaked_cgroups
+        .iter()
+        .rev()
+        .filter(|leak| leak.kind == LeakedCgroupKind::ServiceTree)
+        .find_map(|leak| {
+            (0..=current)
+                .rev()
+                .find(|generation| service_cgroup_root_path(service, *generation) == leak.path)
+        });
+    Ok(leaked_tree_generation.unwrap_or(current))
 }
 
 fn abandoned_reset_warning(service: &str) -> String {

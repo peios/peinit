@@ -245,6 +245,130 @@ fn an_abandoned_services_late_exit_is_not_a_runtime_failure() {
     );
 }
 
+/// Stop `app`, escalate past its timeout, and let the post-kill cleanup find
+/// `main/` still populated: the service goes Abandoned with its tree recorded
+/// as leaked, which advances the cgroup generation past the tree the process
+/// is stuck in.
+fn abandon_app_after_post_kill(
+    supervisor: &mut crate::supervisor::Supervisor,
+    controller: &mut TestProcessController,
+) {
+    stop_app(supervisor);
+    let mut clock = ScriptedClock::new([CONTROL_NS]);
+    supervisor
+        .execute_next_pending_control_operation(controller, &mut clock)
+        .expect("execute stop")
+        .expect("stop dispatch");
+    let due_at_ns = supervisor
+        .next_stop_timeout_deadline()
+        .expect("deadline")
+        .due_at_ns;
+    supervisor
+        .process_next_due_stop_timeout(controller, due_at_ns)
+        .expect("process timeout")
+        .expect("escalation");
+    supervisor
+        .process_due_cgroup_cleanups(controller, due_at_ns + 5_000_000_000)
+        .expect("cleanup")
+        .expect("a cleanup deadline was due");
+    assert_eq!(
+        supervisor.service_status("app").expect("app").state,
+        ServiceState::Abandoned,
+    );
+    assert_eq!(
+        supervisor
+            .services()
+            .get("app")
+            .expect("app entry")
+            .runtime
+            .cgroup_generation,
+        1,
+        "the leak advanced the generation past the abandoned tree -- the premise",
+    );
+    controller.cgroup_populated_checks.clear();
+}
+
+// PEI-817. The reset of an Abandoned service re-checks `main/` and either
+// warns that it is still populated (§6.2) or reclaims the tree. It built that
+// path from the runtime's *current* cgroup generation, which the leak recorded
+// on the way into Abandoned had already advanced -- so it probed
+// `app%gen1/main`, a tree that never existed, found it empty every time, and
+// tried to clean up a root that was not there.
+#[test]
+fn reset_of_a_post_kill_abandoned_service_probes_the_tree_the_process_is_stuck_in() {
+    let mut supervisor = active_app_supervisor();
+    let mut controller = TestProcessController::default();
+    abandon_app_after_post_kill(&mut supervisor, &mut controller);
+    controller.set_cgroup_populated("/sys/fs/cgroup/peinit/app/main", true);
+    let mut clock = ScriptedClock::new([LIFECYCLE_COMMAND_NS + 20_000_000_000]);
+
+    let dispatch = supervisor
+        .run_lifecycle_command_with_process_controller(
+            crate::control::lifecycle::LifecycleCommand::Reset,
+            "app",
+            None,
+            &mut controller,
+            &mut clock,
+        )
+        .expect("reset abandoned app");
+
+    assert_eq!(
+        controller.cgroup_populated_checks,
+        vec!["/sys/fs/cgroup/peinit/app/main"],
+        "the probe reads the generation the abandoned tree lives under",
+    );
+    assert_eq!(
+        dispatch.lifecycle_warnings,
+        vec![
+            "abandoned main cgroup for service app is still populated after reset -- cgroup remains leaked; underlying D-state process requires investigation"
+        ]
+    );
+    assert!(controller.cgroup_removes.is_empty());
+    assert_eq!(
+        supervisor.service_status("app").expect("app").state,
+        ServiceState::Inactive,
+    );
+}
+
+#[test]
+fn reset_of_a_post_kill_abandoned_service_whose_main_emptied_reclaims_that_tree() {
+    let mut supervisor = active_app_supervisor();
+    let mut controller = TestProcessController::default();
+    abandon_app_after_post_kill(&mut supervisor, &mut controller);
+    controller.set_cgroup_populated("/sys/fs/cgroup/peinit/app/main", false);
+    let mut clock = ScriptedClock::new([LIFECYCLE_COMMAND_NS + 20_000_000_000]);
+
+    let dispatch = supervisor
+        .run_lifecycle_command_with_process_controller(
+            crate::control::lifecycle::LifecycleCommand::Reset,
+            "app",
+            None,
+            &mut controller,
+            &mut clock,
+        )
+        .expect("reset abandoned app");
+
+    assert_eq!(
+        controller.cgroup_populated_checks,
+        vec!["/sys/fs/cgroup/peinit/app/main"]
+    );
+    assert!(dispatch.lifecycle_warnings.is_empty());
+    assert_eq!(
+        controller.cgroup_removes,
+        vec![
+            "/sys/fs/cgroup/peinit/app/main",
+            "/sys/fs/cgroup/peinit/app/hooks",
+            "/sys/fs/cgroup/peinit/app/health",
+            "/sys/fs/cgroup/peinit/app",
+        ],
+        "the cleanup runs against the abandoned root, not the never-built next one",
+    );
+    assert_eq!(
+        supervisor.service_status("app").expect("app").state,
+        ServiceState::Inactive,
+    );
+}
+
 // PEI-353. §4.1 names `rmdir` failing EBUSY as *the* trigger for a new cgroup
 // generation. peinit triggered on `cgroup.events` reporting `populated == 1`
 // instead, and the two are not the same question — `populated` counts live
