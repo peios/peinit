@@ -4,7 +4,9 @@ use crate::control::connection::{
 };
 use crate::control::socket::ControlSocketRead;
 use crate::ids::OperationIdAllocator;
+use crate::notify::{NotifyCredentials, NotifyDatagram};
 use crate::runtime::{RuntimeWorkPumpConfig, RuntimeWorkPumpContext, drain_runtime_work_queues};
+use crate::service::Readiness;
 use crate::supervisor::{SupervisorControlConnectionTurnContext, SupervisorControlFrameTurn};
 
 use super::super::super::{
@@ -455,6 +457,131 @@ fn wait_true_lifecycle_command_flushes_operation_timeout_error() {
                 .to_canonical_string()
         )
     );
+}
+
+/// A `wait=true` start is answered against the deadline the service is
+/// actually held to. Before the fix the waiter used the definition's
+/// StartTimeout from the request, so a service granted an extension was
+/// still reported OPERATION_TIMEOUT at the original deadline, and then
+/// succeeded (PEI-838).
+#[test]
+fn readiness_extension_moves_the_waiters_operation_timeout() {
+    let mut app = inactive_alive_service("app");
+    app.readiness = Readiness::Notify;
+    app.start_timeout_secs = 10;
+    let mut supervisor = booted_supervisor(vec![app]);
+    let mut access = TestAccessChecker::allow_all();
+    let mut controller = TestProcessController::default();
+    let mut clock = ScriptedClock::new(
+        (0..16)
+            .map(|offset| LIFECYCLE_COMMAND_NS + offset)
+            .collect::<Vec<_>>(),
+    );
+    let mut connections = ControlConnectionTable::new(4);
+    connections
+        .admit(
+            44,
+            ControlConnectionRecord::new(
+                FakeConnectionIo::scripted_reads([ControlSocketRead::Bytes(
+                    b"{\"command\":\"start\",\"service\":\"app\",\"wait\":true}\n".to_vec(),
+                )]),
+                control_peer(),
+            ),
+        )
+        .expect("admit connection");
+    let turn = supervisor
+        .process_control_connection_table_turn(
+            &mut connections,
+            44,
+            SupervisorControlConnectionTurnContext {
+                control_security: &DEFAULT_CONTROL_SECURITY,
+                access_checker: &mut access,
+                controller: &mut controller,
+                clock: &mut clock,
+                registry: None,
+                max_read_bytes: 1024,
+                max_request_bytes: crate::control::socket::DEFAULT_MAX_REQUEST_SIZE_BYTES,
+                observed_at_ns: LIFECYCLE_COMMAND_NS,
+            },
+        )
+        .expect("connection turn");
+    let SupervisorControlFrameTurn::CommandAccepted {
+        wait: Some(wait), ..
+    } = turn.turn.frames.into_iter().next().expect("frame").frame
+    else {
+        panic!("expected registered wait");
+    };
+    let operation_id = wait.operation().expect("operation wait").operation_id;
+
+    let mut tokens = TestTokenProvider::default();
+    let mut launcher = TestProcessLauncher::new(vec![process(9000, 90)]);
+    let mut filesystem_check_launcher =
+        crate::supervisor::tests::TestFilesystemCheckLauncher::default();
+    drain_runtime_work_queues(
+        &mut supervisor,
+        &mut RuntimeWorkPumpContext {
+            clock: &mut clock,
+            controller: &mut controller,
+            token_provider: &mut tokens,
+            process_launcher: &mut launcher,
+            filesystem_check_launcher: &mut filesystem_check_launcher,
+            config: RuntimeWorkPumpConfig::default(),
+        },
+    )
+    .expect("drain work");
+    let readiness = supervisor
+        .next_readiness_timeout()
+        .expect("readiness deadline");
+    assert_eq!(readiness.operation_id, operation_id);
+
+    // The service asks for more time, well inside the 4x cap.
+    supervisor
+        .apply_notify_datagram(
+            NotifyDatagram {
+                payload: b"EXTEND_TIMEOUT_USEC=5000000".to_vec(),
+                credentials: NotifyCredentials {
+                    pid: 9000,
+                    uid: 0,
+                    gid: 0,
+                },
+                fds: Vec::new(),
+            },
+            readiness.due_at_ns - 1_000_000_000,
+            &mut controller,
+        )
+        .expect("extend readiness");
+    let extended = supervisor
+        .next_readiness_timeout()
+        .expect("extended readiness deadline");
+    assert_eq!(extended.due_at_ns, readiness.due_at_ns + 4_000_000_000);
+
+    // At the original deadline the service is still inside its extension, so
+    // the caller keeps waiting.
+    let flush = supervisor
+        .flush_terminal_control_waits(&mut connections, readiness.due_at_ns, 0)
+        .expect("flush at the original deadline");
+    assert!(flush.completed.is_empty());
+    assert!(
+        connections
+            .get(44)
+            .expect("connection")
+            .state()
+            .pending_wait()
+            .is_some()
+    );
+
+    // At the extended deadline the service has failed it, and so has the wait.
+    let flush = supervisor
+        .flush_terminal_control_waits(&mut connections, extended.due_at_ns, 0)
+        .expect("flush at the extended deadline");
+    assert_eq!(flush.completed.len(), 1);
+    let record = connections.get(44).expect("connection");
+    assert!(record.state().pending_wait().is_none());
+    let writes = record.io().writes.borrow();
+    assert_eq!(writes.len(), 1);
+    let json = response_json(&writes[0]);
+    assert_eq!(json["status"], "error");
+    assert_eq!(json["code"], "OPERATION_TIMEOUT");
 }
 
 #[test]

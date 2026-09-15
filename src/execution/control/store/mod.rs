@@ -116,6 +116,13 @@ impl ControlExecutionStore {
         self.reload_deadlines.record_command(deadline);
     }
 
+    pub fn reload_command_deadline(
+        &self,
+        operation_id: OperationId,
+    ) -> Option<ReloadCommandDeadline> {
+        self.reload_deadlines.command(operation_id)
+    }
+
     pub fn due_reload_command_deadlines(&self, now_ns: u64) -> Vec<ReloadCommandDeadline> {
         self.reload_deadlines.due_commands(now_ns)
     }
