@@ -296,20 +296,32 @@ impl Supervisor {
         })
     }
 
-    /// The job view as a record, with the process handle attached when the
-    /// job is running. A handle that cannot be duplicated is an internal
-    /// error, not a silently handle-less answer: the submitter was promised
-    /// one, and `status` will hand it another chance.
+    /// The job view as a record, with nothing attached. This is the answer
+    /// to `status`, `wait`, `stop` and `signal`: only the submit answer
+    /// carries the process handle (TRM §10.7), and `status` needs no more
+    /// than JOB_QUERY, so a caller holding just that never receives one.
     pub(in crate::supervisor) fn jobs_view_frame(
         &self,
         job_id: JobId,
         time: ControlResponseTimeProjection,
     ) -> Result<JobsResponseFrame, JobsCommandError> {
-        let view = self
-            .submitted_job_view(job_id)
-            .ok_or(JobsCommandError::UnknownJob { job_id })?;
-        let bytes = jobs_job_response(job_view_json(&view, time))
-            .map_err(|error| JobsCommandError::Internal(error.to_string()))?;
+        Ok(JobsResponseFrame {
+            bytes: self.jobs_view_bytes(job_id, time)?,
+            fd: None,
+        })
+    }
+
+    /// The job view as a record, with the process handle attached when the
+    /// job is running: the submit answer. A handle that cannot be duplicated
+    /// is an internal error, not a silently handle-less answer: the submitter
+    /// was promised one. The duplicate is made here and nowhere else, so an
+    /// answer that does not carry it never creates one to leak.
+    pub(in crate::supervisor) fn jobs_view_frame_with_handle(
+        &self,
+        job_id: JobId,
+        time: ControlResponseTimeProjection,
+    ) -> Result<JobsResponseFrame, JobsCommandError> {
+        let bytes = self.jobs_view_bytes(job_id, time)?;
         let fd = self
             .jobs
             .get(job_id)
@@ -323,6 +335,18 @@ impl Supervisor {
             })
             .transpose()?;
         Ok(JobsResponseFrame { bytes, fd })
+    }
+
+    fn jobs_view_bytes(
+        &self,
+        job_id: JobId,
+        time: ControlResponseTimeProjection,
+    ) -> Result<Vec<u8>, JobsCommandError> {
+        let view = self
+            .submitted_job_view(job_id)
+            .ok_or(JobsCommandError::UnknownJob { job_id })?;
+        jobs_job_response(job_view_json(&view, time))
+            .map_err(|error| JobsCommandError::Internal(error.to_string()))
     }
 
     pub(in crate::supervisor) fn jobs_wait_satisfied(
