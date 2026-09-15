@@ -422,6 +422,90 @@ fn shutdown_signal_emits_shutdown_progress() {
     );
 }
 
+// PEI-827. The turn's final action is announced before it is taken and
+// reported after it only if it returns, so the two halves must add up to
+// what the one-shot collectors used to say — and the Critical half must name
+// the service and what spent its budget, because that line is the last thing
+// the operator sees before the reboot.
+#[test]
+fn a_pending_final_action_is_announced_before_it_and_its_outcome_reported_after() {
+    use crate::runtime::{RuntimePendingShutdownFinalization, RuntimeShutdownFinalizationTurn};
+    use crate::supervisor::{
+        CriticalRebootOwed, CriticalRebootTrigger, SupervisorCriticalBudgetRebootDispatch,
+        SupervisorShutdownDeadlineTimerTurn,
+    };
+
+    let mut before = Vec::new();
+    super::push_pending_shutdown_finalization_messages(
+        &mut before,
+        &RuntimePendingShutdownFinalization::CriticalBudgetReboot(CriticalRebootOwed {
+            service: "authd".to_string(),
+            trigger: CriticalRebootTrigger::ServiceMainTerminal,
+        }),
+    );
+    super::push_pending_shutdown_finalization_messages(
+        &mut before,
+        &RuntimePendingShutdownFinalization::FinalAction,
+    );
+    assert_eq!(
+        before
+            .iter()
+            .map(|message| (message.text.as_str(), message.severity))
+            .collect::<Vec<_>>(),
+        vec![
+            (
+                "peinit: critical service authd failed: service main exited\n",
+                super::ConsoleSeverity::Critical,
+            ),
+            (
+                "peinit: critical service authd exhausted its restart budget; rebooting\n",
+                super::ConsoleSeverity::Critical,
+            ),
+            (
+                "peinit: shutdown finalizing\n",
+                super::ConsoleSeverity::Status,
+            ),
+        ],
+    );
+
+    let failed = SupervisorShutdownFinalizationDispatch {
+        report: ShutdownFinalizationReport {
+            random_seed: CleanupActionResult::Failed("seed".to_string()),
+            ..finalization_dispatch().report
+        },
+        finalization: ShutdownFinalizationState::Failed {
+            message: "reboot returned".to_string(),
+            next_retry_at_ns: 2,
+        },
+    };
+    let mut after = Vec::new();
+    super::collect_shutdown_finalization_turn_console_messages(
+        &RuntimeShutdownFinalizationTurn {
+            critical_budget_reboot: Some(SupervisorCriticalBudgetRebootDispatch {
+                service: "authd".to_string(),
+                trigger: CriticalRebootTrigger::ServiceMainTerminal,
+                observed_at_ns: Some(1),
+                finalization: failed.clone(),
+            }),
+            finalization: Some(failed),
+            deadline_timer: SupervisorShutdownDeadlineTimerTurn::Disarmed,
+        },
+        &mut after,
+    );
+    assert_eq!(
+        after
+            .iter()
+            .map(|message| message.text.as_str())
+            .collect::<Vec<_>>(),
+        vec![
+            "peinit: shutdown final action failed: reboot returned\n",
+            "peinit warning: shutdown random seed save failed: seed\n",
+            "peinit: shutdown final action failed: reboot returned\n",
+        ],
+        "nothing announced beforehand is said again; only the outcome is",
+    );
+}
+
 fn collect_messages(
     pre_work: &RuntimeWorkPumpTurn,
     turns: &[RuntimeShutdownEventTurn],

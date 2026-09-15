@@ -1,24 +1,20 @@
-use crate::boundary::{
-    Clock, LinuxTimerFdRead, ProcessController, ShutdownDeadlineTimer, ShutdownFinalizer,
-};
+use crate::boundary::{Clock, LinuxTimerFdRead, ProcessController, ShutdownDeadlineTimer};
 use crate::supervisor::{Supervisor, SupervisorError, SupervisorShutdownDeadlineTimerTurn};
 
 use super::model::{
     RuntimeShutdownDeadlineTimer, RuntimeShutdownEventTurn, RuntimeShutdownEventTurnError,
 };
 
-pub(super) fn process_shutdown_deadline_timer_event<D, C, P, F>(
+pub(super) fn process_shutdown_deadline_timer_event<D, C, P>(
     supervisor: &mut Supervisor,
     deadline_timer: &mut D,
     clock: &mut C,
     controller: &mut P,
-    finalizer: &mut F,
 ) -> Result<RuntimeShutdownEventTurn, RuntimeShutdownEventTurnError>
 where
     D: RuntimeShutdownDeadlineTimer + ?Sized,
     C: Clock + ?Sized,
     P: ProcessController + ?Sized,
-    F: ShutdownFinalizer,
 {
     let read = deadline_timer
         .read_shutdown_deadline()
@@ -28,8 +24,11 @@ where
             let now_ns = clock.monotonic_ns().map_err(|error| {
                 RuntimeShutdownEventTurnError::Supervisor(SupervisorError::Clock(error))
             })?;
+            // The timeouts only. A final action that has come due — the
+            // shutdown ready, or a failed action's retry — is taken at the
+            // end of the turn, after the console has been written (PEI-827).
             supervisor
-                .drive_shutdown(controller, finalizer, now_ns)
+                .drive_shutdown(controller, None, now_ns)
                 .map_err(RuntimeShutdownEventTurnError::Supervisor)?
                 .map(Box::new)
         }

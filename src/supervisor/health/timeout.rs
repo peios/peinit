@@ -1,5 +1,6 @@
 use crate::boundary::{ProcessController, ShutdownFinalizer};
 use crate::supervisor::cgroup_cleanup::{CgroupCleanupKind, record_cgroup_cleanup};
+use crate::supervisor::critical_budget::CriticalRebootTrigger;
 use crate::supervisor::dispatch::SupervisorHealthCheckTimeoutDispatch;
 use crate::supervisor::relationships::apply_relationship_reactions_after_transitions;
 use crate::supervisor::state::{Supervisor, SupervisorError};
@@ -87,11 +88,17 @@ impl Supervisor {
         }
 
         work.commit(self);
-        if let Some(index) = critical_reboot_index
-            && let Some(finalizer) = finalizer
-        {
-            dispatches[index].terminal.critical_reboot =
-                Some(self.critical_reboot(finalizer, now_ns)?);
+        if let Some(index) = critical_reboot_index {
+            if let Some(finalizer) = finalizer {
+                dispatches[index].terminal.critical_reboot =
+                    Some(self.critical_reboot(finalizer, now_ns)?);
+            } else if let Some(service) = dispatches[index].terminal.job_event.service.as_deref() {
+                self.note_deferred_critical_reboot(
+                    service,
+                    CriticalRebootTrigger::HealthCheckFailure,
+                    Some(now_ns),
+                );
+            }
         }
         Ok(dispatches)
     }

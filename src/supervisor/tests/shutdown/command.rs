@@ -228,7 +228,7 @@ fn system_shutdown_command_can_be_driven_to_final_action() {
 
     let mut finalizer = CommandFinalizer::default();
     let dispatch = supervisor
-        .drive_shutdown(&mut controller, &mut finalizer, SHUTDOWN_NS + 4)
+        .drive_shutdown(&mut controller, Some(&mut finalizer), SHUTDOWN_NS + 4)
         .expect("drive shutdown")
         .expect("finalization dispatch");
 

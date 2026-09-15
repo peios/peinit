@@ -91,6 +91,9 @@ pub struct Supervisor {
     pub(super) boot_success: BootSuccessTracker,
     pub(super) shutdown: Option<ShutdownRuntime>,
     pub(super) shutdown_signals: ShutdownSignalTracker,
+    /// A Critical reboot observed by a path that was asked not to finalise
+    /// it, for the reconciliation pass to raise with its cause intact.
+    pub(super) deferred_critical_reboot: Option<super::critical_budget::DeferredCriticalReboot>,
 }
 
 impl Supervisor {
@@ -134,6 +137,7 @@ impl Supervisor {
             boot_success: BootSuccessTracker::default(),
             shutdown: None,
             shutdown_signals: ShutdownSignalTracker::default(),
+            deferred_critical_reboot: None,
         }
     }
 }

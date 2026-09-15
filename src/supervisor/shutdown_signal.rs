@@ -5,17 +5,21 @@ use super::dispatch::{SupervisorShutdownSignalAction, SupervisorShutdownSignalDi
 use super::state::{Supervisor, SupervisorError};
 
 impl Supervisor {
-    pub fn handle_pid1_signal_fd_read<C, P, F>(
+    /// Act on a PID 1 signalfd read.
+    ///
+    /// The finalizer is for the forced reboot a third SIGINT demands; given
+    /// `None`, that reboot is installed as due and left to the caller (see
+    /// [`Self::force_reboot_shutdown`]).
+    pub fn handle_pid1_signal_fd_read<C, P>(
         &mut self,
         read: LinuxSignalFdRead,
         clock: &mut C,
         controller: &mut P,
-        finalizer: &mut F,
+        finalizer: Option<&mut dyn ShutdownFinalizer>,
     ) -> Result<SupervisorPid1SignalFdTurn, SupervisorError>
     where
         C: Clock + ?Sized,
         P: ProcessController + ?Sized,
-        F: ShutdownFinalizer,
     {
         match read {
             LinuxSignalFdRead::Shutdown(signal) => {
@@ -29,16 +33,15 @@ impl Supervisor {
         }
     }
 
-    pub fn handle_shutdown_signal<P, F>(
+    pub fn handle_shutdown_signal<P>(
         &mut self,
         signal: ShutdownSignal,
         controller: &mut P,
-        finalizer: &mut F,
+        finalizer: Option<&mut dyn ShutdownFinalizer>,
         observed_at_ns: u64,
     ) -> Result<SupervisorShutdownSignalDispatch, SupervisorError>
     where
         P: ProcessController + ?Sized,
-        F: ShutdownFinalizer,
     {
         let action = match signal {
             ShutdownSignal::Sigterm | ShutdownSignal::Sigpwr => {
@@ -66,15 +69,14 @@ impl Supervisor {
             .map(SupervisorShutdownSignalAction::Graceful)
     }
 
-    fn handle_sigint<P, F>(
+    fn handle_sigint<P>(
         &mut self,
         controller: &mut P,
-        finalizer: &mut F,
+        finalizer: Option<&mut dyn ShutdownFinalizer>,
         observed_at_ns: u64,
     ) -> Result<SupervisorShutdownSignalAction, SupervisorError>
     where
         P: ProcessController + ?Sized,
-        F: ShutdownFinalizer,
     {
         if self.shutdown_signals.record_sigint(observed_at_ns) {
             return self

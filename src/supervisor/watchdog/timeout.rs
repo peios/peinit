@@ -5,6 +5,7 @@ use crate::service::{
     ErrorControl, RestartEvaluationAction, ServiceDefinition, evaluate_restart_after_failure,
 };
 use crate::supervisor::cgroup_cleanup::{CgroupCleanupKind, record_cgroup_cleanup};
+use crate::supervisor::critical_budget::CriticalRebootTrigger;
 use crate::supervisor::dispatch::{
     SupervisorWatchdogTimeoutDispatch, SupervisorWatchdogTimeoutOutcome,
 };
@@ -72,10 +73,17 @@ impl Supervisor {
         }
 
         work.commit(self);
-        if let Some(index) = critical_reboot_index
-            && let Some(finalizer) = finalizer
-        {
-            dispatches[index].critical_reboot = Some(self.critical_reboot(finalizer, now_ns)?);
+        if let Some(index) = critical_reboot_index {
+            if let Some(finalizer) = finalizer {
+                dispatches[index].critical_reboot = Some(self.critical_reboot(finalizer, now_ns)?);
+            } else {
+                let service = dispatches[index].service.clone();
+                self.note_deferred_critical_reboot(
+                    &service,
+                    CriticalRebootTrigger::WatchdogTimeout,
+                    Some(now_ns),
+                );
+            }
         }
         Ok(dispatches)
     }

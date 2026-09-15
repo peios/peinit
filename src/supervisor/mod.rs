@@ -74,7 +74,9 @@ pub use control_connection::{
 pub use control_connection::{
     SupervisorControlFrameContext, SupervisorShutdownControlFrameContext,
 };
-pub use critical_budget::SupervisorCriticalBudgetRebootDispatch;
+pub use critical_budget::{
+    CriticalRebootOwed, CriticalRebootTrigger, SupervisorCriticalBudgetRebootDispatch,
+};
 pub use dispatch::{
     SupervisedSubmittedTerminalDispatch, SupervisorBootDispatch, SupervisorBootSuccessDispatch,
     SupervisorCancelledProcessSetupDispatch, SupervisorControlDispatch,

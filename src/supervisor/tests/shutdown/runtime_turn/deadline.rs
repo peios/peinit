@@ -148,14 +148,35 @@ fn runtime_deadline_timer_event_can_finalize_without_rebooting_host() {
     )
     .expect("runtime event");
 
+    // The timer event drives the timeouts only; a final action that has
+    // come due is taken at the end of the turn, after the console has been
+    // written (PEI-827).
     assert!(matches!(
         turn,
         RuntimeShutdownEventTurn::ShutdownDeadlineTimer {
-            drive: Some(_),
+            drive: None,
             deadline_timer: crate::supervisor::SupervisorShutdownDeadlineTimerTurn::Disarmed,
             ..
         },
     ));
+    assert!(
+        finalizer.calls.is_empty(),
+        "nothing finalised inside the event"
+    );
+    assert_eq!(
+        deadline_timer.calls,
+        vec![DeadlineTimerCall::Read, DeadlineTimerCall::Disarm],
+    );
+
+    crate::runtime::finalize_due_shutdown(
+        &mut supervisor,
+        &mut finalizer,
+        &mut deadline_timer,
+        SHUTDOWN_NS + 100,
+    )
+    .expect("finalize")
+    .expect("the shutdown was ready");
+
     assert_eq!(
         finalizer.calls,
         vec![
@@ -167,6 +188,10 @@ fn runtime_deadline_timer_event_can_finalize_without_rebooting_host() {
     );
     assert_eq!(
         deadline_timer.calls,
-        vec![DeadlineTimerCall::Read, DeadlineTimerCall::Disarm],
+        vec![
+            DeadlineTimerCall::Read,
+            DeadlineTimerCall::Disarm,
+            DeadlineTimerCall::Disarm,
+        ],
     );
 }

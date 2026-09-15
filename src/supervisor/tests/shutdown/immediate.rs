@@ -17,7 +17,7 @@ fn forced_shutdown_kills_process_cgroups_and_syncs_reboots_without_mount_cleanup
     let mut finalizer = ImmediateFinalizer::default();
 
     let dispatch = supervisor
-        .force_reboot_shutdown(&mut controller, &mut finalizer, SHUTDOWN_NS)
+        .force_reboot_shutdown(&mut controller, Some(&mut finalizer), SHUTDOWN_NS)
         .expect("forced shutdown");
 
     assert_eq!(
@@ -37,15 +37,13 @@ fn forced_shutdown_kills_process_cgroups_and_syncs_reboots_without_mount_cleanup
             "/sys/fs/cgroup/peinit/draining",
         ],
     );
+    let finalization = dispatch.finalization.expect("finalized at once");
     assert_eq!(
-        dispatch.finalization.finalization,
+        finalization.finalization,
         ShutdownFinalizationState::Completed,
     );
-    assert_eq!(
-        dispatch.finalization.report.snapshot_mounts,
-        CleanupActionResult::Ok,
-    );
-    assert!(dispatch.finalization.report.mount_results.is_empty());
+    assert_eq!(finalization.report.snapshot_mounts, CleanupActionResult::Ok);
+    assert!(finalization.report.mount_results.is_empty());
     assert_eq!(
         finalizer.calls,
         vec![ImmediateCall::Sync, ImmediateCall::Reboot]
@@ -95,13 +93,16 @@ fn a_failed_forced_reboot_stays_failed_through_the_reaps_and_retries_only_sync_a
         ImmediateFinalizer::default().with_reboot_results([Err("reboot returned"), Ok(())]);
 
     let forced = supervisor
-        .force_reboot_shutdown(&mut controller, &mut finalizer, SHUTDOWN_NS)
+        .force_reboot_shutdown(&mut controller, Some(&mut finalizer), SHUTDOWN_NS)
         .expect("forced shutdown");
     let failed = ShutdownFinalizationState::Failed {
         message: "Shutdown(\"reboot returned\")".to_string(),
         next_retry_at_ns: SHUTDOWN_NS + 1_000_000_000,
     };
-    assert_eq!(forced.finalization.finalization, failed);
+    assert_eq!(
+        forced.finalization.expect("finalized at once").finalization,
+        failed
+    );
 
     // The killed services are reaped while the retry is pending.
     for (job, at) in [(app_job, 1), (db_job, 2), (draining_job, 3)] {
@@ -132,7 +133,11 @@ fn a_failed_forced_reboot_stays_failed_through_the_reaps_and_retries_only_sync_a
     // the ImmediateFinalizer refuses to do.
     let calls_before_retry = finalizer.calls.len();
     let retried = supervisor
-        .drive_shutdown(&mut controller, &mut finalizer, SHUTDOWN_NS + 1_000_000_000)
+        .drive_shutdown(
+            &mut controller,
+            Some(&mut finalizer),
+            SHUTDOWN_NS + 1_000_000_000,
+        )
         .expect("drive retry")
         .expect("retry dispatch")
         .finalization

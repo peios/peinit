@@ -372,14 +372,17 @@ fn runtime_sigchld_event_finalizes_shutdown_when_last_service_exits() {
     )
     .expect("runtime event");
 
+    // The reap makes the shutdown Ready and leaves it there: the final
+    // action is the end of the turn's business, after the turn's console
+    // output — this reap's own line among it — has been written (PEI-827).
     let RuntimeShutdownEventTurn::Pid1Signal {
         child_reaps,
-        drive: Some(drive),
+        drive: None,
         deadline_timer: Some(crate::supervisor::SupervisorShutdownDeadlineTimerTurn::Disarmed),
         ..
     } = turn
     else {
-        panic!("expected final child reap to drive shutdown finalization");
+        panic!("expected the final child reap to leave the shutdown ready, not finalize it");
     };
     assert_eq!(child_reaper.calls, 1);
     assert!(matches!(
@@ -390,9 +393,30 @@ fn runtime_sigchld_event_finalizes_shutdown_when_last_service_exits() {
             ..
         }],
     ));
-    assert!(drive.timeout.is_none());
     assert_eq!(
-        drive.finalization.expect("finalization").finalization,
+        supervisor.shutdown().expect("shutdown").finalization,
+        ShutdownFinalizationState::Ready,
+    );
+    assert!(
+        finalizer.calls.is_empty(),
+        "nothing finalised inside the event"
+    );
+    assert_eq!(deadline_timer.calls, vec![DeadlineTimerCall::Disarm]);
+
+    let finalization = crate::runtime::finalize_due_shutdown(
+        &mut supervisor,
+        &mut finalizer,
+        &mut deadline_timer,
+        DB_REAP_NS,
+    )
+    .expect("finalize")
+    .expect("the shutdown was ready");
+
+    assert_eq!(
+        finalization
+            .finalization
+            .expect("finalization")
+            .finalization,
         ShutdownFinalizationState::Completed,
     );
     assert_eq!(
@@ -408,5 +432,8 @@ fn runtime_sigchld_event_finalizes_shutdown_when_last_service_exits() {
             RuntimeFinalizerCall::Reboot(ShutdownKind::Poweroff),
         ],
     );
-    assert_eq!(deadline_timer.calls, vec![DeadlineTimerCall::Disarm]);
+    assert_eq!(
+        deadline_timer.calls,
+        vec![DeadlineTimerCall::Disarm, DeadlineTimerCall::Disarm],
+    );
 }

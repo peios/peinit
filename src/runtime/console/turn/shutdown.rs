@@ -91,7 +91,9 @@ fn collect_shutdown_signal_dispatch_console_messages(
             for killed in &immediate.killed_services {
                 collect_shutdown_cgroup_kill_console_message(killed, out);
             }
-            collect_shutdown_finalization_dispatch_console_messages(&immediate.finalization, out);
+            if let Some(finalization) = &immediate.finalization {
+                collect_shutdown_finalization_dispatch_console_messages(finalization, out);
+            }
         }
         SupervisorShutdownSignalAction::AlreadyInProgress { kind } => {
             push_message(
@@ -129,13 +131,7 @@ fn collect_shutdown_finalization_dispatch_console_messages(
     out: &mut Vec<ConsoleMessage>,
 ) {
     push_message(out, "peinit: shutdown finalizing\n");
-    if let crate::shutdown::CleanupActionResult::Failed(message) = &dispatch.report.random_seed {
-        push_message(
-            out,
-            format!("peinit warning: shutdown random seed save failed: {message}\n"),
-        );
-    }
-    collect_shutdown_finalization_state_console_message(&dispatch.finalization, out);
+    crate::runtime::console::collect_shutdown_finalization_result_console_messages(dispatch, out);
 }
 
 fn collect_shutdown_kill_console_message(

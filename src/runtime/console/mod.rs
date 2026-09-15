@@ -234,22 +234,82 @@ pub(super) fn push_critical_service_failure(
 /// The machine is rebooting because a Critical service ran out of restart
 /// budget. Critical, and phrased so the reason is on the same line as the
 /// consequence: this is the last thing the operator sees before the reboot.
-///
-/// Followed by the outcome of the final action, which is only ever seen when
-/// `reboot(2)` returned: the operator then needs to know the machine is still
-/// up and retrying, not rebooting (PEI-1087).
+/// Preceded by what spent the budget, where the path that saw it said.
+fn push_critical_budget_reboot_announcement(
+    out: &mut Vec<ConsoleMessage>,
+    service: &str,
+    trigger: crate::supervisor::CriticalRebootTrigger,
+) {
+    if let Some(reason) = trigger.console_reason() {
+        push_critical_service_failure(out, service, reason);
+    }
+    push_critical(
+        out,
+        format!("peinit: critical service {service} exhausted its restart budget; rebooting\n"),
+    );
+}
+
+/// A Critical reboot raised inline, with its outcome. Only ever seen in
+/// full when `reboot(2)` returned: the operator then needs to know the
+/// machine is still up and retrying, not rebooting (PEI-1087).
 pub(crate) fn push_critical_budget_reboot_messages(
     out: &mut Vec<ConsoleMessage>,
     dispatch: &crate::supervisor::SupervisorCriticalBudgetRebootDispatch,
 ) {
-    push_critical(
-        out,
-        format!(
-            "peinit: critical service {} exhausted its restart budget; rebooting\n",
-            dispatch.service
-        ),
-    );
+    push_critical_budget_reboot_announcement(out, &dispatch.service, dispatch.trigger);
     collect_shutdown_finalization_state_console_message(&dispatch.finalization.finalization, out);
+}
+
+/// What the runtime says before the final action it is about to take.
+///
+/// Written and flushed ahead of the action, because the action does not
+/// return on success and nothing said afterwards is heard (PEI-827). The
+/// Critical reboot names the service and what spent its budget; a
+/// shutdown's final action is the "finalizing" line of the graceful
+/// sequence. What either action reports afterwards, if it returns, is
+/// [`collect_shutdown_finalization_turn_console_messages`].
+pub(crate) fn push_pending_shutdown_finalization_messages(
+    out: &mut Vec<ConsoleMessage>,
+    pending: &crate::runtime::RuntimePendingShutdownFinalization,
+) {
+    match pending {
+        crate::runtime::RuntimePendingShutdownFinalization::CriticalBudgetReboot(owed) => {
+            push_critical_budget_reboot_announcement(out, &owed.service, owed.trigger);
+        }
+        crate::runtime::RuntimePendingShutdownFinalization::FinalAction => {
+            push_message(out, "peinit: shutdown finalizing\n");
+        }
+    }
+}
+
+/// What a final action that returned has to report: the seed write that
+/// failed on the way, and the failed-shutdown state the machine is now in.
+pub(crate) fn collect_shutdown_finalization_turn_console_messages(
+    finalization: &crate::runtime::RuntimeShutdownFinalizationTurn,
+    out: &mut Vec<ConsoleMessage>,
+) {
+    if let Some(reboot) = &finalization.critical_budget_reboot {
+        collect_shutdown_finalization_state_console_message(&reboot.finalization.finalization, out);
+    }
+    if let Some(dispatch) = &finalization.finalization {
+        collect_shutdown_finalization_result_console_messages(dispatch, out);
+    }
+}
+
+/// The outcome of a final action: everything
+/// `collect_shutdown_finalization_dispatch_console_messages` says except
+/// the "finalizing" line, which the runtime has already said.
+pub(super) fn collect_shutdown_finalization_result_console_messages(
+    dispatch: &crate::supervisor::SupervisorShutdownFinalizationDispatch,
+    out: &mut Vec<ConsoleMessage>,
+) {
+    if let crate::shutdown::CleanupActionResult::Failed(message) = &dispatch.report.random_seed {
+        push_message(
+            out,
+            format!("peinit warning: shutdown random seed save failed: {message}\n"),
+        );
+    }
+    collect_shutdown_finalization_state_console_message(&dispatch.finalization, out);
 }
 
 pub(super) fn collect_shutdown_finalization_state_console_message(

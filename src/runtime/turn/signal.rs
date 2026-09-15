@@ -40,8 +40,12 @@ where
     let read = signal_source
         .read_pid1_signal()
         .map_err(RuntimeShutdownEventTurnError::SignalRead)?;
+    // No finalizer on any of these: a forced reboot, a Critical service's
+    // reboot and a shutdown's final action are all left to the end of the
+    // turn (`finalize_due_shutdown`), once the turn's console output has
+    // been written (PEI-827).
     let supervisor_turn = supervisor
-        .handle_pid1_signal_fd_read(read, context.clock, context.controller, context.finalizer)
+        .handle_pid1_signal_fd_read(read, context.clock, context.controller, None)
         .map_err(RuntimeShutdownEventTurnError::Supervisor)?;
     if let SupervisorPid1SignalFdTurn::Shutdown(dispatch) = &supervisor_turn
         && let SupervisorShutdownSignalAction::Graceful(shutdown) = &dispatch.action
@@ -49,13 +53,7 @@ where
         release_cancelled_process_setups(&shutdown.cancelled_setups, context.registrar);
     }
     let reaps = if matches!(read, LinuxSignalFdRead::Other { signal } if signal == libc::SIGCHLD) {
-        process_sigchld_reaps(
-            supervisor,
-            child_reaper,
-            context.clock,
-            context.controller,
-            context.finalizer,
-        )?
+        process_sigchld_reaps(supervisor, child_reaper, context.clock, context.controller)?
     } else {
         SigchldReaps::empty()
     };
@@ -63,7 +61,7 @@ where
     let drive = if shutdown_advanced {
         let now_ns = reaps.ended_at_ns.expect("shutdown reaps have a timestamp");
         supervisor
-            .drive_shutdown(context.controller, context.finalizer, now_ns)
+            .drive_shutdown(context.controller, None, now_ns)
             .map_err(RuntimeShutdownEventTurnError::Supervisor)?
             .map(Box::new)
     } else {
@@ -99,18 +97,16 @@ impl SigchldReaps {
     }
 }
 
-fn process_sigchld_reaps<H, C, P, F>(
+fn process_sigchld_reaps<H, C, P>(
     supervisor: &mut Supervisor,
     child_reaper: &mut H,
     clock: &mut C,
     controller: &mut P,
-    finalizer: &mut F,
 ) -> Result<SigchldReaps, RuntimeShutdownEventTurnError>
 where
     H: ChildReaper + ?Sized,
     C: Clock + ?Sized,
     P: ProcessController + ?Sized,
-    F: ShutdownFinalizer,
 {
     let children = child_reaper
         .reap_children()
@@ -123,9 +119,7 @@ where
     })?;
     let child_reaps = children
         .into_iter()
-        .map(|child: ChildReap| {
-            supervisor.apply_reaped_child(child, ended_at_ns, controller, finalizer)
-        })
+        .map(|child: ChildReap| supervisor.apply_reaped_child(child, ended_at_ns, controller, None))
         .collect::<Result<Vec<_>, _>>()
         .map_err(RuntimeShutdownEventTurnError::Supervisor)?;
     Ok(SigchldReaps {

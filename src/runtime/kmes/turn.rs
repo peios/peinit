@@ -46,6 +46,26 @@ pub(crate) fn collect_runtime_loop_kmes_events(
     Ok(())
 }
 
+/// The audit record of a final action that returned: the `critical.failure`
+/// for a Critical service's reboot, with the trigger the path that observed
+/// it recorded. A shutdown's own final action has no event, as on the
+/// drive paths.
+pub(crate) fn collect_runtime_shutdown_finalization_kmes_events(
+    finalization: &crate::runtime::RuntimeShutdownFinalizationTurn,
+    out: &mut Vec<KmesEvent>,
+) -> Result<(), BoundaryError> {
+    if let Some(reboot) = &finalization.critical_budget_reboot {
+        super::event::push_critical_failure(
+            out,
+            &reboot.service,
+            reboot.trigger.kmes_id(),
+            reboot.observed_at_ns,
+            &reboot.finalization,
+        )?;
+    }
+    Ok(())
+}
+
 pub(crate) fn collect_runtime_shutdown_turn_kmes_events(
     turn: &RuntimeShutdownEventTurn,
     out: &mut Vec<KmesEvent>,
