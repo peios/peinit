@@ -5,6 +5,8 @@ mod random;
 #[cfg(feature = "peios-registry")]
 mod registration;
 mod table;
+#[cfg(test)]
+mod test_support;
 
 #[cfg(feature = "peios-registry")]
 mod boot;
