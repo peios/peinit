@@ -182,7 +182,11 @@ fn a_stale_activation_generation_is_rejected_without_state_change() {
         .jobs()
         .current_service_main_job("app")
         .expect("app has a current main job");
-    let current = supervisor.services().runtime("app").expect("runtime").generation;
+    let current = supervisor
+        .services()
+        .runtime("app")
+        .expect("runtime")
+        .generation;
     let stale = current.checked_sub(1).unwrap_or(current + 1);
     supervisor
         .jobs_mut()
@@ -340,7 +344,7 @@ fn a_readiness_timeout_followed_by_the_reap_charges_the_budget_once() {
             },
             deadline.due_at_ns + 1,
             &mut controller,
-            &mut finalizer,
+            Some(&mut finalizer),
         )
         .expect("reap the killed process");
 

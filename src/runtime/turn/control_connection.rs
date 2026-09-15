@@ -86,17 +86,22 @@ where
 fn control_connection_shutdown(
     turn: &SupervisorControlConnectionTableTurn,
 ) -> Option<&SupervisorShutdownDispatch> {
-    match turn.turn.frame.as_ref().map(|frame| &frame.frame)? {
-        SupervisorControlFrameTurn::ShutdownAccepted { dispatch, .. } => Some(&dispatch.shutdown),
-        SupervisorControlFrameTurn::CommandAccepted {
-            dispatch: Some(dispatch),
-            ..
-        } => match &**dispatch {
-            SupervisorControlCommandDispatch::Shutdown(dispatch) => Some(&dispatch.shutdown),
+    turn.turn
+        .frames
+        .iter()
+        .find_map(|frame| match &frame.frame {
+            SupervisorControlFrameTurn::ShutdownAccepted { dispatch, .. } => {
+                Some(&dispatch.shutdown)
+            }
+            SupervisorControlFrameTurn::CommandAccepted {
+                dispatch: Some(dispatch),
+                ..
+            } => match &**dispatch {
+                SupervisorControlCommandDispatch::Shutdown(dispatch) => Some(&dispatch.shutdown),
+                _ => None,
+            },
             _ => None,
-        },
-        _ => None,
-    }
+        })
 }
 
 fn control_connection_started_shutdown(turn: &SupervisorControlConnectionTableTurn) -> bool {

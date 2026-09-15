@@ -72,7 +72,7 @@ fn reaping_a_service_main_job_releases_its_pidfd_once() {
             },
             APP_LAUNCH_NS + 1,
             &mut controller,
-            &mut finalizer,
+            Some(&mut finalizer),
         )
         .expect("reap");
 
