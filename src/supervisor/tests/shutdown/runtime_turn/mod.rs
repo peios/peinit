@@ -6,6 +6,7 @@ mod lifecycle_deadline;
 mod loop_turn;
 mod notify;
 mod power_button;
+mod process_setup;
 mod registry_watch;
 mod signal;
 mod support;
