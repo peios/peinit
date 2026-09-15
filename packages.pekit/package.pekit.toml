@@ -85,7 +85,9 @@ format = "peipkg"
 # release (PEI-830, PEI-821).
 # 0.0.5-8 (2026-09-15): a launched member still starting is attempted, not
 # frozen (PEI-350); an illegal service name is an undecodable key (PEI-621).
-version      = "{{version}}-8"
+# 0.0.5-9 (2026-09-16): a held member with no job record yet is frozen, not
+# counted as launched (PEI-350).
+version      = "{{version}}-9"
 architecture = "x86_64"
 license      = "MIT"
 license_class = "free"
