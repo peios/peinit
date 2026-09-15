@@ -76,6 +76,9 @@ pub(in crate::runtime::kmes) fn collect_readiness_timeout(
     dispatch: &ReadinessTimeoutDispatch,
     out: &mut Vec<KmesEvent>,
 ) -> Result<(), BoundaryError> {
+    if let Some(job_event) = &dispatch.job_event {
+        push_job(out, job_event)?;
+    }
     push_operations(out, &dispatch.operation_events)?;
     push_graphs(out, &dispatch.graph_events)
 }

@@ -256,3 +256,112 @@ fn readiness_timeout_kills_service_cgroup_and_fails_start() {
     assert_eq!(operation.error.as_deref(), Some(expected.as_str()));
     assert!(supervisor.next_readiness_timeout().is_none());
 }
+
+#[derive(Debug, Default)]
+struct QuietFinalizer;
+
+impl crate::boundary::ShutdownFinalizer for QuietFinalizer {
+    fn snapshot_mounts(&mut self) -> Result<Vec<String>, crate::boundary::BoundaryError> {
+        Ok(Vec::new())
+    }
+    fn unmount(&mut self, _mount_point: &str) -> Result<(), crate::boundary::BoundaryError> {
+        Ok(())
+    }
+    fn remount_readonly(
+        &mut self,
+        _mount_point: &str,
+    ) -> Result<(), crate::boundary::BoundaryError> {
+        Ok(())
+    }
+    fn sync_filesystems(&mut self) -> Result<(), crate::boundary::BoundaryError> {
+        Ok(())
+    }
+    fn reboot(
+        &mut self,
+        _kind: crate::shutdown::ShutdownKind,
+    ) -> Result<(), crate::boundary::BoundaryError> {
+        Ok(())
+    }
+}
+
+// PEI-822. The readiness timeout killed the service cgroup but left the main
+// job Running, so when the killed process's exit was reaped it was evaluated
+// as a fresh failure and the restart budget was charged a second time: a
+// ReadinessTimeout loop with RestartMaxRetries=4 got three activations where
+// a ProcessCrash loop got five. The watchdog and health paths retire the job
+// they kill; this one has to as well.
+#[test]
+fn a_readiness_timeout_followed_by_the_reap_charges_the_budget_once() {
+    let mut supervisor = notify_app_supervisor();
+    let job_id = supervisor
+        .jobs()
+        .current_service_main_job("app")
+        .expect("app has a current main job");
+    let deadline = supervisor
+        .next_readiness_timeout()
+        .expect("readiness timeout");
+    let mut controller = TestProcessController::default();
+
+    let timeout = supervisor
+        .process_next_due_readiness_timeout(&mut controller, deadline.due_at_ns)
+        .expect("process readiness timeout")
+        .expect("timeout dispatch");
+
+    let job_event = timeout
+        .timeout
+        .job_event
+        .expect("the timeout retires the job it killed");
+    assert_eq!(job_event.job_id, job_id);
+    assert_eq!(job_event.state, crate::job::JobState::Failed);
+    assert_eq!(job_event.exit_signal, Some(libc::SIGKILL));
+    assert!(supervisor.jobs().get(job_id).is_none());
+    let failures_after_timeout = supervisor
+        .services()
+        .runtime("app")
+        .expect("runtime")
+        .consecutive_restart_failures;
+    assert_eq!(failures_after_timeout, 1);
+    assert_eq!(
+        supervisor.service_status("app").expect("app").state,
+        ServiceState::Backoff
+    );
+
+    // The SIGKILL lands and the exit is reaped: news about a process already
+    // written off, not a second failure.
+    let mut finalizer = QuietFinalizer;
+    let reap = supervisor
+        .apply_reaped_child(
+            crate::boundary::ChildReap {
+                pid: 8000,
+                status: crate::boundary::ChildExitStatus::Signaled {
+                    signal: libc::SIGKILL,
+                    core_dumped: false,
+                },
+            },
+            deadline.due_at_ns + 1,
+            &mut controller,
+            &mut finalizer,
+        )
+        .expect("reap the killed process");
+
+    assert!(
+        matches!(
+            reap,
+            crate::supervisor::SupervisorChildReapTurn::Untracked { .. }
+        ),
+        "the exit belongs to no job: {reap:?}",
+    );
+    assert_eq!(
+        supervisor
+            .services()
+            .runtime("app")
+            .expect("runtime")
+            .consecutive_restart_failures,
+        failures_after_timeout,
+        "the reap must not charge the budget again",
+    );
+    assert_eq!(
+        supervisor.service_status("app").expect("app").state,
+        ServiceState::Backoff
+    );
+}
