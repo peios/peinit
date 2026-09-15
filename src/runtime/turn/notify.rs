@@ -83,7 +83,29 @@ where
             Err(SupervisorError::Shutdown(
                 error @ ShutdownError::InvalidTimeoutExtension { .. },
             )) => RuntimeNotifySupervisorTurn::Rejected(RuntimeNotifyRejection::Shutdown(error)),
-            Err(error) => return Err(RuntimeShutdownEventTurnError::Supervisor(error)),
+            // Anything else is peinit unable to act on one datagram. The
+            // datagram is consumed and gone; what it was about is the
+            // sender's service, and that is what fails (PEI-1125). A sender
+            // that cannot be attributed fails nothing: the error is
+            // announced and the datagram dropped.
+            Err(error) => {
+                let subject = supervisor
+                    .authenticate_notify_datagram_sender(sender_pid, controller)
+                    .ok()
+                    .map(|sender| crate::supervisor::SupervisorInternalErrorSubject {
+                        service: Some(sender.service),
+                        job_id: Some(sender.job_id),
+                    })
+                    .unwrap_or_default();
+                let dispatch = supervisor.fail_after_internal_error(
+                    subject,
+                    "notify",
+                    format!("{error:?}"),
+                    observed_at_ns,
+                    controller,
+                );
+                RuntimeNotifySupervisorTurn::InternalError(Box::new(dispatch))
+            }
         };
     let deadline_timer_turn = if notify_extended_shutdown_timeout(supervisor, &supervisor_turn) {
         Some(sync_deadline_timer(supervisor, deadline_timer)?)

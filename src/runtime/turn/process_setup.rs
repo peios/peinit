@@ -38,11 +38,32 @@ where
             turn: RuntimeProcessSetupTurn::Stale { fd },
         });
     }
-    let status = launcher.read_process_setup_status(fd).map_err(|error| {
-        RuntimeShutdownEventTurnError::Supervisor(crate::supervisor::SupervisorError::Launch(
-            crate::execution::launch::LaunchCreatedJobError::Boundary(error),
-        ))
-    })?;
+    // Resolved before anything is read: once the read or the supervisor has
+    // refused, the setup it was about is no longer the way to find out
+    // which service the refusal belongs to (PEI-1125).
+    let subject = supervisor.internal_error_subject_for_setup(fd);
+    let status = match launcher.read_process_setup_status(fd) {
+        Ok(status) => status,
+        Err(error) => {
+            // The status pipe of one launch could not be read — EBADF on a
+            // descriptor that has gone, or whatever the launcher found. That
+            // is this launch's problem: fail the service it was starting.
+            let observed_at_ns = clock.monotonic_ns().map_err(|error| {
+                RuntimeShutdownEventTurnError::Supervisor(
+                    crate::supervisor::SupervisorError::Clock(error),
+                )
+            })?;
+            return Ok(contain_setup_error(
+                supervisor,
+                fd,
+                subject,
+                format!("{error:?}"),
+                observed_at_ns,
+                controller,
+                registrar,
+            ));
+        }
+    };
     let terminal = !matches!(status, ProcessSetupStatus::Pending);
     if terminal {
         registrar
@@ -52,9 +73,25 @@ where
     let observed_at_ns = clock.monotonic_ns().map_err(|error| {
         RuntimeShutdownEventTurnError::Supervisor(crate::supervisor::SupervisorError::Clock(error))
     })?;
-    let dispatch = supervisor
-        .process_pending_process_setup_status(fd, status, observed_at_ns, controller)
-        .map_err(RuntimeShutdownEventTurnError::Supervisor)?;
+    let dispatch = match supervisor.process_pending_process_setup_status(
+        fd,
+        status,
+        observed_at_ns,
+        controller,
+    ) {
+        Ok(dispatch) => dispatch,
+        Err(error) => {
+            return Ok(contain_setup_error(
+                supervisor,
+                fd,
+                subject,
+                format!("{error:?}"),
+                observed_at_ns,
+                controller,
+                registrar,
+            ));
+        }
+    };
     let stale = matches!(dispatch, SupervisorProcessSetupDispatch::Stale { .. });
     if stale && !terminal {
         registrar
@@ -84,6 +121,39 @@ where
         }
     };
     Ok(RuntimeShutdownEventTurn::ProcessSetup { fd, turn })
+}
+
+/// Fail the launching service over a setup step peinit could not carry out,
+/// and release the setup's descriptor: it is not going to be read again.
+fn contain_setup_error<P, R>(
+    supervisor: &mut Supervisor,
+    fd: i32,
+    subject: crate::supervisor::SupervisorInternalErrorSubject,
+    error: String,
+    observed_at_ns: u64,
+    controller: &mut P,
+    registrar: &mut R,
+) -> RuntimeShutdownEventTurn
+where
+    P: ProcessController + ?Sized,
+    R: RuntimeEventRegistrar + ?Sized,
+{
+    let _ = registrar.unregister_source(fd);
+    let dispatch = supervisor.fail_after_internal_error(
+        subject,
+        "process setup",
+        error,
+        observed_at_ns,
+        controller,
+    );
+    close_fd(fd);
+    RuntimeShutdownEventTurn::ProcessSetup {
+        fd,
+        turn: RuntimeProcessSetupTurn::InternalError {
+            fd,
+            dispatch: Box::new(dispatch),
+        },
+    }
 }
 
 pub(crate) fn register_process_setup_sources<R>(

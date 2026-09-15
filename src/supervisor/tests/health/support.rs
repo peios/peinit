@@ -14,7 +14,7 @@ use super::super::{
 pub(super) const HEALTH_INTERVAL_SECS: u64 = 1;
 pub(super) const HEALTH_TIMEOUT_SECS: u64 = 5;
 
-pub(super) fn active_health_supervisor(retries: u32) -> (Supervisor, u64) {
+pub(in crate::supervisor::tests) fn active_health_supervisor(retries: u32) -> (Supervisor, u64) {
     let mut app = alive_service("app");
     app.health_check = Some("/bin/app-health --quick".to_string());
     app.health_check_interval_secs = HEALTH_INTERVAL_SECS;
@@ -75,7 +75,7 @@ pub(super) fn critical_active_health_supervisor() -> (Supervisor, u64) {
     )
 }
 
-pub(super) fn launch_due_health_check(
+pub(in crate::supervisor::tests) fn launch_due_health_check(
     supervisor: &mut Supervisor,
     due_at_ns: u64,
     pid: u32,

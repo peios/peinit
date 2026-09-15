@@ -84,6 +84,26 @@ pub(super) fn push_critical_failure(
     Ok(())
 }
 
+/// The audit record of a contained internal error: the job it retired, the
+/// operation it failed, the starts its reactions released, and the
+/// `service.internal_error` that says what peinit could not do (PEI-1125).
+pub(super) fn push_internal_error(
+    out: &mut Vec<KmesEvent>,
+    dispatch: &crate::supervisor::SupervisorInternalErrorDispatch,
+) -> Result<(), BoundaryError> {
+    if let Some(job_event) = &dispatch.job_event {
+        push_job(out, job_event)?;
+    }
+    if let Some(job_event) = &dispatch.service_job_event {
+        push_job(out, job_event)?;
+    }
+    if let Some(operation_event) = &dispatch.operation_event {
+        push_operation(out, operation_event)?;
+    }
+    out.push(crate::kmes::encode_service_internal_error_event(dispatch)?);
+    super::job::collect_start_dispatches(&dispatch.start_dispatches, out)
+}
+
 pub(super) fn push_shutdown_abandoned(
     out: &mut Vec<KmesEvent>,
     abandoned: &SupervisorShutdownAbandonedDispatch,

@@ -105,6 +105,7 @@ impl LinuxShutdownRuntime {
             lifecycle_timer,
             calendar_timers: super::calendar_timer::LinuxCalendarTimerTable::new(),
             kmes_sink: crate::boundary::LinuxKmesEventSink::new(),
+            dropped_kmes_events: 0,
             console_sink: LinuxConsoleSink::new(),
             quiet: config.quiet,
             quiet_policy: crate::runtime::console::QuietPolicy::new(config.quiet, false),

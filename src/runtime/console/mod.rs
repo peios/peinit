@@ -188,6 +188,22 @@ pub(super) fn collect_service_transition_console_message(
     }
 }
 
+/// What the console says about an internal error contained to one service
+/// (PEI-1125): a `[FAILED]` line naming the service, the step and the error,
+/// then the transition line a failure gets anyway, then whatever the
+/// failure's reactions started. Loud on purpose — this replaces a `[ CRIT ]`
+/// recovery entry, and a quiet downgrade would hide the fault it names.
+pub(crate) fn push_internal_error_messages(
+    out: &mut Vec<ConsoleMessage>,
+    dispatch: &crate::supervisor::SupervisorInternalErrorDispatch,
+) {
+    push_error(out, format!("{}\n", dispatch.message()));
+    if let Some(transition) = &dispatch.service_transition {
+        collect_service_transition_console_message(transition, out);
+    }
+    collect_start_dispatches_console_messages(&dispatch.start_dispatches, out);
+}
+
 pub(super) fn push_service_started(
     out: &mut Vec<ConsoleMessage>,
     job_event: &crate::job::JobEvent,

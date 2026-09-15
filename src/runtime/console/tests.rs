@@ -711,3 +711,60 @@ fn job_id(sequence: u64) -> JobId {
         .allocate_batch(sequence as usize + 1, 1_717_171_717_123_456_789)
         .expect("job id")[sequence as usize]
 }
+
+/// PEI-1125: an internal error contained to one service is announced as
+/// loudly as the recovery entry it replaces — a `[FAILED]` line naming the
+/// service, the step and the error, then the failure's own transition line.
+#[test]
+fn a_contained_internal_error_names_the_service_the_step_and_the_error() {
+    let dispatch = crate::supervisor::SupervisorInternalErrorDispatch {
+        step: "job terminal",
+        subject: crate::supervisor::SupervisorInternalErrorSubject {
+            service: Some("app".to_string()),
+            job_id: Some(job_id(1)),
+        },
+        error: "JobStore(Transition(..))".to_string(),
+        observed_at_ns: 30,
+        job_event: Some(failed_job("app", job_id(1))),
+        service_job_event: None,
+        operation_event: None,
+        service_transition: Some(transition(
+            "app",
+            ServiceState::Active,
+            ServiceState::Failed,
+            TransitionCause::InternalError,
+        )),
+        start_dispatches: Vec::new(),
+    };
+    let turn = RuntimeShutdownEventTurn::Pid1Signal {
+        read: LinuxSignalFdRead::Other {
+            signal: libc::SIGCHLD,
+        },
+        supervisor: SupervisorPid1SignalFdTurn::Other {
+            signal: libc::SIGCHLD,
+        },
+        child_reaps: vec![SupervisorChildReapTurn::InternalError {
+            child: ChildReap {
+                pid: 800,
+                status: ChildExitStatus::Exited { code: 0 },
+            },
+            dispatch: Box::new(dispatch),
+        }],
+        drive: None,
+        deadline_timer: None,
+    };
+
+    let messages = collect_messages(
+        &RuntimeWorkPumpTurn::default(),
+        &[turn],
+        &RuntimeWorkPumpTurn::default(),
+    );
+
+    assert_eq!(
+        messages,
+        vec![
+            "peinit: service app: internal error at job terminal: JobStore(Transition(..)); the service is failed\n",
+            "peinit: service app failed: InternalError\n",
+        ],
+    );
+}

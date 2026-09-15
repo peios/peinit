@@ -43,6 +43,7 @@ pub(super) fn is_allowed_transition(
                 | TransitionCause::ValidationError
                 | TransitionCause::CycleDetected
                 | TransitionCause::RestartBudgetExhausted
+                | TransitionCause::InternalError
         ),
         (ServiceState::Active, ServiceState::Reloading) => {
             matches!(cause, TransitionCause::ExplicitReload)
@@ -55,12 +56,17 @@ pub(super) fn is_allowed_transition(
                 | TransitionCause::HealthCheckFailure
                 | TransitionCause::WatchdogTimeout
         ),
+        // `InternalError` is the one cause every supervised state can fail
+        // under: peinit could not carry out a step on the service, and the
+        // service is failed rather than the runtime loop (PEI-1125). It is
+        // never restart-eligible and never triggers OnFailure.
         (ServiceState::Active, ServiceState::Failed) => matches!(
             cause,
             TransitionCause::ProcessCrash
                 | TransitionCause::HealthCheckFailure
                 | TransitionCause::WatchdogTimeout
                 | TransitionCause::RestartBudgetExhausted
+                | TransitionCause::InternalError
         ),
         (ServiceState::Active, ServiceState::Inactive) => cause == TransitionCause::CleanExit,
         (ServiceState::Backoff, ServiceState::Starting) => cause == TransitionCause::RestartPolicy,
@@ -82,7 +88,9 @@ pub(super) fn is_allowed_transition(
         (ServiceState::Reloading, ServiceState::Backoff) => cause == TransitionCause::ProcessCrash,
         (ServiceState::Reloading, ServiceState::Failed) => matches!(
             cause,
-            TransitionCause::ProcessCrash | TransitionCause::RestartBudgetExhausted
+            TransitionCause::ProcessCrash
+                | TransitionCause::RestartBudgetExhausted
+                | TransitionCause::InternalError
         ),
         (ServiceState::Stopping, ServiceState::Inactive) => matches!(
             cause,
@@ -90,7 +98,9 @@ pub(super) fn is_allowed_transition(
         ),
         (ServiceState::Stopping, ServiceState::Failed) => matches!(
             cause,
-            TransitionCause::ConflictEviction | TransitionCause::BindsToPropagation
+            TransitionCause::ConflictEviction
+                | TransitionCause::BindsToPropagation
+                | TransitionCause::InternalError
         ),
         (ServiceState::Stopping, ServiceState::Abandoned) => {
             cause == TransitionCause::ProcessUnkillable

@@ -45,6 +45,9 @@ pub enum RuntimeNotifySupervisorTurn {
     Applied(Box<SupervisorNotifyDispatch>),
     AppliedToJob(Box<SupervisorSubmittedNotifyDispatch>),
     Rejected(RuntimeNotifyRejection),
+    /// Applying the datagram raised an internal error, contained to the
+    /// sender's service (PEI-1125).
+    InternalError(Box<crate::supervisor::SupervisorInternalErrorDispatch>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

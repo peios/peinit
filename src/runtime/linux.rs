@@ -36,6 +36,10 @@ pub struct LinuxShutdownRuntime {
     lifecycle_timer: LinuxTimerFd,
     calendar_timers: calendar_timer::LinuxCalendarTimerTable,
     kmes_sink: LinuxKmesEventSink,
+    /// Events the ring refused since boot, dropped rather than fatal
+    /// (PEI-1082). Carried in every `event.oversized` so the trail says how
+    /// many gaps it has.
+    dropped_kmes_events: u64,
     console_sink: LinuxConsoleSink,
     /// `peios.quiet`, from the kernel command line.
     quiet: crate::init::QuietLevel,

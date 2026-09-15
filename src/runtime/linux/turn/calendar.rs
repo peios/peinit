@@ -37,8 +37,11 @@ impl LinuxShutdownRuntime {
         if calendar_turns.is_empty() {
             return Ok(());
         }
-        emit_runtime_loop_kmes_events(
-            &mut self.kmes_sink,
+        let dropped_events = emit_runtime_loop_kmes_events(
+            super::support::RuntimeKmesEmitter {
+                sink: &mut self.kmes_sink,
+                dropped_events: &mut self.dropped_kmes_events,
+            },
             &crate::runtime::RuntimeWorkPumpTurn::default(),
             &crate::supervisor::SupervisorOperationMaintenanceTurn::default(),
             &[],
@@ -54,6 +57,9 @@ impl LinuxShutdownRuntime {
             calendar_turns,
             &mut console_messages,
         );
+        for dropped in &dropped_events {
+            crate::runtime::console::push_warn(&mut console_messages, dropped.console_message());
+        }
         self.write_console_messages(console_messages);
         Ok(())
     }
