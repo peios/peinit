@@ -2,8 +2,8 @@ use crate::boundary::{BoundaryError, KmesEvent};
 use crate::control::lifecycle::OnDemandStartDispatch;
 use crate::execution::graph::GraphExecutionEvent;
 use crate::kmes::{
-    encode_critical_failure_event, encode_graph_event, encode_job_event, encode_operation_event,
-    encode_shutdown_abandoned_event,
+    encode_critical_failure_event, encode_graph_event, encode_job_event_bounded,
+    encode_operation_event, encode_shutdown_abandoned_event,
 };
 use crate::operation::store::{OperationEvent, OperationRequestOutcome};
 use crate::supervisor::{
@@ -24,11 +24,30 @@ pub(super) fn collect_on_demand_start(
     push_operations(out, &dispatch.events)
 }
 
+/// A job event, and — when a `job.ended` had its arguments cut to fit the
+/// ring — the `event.oversized` that records the cut beside it (PEI-1082).
 pub(super) fn push_job(
     out: &mut Vec<KmesEvent>,
     event: &crate::job::JobEvent,
 ) -> Result<(), BoundaryError> {
-    out.push(encode_job_event(event)?);
+    let (encoded, truncation) = encode_job_event_bounded(event)?;
+    let event_type = encoded.event_type.clone();
+    out.push(encoded);
+    if let Some(truncation) = truncation {
+        let job_id = event.job_id.to_string();
+        out.push(crate::kmes::encode_event_oversized_event(
+            &crate::kmes::OversizedEvent {
+                event_type: &event_type,
+                action: crate::kmes::OversizedEventAction::Truncated,
+                service: event.service.as_deref(),
+                job_id: Some(&job_id),
+                size_bytes: truncation.arguments_bytes,
+                limit_bytes: Some(truncation.limit_bytes),
+                dropped_total: None,
+                error: None,
+            },
+        )?);
+    }
     Ok(())
 }
 

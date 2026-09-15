@@ -5,7 +5,9 @@ mod operation;
 mod submitted;
 
 pub use graph::encode_graph_event;
-pub use job::encode_job_event;
+pub use job::{
+    JobEventTruncation, MAX_JOB_ENDED_ARGUMENTS_BYTES, encode_job_event, encode_job_event_bounded,
+};
 pub use notify::{
     encode_fd_store_rejection_event, encode_notify_applied_field_events,
     encode_notify_rejection_event,
