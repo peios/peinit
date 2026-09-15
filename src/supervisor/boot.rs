@@ -1,7 +1,9 @@
 use crate::boot::phase2::{Phase2BootRun, Phase2BootRunError, run_phase2_boot_with_retained};
 use crate::boundary::{Clock, RegistryClient};
 use crate::service::runtime::{ServiceState, ServiceTransition};
-use crate::service::{ServiceDefinition, ServiceTable, ServiceTableError};
+use crate::service::{
+    ServiceDefinition, ServiceSecurityDescriptor, ServiceTable, ServiceTableError,
+};
 
 use super::dispatch::SupervisorBootDispatch;
 use super::state::{Supervisor, SupervisorError};
@@ -29,6 +31,7 @@ impl Supervisor {
             jobs_limits,
             log_config,
             service_table,
+            inherited_service_security,
             global_environment,
             eventd_log_socket_path,
             plan,
@@ -44,10 +47,13 @@ impl Supervisor {
         )
         .map_err(SupervisorError::Phase2Boot)?;
 
-        merge_phase2_service_table(&mut work.services, service_table, &retained_satisfied)
-            .map_err(|error| {
-                SupervisorError::Phase2Boot(Phase2BootRunError::ServiceTable(error))
-            })?;
+        merge_phase2_service_table(
+            &mut work.services,
+            service_table,
+            &retained_satisfied,
+            inherited_service_security.as_ref(),
+        )
+        .map_err(|error| SupervisorError::Phase2Boot(Phase2BootRunError::ServiceTable(error)))?;
         apply_blocked_phase2_services(&mut work.services, &plan).map_err(|error| {
             SupervisorError::Phase2Boot(Phase2BootRunError::ServiceTable(error))
         })?;
@@ -150,6 +156,7 @@ fn merge_phase2_service_table(
     retained: &mut ServiceTable,
     phase2: ServiceTable,
     retained_satisfied: &[String],
+    inherited_service_security: Option<&ServiceSecurityDescriptor>,
 ) -> Result<(), ServiceTableError> {
     if retained.service_names().is_empty() {
         *retained = phase2;
@@ -167,9 +174,14 @@ fn merge_phase2_service_table(
         // compiled-in registryd, which bootstraps the registry and so can never
         // be a registry entry. Carry its existing (compiled-in) definition into
         // the snapshot so apply_definition_snapshot keeps the running service
-        // instead of treating it as removed (or, previously, erroring).
-        match retained.definition(service) {
-            Some(definition) => definitions.push(definition.clone()),
+        // instead of treating it as removed (or, previously, erroring). It has
+        // no descriptor of its own, so it takes the Services-key one here, now
+        // that Phase 2 has read it (§4.6, PEI-1072). A registry definition of
+        // registryd is not this case: it is in `definitions` above and is
+        // merged onto the retained activation with whatever `ServiceSecurity`
+        // it carries or inherited (§2.3).
+        match retained.definition_inheriting_service_security(service, inherited_service_security) {
+            Some(definition) => definitions.push(definition),
             None => {
                 return Err(ServiceTableError::UnknownService {
                     service: service.clone(),

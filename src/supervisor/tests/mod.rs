@@ -65,6 +65,10 @@ struct StaticRegistry {
     eventd_log_socket_path: Option<String>,
     /// Keys the partial boot read reports as present but undecodable.
     undecodable: Vec<crate::boundary::UndecodableService>,
+    /// The `ServiceSecurity` on the Services key itself. Not applied to
+    /// `services` here — the LCS reader does that — only reported, which is
+    /// the part the compiled-in registryd depends on (PEI-1072).
+    inherited_service_security: Option<crate::service::ServiceSecurityDescriptor>,
 }
 
 impl StaticRegistry {
@@ -77,6 +81,7 @@ impl StaticRegistry {
             shutdown_timeout_secs: None,
             eventd_log_socket_path: None,
             undecodable: Vec::new(),
+            inherited_service_security: None,
         }
     }
 
@@ -85,6 +90,14 @@ impl StaticRegistry {
             name: name.to_string(),
             message: message.to_string(),
         });
+        self
+    }
+
+    fn with_inherited_service_security(
+        mut self,
+        inherited: crate::service::ServiceSecurityDescriptor,
+    ) -> Self {
+        self.inherited_service_security = Some(inherited);
         self
     }
 
@@ -100,6 +113,7 @@ impl StaticRegistry {
             shutdown_timeout_secs: None,
             eventd_log_socket_path: None,
             undecodable: Vec::new(),
+            inherited_service_security: None,
         }
     }
 
@@ -135,6 +149,7 @@ impl RegistryClient for StaticRegistry {
         Ok(crate::boundary::ServiceDefinitionsRead {
             definitions: self.services.clone(),
             undecodable: self.undecodable.clone(),
+            inherited_service_security: self.inherited_service_security.clone(),
         })
     }
 

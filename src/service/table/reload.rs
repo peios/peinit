@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::service::definition::ServiceDefinition;
+use crate::service::definition::{ServiceDefinition, ServiceSecurityDescriptor};
 use crate::service::runtime::ServiceRuntimeSnapshot;
 use crate::service::synthesise_role_dependencies;
 
@@ -88,6 +88,45 @@ impl ServiceTable {
         }
 
         Ok(summary)
+    }
+}
+
+impl ServiceTable {
+    /// The definition a registry snapshot should carry for a retained entry
+    /// the registry does not define — the compiled-in registryd.
+    ///
+    /// Such a service has no `ServiceSecurity` of its own, so it takes the
+    /// one on `Machine\System\Services` like any other service without one
+    /// (§4.6), and drops back to the built-in default when the key carries
+    /// none. Until this existed registryd kept its compiled-in default
+    /// whatever the Services key said, so an administrator narrowing that
+    /// key narrowed every service except the Critical one (PEI-1072).
+    pub fn definition_inheriting_service_security(
+        &self,
+        service: &str,
+        inherited: Option<&ServiceSecurityDescriptor>,
+    ) -> Option<ServiceDefinition> {
+        let mut definition = self.definition(service)?.clone();
+        definition.service_security = inherited.cloned().unwrap_or_default();
+        Some(definition)
+    }
+
+    /// The compiled-in services a snapshot does not name, each carrying the
+    /// inherited descriptor, so a reload reaches them as it reaches every
+    /// other service without a descriptor of its own (PEI-1072).
+    pub fn compiled_in_definitions_absent_from(
+        &self,
+        snapshot: &[ServiceDefinition],
+        inherited: Option<&ServiceSecurityDescriptor>,
+    ) -> Vec<ServiceDefinition> {
+        self.entries
+            .iter()
+            .filter(|(name, entry)| {
+                entry.definition.compiled_in
+                    && !snapshot.iter().any(|definition| &definition.name == *name)
+            })
+            .filter_map(|(name, _)| self.definition_inheriting_service_security(name, inherited))
+            .collect()
     }
 }
 
