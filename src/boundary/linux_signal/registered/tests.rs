@@ -256,6 +256,10 @@ impl Pid1SignalFdSyscalls for FakeRegisteredSignalSyscalls {
 }
 
 impl LinuxEpollSyscallApi for FakeRegisteredSignalSyscalls {
+    fn monotonic_ns(&mut self) -> io::Result<u64> {
+        unreachable!("registered signalfd setup never waits")
+    }
+
     fn epoll_create1(&mut self, _flags: i32) -> io::Result<i64> {
         unreachable!("registered signalfd setup receives an existing epoll fd")
     }

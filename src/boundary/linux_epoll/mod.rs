@@ -7,6 +7,7 @@ pub use model::{
     LinuxEpollCreateError, LinuxEpollEvent, LinuxEpollRegisterError, LinuxEpollUnregisterError,
     LinuxEpollWaitError,
 };
+pub(in crate::boundary) use syscall::clock_monotonic_ns;
 pub use syscall::{
     LinuxEpollSyscallApi, create_linux_epoll, register_linux_epoll_read, unregister_linux_epoll,
     wait_linux_epoll,
