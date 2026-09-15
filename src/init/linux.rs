@@ -179,10 +179,7 @@ impl InitRuntime for LinuxRuntimeEntrypoint {
         mut infrastructure: Phase1Infrastructure,
     ) -> Result<(), BoundaryError> {
         let mut runtime = LinuxShutdownRuntime::setup_with_infrastructure(
-            LinuxRuntimeConfig {
-                quiet: supervisor.settings().quiet,
-                ..LinuxRuntimeConfig::default()
-            },
+            LinuxRuntimeConfig::for_settings(supervisor.settings()),
             &mut infrastructure,
         )
         .map_err(runtime_setup_error)?;
