@@ -340,3 +340,67 @@ fn a_launched_member_still_starting_is_attempted_not_frozen() {
     assert!(outcome.summary.deferred.is_empty());
     assert_eq!(outcome.summary.updated, vec!["app".to_string()]);
 }
+
+/// A member held behind a dependency that has launched but is not ready
+/// has no job record yet — the job is created when it is released — and
+/// is frozen all the same. (On the image every held member was counted as
+/// launched for want of a record, and nothing was ever deferred.)
+#[test]
+fn a_member_held_behind_a_starting_dependency_has_no_job_yet_and_is_frozen() {
+    let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
+    let mut app = alive_service("app");
+    app.requires.push("authd".to_string());
+    let authd = ServiceDefinition::simple_system_boot("authd", "/sbin/authd");
+    let mut registry = StaticRegistry::services(vec![app.clone(), authd]);
+    supervisor
+        .run_phase2_boot(&mut registry, &mut ScriptedClock::new([BOOT_NS]))
+        .expect("boot");
+    let mut tokens = TestTokenProvider::default();
+    let mut launcher = TestProcessLauncher::new(vec![process(4242, 9)]);
+    supervisor
+        .launch_next_pending_job(
+            &mut tokens,
+            &mut launcher,
+            &mut ScriptedClock::new([APP_LAUNCH_NS]),
+        )
+        .expect("launch authd")
+        .expect("authd launch");
+    assert_eq!(
+        supervisor.service_status("authd").expect("authd").state,
+        ServiceState::Starting,
+        "a Notify service is Starting until it reports ready"
+    );
+    assert!(
+        supervisor
+            .service_status("app")
+            .expect("app")
+            .current_job
+            .is_none(),
+        "the held dependent has no job yet"
+    );
+    assert!(supervisor.boot_plan_in_progress());
+    assert_eq!(
+        supervisor.frozen_boot_plan_members(),
+        vec!["app".to_string()]
+    );
+
+    let mut changed_app = app.clone();
+    changed_app.description = Some("changed during the window".to_string());
+    let outcome = supervisor
+        .reload_config_from_registry(&mut StaticRegistry::services(vec![
+            changed_app,
+            ServiceDefinition::simple_system_boot("authd", "/sbin/authd"),
+        ]))
+        .expect("reload during the window");
+    assert_eq!(outcome.summary.deferred, vec!["app".to_string()]);
+    assert!(outcome.summary.updated.is_empty());
+    assert_eq!(
+        supervisor
+            .services()
+            .get("app")
+            .expect("app")
+            .definition
+            .description,
+        None
+    );
+}

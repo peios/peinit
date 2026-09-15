@@ -60,8 +60,9 @@ impl Supervisor {
     /// dispatched members have actually launched, because a dispatched
     /// job can still be queued and the activation snapshot is taken at the
     /// launch. That half is the job store's: a member whose reserved job
-    /// has left `Created` — or is gone altogether — has been attempted,
-    /// whatever happens to it next.
+    /// exists and has left `Created` has been attempted, whatever happens
+    /// to it next. A member with no job record yet has not: a held
+    /// member's job is only created when it is released.
     pub fn frozen_boot_plan_members(&self) -> Vec<String> {
         let Some(context_id) = self.boot_plan_context else {
             return Vec::new();
@@ -77,11 +78,8 @@ impl Supervisor {
                     .members
                     .get(service)
                     .and_then(|member| member.reserved_job_id)
-                    .is_none_or(|job_id| {
-                        self.jobs
-                            .get(job_id)
-                            .is_none_or(|job| job.state != crate::job::JobState::Created)
-                    });
+                    .and_then(|job_id| self.jobs.get(job_id))
+                    .is_some_and(|job| job.state != crate::job::JobState::Created);
                 !launched
             })
             .collect()
