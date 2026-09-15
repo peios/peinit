@@ -3,6 +3,7 @@ mod boot_window;
 mod conditions;
 mod control_commands;
 mod health;
+mod held_level_waiters;
 mod launch_failure;
 mod lifecycle_commands;
 mod notify;
