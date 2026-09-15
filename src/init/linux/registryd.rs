@@ -22,7 +22,7 @@ pub(super) fn start_linux_phase1_registryd(
     registry: &mut dyn RegistryClient,
     observed_at_ns: u64,
 ) -> Result<(), BoundaryError> {
-    ensure_notify_socket_parent(supervisor.settings().notify_socket_path.as_str())?;
+    ensure_runtime_directories(supervisor.settings().notify_socket_path.as_str())?;
     let notify_socket = NotifySocket::bind_secured(
         &supervisor.settings().notify_socket_path,
         // Stamped as early as bind allows -- by path, because the fd form
@@ -324,37 +324,65 @@ fn poll_fd_readable(fd: i32, remaining_ns: u64) -> Result<(), BoundaryError> {
     }
 }
 
-fn ensure_notify_socket_parent(path: &str) -> Result<(), BoundaryError> {
-    let Some(parent) = Path::new(path).parent() else {
-        return Ok(());
-    };
-    // Through `ensure_runtime_directory` rather than `create_dir_all`, and with
-    // the descriptor shared with the control socket that lands in the same
-    // directory later in boot -- see SERVICES_RUNTIME_DIR_SDDL. A bare
-    // create_dir_all leaves the directory inheriting the Phase 1 /run seed,
-    // which is SYSTEM-only, so no service could traverse to the socket however
-    // the socket itself was stamped.
-    //
-    // **Each level explicitly.** `ensure_runtime_directory` creates one
-    // directory and requires its parent to already exist -- peinit does not
-    // create ancestors, deliberately, because a directory nobody named is a
-    // directory whose descriptor nobody chose. `create_dir_all` used to hide
-    // that here: at this point in Phase 1 only `/run` exists, and swapping in
-    // the descriptor-aware call without walking the chain took PID 1 into
-    // recovery on `/run/services`.
-    for level in ancestors_under_run(parent) {
+/// Create peinit's runtime directory and, if `peios.notifysocket=` put the
+/// notify socket somewhere else under `/run`, that directory too.
+///
+/// Through `ensure_runtime_directory` rather than `create_dir_all`, and with
+/// the descriptor shared with the control socket that lands in the same
+/// directory later in boot -- see SERVICES_RUNTIME_DIR_SDDL. A bare
+/// create_dir_all leaves the directory inheriting the Phase 1 /run seed,
+/// which is SYSTEM-only, so no service could traverse to the socket however
+/// the socket itself was stamped.
+///
+/// **Each level explicitly.** `ensure_runtime_directory` creates one
+/// directory and requires its parent to already exist -- peinit does not
+/// create ancestors, deliberately, because a directory nobody named is a
+/// directory whose descriptor nobody chose. `create_dir_all` used to hide
+/// that here: at this point in Phase 1 only `/run` exists, and swapping in
+/// the descriptor-aware call without walking the chain took PID 1 into
+/// recovery on `/run/services`.
+fn ensure_runtime_directories(notify_socket_path: &str) -> Result<(), BoundaryError> {
+    for level in runtime_directories_to_ensure(notify_socket_path) {
         crate::boundary::ensure_runtime_directory(
             &level,
             super::infrastructure::SERVICES_RUNTIME_DIR_SDDL,
         )
         .map_err(|error| {
             BoundaryError::Recovery(format!(
-                "create notify socket directory {} failed: {error}",
+                "create runtime directory {} failed: {error}",
                 level.display()
             ))
         })?;
     }
     Ok(())
+}
+
+/// The directories Phase 1 creates before anything binds a socket, outermost
+/// first: peinit's own runtime directory always, because the control and
+/// jobs sockets land there whatever the notify socket does, and then the
+/// notify socket's directory when it is elsewhere under `/run`.
+///
+/// Creating the runtime directory used to be a side effect of creating the
+/// notify socket's parent, so `peios.notifysocket=` pointing outside it left
+/// `/run/services/peinit` uncreated and the control socket bind took PID 1
+/// into recovery (PEI-804).
+///
+/// A notify path outside `/run` gets no directory made for it: `/run` is the
+/// only tree Phase 1 owns, and stamping the services descriptor onto
+/// `/tmp` or `/var` because a socket was pointed there would be worse than
+/// the bind failing. Its parent has to exist already.
+fn runtime_directories_to_ensure(notify_socket_path: &str) -> Vec<std::path::PathBuf> {
+    let mut levels = ancestors_under_run(Path::new(super::infrastructure::PEINIT_RUNTIME_DIR));
+    if let Some(parent) = Path::new(notify_socket_path).parent()
+        && parent.starts_with("/run")
+    {
+        for level in ancestors_under_run(parent) {
+            if !levels.contains(&level) {
+                levels.push(level);
+            }
+        }
+    }
+    levels
 }
 
 /// Every directory from `/run` down to `path`, `/run` itself excluded.
@@ -375,8 +403,66 @@ fn ancestors_under_run(path: &Path) -> Vec<std::path::PathBuf> {
 
 #[cfg(test)]
 mod parent_tests {
-    use super::ancestors_under_run;
+    use super::{ancestors_under_run, runtime_directories_to_ensure};
     use std::path::Path;
+
+    fn names(levels: &[std::path::PathBuf]) -> Vec<&str> {
+        levels.iter().map(|p| p.to_str().unwrap()).collect()
+    }
+
+    /// The default: the notify socket lives in the runtime directory, so
+    /// that chain is the whole list.
+    #[test]
+    fn the_default_notify_path_needs_only_the_runtime_directory() {
+        let levels = runtime_directories_to_ensure(
+            crate::supervisor::SupervisorSettings::DEFAULT_NOTIFY_SOCKET_PATH,
+        );
+        assert_eq!(
+            names(&levels),
+            vec!["/run/services", "/run/services/peinit"]
+        );
+    }
+
+    /// The bug: `peios.notifysocket=/run/alt/notify.sock` created `/run/alt`
+    /// and nothing else, and the control socket bind then failed on the
+    /// missing `/run/services/peinit` (PEI-804).
+    #[test]
+    fn an_overridden_notify_path_still_creates_the_runtime_directory() {
+        let levels = runtime_directories_to_ensure("/run/alt/deep/notify.sock");
+        assert_eq!(
+            names(&levels),
+            vec![
+                "/run/services",
+                "/run/services/peinit",
+                "/run/alt",
+                "/run/alt/deep",
+            ]
+        );
+    }
+
+    /// A notify path elsewhere under the runtime tree shares the chain.
+    #[test]
+    fn a_notify_path_under_the_runtime_directory_adds_only_the_extra_level() {
+        let levels = runtime_directories_to_ensure("/run/services/peinit/notify/notify.sock");
+        assert_eq!(
+            names(&levels),
+            vec![
+                "/run/services",
+                "/run/services/peinit",
+                "/run/services/peinit/notify",
+            ]
+        );
+    }
+
+    /// Nothing outside `/run` is created or restamped for a socket path.
+    #[test]
+    fn a_notify_path_outside_run_gets_no_directory_made() {
+        let levels = runtime_directories_to_ensure("/tmp/peinit/notify.sock");
+        assert_eq!(
+            names(&levels),
+            vec!["/run/services", "/run/services/peinit"]
+        );
+    }
 
     /// The bug this exists for: `/run/services` did not exist at Phase 1, and
     /// creating only the leaf took PID 1 into recovery.

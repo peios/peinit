@@ -63,6 +63,13 @@ const CONTROL_SOCKET_SDDL: &str = "O:SYG:SYD:(A;;GA;;;SY)(A;;GA;;;BA)";
 pub(super) const SERVICES_RUNTIME_DIR_SDDL: &str =
     "O:SYG:SYD:(A;;GA;;;SY)(A;;GA;;;BA)(A;;GX;;;S-1-5-6)";
 
+/// peinit's runtime directory: the parent of the control and jobs sockets,
+/// and of the notify socket unless `peios.notifysocket=` moved it. It is
+/// created in Phase 1 whether or not the notify socket lives in it, because
+/// the two sockets that always do are bound later in boot and need it
+/// (PEI-804).
+pub(super) const PEINIT_RUNTIME_DIR: &str = "/run/services/peinit";
+
 /// The jobs socket admits every authenticated principal (PSPU §7.A).
 ///
 /// Being able to connect *is* the permission to submit: the kernel checks

@@ -29,6 +29,23 @@ pub struct LinuxRuntimeConfig {
     pub quiet: crate::init::QuietLevel,
 }
 
+impl LinuxRuntimeConfig {
+    /// The runtime configuration for the supervisor Phase 1 hands over.
+    ///
+    /// The per-boot command-line values the supervisor carries apply to the
+    /// runtime too: `peios.quiet`, and the notify socket path, which Phase 1
+    /// bound and every service's NOTIFY_SOCKET names. The runtime rebinds
+    /// that path, so it has to be the same one, or nothing listens where
+    /// services were told to write (PEI-804).
+    pub fn for_settings(settings: &SupervisorSettings) -> Self {
+        Self {
+            notify_socket_path: PathBuf::from(&settings.notify_socket_path),
+            quiet: settings.quiet,
+            ..Self::default()
+        }
+    }
+}
+
 impl Default for LinuxRuntimeConfig {
     fn default() -> Self {
         Self {

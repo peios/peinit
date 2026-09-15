@@ -102,6 +102,29 @@ mod tests {
 
     use super::{DEFAULT_MAX_RUNTIME_EVENTS, LinuxRuntimeConfig};
 
+    /// `peios.notifysocket=` reaches the runtime: the socket the runtime
+    /// binds is the one Phase 1 bound and services were told about, not the
+    /// default beside it (PEI-804).
+    #[test]
+    fn linux_runtime_config_for_settings_carries_the_notify_socket_and_quiet_level() {
+        let mut settings = SupervisorSettings::default();
+        settings.notify_socket_path = "/run/alt/notify.sock".to_string();
+        settings.quiet = crate::init::QuietLevel::Blackout;
+
+        let config = LinuxRuntimeConfig::for_settings(&settings);
+
+        assert_eq!(
+            config.notify_socket_path,
+            std::path::PathBuf::from("/run/alt/notify.sock")
+        );
+        assert_eq!(config.quiet, crate::init::QuietLevel::Blackout);
+        assert_eq!(
+            config.control_socket_path,
+            std::path::PathBuf::from(CONTROL_SOCKET_PATH)
+        );
+        assert_eq!(config.max_events, DEFAULT_MAX_RUNTIME_EVENTS);
+    }
+
     #[test]
     fn linux_runtime_config_defaults_match_control_limits() {
         let config = LinuxRuntimeConfig::default();
