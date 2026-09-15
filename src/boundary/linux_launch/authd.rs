@@ -89,8 +89,17 @@ impl AuthdTokenClient for SocketAuthdTokenClient {
 
 /// One request, one reply. A `ServiceAttest` is not a conversation: it carries
 /// no credential, so there is nothing to exchange and no round to loop over.
+///
+/// The blocking calls are retried on `EINTR`. This runs in PID 1 with a
+/// socket timeout set, and a timed `recvmsg` interrupted by a ptrace stop
+/// returns `EINTR` even with no handler installed — so a debugger attaching
+/// to peinit mid-launch used to fail the service with "token materialization
+/// failed: Interrupted system call" (PEI-1085). The send needs no wrapper:
+/// `write_all` already retries an interrupted write. `recvmsg` with
+/// `MSG_WAITALL` returns a short count rather than `EINTR` once any byte has
+/// arrived, so retrying it never re-reads a header.
 fn attest(path: &str, request: &AuthdTokenRequest) -> io::Result<Token> {
-    let socket = UnixStream::connect(path)?;
+    let socket = retry_interrupted(|| UnixStream::connect(path))?;
     socket.set_read_timeout(Some(AUTHD_TIMEOUT))?;
     socket.set_write_timeout(Some(AUTHD_TIMEOUT))?;
 
@@ -101,7 +110,7 @@ fn attest(path: &str, request: &AuthdTokenRequest) -> io::Result<Token> {
     .map_err(|error| io::Error::other(format!("could not encode the request: {error:?}")))?;
     send_message(&socket, &message)?;
 
-    let (reply, descriptor) = recv_message_with_fd(&wire::FRAMING, &socket)?;
+    let (reply, descriptor) = retry_interrupted(|| recv_message_with_fd(&wire::FRAMING, &socket))?;
     let (message_type, _) = decode_header(reply.expose())
         .map_err(|error| io::Error::other(format!("malformed reply: {error:?}")))?;
 
@@ -130,9 +139,48 @@ fn attest(path: &str, request: &AuthdTokenRequest) -> io::Result<Token> {
     }
 }
 
+/// Run `operation` again for as long as it fails with `EINTR`.
+///
+/// Unbounded, like the crate's other `EINTR` loops: each retry costs one
+/// interruption, and nothing interrupts PID 1 in a loop.
+fn retry_interrupted<T>(mut operation: impl FnMut() -> io::Result<T>) -> io::Result<T> {
+    loop {
+        match operation() {
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+            result => return result,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// PEI-1085. A ptrace stop while PID 1 waits on the authority must not
+    /// fail the launch.
+    #[test]
+    fn an_interrupted_call_is_retried_and_a_real_failure_is_not() {
+        let mut attempts = 0;
+        let value = retry_interrupted(|| {
+            attempts += 1;
+            if attempts < 3 {
+                Err(io::Error::from(io::ErrorKind::Interrupted))
+            } else {
+                Ok(attempts)
+            }
+        })
+        .expect("retried past the interruptions");
+        assert_eq!(value, 3);
+
+        let mut attempts = 0;
+        let error = retry_interrupted(|| {
+            attempts += 1;
+            Err::<(), _>(io::Error::from(io::ErrorKind::ConnectionRefused))
+        })
+        .expect_err("a real failure");
+        assert_eq!(error.kind(), io::ErrorKind::ConnectionRefused);
+        assert_eq!(attempts, 1);
+    }
 
     /// The failure that matters. A service start that cannot reach the
     /// authority must fail, not fall back — the whole point of moving minting

@@ -53,4 +53,9 @@ pub enum LinuxEpollWaitError {
         timeout_ms: i32,
         source: io::Error,
     },
+    /// The monotonic clock read that recomputes the remaining timeout after an
+    /// interrupted wait failed.
+    Clock {
+        source: io::Error,
+    },
 }

@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::io;
 
 use crate::boundary::linux_epoll::{
@@ -132,6 +133,8 @@ fn wait_linux_epoll_returns_ready_events_and_rejects_empty_buffers() {
     ];
     let mut syscalls = FakeEpollSyscalls {
         wait_events: ready.clone(),
+        // A timed wait notes when it started, in case it has to be retried.
+        monotonic_ns: VecDeque::from([1_000_000_000]),
         ..FakeEpollSyscalls::default()
     };
 
@@ -146,6 +149,7 @@ fn wait_linux_epoll_returns_ready_events_and_rejects_empty_buffers() {
             timeout_ms: 250,
         }],
     );
+    assert_eq!(syscalls.clock_reads, 1);
     assert!(matches!(
         wait_linux_epoll(&mut syscalls, 23, 0, 250).expect_err("empty buffer"),
         LinuxEpollWaitError::InvalidMaxEvents,
@@ -155,7 +159,7 @@ fn wait_linux_epoll_returns_ready_events_and_rejects_empty_buffers() {
 #[test]
 fn wait_linux_epoll_reports_wait_failure() {
     let mut syscalls = FakeEpollSyscalls {
-        wait_error: Some(io::ErrorKind::Interrupted),
+        wait_errors: VecDeque::from([io::ErrorKind::InvalidInput]),
         ..FakeEpollSyscalls::default()
     };
 
@@ -169,6 +173,103 @@ fn wait_linux_epoll_reports_wait_failure() {
             ..
         },
     ));
+    assert_eq!(syscalls.calls.len(), 1, "a real failure is not retried");
+}
+
+// PEI-1085. A ptrace stop interrupts a timed epoll_wait with EINTR even when
+// no handler ran; the wait is where PID 1 lives, so before this a debugger
+// attaching to peinit ended its runtime loop. The retry keeps the original
+// deadline: the clock ran on while peinit was stopped.
+#[test]
+fn wait_linux_epoll_retries_an_interrupted_wait_with_the_remaining_timeout() {
+    let ready = vec![LinuxEpollEvent::read(7)];
+    let mut syscalls = FakeEpollSyscalls {
+        wait_events: ready.clone(),
+        wait_errors: VecDeque::from([io::ErrorKind::Interrupted, io::ErrorKind::Interrupted]),
+        // Before the wait, then after each interruption: 100 ms and 249.5 ms in.
+        monotonic_ns: VecDeque::from([1_000_000_000, 1_100_000_000, 1_249_500_000]),
+        ..FakeEpollSyscalls::default()
+    };
+
+    let events = wait_linux_epoll(&mut syscalls, 23, 16, 250).expect("wait");
+
+    assert_eq!(events, ready);
+    assert_eq!(
+        syscalls.calls,
+        vec![
+            FakeEpollCall::Wait {
+                epoll_fd: 23,
+                max_events: 16,
+                timeout_ms: 250,
+            },
+            FakeEpollCall::Wait {
+                epoll_fd: 23,
+                max_events: 16,
+                timeout_ms: 150,
+            },
+            // Rounded up, never down: a retry must not return early.
+            FakeEpollCall::Wait {
+                epoll_fd: 23,
+                max_events: 16,
+                timeout_ms: 1,
+            },
+        ],
+    );
+}
+
+#[test]
+fn wait_linux_epoll_retries_an_interrupted_wait_past_its_deadline_without_blocking() {
+    let mut syscalls = FakeEpollSyscalls {
+        wait_errors: VecDeque::from([io::ErrorKind::Interrupted]),
+        monotonic_ns: VecDeque::from([1_000_000_000, 5_000_000_000]),
+        ..FakeEpollSyscalls::default()
+    };
+
+    let events = wait_linux_epoll(&mut syscalls, 23, 16, 250).expect("wait");
+
+    assert!(events.is_empty());
+    assert!(matches!(
+        syscalls.calls.as_slice(),
+        [
+            FakeEpollCall::Wait {
+                timeout_ms: 250,
+                ..
+            },
+            FakeEpollCall::Wait { timeout_ms: 0, .. },
+        ],
+    ));
+}
+
+#[test]
+fn wait_linux_epoll_retries_an_interrupted_unbounded_wait_without_reading_the_clock() {
+    let mut syscalls = FakeEpollSyscalls {
+        wait_errors: VecDeque::from([io::ErrorKind::Interrupted]),
+        ..FakeEpollSyscalls::default()
+    };
+
+    wait_linux_epoll(&mut syscalls, 23, 16, -1).expect("wait");
+
+    assert!(matches!(
+        syscalls.calls.as_slice(),
+        [
+            FakeEpollCall::Wait { timeout_ms: -1, .. },
+            FakeEpollCall::Wait { timeout_ms: -1, .. },
+        ],
+    ));
+    assert_eq!(syscalls.clock_reads, 0);
+}
+
+#[test]
+fn wait_linux_epoll_reports_a_clock_failure_while_retrying() {
+    let mut syscalls = FakeEpollSyscalls {
+        wait_errors: VecDeque::from([io::ErrorKind::Interrupted]),
+        monotonic_ns: VecDeque::from([1_000_000_000]),
+        ..FakeEpollSyscalls::default()
+    };
+
+    let err = wait_linux_epoll(&mut syscalls, 23, 16, 250).expect_err("clock failure");
+
+    assert!(matches!(err, LinuxEpollWaitError::Clock { .. }));
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -195,7 +296,11 @@ struct FakeEpollSyscalls {
     create_error: Option<io::ErrorKind>,
     ctl_error: Option<io::ErrorKind>,
     wait_events: Vec<LinuxEpollEvent>,
-    wait_error: Option<io::ErrorKind>,
+    /// Consumed one per wait; once empty, waits succeed.
+    wait_errors: VecDeque<io::ErrorKind>,
+    /// Consumed one per clock read; once empty, the clock fails.
+    monotonic_ns: VecDeque<u64>,
+    clock_reads: usize,
     calls: Vec<FakeEpollCall>,
 }
 
@@ -206,13 +311,22 @@ impl Default for FakeEpollSyscalls {
             create_error: None,
             ctl_error: None,
             wait_events: Vec::new(),
-            wait_error: None,
+            wait_errors: VecDeque::new(),
+            monotonic_ns: VecDeque::new(),
+            clock_reads: 0,
             calls: Vec::new(),
         }
     }
 }
 
 impl LinuxEpollSyscallApi for FakeEpollSyscalls {
+    fn monotonic_ns(&mut self) -> io::Result<u64> {
+        self.clock_reads += 1;
+        self.monotonic_ns
+            .pop_front()
+            .ok_or_else(|| io::Error::other("clock script exhausted"))
+    }
+
     fn epoll_create1(&mut self, flags: i32) -> io::Result<i64> {
         self.calls.push(FakeEpollCall::Create { flags });
         match self.create_error {
@@ -251,7 +365,7 @@ impl LinuxEpollSyscallApi for FakeEpollSyscalls {
             max_events,
             timeout_ms,
         });
-        match self.wait_error {
+        match self.wait_errors.pop_front() {
             Some(kind) => Err(io::Error::from(kind)),
             None => Ok(self.wait_events.clone()),
         }

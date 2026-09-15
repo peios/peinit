@@ -63,6 +63,10 @@ where
 }
 
 impl LinuxEpollSyscallApi for LinuxSignalSyscalls {
+    fn monotonic_ns(&mut self) -> io::Result<u64> {
+        crate::boundary::linux_epoll::clock_monotonic_ns()
+    }
+
     fn epoll_create1(&mut self, flags: i32) -> io::Result<i64> {
         let fd = unsafe { libc::epoll_create1(flags) };
         if fd < 0 {
