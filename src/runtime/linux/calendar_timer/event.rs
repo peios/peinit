@@ -127,7 +127,7 @@ impl LinuxCalendarTimerTable {
         C: Clock + RealtimeClock + ?Sized,
         W: TimerLastRunWriter + ?Sized,
     {
-        let (service, schedule, storage, anchor_ns) = {
+        let (service, schedule, storage, persistent, anchor_ns) = {
             let entry = self
                 .entries
                 .get(&fd)
@@ -136,6 +136,7 @@ impl LinuxCalendarTimerTable {
                 entry.service.clone(),
                 entry.schedule.clone(),
                 entry.storage,
+                entry.persistent,
                 rearm_anchor_ns(entry.next_scheduled_ns, entry.jitter_secs, realtime_now_ns),
             )
         };
@@ -145,17 +146,22 @@ impl LinuxCalendarTimerTable {
         let supervisor_dispatch = supervisor
             .handle_timer_firing(&service, &schedule, monotonic_now_ns)
             .map_err(LinuxCalendarTimerError::Supervisor)?;
-        let last_run_write = writer.queue_timer_last_run_write(TimerLastRunWriteRequest {
-            service: service.clone(),
-            schedule: schedule.clone(),
-            storage,
-            timestamp_realtime_ns: realtime_now_ns,
+        // A TimerPersistent=0 trigger never reads its history (§9.3), so
+        // writing it would only fork PID 1 for a value nothing consults
+        // (PEI-1083).
+        let last_run_write = persistent.then(|| {
+            writer.queue_timer_last_run_write(TimerLastRunWriteRequest {
+                service: service.clone(),
+                schedule: schedule.clone(),
+                storage,
+                timestamp_realtime_ns: realtime_now_ns,
+            })
         });
         let next_scheduled_ns = self.rearm_after(fd, anchor_ns)?;
         Ok(RuntimeCalendarTimerTurn::Read {
             read,
             supervisor: Some(Box::new(supervisor_dispatch)),
-            last_run_write: Some(last_run_write),
+            last_run_write,
             next_scheduled_ns: Some(next_scheduled_ns),
         })
     }
