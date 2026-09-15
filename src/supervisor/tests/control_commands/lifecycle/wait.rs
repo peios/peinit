@@ -707,8 +707,9 @@ fn active_app_with_a_waiting_stop(
             turn_context(access, controller, clock, 123),
         )
         .expect("connection turn");
+    assert_eq!(turn.turn.frames.len(), 1);
     assert!(matches!(
-        turn.turn.frame.expect("frame").frame,
+        turn.turn.frames[0].frame,
         SupervisorControlFrameTurn::CommandAccepted {
             response_line: None,
             wait: Some(_),
