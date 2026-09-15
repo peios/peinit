@@ -21,7 +21,8 @@ use super::system::{
 use crate::runtime::{
     RuntimeCalendarTimerTurn, RuntimeFilesystemCheckHelperTurn, RuntimeNotifyRead,
     RuntimeNotifyRejection, RuntimeNotifySupervisorTurn, RuntimePowerButtonTurn,
-    RuntimeProcessSetupTurn, RuntimeShutdownEventTurn, RuntimeWorkPumpTurn,
+    RuntimeProcessSetupTurn, RuntimeRegistryWatchTurn, RuntimeShutdownEventTurn,
+    RuntimeWorkPumpTurn,
 };
 
 pub(crate) fn collect_runtime_loop_kmes_events(
@@ -134,6 +135,27 @@ pub(crate) fn collect_runtime_shutdown_turn_kmes_events(
         }
         RuntimeShutdownEventTurn::JobsConnection { turn, .. } => {
             super::submitted::collect_jobs_connection_turn(turn, out)?;
+        }
+        RuntimeShutdownEventTurn::RegistryWatch {
+            turn:
+                RuntimeRegistryWatchTurn::DeferredUntilBootDrains {
+                    events, overflow, ..
+                },
+            ..
+        } => {
+            out.push(crate::kmes::encode_registry_reload_deferred_event(
+                events.len(),
+                *overflow,
+            )?);
+        }
+        RuntimeShutdownEventTurn::DeferredRegistryReload { turn } => {
+            out.push(crate::kmes::encode_registry_reload_coalesced_event(
+                &turn.deferred,
+                &turn.outcome,
+            )?);
+            if let Ok(outcome) = turn.outcome.as_ref() {
+                super::system::collect_reload_config_warnings(outcome, out)?;
+            }
         }
         RuntimeShutdownEventTurn::ControlListener { .. }
         | RuntimeShutdownEventTurn::IdleControlConnectionsClosed { .. }

@@ -82,6 +82,11 @@ pub enum RuntimeShutdownEventTurn {
         fd: i32,
         turn: RuntimeRegistryWatchTurn,
     },
+    /// Not a source's turn: the coalesced reload owed after the boot plan
+    /// drained, run at the turn boundary that observed the drain.
+    DeferredRegistryReload {
+        turn: RuntimeDeferredRegistryReloadTurn,
+    },
     ProcessSetup {
         fd: i32,
         turn: RuntimeProcessSetupTurn,
@@ -170,6 +175,22 @@ pub enum RuntimeRegistryWatchTurn {
         overflow: bool,
         outcome: Box<Result<ReloadConfigOutcome, ReloadConfigError>>,
     },
+    /// The events arrived while the boot plan was still draining, and a
+    /// boot executes against its snapshot (§3.7). Recorded on the
+    /// supervisor for the one reload that follows the drain (PEI-350).
+    DeferredUntilBootDrains {
+        fd: i32,
+        events: Vec<RegistryWatchEvent>,
+        overflow: bool,
+    },
+}
+
+/// The one reload that follows the boot window, standing in for every
+/// registry change and reload request deferred during it (PEI-350).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RuntimeDeferredRegistryReloadTurn {
+    pub deferred: crate::supervisor::DeferredRegistryReload,
+    pub outcome: Box<Result<ReloadConfigOutcome, ReloadConfigError>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

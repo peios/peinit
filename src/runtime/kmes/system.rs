@@ -4,7 +4,7 @@ mod reap;
 mod shutdown;
 mod timer;
 
-pub(super) use control::collect_control_connection_table_turn;
+pub(super) use control::{collect_control_connection_table_turn, collect_reload_config_warnings};
 pub(super) use deadline::collect_lifecycle_deadline_dispatch;
 pub(super) use reap::collect_child_reap_turn;
 pub(super) use shutdown::{

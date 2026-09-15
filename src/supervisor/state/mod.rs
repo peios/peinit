@@ -94,6 +94,13 @@ pub struct Supervisor {
     /// A Critical reboot observed by a path that was asked not to finalise
     /// it, for the reconciliation pass to raise with its cause intact.
     pub(super) deferred_critical_reboot: Option<super::critical_budget::DeferredCriticalReboot>,
+    /// The Phase 2 boot graph context: while it has a member that is not
+    /// terminal, the boot plan is still executing and the registry is not
+    /// re-read (§3.7, PEI-350). See [`super::boot_window`].
+    pub(super) boot_plan_context: Option<crate::execution::graph::GraphContextId>,
+    /// Registry changes and reload requests that arrived during the boot
+    /// window, for the one reload that follows it.
+    pub(super) deferred_registry_reload: Option<super::boot_window::DeferredRegistryReload>,
 }
 
 impl Supervisor {
@@ -138,6 +145,8 @@ impl Supervisor {
             shutdown: None,
             shutdown_signals: ShutdownSignalTracker::default(),
             deferred_critical_reboot: None,
+            boot_plan_context: None,
+            deferred_registry_reload: None,
         }
     }
 }

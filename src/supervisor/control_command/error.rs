@@ -176,6 +176,13 @@ fn reload_config_error_response(
                 failure.findings
             )),
         ),
+        ReloadConfigError::BootInProgress => (
+            ControlErrorCode::InvalidState,
+            Cow::Borrowed(
+                "configuration reload deferred: the boot plan has not drained, and the \
+                 registry is re-read once it has",
+            ),
+        ),
         // A read the registry refused as a whole — the Services root that
         // will not open, say. A definition that will not decode is no longer
         // one of these (PEI-621: it fails that service and the reload is

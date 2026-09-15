@@ -190,7 +190,11 @@ fn a_registry_definition_of_registryd_sets_its_own_descriptor() {
 #[test]
 fn reload_config_reaches_registryd_with_the_services_key_descriptor() {
     let mut supervisor = active_registryd_after_phase1();
-    let mut registry = StaticRegistry::services(vec![alive_service("app")]);
+    // No boot trigger: the boot plan drains at once, so the reloads below
+    // are not deferred by the boot window (PEI-350).
+    let mut app = alive_service("app");
+    app.triggers.clear();
+    let mut registry = StaticRegistry::services(vec![app.clone()]);
     let mut clock = ScriptedClock::new([APP_LAUNCH_NS]);
     supervisor
         .run_phase2_boot(&mut registry, &mut clock)
@@ -199,7 +203,7 @@ fn reload_config_reaches_registryd_with_the_services_key_descriptor() {
 
     let outcome = supervisor
         .reload_config_from_registry(
-            &mut StaticRegistry::services(vec![alive_service("app")])
+            &mut StaticRegistry::services(vec![app.clone()])
                 .with_inherited_service_security(narrowed.clone()),
         )
         .expect("reload with a narrowed Services key");
@@ -217,7 +221,7 @@ fn reload_config_reaches_registryd_with_the_services_key_descriptor() {
     assert!(!registryd.definition_removed);
 
     let outcome = supervisor
-        .reload_config_from_registry(&mut StaticRegistry::services(vec![alive_service("app")]))
+        .reload_config_from_registry(&mut StaticRegistry::services(vec![app]))
         .expect("reload with the Services key value removed");
 
     assert_eq!(

@@ -270,6 +270,9 @@ pub(in crate::runtime::linux::turn) fn reload_config_succeeded(
         RuntimeShutdownEventTurn::RegistryWatch {
             turn: RuntimeRegistryWatchTurn::ReloadConfig { outcome, .. },
             ..
+        }
+        | RuntimeShutdownEventTurn::DeferredRegistryReload {
+            turn: crate::runtime::RuntimeDeferredRegistryReloadTurn { outcome, .. },
         } => outcome.is_ok(),
         RuntimeShutdownEventTurn::ControlConnection {
             supervisor: supervisor_turn,

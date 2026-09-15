@@ -147,7 +147,7 @@ fn collect_shutdown_rejection(
     Ok(())
 }
 
-fn collect_reload_config_warnings(
+pub(in crate::runtime::kmes) fn collect_reload_config_warnings(
     outcome: &ReloadConfigOutcome,
     out: &mut Vec<KmesEvent>,
 ) -> Result<(), BoundaryError> {

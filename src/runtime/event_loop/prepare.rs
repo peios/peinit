@@ -16,6 +16,7 @@ use crate::runtime::{
     RuntimeShutdownEventSources, RuntimeShutdownEventTurn, RuntimeShutdownEventTurnError,
     RuntimeWorkPumpTurn, drain_runtime_work_queues, process_runtime_control_connection_event,
     register_filesystem_check_helper_sources, register_process_setup_sources,
+    run_deferred_registry_reload,
 };
 
 /// Drive a turn for every control connection holding a complete frame that
@@ -133,13 +134,21 @@ where
             wait_flush_realtime_ns,
         )
         .map_err(RuntimeShutdownLoopError::ControlWait)?;
-    let resumed_control_turns = resume_buffered_control_frames(
+    let mut control_registry = control_registry;
+    // The pre-wait pump may have drained the boot plan (a launch that
+    // failed, say); the reload the boot window deferred runs here rather
+    // than after a wait that could be long (PEI-350).
+    let mut resumed_control_turns =
+        run_deferred_registry_reload(supervisor, control_registry.as_deref_mut())
+            .into_iter()
+            .collect::<Vec<_>>();
+    resumed_control_turns.extend(resume_buffered_control_frames(
         supervisor,
         event_sources.control_connections,
         control_registry,
         event_sources.deadline_timer,
         context.event_context(),
-    )?;
+    )?);
     flush_jobs_waits(supervisor, event_sources.jobs_channel, context.clock)?;
     supervisor
         .sync_lifecycle_deadline_timer(event_sources.lifecycle_timer)

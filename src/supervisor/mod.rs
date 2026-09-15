@@ -1,7 +1,9 @@
 mod admin;
 mod boot;
 mod boot_settle;
+mod boot_window;
 pub use boot_settle::DEFAULT_SETTLE_TIMEOUT_SECS;
+pub use boot_window::DeferredRegistryReload;
 mod boot_success;
 mod cgroup_cleanup;
 mod child_reap;

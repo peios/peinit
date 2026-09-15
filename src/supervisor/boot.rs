@@ -102,6 +102,7 @@ impl Supervisor {
         work.commit(self);
         self.settings.phase2 = phase2_settings;
         self.settings.shutdown = shutdown_settings;
+        self.note_boot_plan_context(context_id);
 
         Ok(SupervisorBootDispatch {
             plan,

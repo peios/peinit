@@ -8,6 +8,14 @@ impl Supervisor {
         &mut self,
         registry: &mut dyn RegistryClient,
     ) -> Result<ReloadConfigOutcome, ReloadConfigError> {
+        // §3.7: a boot executes against its snapshot. Until the boot plan has
+        // drained, nothing re-reads the registry — a boot-plan service that
+        // has not started yet would otherwise start from a definition the
+        // plan never saw (PEI-350). The request is not lost: the runtime runs
+        // one coalesced reload once the plan drains.
+        if self.refuse_reload_during_boot_window() {
+            return Err(ReloadConfigError::BootInProgress);
+        }
         let outcome = reload_config(registry, &mut self.services)?;
         self.control_security = outcome.control_security.clone();
         self.control_limits = outcome.control_limits;

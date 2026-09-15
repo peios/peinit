@@ -48,17 +48,19 @@ pub use logging::{
 };
 pub use source::{RuntimeEventSource, RuntimeEventSourceDecodeError};
 pub(crate) use turn::{
-    NoRuntimeRegistryClient, process_registry_watch_event, process_runtime_control_connection_event,
+    NoRuntimeRegistryClient, process_registry_watch_event,
+    process_runtime_control_connection_event, run_deferred_registry_reload,
 };
 pub use turn::{
-    RuntimeCalendarTimerTurn, RuntimeEventRegistrar, RuntimeEventRegistrationError,
-    RuntimeFilesystemCheckHelperTurn, RuntimeLifecycleDeadlineTimer, RuntimeNotifyDatagram,
-    RuntimeNotifyRead, RuntimeNotifyRejection, RuntimeNotifySource, RuntimeNotifySupervisorTurn,
-    RuntimePendingShutdownFinalization, RuntimePid1SignalSource, RuntimePowerButtonSource,
-    RuntimePowerButtonTurn, RuntimeProcessSetupTurn, RuntimeRegistryWatchTurn,
-    RuntimeShutdownDeadlineTimer, RuntimeShutdownEventContext, RuntimeShutdownEventSources,
-    RuntimeShutdownEventTurn, RuntimeShutdownEventTurnError, RuntimeShutdownFinalizationTurn,
-    finalize_due_shutdown, pending_shutdown_finalization, process_runtime_shutdown_event,
+    RuntimeCalendarTimerTurn, RuntimeDeferredRegistryReloadTurn, RuntimeEventRegistrar,
+    RuntimeEventRegistrationError, RuntimeFilesystemCheckHelperTurn, RuntimeLifecycleDeadlineTimer,
+    RuntimeNotifyDatagram, RuntimeNotifyRead, RuntimeNotifyRejection, RuntimeNotifySource,
+    RuntimeNotifySupervisorTurn, RuntimePendingShutdownFinalization, RuntimePid1SignalSource,
+    RuntimePowerButtonSource, RuntimePowerButtonTurn, RuntimeProcessSetupTurn,
+    RuntimeRegistryWatchTurn, RuntimeShutdownDeadlineTimer, RuntimeShutdownEventContext,
+    RuntimeShutdownEventSources, RuntimeShutdownEventTurn, RuntimeShutdownEventTurnError,
+    RuntimeShutdownFinalizationTurn, finalize_due_shutdown, pending_shutdown_finalization,
+    process_runtime_shutdown_event,
 };
 pub use work_pump::{
     RuntimeWorkPumpConfig, RuntimeWorkPumpContext, RuntimeWorkPumpError, RuntimeWorkPumpTurn,
