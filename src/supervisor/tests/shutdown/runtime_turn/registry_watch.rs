@@ -212,24 +212,27 @@ impl RegistryWatchSource for FakeRegistryWatchSource {
     }
 }
 
-/// PEI-350 (§3.7): a watch event during the boot window does not reload; it
-/// is counted, and the one reload it asks for runs at the turn boundary
-/// that observes the boot plan draining — here the same turn, because the
-/// work pump after the sources launches the last boot-plan service.
+/// PEI-350 (§3.7): a watch event during the boot window reloads, but a
+/// boot-plan member whose launch has not been attempted keeps the plan's
+/// definition with the new one pending; the reload after the window — here
+/// the same turn, because the work pump after the sources launches the last
+/// member — applies it, announced as the coalesced reload.
 #[test]
-fn runtime_registry_watch_event_during_the_boot_window_is_deferred_and_coalesced_after_it() {
+fn runtime_registry_watch_event_during_the_boot_window_defers_the_unlaunched_member() {
     let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
     let mut boot_registry = StaticRegistry::services(vec![alive_service("app")]);
     supervisor
         .run_phase2_boot(&mut boot_registry, &mut ScriptedClock::new([BOOT_NS]))
         .expect("boot");
     assert!(supervisor.boot_plan_in_progress());
-    let mut registry = StaticRegistry::services(vec![alive_service("app"), alive_service("fresh")]);
+    let mut changed_app = alive_service("app");
+    changed_app.image_path = "/sbin/app-v2".to_string();
+    let mut registry = StaticRegistry::services(vec![changed_app, alive_service("fresh")]);
     let mut watch = FakeRegistryWatchSource::events(vec![RegistryWatchEvent {
         root: RegistryWatchRoot::Services,
         kind: RegistryWatchEventKind::ValueSet,
         name: "ImagePath".to_string(),
-        path: vec!["fresh".to_string()],
+        path: vec!["app".to_string()],
     }]);
 
     let (turn, _) = run_registry_watch_turn_launching(
@@ -240,26 +243,24 @@ fn runtime_registry_watch_event_during_the_boot_window_is_deferred_and_coalesced
         vec![process(4242, 9)],
     );
 
-    // First the watch event, held back because the plan had not drained
-    // when it was read...
+    // First the watch event: the reload ran, added `fresh`, and deferred
+    // `app`, whose launch had not been attempted when it was read...
     let RuntimeShutdownEventTurn::RegistryWatch {
         fd: 91,
-        turn:
-            RuntimeRegistryWatchTurn::DeferredUntilBootDrains {
-                fd: 91,
-                events,
-                overflow: false,
-            },
+        turn: RuntimeRegistryWatchTurn::ReloadConfig { outcome, .. },
     } = &turn.turns[0]
     else {
         panic!(
-            "expected a deferred registry-watch turn, got {:?}",
+            "expected a registry-watch reload turn, got {:?}",
             turn.turns
         );
     };
-    assert_eq!(events.len(), 1);
-    // ...then the pump launched app (Alive readiness: Active at once, the
-    // plan drained), and the coalesced reload followed the drain.
+    let outcome = outcome.as_ref().as_ref().expect("reload outcome");
+    assert_eq!(outcome.summary.added, vec!["fresh".to_string()]);
+    assert_eq!(outcome.summary.deferred, vec!["app".to_string()]);
+    // ...then the pump launched app from the plan's definition (Alive
+    // readiness: Active at once, the window closed), and the coalesced
+    // reload followed.
     assert_eq!(turn.post_work.service_launches.len(), 1);
     assert!(!supervisor.boot_plan_in_progress());
     let RuntimeShutdownEventTurn::DeferredRegistryReload { turn: reload } = &turn.turns[1] else {
@@ -269,21 +270,21 @@ fn runtime_registry_watch_event_during_the_boot_window_is_deferred_and_coalesced
     assert_eq!(
         reload.deferred,
         crate::supervisor::DeferredRegistryReload {
-            watch_fd: Some(91),
-            watch_events: 1,
-            overflow: false,
-            explicit_requests: 0,
+            services: vec!["app".to_string()],
         }
     );
-    let outcome = reload.outcome.as_ref().as_ref().expect("reload outcome");
-    assert_eq!(outcome.summary.added, vec!["fresh".to_string()]);
-    assert!(supervisor.services().get("fresh").is_some());
-    // app started from the boot's snapshot; the reload did not touch the
-    // running activation.
+    let coalesced = reload.outcome.as_ref().as_ref().expect("coalesced outcome");
+    assert!(coalesced.summary.deferred.is_empty());
+    let app = supervisor.services().get("app").expect("app");
+    assert_eq!(app.runtime.state, ServiceState::Active);
+    assert_eq!(app.definition.image_path, "/sbin/app");
     assert_eq!(
-        supervisor.service_status("app").expect("app").state,
-        ServiceState::Active
+        app.pending_definition
+            .as_ref()
+            .map(|d| d.image_path.as_str()),
+        Some("/sbin/app-v2")
     );
+    assert!(supervisor.services().get("fresh").is_some());
     assert!(!supervisor.has_deferred_registry_reload());
 
     // Once, not again.

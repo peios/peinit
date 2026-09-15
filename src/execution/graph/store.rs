@@ -80,6 +80,24 @@ impl GraphExecutionStore {
             .collect()
     }
 
+    /// Whether `service`'s launch under `context_id` has been attempted or
+    /// decided against. A retired or unknown context has nothing left to
+    /// launch, so everything counts as attempted (PEI-350).
+    pub fn boot_launch_attempted(&self, context_id: GraphContextId, service: &str) -> bool {
+        self.contexts
+            .get(&context_id)
+            .is_none_or(|context| context.launch_attempted(service))
+    }
+
+    /// The members of `context_id` whose launch has not been attempted, in
+    /// plan order; empty for a retired or unknown context.
+    pub fn unattempted_launches(&self, context_id: GraphContextId) -> Vec<String> {
+        self.contexts
+            .get(&context_id)
+            .map(GraphExecutionContext::unattempted_launches)
+            .unwrap_or_default()
+    }
+
     pub fn associated_contexts(&self, operation_id: OperationId) -> Vec<GraphContextId> {
         self.associations
             .get(&operation_id)

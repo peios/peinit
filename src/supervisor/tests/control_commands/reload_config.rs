@@ -370,18 +370,17 @@ fn reload_config_reports_undecodable_definitions_in_the_response() {
 }
 
 /// PEI-350 (§3.7): an explicit `reload-config` during the boot window is
-/// refused with INVALID_STATE, and the refusal says why. Its intent is
-/// honoured by the coalesced reload once the plan drains.
+/// accepted; the boot-plan member whose launch has not been attempted is
+/// reported as deferred and keeps the plan's definition.
 #[test]
-fn reload_config_during_the_boot_window_is_refused_with_invalid_state() {
+fn reload_config_during_the_boot_window_succeeds_and_reports_the_deferred_member() {
     // `alive_service` carries the boot trigger: `app` is in the plan and
-    // still waiting for its launch, so the plan has not drained.
+    // still waiting for its launch, so the window is open.
     let mut supervisor = booted_supervisor(vec![super::super::alive_service("app")]);
     assert!(supervisor.boot_plan_in_progress());
-    let mut registry = StaticRegistry::services(vec![
-        super::super::alive_service("app"),
-        inactive_alive_service("new"),
-    ]);
+    let mut changed_app = super::super::alive_service("app");
+    changed_app.image_path = "/sbin/app-v2".to_string();
+    let mut registry = StaticRegistry::services(vec![changed_app, inactive_alive_service("new")]);
     let mut access = TestAccessChecker::allow_all();
     let mut controller = TestProcessController::default();
     let mut clock = ScriptedClock::new([2_001]);
@@ -401,17 +400,26 @@ fn reload_config_during_the_boot_window_is_refused_with_invalid_state() {
         )
         .expect("response");
 
-    let SupervisorControlCommandBodyResponse::Rejected { response_line, .. } = response else {
-        panic!("expected the reload to be refused, got {response:?}");
+    let SupervisorControlCommandBodyResponse::Accepted {
+        response_line: Some(response_line),
+        ..
+    } = response
+    else {
+        panic!("expected the reload to be accepted, got {response:?}");
     };
     let json = response_json(&response_line);
-    assert_eq!(json["status"], "error");
-    assert_eq!(json["code"], "INVALID_STATE");
+    assert_eq!(json["status"], "ok");
+    assert_eq!(json["summary"]["added"], serde_json::json!(["new"]));
+    assert_eq!(json["summary"]["updated"], serde_json::json!([]));
+    assert_eq!(json["summary"]["deferred"], serde_json::json!(["app"]));
+    assert!(supervisor.services().get("new").is_some());
+    let app = supervisor.services().get("app").expect("app");
+    assert_eq!(app.definition.image_path, "/sbin/app");
     assert_eq!(
-        json["message"],
-        "configuration reload deferred: the boot plan has not drained, and the registry is \
-         re-read once it has"
+        app.pending_definition
+            .as_ref()
+            .map(|d| d.image_path.as_str()),
+        Some("/sbin/app-v2")
     );
-    assert!(supervisor.services().get("new").is_none());
     assert!(supervisor.has_deferred_registry_reload());
 }

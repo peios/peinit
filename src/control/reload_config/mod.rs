@@ -5,4 +5,4 @@ mod transaction;
 mod tests;
 
 pub use model::{ReloadConfigError, ReloadConfigOutcome};
-pub use transaction::reload_config;
+pub use transaction::{reload_config, reload_config_with_frozen};

@@ -126,6 +126,39 @@ impl GraphExecutionContext {
     /// holding every reload for the length of a retry cycle would be the
     /// cost of a crash loop, not of the boot.
     pub fn has_attempted_every_launch(&self) -> bool {
+        self.settled_launches().len() == self.members.len()
+    }
+
+    /// Whether this member's launch has been attempted or decided against
+    /// — the per-member half of [`Self::has_attempted_every_launch`].
+    ///
+    /// A member that has not is the one thing a reload during the boot
+    /// window must not touch: its start is still to be made from the
+    /// boot's snapshot (§3.7, PEI-350). A name that is not a member counts
+    /// as attempted; the context has nothing planned for it.
+    pub fn launch_attempted(&self, service: &str) -> bool {
+        !self.members.contains_key(service) || self.settled_launches().contains(service)
+    }
+
+    /// The members whose launch has not been attempted, in plan order.
+    pub fn unattempted_launches(&self) -> Vec<String> {
+        let settled = self.settled_launches();
+        let mut members = self
+            .members
+            .values()
+            .filter(|member| !settled.contains(member.service.as_str()))
+            .collect::<Vec<_>>();
+        members.sort_by_key(|member| member.sequence);
+        members
+            .into_iter()
+            .map(|member| member.service.clone())
+            .collect()
+    }
+
+    /// The members that are terminal, awaiting a restart, or held only on
+    /// members that are — closed over the dependency edges, so a dependent
+    /// waiting on nothing that can still launch is settled too.
+    fn settled_launches(&self) -> std::collections::BTreeSet<&str> {
         let mut settled: std::collections::BTreeSet<&str> = self
             .members
             .values()
@@ -160,7 +193,7 @@ impl GraphExecutionContext {
                 break;
             }
         }
-        settled.len() == self.members.len()
+        settled
     }
 }
 

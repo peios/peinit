@@ -281,10 +281,11 @@ fn encodes_graph_validation_audit_payloads() {
 /// snapshot was let go of.
 #[test]
 fn encodes_the_boot_window_deferral_and_the_coalesced_reload() {
-    let deferred = encode_registry_reload_deferred_event(3, true).expect("deferred event");
+    let deferred = encode_registry_reload_deferred_event(&["app".to_string(), "db".to_string()])
+        .expect("deferred event");
     assert_eq!(deferred.event_type, "config.reload_deferred");
-    assert_eq!(read_uint(&deferred.payload, "events"), 3);
-    assert_eq!(read_str(&deferred.payload, "overflow"), "true");
+    assert_eq!(read_uint(&deferred.payload, "events"), 2);
+    assert_eq!(read_str_array(&deferred.payload, "services"), ["app", "db"]);
 
     let outcome = crate::control::reload_config::ReloadConfigOutcome {
         summary: crate::service::ServiceReloadSummary {
@@ -294,6 +295,7 @@ fn encodes_the_boot_window_deferral_and_the_coalesced_reload() {
             marked_removed: Vec::new(),
             discarded: Vec::new(),
             undecodable: vec!["broken".to_string()],
+            deferred: Vec::new(),
         },
         services_schema_version: 1,
         config_warnings: Vec::new(),
@@ -309,18 +311,17 @@ fn encodes_the_boot_window_deferral_and_the_coalesced_reload() {
     };
     let coalesced = encode_registry_reload_coalesced_event(
         &crate::supervisor::DeferredRegistryReload {
-            watch_fd: Some(91),
-            watch_events: 3,
-            overflow: true,
-            explicit_requests: 1,
+            services: vec!["app".to_string(), "db".to_string()],
         },
         &Ok(outcome),
     )
     .expect("coalesced event");
     assert_eq!(coalesced.event_type, "config.reload_coalesced");
-    assert_eq!(read_uint(&coalesced.payload, "watch_events"), 3);
-    assert_eq!(read_uint(&coalesced.payload, "explicit_requests"), 1);
-    assert_eq!(read_str(&coalesced.payload, "overflow"), "true");
+    assert_eq!(read_uint(&coalesced.payload, "deferred"), 2);
+    assert_eq!(
+        read_str_array(&coalesced.payload, "services"),
+        ["app", "db"]
+    );
     assert_eq!(read_str(&coalesced.payload, "result"), "ok");
     assert_eq!(read_uint(&coalesced.payload, "added"), 1);
     assert_eq!(read_uint(&coalesced.payload, "undecodable"), 1);

@@ -137,16 +137,14 @@ pub(crate) fn collect_runtime_shutdown_turn_kmes_events(
             super::submitted::collect_jobs_connection_turn(turn, out)?;
         }
         RuntimeShutdownEventTurn::RegistryWatch {
-            turn:
-                RuntimeRegistryWatchTurn::DeferredUntilBootDrains {
-                    events, overflow, ..
-                },
+            turn: RuntimeRegistryWatchTurn::ReloadConfig { outcome, .. },
             ..
         } => {
-            out.push(crate::kmes::encode_registry_reload_deferred_event(
-                events.len(),
-                *overflow,
-            )?);
+            // A watch-triggered reload is audited as an explicit one is:
+            // its warnings, the keys it failed, and what it deferred.
+            if let Ok(outcome) = outcome.as_ref() {
+                super::system::collect_reload_config_warnings(outcome, out)?;
+            }
         }
         RuntimeShutdownEventTurn::DeferredRegistryReload { turn } => {
             out.push(crate::kmes::encode_registry_reload_coalesced_event(

@@ -14,6 +14,22 @@ pub fn reload_config<R>(
 where
     R: RegistryClient + ?Sized,
 {
+    reload_config_with_frozen(registry, services, &[])
+}
+
+/// `reload_config`, leaving `frozen` services' definitions as they are.
+///
+/// For the boot window (§3.7): a boot-plan member whose launch has not been
+/// attempted keeps the plan's definition and takes the new one as pending,
+/// and is listed under `summary.deferred` (PEI-350).
+pub fn reload_config_with_frozen<R>(
+    registry: &mut R,
+    services: &mut ServiceTable,
+    frozen: &[String],
+) -> Result<ReloadConfigOutcome, ReloadConfigError>
+where
+    R: RegistryClient + ?Sized,
+{
     let services_schema_version = registry
         .read_services_schema_version()
         .map_err(ReloadConfigError::Registry)?;
@@ -60,7 +76,7 @@ where
             .map_err(ReloadConfigError::Validation)?;
     let mut next_services = services.clone();
     let summary = next_services
-        .apply_definition_snapshot_with_undecodable(definitions, &undecodable)
+        .apply_definition_snapshot_with(definitions, &undecodable, frozen)
         .map_err(ReloadConfigError::ServiceTable)?;
 
     *services = next_services;

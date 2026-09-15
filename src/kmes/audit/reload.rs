@@ -5,7 +5,8 @@ use crate::control::reload_config::{ReloadConfigError, ReloadConfigOutcome};
 use crate::supervisor::DeferredRegistryReload;
 
 use crate::kmes::payload::{
-    finish_event, write_optional_str_field, write_str_field, write_uint_field,
+    finish_event, write_optional_str_field, write_str_field, write_string_array_field,
+    write_uint_field,
 };
 
 /// A service announced `RELOADING=1` and then never completed the reload.
@@ -31,50 +32,42 @@ pub fn encode_reload_unconfirmed_event(service: &str) -> Result<KmesEvent, Bound
     finish_event("service.reload_unconfirmed", writer)
 }
 
-/// A registry watch batch arrived while the boot plan was still draining,
-/// and was held back: a boot executes against its snapshot (§3.7), so the
-/// reload the batch asks for runs once the plan has drained (PEI-350).
+/// A reload during the boot window left definitions pending on boot-plan
+/// members whose launch had not been attempted: a boot executes against its
+/// snapshot (§3.7), so those members start from the plan and take the
+/// change once the window has closed (PEI-350). `events` is the number of
+/// definitions deferred by this reload.
 pub fn encode_registry_reload_deferred_event(
-    events: usize,
-    overflow: bool,
+    services: &[String],
 ) -> Result<KmesEvent, BoundaryError> {
     let mut writer = Writer::new();
     writer.write_map(3);
-    write_uint_field(&mut writer, "events", events as u64);
-    write_str_field(
-        &mut writer,
-        "overflow",
-        if overflow { "true" } else { "false" },
-    );
+    write_uint_field(&mut writer, "events", services.len() as u64);
+    write_string_array_field(&mut writer, "services", services);
     write_str_field(
         &mut writer,
         "message",
-        "registry changed during the boot window; configuration reload deferred until the boot plan drains",
+        &format!(
+            "registry changed during the boot window; {} definition(s) deferred until the boot plan drains: {}",
+            services.len(),
+            services.join(", ")
+        ),
     );
     finish_event("config.reload_deferred", writer)
 }
 
-/// The one reload that followed the boot window, standing in for every
-/// watch batch and `reload-config` request deferred during it. This is the
-/// mark that the boot's snapshot has been let go of: after it, the registry
-/// as it now stands is the running configuration (PEI-350).
+/// The one reload that followed the boot window, applying what the reloads
+/// during it deferred. This is the mark that the boot's snapshot has been
+/// let go of: after it, the registry as it now stands is the running
+/// configuration (PEI-350).
 pub fn encode_registry_reload_coalesced_event(
     deferred: &DeferredRegistryReload,
     outcome: &Result<ReloadConfigOutcome, ReloadConfigError>,
 ) -> Result<KmesEvent, BoundaryError> {
     let mut writer = Writer::new();
-    writer.write_map(11);
-    write_uint_field(&mut writer, "watch_events", deferred.watch_events as u64);
-    write_uint_field(
-        &mut writer,
-        "explicit_requests",
-        deferred.explicit_requests as u64,
-    );
-    write_str_field(
-        &mut writer,
-        "overflow",
-        if deferred.overflow { "true" } else { "false" },
-    );
+    writer.write_map(10);
+    write_uint_field(&mut writer, "deferred", deferred.services.len() as u64);
+    write_string_array_field(&mut writer, "services", &deferred.services);
     match outcome {
         Ok(outcome) => {
             write_str_field(&mut writer, "result", "ok");
