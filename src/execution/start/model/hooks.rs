@@ -68,6 +68,10 @@ pub struct PostStartHookTimeoutDispatch {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReadinessTimeoutDispatch {
+    /// The main job the timeout killed, failed here so its later exit is not
+    /// evaluated as a second failure (PEI-822). `None` when the job was not
+    /// yet running at the deadline.
+    pub job_event: Option<JobEvent>,
     pub operation_events: Vec<OperationEvent>,
     pub service_transitions: Vec<ServiceTableTransition>,
     pub graph_events: Vec<GraphExecutionEvent>,
