@@ -43,6 +43,10 @@ pub(super) fn write_optional_string_field(writer: &mut Writer, key: &str, value:
     }
 }
 
+pub(super) fn write_bool_field(writer: &mut Writer, key: &str, value: bool) {
+    writer.write_str(key).write_bool(value);
+}
+
 pub(super) fn write_uint_field(writer: &mut Writer, key: &str, value: u64) {
     writer.write_str(key).write_uint(value);
 }

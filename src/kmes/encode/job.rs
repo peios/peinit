@@ -5,23 +5,61 @@ use crate::job::{JobEvent, JobEventDetail};
 
 use super::super::labels::{job_state_label, job_type_label};
 use super::super::payload::{
-    finish_event, write_optional_i32_field, write_optional_str_field, write_optional_string_field,
-    write_optional_u32_field, write_optional_u64_field, write_str_field, write_string_array_field,
-    write_token_summary_field, write_uint_field,
+    finish_event, write_bool_field, write_optional_i32_field, write_optional_str_field,
+    write_optional_string_field, write_optional_u32_field, write_optional_u64_field,
+    write_str_field, write_string_array_field, write_token_summary_field, write_uint_field,
 };
 
+/// The most of a job's `arguments` a `job.ended` carries, in encoded bytes.
+///
+/// `job.ended` carries the whole record, and the record's `arguments` are
+/// bounded only by what admitted them: `MaxJobMessageSize` for a submitted
+/// job, the registry for a service. KMES refuses an event over
+/// `MaxEventSize` (65536 by default), and an event PID 1 cannot emit must
+/// never be PID 1's problem (PEI-1082). So the arguments are cut to this
+/// budget — half the default `MaxEventSize`, leaving the other half for the
+/// record's other twenty-odd fields — and the event says when they were.
+/// The default `MaxJobMessageSize` is held at or below this budget, so a
+/// record that fills a default-sized message is never cut: a MessagePack
+/// string costs at most three bytes over its length, a JSON one at least
+/// two plus the record's framing, so the encoded arguments of a record are
+/// always smaller than the record that carried them.
+pub const MAX_JOB_ENDED_ARGUMENTS_BYTES: usize = 32 * 1024;
+
+/// What a `job.ended` left out to fit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct JobEventTruncation {
+    /// The encoded size the arguments would have had.
+    pub arguments_bytes: u64,
+    /// The budget they were cut to.
+    pub limit_bytes: u64,
+}
+
 pub fn encode_job_event(event: &JobEvent) -> Result<KmesEvent, BoundaryError> {
+    encode_job_event_bounded(event).map(|(event, _)| event)
+}
+
+/// Encode the event, and say whether its arguments were cut to fit.
+pub fn encode_job_event_bounded(
+    event: &JobEvent,
+) -> Result<(KmesEvent, Option<JobEventTruncation>), BoundaryError> {
     match &event.detail {
         JobEventDetail::Created {
             image_path,
             identity,
             operation_id,
-        } => encode_created_job_event(event, image_path, identity, *operation_id),
+        } => Ok((
+            encode_created_job_event(event, image_path, identity, *operation_id)?,
+            None,
+        )),
         JobEventDetail::Started {
             started_at_ns,
             pid,
             cgroup_id,
-        } => encode_started_job_event(event, *started_at_ns, *pid, cgroup_id),
+        } => Ok((
+            encode_started_job_event(event, *started_at_ns, *pid, cgroup_id)?,
+            None,
+        )),
         JobEventDetail::Ended {
             ended_at_ns,
             duration_ns,
@@ -80,15 +118,22 @@ fn encode_ended_job_event(
     exit_code: Option<i32>,
     exit_signal: Option<i32>,
     failure_cause: Option<&str>,
-) -> Result<KmesEvent, BoundaryError> {
+) -> Result<(KmesEvent, Option<JobEventTruncation>), BoundaryError> {
+    let (arguments, truncation) = bounded_arguments(&event.arguments);
     let mut writer = Writer::new();
-    writer.write_map(22);
+    writer.write_map(24);
     write_job_common(&mut writer, event);
     write_optional_u32_field(&mut writer, "pid", event.pid);
     write_optional_i32_field(&mut writer, "pidfd", event.pidfd);
     write_str_field(&mut writer, "resolved_identity", &event.resolved_identity);
     write_str_field(&mut writer, "image_path", &event.image_path);
-    write_string_array_field(&mut writer, "arguments", &event.arguments);
+    write_string_array_field(&mut writer, "arguments", arguments);
+    write_bool_field(&mut writer, "arguments_truncated", truncation.is_some());
+    write_uint_field(
+        &mut writer,
+        "arguments_total",
+        u64::try_from(event.arguments.len()).unwrap_or(u64::MAX),
+    );
     write_uint_field(&mut writer, "created_at_ns", event.created_at_ns);
     write_optional_u64_field(&mut writer, "started_at_ns", event.started_at_ns);
     write_uint_field(&mut writer, "ended_at_ns", ended_at_ns);
@@ -98,7 +143,51 @@ fn encode_ended_job_event(
     write_optional_str_field(&mut writer, "failure_cause", failure_cause);
     write_str_field(&mut writer, "cgroup_id", &event.cgroup_id);
     write_uint_field(&mut writer, "cgroup_generation", event.cgroup_generation);
-    finish_event("job.ended", writer)
+    Ok((finish_event("job.ended", writer)?, truncation))
+}
+
+/// The longest prefix of `arguments` whose encoding fits the budget, and
+/// what was cut if the whole did not.
+///
+/// Whole arguments only: a cut argument would read as a different command
+/// line, and the count of what is missing is on the event beside them.
+fn bounded_arguments(arguments: &[String]) -> (&[String], Option<JobEventTruncation>) {
+    let total: usize = arguments
+        .iter()
+        .map(|argument| msgpack_str_size(argument.len()))
+        .sum();
+    if total <= MAX_JOB_ENDED_ARGUMENTS_BYTES {
+        return (arguments, None);
+    }
+    let mut used = 0;
+    let mut kept = 0;
+    for argument in arguments {
+        let size = msgpack_str_size(argument.len());
+        if used + size > MAX_JOB_ENDED_ARGUMENTS_BYTES {
+            break;
+        }
+        used += size;
+        kept += 1;
+    }
+    (
+        &arguments[..kept],
+        Some(JobEventTruncation {
+            arguments_bytes: total as u64,
+            limit_bytes: MAX_JOB_ENDED_ARGUMENTS_BYTES as u64,
+        }),
+    )
+}
+
+/// The encoded size of a MessagePack string of `len` bytes: the header the
+/// writer picks for that length, plus the bytes.
+fn msgpack_str_size(len: usize) -> usize {
+    let header = match len {
+        0..=31 => 1,
+        32..=255 => 2,
+        256..=65_535 => 3,
+        _ => 5,
+    };
+    header + len
 }
 
 fn write_job_common(writer: &mut Writer, event: &JobEvent) {

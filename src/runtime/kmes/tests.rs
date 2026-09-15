@@ -339,3 +339,106 @@ fn runtime_loop_collector_records_a_contained_internal_error() {
         Some("app")
     );
 }
+
+/// PEI-1082: a `job.ended` whose arguments were cut is followed by an
+/// `event.oversized` saying so, so the audit trail records the gap.
+#[test]
+fn a_cut_job_ended_is_followed_by_an_event_oversized_naming_the_cut() {
+    let job_id = crate::ids::JobIdAllocator::new()
+        .allocate_batch(1, 1_717_171_717_123_456_789)
+        .expect("job id")[0];
+    let job_event = crate::job::JobEvent::ended(&crate::job::JobRecord {
+        id: job_id,
+        service: Some("app".to_string()),
+        job_type: crate::job::JobType::ServiceMain,
+        hook_index: None,
+        state: crate::job::JobState::Failed,
+        pid: Some(800),
+        pidfd: Some(80),
+        resolved_identity: "SYSTEM".to_string(),
+        token_summary: TokenSummary::requested_identity("SYSTEM"),
+        required_privileges: Vec::new(),
+        image_path: "/sbin/app".to_string(),
+        arguments: (0..20).map(|_| "a".repeat(4096)).collect(),
+        environment: Vec::new(),
+        working_directory: "/".to_string(),
+        limit_nofile: None,
+        limit_core: None,
+        oom_score_adj: 0,
+        created_at_ns: 10,
+        started_at_ns: Some(20),
+        ended_at_ns: Some(30),
+        exit_code: None,
+        exit_signal: None,
+        failure_cause: Some("internal_error: job terminal: x".to_string()),
+        cgroup_id: "system.slice/app".to_string(),
+        activation_generation: 1,
+        cgroup_generation: 0,
+        operation_id: None,
+        console_path: None,
+    })
+    .expect("job event");
+    let turn = RuntimeShutdownEventTurn::DeferredChildReaps {
+        child_reaps: vec![crate::supervisor::SupervisorChildReapTurn::InternalError {
+            child: crate::boundary::ChildReap {
+                pid: 800,
+                status: crate::boundary::ChildExitStatus::Exited { code: 0 },
+            },
+            dispatch: Box::new(crate::supervisor::SupervisorInternalErrorDispatch {
+                step: "job terminal",
+                subject: crate::supervisor::SupervisorInternalErrorSubject {
+                    service: Some("app".to_string()),
+                    job_id: Some(job_id),
+                },
+                error: "x".to_string(),
+                observed_at_ns: 30,
+                job_event: Some(job_event),
+                service_job_event: None,
+                operation_event: None,
+                service_transition: None,
+                start_dispatches: Vec::new(),
+            }),
+        }],
+        ended_at_ns: 30,
+    };
+
+    let mut events = Vec::new();
+    collect_runtime_loop_kmes_events(
+        &RuntimeWorkPumpTurn::default(),
+        &SupervisorOperationMaintenanceTurn::default(),
+        &[turn],
+        &RuntimeWorkPumpTurn::default(),
+        &SupervisorOperationMaintenanceTurn::default(),
+        &[],
+        &mut events,
+    )
+    .expect("collected KMES events");
+
+    assert_eq!(
+        events
+            .iter()
+            .map(|event| event.event_type.as_str())
+            .collect::<Vec<_>>(),
+        vec!["job.ended", "event.oversized", "service.internal_error"],
+    );
+    assert!(events[0].payload.len() < 65_536);
+    assert_eq!(
+        crate::kmes::kmes_event_subject(&events[1].payload),
+        (Some("app".to_string()), Some(job_id.to_string())),
+    );
+    assert_eq!(read_str(&events[1].payload, "action"), "truncated");
+    assert_eq!(read_str(&events[1].payload, "event"), "job.ended");
+}
+
+fn read_str(payload: &[u8], field: &str) -> String {
+    let mut reader = peios::msgpack::Reader::new(payload);
+    let count = reader.read_map().expect("payload map");
+    for _ in 0..count {
+        let key = reader.read_str().expect("field key");
+        if key == field {
+            return reader.read_str().expect("field value").to_string();
+        }
+        reader.skip().expect("skip value");
+    }
+    panic!("missing field {field}");
+}

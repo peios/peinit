@@ -7,7 +7,17 @@ use crate::control::socket::{ControlSocketBindError, ControlSocketPathError};
 pub const JOBS_SOCKET_PATH: &str = "/run/services/peinit/jobs.sock";
 pub const JOBS_SOCKET_LISTEN_BACKLOG: i32 = 32;
 pub const DEFAULT_MAX_JOBS_CONNECTIONS: usize = 64;
-pub const DEFAULT_MAX_JOBS_MESSAGE_BYTES: usize = 65_536;
+/// Half of KMES's default `MaxEventSize` (65536), and at most the
+/// `job.ended` argument budget (`kmes::MAX_JOB_ENDED_ARGUMENTS_BYTES`).
+///
+/// A submission's `arguments` come back out in its `job.ended`, next to
+/// about twenty other fields, and the two limits used to be equal — so a
+/// record that filled one message produced an event the ring refused, and
+/// until PEI-1125 that ended PID 1's runtime loop (PEI-1082). The event's
+/// arguments are cut to their budget regardless of this setting; this
+/// default is what keeps a default-sized record from ever being cut, with
+/// the other half of the event left for the record's remaining fields.
+pub const DEFAULT_MAX_JOBS_MESSAGE_BYTES: usize = 32_768;
 pub const DEFAULT_JOBS_CONNECTION_TIMEOUT_SECS: u64 = 30;
 pub const DEFAULT_MAX_JOBS_PER_SUBMITTER: usize = 64;
 /// Descriptors accepted on one message, the output sink included (PSPU §7.A).

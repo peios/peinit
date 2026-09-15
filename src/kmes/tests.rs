@@ -683,3 +683,140 @@ fn encodes_internal_error_and_oversized_event_payloads() {
         "the subject of any event can be read back from its payload",
     );
 }
+
+fn read_bool(payload: &[u8], field: &str) -> bool {
+    read_field(payload, field, |reader| reader.read_bool())
+}
+
+/// A finished job record whose `arguments` and the other fields that can be
+/// large are whatever the test needs them to be.
+fn ended_job_record(
+    arguments: Vec<String>,
+    token_summary: TokenSummary,
+    image_path: String,
+    failure_cause: String,
+) -> JobRecord {
+    JobRecord {
+        id: job_id(),
+        service: Some("a".repeat(255)),
+        job_type: JobType::Submitted,
+        hook_index: None,
+        state: JobState::Failed,
+        pid: Some(u32::MAX),
+        pidfd: Some(i32::MAX),
+        resolved_identity: "u".repeat(255),
+        token_summary,
+        required_privileges: Vec::new(),
+        image_path,
+        arguments,
+        environment: Vec::new(),
+        working_directory: "/".to_string(),
+        limit_nofile: None,
+        limit_core: None,
+        oom_score_adj: 0,
+        created_at_ns: u64::MAX,
+        started_at_ns: Some(u64::MAX),
+        ended_at_ns: Some(u64::MAX),
+        exit_code: Some(i32::MAX),
+        exit_signal: Some(i32::MAX),
+        failure_cause: Some(failure_cause),
+        cgroup_id: "c".repeat(512),
+        activation_generation: u64::MAX,
+        cgroup_generation: u64::MAX,
+        operation_id: Some(operation_id()),
+        console_path: None,
+    }
+}
+
+/// PEI-1082: a `job.ended` carries at most `MAX_JOB_ENDED_ARGUMENTS_BYTES`
+/// of `arguments`, whole arguments only, and says how many it left out —
+/// so an event PID 1 cannot emit is never built in the first place.
+#[test]
+fn a_job_ended_event_cuts_its_arguments_to_the_budget_and_says_so() {
+    let arguments: Vec<String> = (0..10).map(|_| "a".repeat(4096)).collect();
+    let event = JobEvent::ended(&ended_job_record(
+        arguments,
+        token("SYSTEM"),
+        "/bin/true".to_string(),
+        "exit 1".to_string(),
+    ))
+    .expect("job ended event");
+
+    let (encoded, truncation) =
+        crate::kmes::encode_job_event_bounded(&event).expect("encoded event");
+
+    // Ten 4 KiB arguments encode to 40,990 bytes (4,099 each); seven of
+    // them fit the 32,768-byte budget and the eighth does not.
+    let kept = read_str_array(&encoded.payload, "arguments");
+    assert_eq!(kept.len(), 7);
+    assert!(read_bool(&encoded.payload, "arguments_truncated"));
+    assert_eq!(read_uint(&encoded.payload, "arguments_total"), 10);
+    assert_eq!(
+        truncation,
+        Some(crate::kmes::JobEventTruncation {
+            arguments_bytes: 10 * (4096 + 3),
+            limit_bytes: crate::kmes::MAX_JOB_ENDED_ARGUMENTS_BYTES as u64,
+        }),
+    );
+    assert!(
+        encoded.payload.len() < 65_536,
+        "{} bytes",
+        encoded.payload.len()
+    );
+}
+
+/// PEI-1082, the defaults: a record that fills a default-sized jobs message
+/// produces a `job.ended` that fits a default-sized KMES event with room to
+/// spare, however large the record's other fields are — the arguments are
+/// never cut, and the whole event stays under the ring's default limit.
+/// Both defaults live in this crate and in the kernel respectively:
+/// `DEFAULT_MAX_JOBS_MESSAGE_BYTES` (`jobs::socket`, 32768) and
+/// `KMES_CONFIG_MAX_EVENT_SIZE_DEFAULT` (`pkm/uapi/pkm/kmes.h`, 65536).
+#[test]
+fn a_record_at_the_default_message_size_produces_a_job_ended_that_fits_the_default_event_size() {
+    const KMES_DEFAULT_MAX_EVENT_SIZE: usize = 65_536;
+    const DEFAULT_MAX_JOBS_MESSAGE_BYTES: usize =
+        crate::jobs::socket::DEFAULT_MAX_JOBS_MESSAGE_BYTES;
+    const {
+        assert!(DEFAULT_MAX_JOBS_MESSAGE_BYTES <= crate::kmes::MAX_JOB_ENDED_ARGUMENTS_BYTES);
+        assert!(2 * crate::kmes::MAX_JOB_ENDED_ARGUMENTS_BYTES <= KMES_DEFAULT_MAX_EVENT_SIZE);
+    }
+
+    // The whole message budget spent on one argument, beside a token with
+    // 128 groups and 64 privileges of each kind, a PATH_MAX image path and
+    // a 4 KiB failure cause. The argument is the message less the smallest
+    // record that can carry it: a MessagePack string costs at most three
+    // bytes over its length, a JSON one at least two plus its framing, so
+    // the encoded arguments of any record are smaller than the record.
+    const SMALLEST_SUBMIT_RECORD: usize =
+        r#"{"command":"submit","image_path":"/","arguments":[""]}"#.len();
+    let mut token_summary = token(&"i".repeat(255));
+    token_summary.user_sid = "S-1-5-21-".to_string() + &"9".repeat(180);
+    token_summary.group_sids = (0..128)
+        .map(|index| format!("S-1-5-21-{}-{index}", "9".repeat(50)))
+        .collect();
+    token_summary.present_privileges = (0..64)
+        .map(|index| format!("SePrivilege{index:02}"))
+        .collect();
+    token_summary.enabled_privileges = token_summary.present_privileges.clone();
+    let event = JobEvent::ended(&ended_job_record(
+        vec!["a".repeat(DEFAULT_MAX_JOBS_MESSAGE_BYTES - SMALLEST_SUBMIT_RECORD)],
+        token_summary,
+        "/".to_string() + &"p".repeat(4095),
+        "f".repeat(4096),
+    ))
+    .expect("job ended event");
+
+    let (encoded, truncation) =
+        crate::kmes::encode_job_event_bounded(&event).expect("encoded event");
+
+    assert_eq!(truncation, None);
+    assert!(!read_bool(&encoded.payload, "arguments_truncated"));
+    // Header plus payload is what the ring counts; the header and the
+    // event type are well under a kilobyte.
+    assert!(
+        encoded.payload.len() + 1024 <= KMES_DEFAULT_MAX_EVENT_SIZE,
+        "{} bytes",
+        encoded.payload.len()
+    );
+}
