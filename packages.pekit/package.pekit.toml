@@ -65,7 +65,11 @@ format = "peipkg"
 # 0.0.5-3 (2026-09-15): the tree as of d404c6c — Reloading satisfies
 # dependents, a declared BindsTo is not doubled by a derived Requires — as the
 # baseline for the peinit known-bug batch.
-version      = "{{version}}-3"
+# 0.0.5-4 (2026-09-15): the known-bug batch — 24 fixes from PEI-824 through
+# PEI-827 (control conflict rows, timers, boot roles, notify, pidfd release,
+# abandoned resets, readiness budget, eventd batching, control frames, jobs
+# handles, wait deadlines, init console, shutdown waves and finalisation).
+version      = "{{version}}-4"
 architecture = "x86_64"
 license      = "MIT"
 license_class = "free"
