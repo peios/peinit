@@ -59,9 +59,7 @@ impl Supervisor {
             }
         }
 
-        if let Some(finalizer) = finalizer {
-            annotate_critical_reboot_if_due(self, &mut dispatch, finalizer, now_ns)?;
-        }
+        annotate_critical_reboot_if_due(self, &mut dispatch, finalizer, now_ns)?;
 
         Ok((!dispatch.is_empty()).then_some(dispatch))
     }

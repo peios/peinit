@@ -45,7 +45,7 @@ fn drive_shutdown_before_next_deadline_is_a_noop() {
     let dispatch = supervisor
         .drive_shutdown(
             &mut controller,
-            &mut finalizer,
+            Some(&mut finalizer),
             DRAINING_STOP_DEADLINE_NS - 1,
         )
         .expect("drive shutdown");
@@ -66,7 +66,11 @@ fn drive_shutdown_processes_due_stop_timeout_and_schedules_post_kill_deadline() 
     controller.cgroup_kills.clear();
 
     let dispatch = supervisor
-        .drive_shutdown(&mut controller, &mut finalizer, DRAINING_STOP_DEADLINE_NS)
+        .drive_shutdown(
+            &mut controller,
+            Some(&mut finalizer),
+            DRAINING_STOP_DEADLINE_NS,
+        )
         .expect("drive shutdown")
         .expect("timeout dispatch");
     let timeout = dispatch.timeout.expect("timeout work");
@@ -107,7 +111,7 @@ fn drive_shutdown_finalizes_when_services_are_ready() {
     let mut finalizer = TestDriveFinalizer::new(["/", "/run"]);
 
     let dispatch = supervisor
-        .drive_shutdown(&mut controller, &mut finalizer, SHUTDOWN_NS + 100)
+        .drive_shutdown(&mut controller, Some(&mut finalizer), SHUTDOWN_NS + 100)
         .expect("drive shutdown")
         .expect("finalization dispatch");
 
@@ -137,7 +141,7 @@ fn drive_shutdown_retries_failed_final_action_only_when_due() {
         TestDriveFinalizer::new(["/", "/run"]).with_reboot_results([Err("first failed"), Ok(())]);
 
     let failed = supervisor
-        .drive_shutdown(&mut controller, &mut finalizer, SHUTDOWN_NS + 100)
+        .drive_shutdown(&mut controller, Some(&mut finalizer), SHUTDOWN_NS + 100)
         .expect("drive shutdown")
         .expect("failed finalization")
         .finalization
@@ -159,13 +163,13 @@ fn drive_shutdown_retries_failed_final_action_only_when_due() {
     );
 
     let not_due = supervisor
-        .drive_shutdown(&mut controller, &mut finalizer, next_retry_at_ns - 1)
+        .drive_shutdown(&mut controller, Some(&mut finalizer), next_retry_at_ns - 1)
         .expect("drive before retry");
     assert_eq!(not_due, None);
     let calls_before_retry = finalizer.calls.len();
 
     let retried = supervisor
-        .drive_shutdown(&mut controller, &mut finalizer, next_retry_at_ns)
+        .drive_shutdown(&mut controller, Some(&mut finalizer), next_retry_at_ns)
         .expect("drive retry")
         .expect("retry dispatch")
         .finalization

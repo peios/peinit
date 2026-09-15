@@ -5,9 +5,10 @@ use crate::control::connection::{
 #[cfg(feature = "peios-registry")]
 use crate::runtime::RuntimeRegistryWatchTurn;
 use crate::runtime::{
-    RuntimeCalendarTimerTurn, RuntimeCriticalBudgetRebootTurn, RuntimeShutdownEventTurn,
+    RuntimeCalendarTimerTurn, RuntimeShutdownEventTurn, RuntimeShutdownFinalizationTurn,
     RuntimeShutdownLoopError, RuntimeShutdownLoopTurn, RuntimeWorkPumpTurn,
-    collect_runtime_loop_kmes_events, process_due_critical_budget_reboot,
+    collect_runtime_loop_kmes_events, collect_runtime_shutdown_finalization_kmes_events,
+    finalize_due_shutdown,
 };
 use crate::supervisor::{Supervisor, SupervisorOperationMaintenanceTurn};
 #[cfg(feature = "peios-registry")]
@@ -51,23 +52,24 @@ pub(in crate::runtime::linux::turn) fn process_due_operation_maintenance_at(
     Ok(SupervisorOperationMaintenanceTurn::default())
 }
 
-/// Reboot if a Critical service has run out of restart budget.
+/// The final action the turn ends in, if one is due: a shutdown's, or the
+/// reboot for a Critical service out of restart budget.
 ///
-/// Once per turn, after the turn's events have been applied. The paths that
-/// raise the reboot inline have already set the shutdown state by then, so
-/// this is a no-op for them; it is here for the paths that do not, which is
-/// every way a service can exhaust its budget without ever running.
-///
-/// The deadline timer is re-synced afterwards, as on every other path that
-/// finalises: a `reboot(2)` that returned leaves a retry to arm (PEI-1087).
-pub(in crate::runtime::linux::turn) fn process_due_critical_budget_reboot_at(
+/// Once per turn, after the turn's events have been applied and its console
+/// output written — the action does not return (PEI-827). The Critical
+/// reboot is asked as one question about the service table rather than
+/// raised by the path that observed the failure: enumerating those paths is
+/// what was incomplete before (PEI-341). The deadline timer is re-synced
+/// afterwards, as on every other path that changes the shutdown's
+/// deadlines: a `reboot(2)` that returned leaves a retry to arm (PEI-1087).
+pub(in crate::runtime::linux::turn) fn finalize_due_shutdown_at(
     supervisor: &mut Supervisor,
     finalizer: &mut dyn crate::boundary::ShutdownFinalizer,
     deadline_timer: &mut dyn crate::boundary::ShutdownDeadlineTimer,
     now_ns: u64,
-) -> Result<Option<RuntimeCriticalBudgetRebootTurn>, RuntimeShutdownLoopError> {
-    process_due_critical_budget_reboot(supervisor, finalizer, deadline_timer, now_ns)
-        .map_err(RuntimeShutdownLoopError::OperationMaintenance)
+) -> Result<Option<RuntimeShutdownFinalizationTurn>, RuntimeShutdownLoopError> {
+    finalize_due_shutdown(supervisor, finalizer, deadline_timer, now_ns)
+        .map_err(RuntimeShutdownLoopError::Finalization)
 }
 
 pub(in crate::runtime::linux::turn) fn flush_operation_waits_at<I>(
@@ -149,6 +151,21 @@ pub(in crate::runtime::linux::turn) fn emit_runtime_loop_kmes_events(
         &mut events,
     )
     .map_err(RuntimeShutdownLoopError::Kmes)?;
+    sink.emit_kmes_events(&events)
+        .map_err(RuntimeShutdownLoopError::Kmes)
+}
+
+/// The audit record of a final action that returned.
+pub(in crate::runtime::linux::turn) fn emit_runtime_shutdown_finalization_kmes_events(
+    sink: &mut dyn KmesEventSink,
+    finalization: &RuntimeShutdownFinalizationTurn,
+) -> Result<(), RuntimeShutdownLoopError> {
+    let mut events = Vec::new();
+    collect_runtime_shutdown_finalization_kmes_events(finalization, &mut events)
+        .map_err(RuntimeShutdownLoopError::Kmes)?;
+    if events.is_empty() {
+        return Ok(());
+    }
     sink.emit_kmes_events(&events)
         .map_err(RuntimeShutdownLoopError::Kmes)
 }

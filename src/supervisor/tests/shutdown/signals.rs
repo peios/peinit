@@ -16,7 +16,7 @@ fn sigterm_begins_graceful_poweroff_shutdown() {
         .handle_shutdown_signal(
             ShutdownSignal::Sigterm,
             &mut controller,
-            &mut finalizer,
+            Some(&mut finalizer),
             SHUTDOWN_NS,
         )
         .expect("handle sigterm");
@@ -38,7 +38,7 @@ fn sigpwr_begins_graceful_poweroff_shutdown() {
         .handle_shutdown_signal(
             ShutdownSignal::Sigpwr,
             &mut controller,
-            &mut finalizer,
+            Some(&mut finalizer),
             SHUTDOWN_NS,
         )
         .expect("handle sigpwr");
@@ -60,7 +60,7 @@ fn third_sigint_in_window_forces_immediate_reboot() {
         .handle_shutdown_signal(
             ShutdownSignal::Sigint,
             &mut controller,
-            &mut finalizer,
+            Some(&mut finalizer),
             SHUTDOWN_NS,
         )
         .expect("first sigint");
@@ -73,7 +73,7 @@ fn third_sigint_in_window_forces_immediate_reboot() {
         .handle_shutdown_signal(
             ShutdownSignal::Sigint,
             &mut controller,
-            &mut finalizer,
+            Some(&mut finalizer),
             SHUTDOWN_NS + 1_000_000_000,
         )
         .expect("second sigint");
@@ -88,7 +88,7 @@ fn third_sigint_in_window_forces_immediate_reboot() {
         .handle_shutdown_signal(
             ShutdownSignal::Sigint,
             &mut controller,
-            &mut finalizer,
+            Some(&mut finalizer),
             SHUTDOWN_NS + 2_000_000_000,
         )
         .expect("third sigint");
@@ -123,7 +123,7 @@ fn pid1_signal_fd_shutdown_read_enters_supervisor_shutdown_path() {
             LinuxSignalFdRead::Shutdown(ShutdownSignal::Sigterm),
             &mut clock,
             &mut controller,
-            &mut finalizer,
+            Some(&mut finalizer),
         )
         .expect("signal fd turn");
 
@@ -151,7 +151,7 @@ fn pid1_signal_fd_other_signal_does_not_consume_clock_or_mutate_shutdown() {
             },
             &mut clock,
             &mut controller,
-            &mut finalizer,
+            Some(&mut finalizer),
         )
         .expect("signal fd turn");
 
@@ -176,7 +176,7 @@ fn pid1_signal_fd_would_block_does_not_consume_clock_or_mutate_shutdown() {
             LinuxSignalFdRead::WouldBlock,
             &mut clock,
             &mut controller,
-            &mut finalizer,
+            Some(&mut finalizer),
         )
         .expect("signal fd turn");
 

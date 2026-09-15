@@ -184,6 +184,7 @@ where
         turns,
         post_work,
         eventd_flush,
+        finalization: None,
     })
 }
 

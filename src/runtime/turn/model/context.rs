@@ -24,6 +24,10 @@ where
     pub clock: &'a mut C,
     pub controller: &'a mut P,
     pub process_launcher: Option<&'a mut dyn ProcessLauncher>,
+    /// The turn's finalizer. No event handler hands it to the supervisor:
+    /// the final action does not return, so it is taken by
+    /// `finalize_due_shutdown` at the end of the turn, after the turn's
+    /// console output has been written (PEI-827).
     pub finalizer: &'a mut F,
     pub access_checker: &'a mut A,
     pub registrar: &'a mut R,

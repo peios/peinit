@@ -10,15 +10,20 @@ use super::state::{Supervisor, SupervisorError};
 use super::work::SupervisorWork;
 
 impl Supervisor {
-    pub fn force_reboot_shutdown<P, F>(
+    /// Kill every service outright and reboot: the third SIGINT.
+    ///
+    /// Given no finalizer, the kills are done and the shutdown is installed
+    /// as an immediate final action already due, for the caller to finalise
+    /// once it has said what it needs to say: the runtime writes the turn's
+    /// console output first, because `reboot(2)` does not return (PEI-827).
+    pub fn force_reboot_shutdown<P>(
         &mut self,
         controller: &mut P,
-        finalizer: &mut F,
+        finalizer: Option<&mut dyn ShutdownFinalizer>,
         now_ns: u64,
     ) -> Result<SupervisorImmediateShutdownDispatch, SupervisorError>
     where
         P: ProcessController + ?Sized,
-        F: ShutdownFinalizer + ?Sized,
     {
         let mut work = SupervisorWork::from_supervisor(self);
         let killed_services = kill_all_process_cgroups(&mut work, controller, now_ns)
@@ -26,7 +31,10 @@ impl Supervisor {
         work.shutdown = Some(immediate_runtime(ShutdownKind::Reboot, now_ns));
         work.commit(self);
 
-        let finalization = self.finalize_without_mount_cleanup(finalizer, now_ns)?;
+        let finalization = match finalizer {
+            Some(finalizer) => Some(self.finalize_without_mount_cleanup(finalizer, now_ns)?),
+            None => None,
+        };
         Ok(SupervisorImmediateShutdownDispatch {
             killed_services,
             finalization,

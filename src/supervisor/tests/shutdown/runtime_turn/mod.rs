@@ -1,6 +1,6 @@
 mod control;
-mod critical_budget;
 mod deadline;
+mod finalize;
 mod lifecycle_boot_success;
 mod lifecycle_deadline;
 mod loop_turn;

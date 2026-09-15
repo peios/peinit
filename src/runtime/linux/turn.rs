@@ -8,16 +8,18 @@ use self::support::{
 };
 use self::support::{
     append_idle_closure_turn, append_idle_jobs_closure_turn, emit_runtime_loop_kmes_events,
+    emit_runtime_shutdown_finalization_kmes_events, finalize_due_shutdown_at,
     flush_operation_waits_at, prepend_idle_closure_turn, prepend_idle_jobs_closure_turn,
-    process_due_critical_budget_reboot_at, process_due_operation_maintenance_at,
+    process_due_operation_maintenance_at,
 };
 use crate::boundary::{Clock, ConsoleSink, ProcessController, RealtimeClock};
 use crate::runtime::{
     RuntimeEventRegistrationError, RuntimeEventSource, RuntimeEventWaiter,
     RuntimeShutdownEventContext, RuntimeShutdownEventSources, RuntimeShutdownEventTurn,
     RuntimeShutdownLoopContext, RuntimeShutdownLoopError, RuntimeShutdownLoopTurn,
-    collect_runtime_loop_console_messages, prepare_runtime_shutdown_loop_turn,
-    process_runtime_shutdown_sources_with_registry, resume_buffered_control_frames,
+    collect_runtime_loop_console_messages, pending_shutdown_finalization,
+    prepare_runtime_shutdown_loop_turn, process_runtime_shutdown_sources_with_registry,
+    resume_buffered_control_frames,
 };
 use crate::supervisor::{
     Supervisor, SupervisorError, SupervisorLifecycleDeadlineTimerTurn,
@@ -261,12 +263,7 @@ impl LinuxShutdownRuntime {
             for child in deferred_reaps {
                 child_reaps.push(
                     supervisor
-                        .apply_reaped_child(
-                            child,
-                            after_sources_ns,
-                            &mut self.controller,
-                            &mut self.finalizer,
-                        )
+                        .apply_reaped_child(child, after_sources_ns, &mut self.controller, None)
                         .map_err(RuntimeShutdownLoopError::DeferredChildReap)?,
                 );
             }
@@ -280,14 +277,6 @@ impl LinuxShutdownRuntime {
         let maintenance_after_sources = process_due_operation_maintenance_at(
             supervisor,
             &mut self.controller,
-            after_sources_ns,
-        )?;
-        // After the turn's events, so a service that exhausted its budget
-        // anywhere in it is seen however it got there (PEI-341).
-        let critical_budget_reboot = process_due_critical_budget_reboot_at(
-            supervisor,
-            &mut self.finalizer,
-            &mut self.deadline_timer,
             after_sources_ns,
         )?;
         let resumed_after_sources = self.flush_operation_waits_and_resume_at(
@@ -357,10 +346,22 @@ impl LinuxShutdownRuntime {
                 ),
             );
         }
-        if let Some(reboot) = &critical_budget_reboot {
-            crate::runtime::console::push_critical_budget_reboot_messages(
+        // The turn's final action comes last, and is announced before it is
+        // taken: `reboot(2)` does not return, and until this was ordered so
+        // nothing the finalising turn said reached the console — not "shutdown
+        // ready to finalize", not "shutdown finalizing", and not the name of
+        // the Critical service that took the machine down (PEI-827). Only
+        // what the action itself has to report, if it returns, is printed
+        // after it.
+        let finalization_now_ns = self
+            .clock
+            .monotonic_ns()
+            .map_err(RuntimeShutdownLoopError::Clock)?;
+        let pending = pending_shutdown_finalization(supervisor, finalization_now_ns);
+        if let Some(pending) = &pending {
+            crate::runtime::console::push_pending_shutdown_finalization_messages(
                 &mut console_messages,
-                &reboot.dispatch,
+                pending,
             );
         }
         // Records that could not fit one eventd datagram are gone for good,
@@ -390,6 +391,21 @@ impl LinuxShutdownRuntime {
             }
         }
         self.write_console_messages(console_messages);
+        turn.finalization = finalize_due_shutdown_at(
+            supervisor,
+            &mut self.finalizer,
+            &mut self.deadline_timer,
+            finalization_now_ns,
+        )?;
+        if let Some(finalization) = &turn.finalization {
+            emit_runtime_shutdown_finalization_kmes_events(&mut self.kmes_sink, finalization)?;
+            let mut after_action = Vec::new();
+            crate::runtime::console::collect_shutdown_finalization_turn_console_messages(
+                finalization,
+                &mut after_action,
+            );
+            self.write_console_messages(after_action);
+        }
         turn.sources.extend(calendar_sources);
         turn.turns
             .extend(calendar_turns.into_iter().map(|(fd, turn)| {

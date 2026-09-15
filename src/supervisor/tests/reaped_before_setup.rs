@@ -97,7 +97,7 @@ fn an_exit_reaped_before_the_setup_status_is_held_and_replayed() {
             },
             APP_LAUNCH_NS + 1,
             &mut controller,
-            &mut finalizer,
+            Some(&mut finalizer),
         )
         .expect("reap");
     assert!(
@@ -133,7 +133,12 @@ fn an_exit_reaped_before_the_setup_status_is_held_and_replayed() {
         }]
     );
     let replayed = supervisor
-        .apply_reaped_child(ready[0], APP_LAUNCH_NS + 3, &mut controller, &mut finalizer)
+        .apply_reaped_child(
+            ready[0],
+            APP_LAUNCH_NS + 3,
+            &mut controller,
+            Some(&mut finalizer),
+        )
         .expect("replay");
     assert!(matches!(replayed, SupervisorChildReapTurn::Tracked { .. }));
     assert!(
@@ -163,7 +168,7 @@ fn the_service_does_not_park_in_starting_when_it_loses_the_race() {
             },
             APP_LAUNCH_NS + 1,
             &mut controller,
-            &mut finalizer,
+            Some(&mut finalizer),
         )
         .expect("reap");
     supervisor
@@ -176,7 +181,12 @@ fn the_service_does_not_park_in_starting_when_it_loses_the_race() {
         .expect("complete setup");
     for child in supervisor.take_ready_deferred_reaps() {
         supervisor
-            .apply_reaped_child(child, APP_LAUNCH_NS + 3, &mut controller, &mut finalizer)
+            .apply_reaped_child(
+                child,
+                APP_LAUNCH_NS + 3,
+                &mut controller,
+                Some(&mut finalizer),
+            )
             .expect("replay");
     }
 
@@ -204,7 +214,7 @@ fn a_pid_with_no_pending_setup_is_still_untracked() {
             },
             APP_LAUNCH_NS + 1,
             &mut controller,
-            &mut finalizer,
+            Some(&mut finalizer),
         )
         .expect("reap");
     assert!(matches!(reap, SupervisorChildReapTurn::Untracked { .. }));

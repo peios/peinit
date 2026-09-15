@@ -1,6 +1,7 @@
 use crate::boundary::{ProcessController, ShutdownFinalizer};
 use crate::job::{JobEvent, JobExit, JobStore, JobStoreError};
 use crate::supervisor::cgroup_cleanup::{CgroupCleanupKind, record_cgroup_cleanup};
+use crate::supervisor::critical_budget::CriticalRebootTrigger;
 use crate::supervisor::dispatch::SupervisorHealthCheckTerminalDispatch;
 use crate::supervisor::relationships::apply_relationship_reactions_after_transitions;
 use crate::supervisor::state::{Supervisor, SupervisorError};
@@ -55,7 +56,7 @@ impl Supervisor {
         )
     }
 
-    fn apply_health_check_terminal_job_event<F, P>(
+    pub(in crate::supervisor) fn apply_health_check_terminal_job_event<F, P>(
         &mut self,
         job_id: crate::ids::JobId,
         observed_at_ns: u64,
@@ -124,8 +125,16 @@ impl Supervisor {
         }
 
         work.commit(self);
-        if critical_reboot_due && let Some(finalizer) = finalizer {
-            terminal.critical_reboot = Some(self.critical_reboot(finalizer, observed_at_ns)?);
+        if critical_reboot_due {
+            if let Some(finalizer) = finalizer {
+                terminal.critical_reboot = Some(self.critical_reboot(finalizer, observed_at_ns)?);
+            } else if let Some(service) = terminal.job_event.service.as_deref() {
+                self.note_deferred_critical_reboot(
+                    service,
+                    CriticalRebootTrigger::HealthCheckFailure,
+                    terminal.job_event.ended_at_ns,
+                );
+            }
         }
 
         Ok(terminal)

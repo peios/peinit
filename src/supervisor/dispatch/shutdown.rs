@@ -108,7 +108,9 @@ pub struct SupervisorShutdownFinalizationDispatch {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SupervisorImmediateShutdownDispatch {
     pub killed_services: Vec<SupervisorShutdownCgroupKillDispatch>,
-    pub finalization: SupervisorShutdownFinalizationDispatch,
+    /// The final action, where the caller asked for it to be attempted at
+    /// once; `None` when it was left to the end of the runtime's turn.
+    pub finalization: Option<SupervisorShutdownFinalizationDispatch>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

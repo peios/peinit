@@ -20,7 +20,9 @@ pub(crate) use event_loop::process_runtime_shutdown_sources_with_registry;
 #[cfg(any(test, feature = "peios-boundary"))]
 pub(crate) use event_loop::resume_buffered_control_frames;
 #[cfg(feature = "peios-boundary")]
-pub(crate) use kmes::collect_runtime_loop_kmes_events;
+pub(crate) use kmes::{
+    collect_runtime_loop_kmes_events, collect_runtime_shutdown_finalization_kmes_events,
+};
 pub(crate) use turn::{register_filesystem_check_helper_sources, register_process_setup_sources};
 
 pub use event_loop::{
@@ -47,14 +49,14 @@ pub(crate) use turn::{
     NoRuntimeRegistryClient, process_registry_watch_event, process_runtime_control_connection_event,
 };
 pub use turn::{
-    RuntimeCalendarTimerTurn, RuntimeCriticalBudgetRebootTurn, RuntimeEventRegistrar,
-    RuntimeEventRegistrationError, RuntimeFilesystemCheckHelperTurn, RuntimeLifecycleDeadlineTimer,
-    RuntimeNotifyDatagram, RuntimeNotifyRead, RuntimeNotifyRejection, RuntimeNotifySource,
-    RuntimeNotifySupervisorTurn, RuntimePid1SignalSource, RuntimePowerButtonSource,
+    RuntimeCalendarTimerTurn, RuntimeEventRegistrar, RuntimeEventRegistrationError,
+    RuntimeFilesystemCheckHelperTurn, RuntimeLifecycleDeadlineTimer, RuntimeNotifyDatagram,
+    RuntimeNotifyRead, RuntimeNotifyRejection, RuntimeNotifySource, RuntimeNotifySupervisorTurn,
+    RuntimePendingShutdownFinalization, RuntimePid1SignalSource, RuntimePowerButtonSource,
     RuntimePowerButtonTurn, RuntimeProcessSetupTurn, RuntimeRegistryWatchTurn,
     RuntimeShutdownDeadlineTimer, RuntimeShutdownEventContext, RuntimeShutdownEventSources,
-    RuntimeShutdownEventTurn, RuntimeShutdownEventTurnError, process_due_critical_budget_reboot,
-    process_runtime_shutdown_event,
+    RuntimeShutdownEventTurn, RuntimeShutdownEventTurnError, RuntimeShutdownFinalizationTurn,
+    finalize_due_shutdown, pending_shutdown_finalization, process_runtime_shutdown_event,
 };
 pub use work_pump::{
     RuntimeWorkPumpConfig, RuntimeWorkPumpContext, RuntimeWorkPumpError, RuntimeWorkPumpTurn,

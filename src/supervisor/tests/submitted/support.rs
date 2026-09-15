@@ -362,7 +362,7 @@ pub(super) fn reap(
             ChildReap { pid, status },
             ended_at_ns,
             controller,
-            &mut NoopFinalizer,
+            Some(&mut NoopFinalizer),
         )
         .expect("reap")
 }

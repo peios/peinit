@@ -54,10 +54,114 @@ pub(super) fn critical_budget_reboot_owed(services: &ServiceTable, service: &str
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SupervisorCriticalBudgetRebootDispatch {
     pub service: String,
+    /// What spent the last of the budget, where the path that observed it
+    /// left the reboot to this pass (see [`CriticalRebootTrigger`]).
+    pub trigger: CriticalRebootTrigger,
+    /// When that was observed, if the path recorded a time.
+    pub observed_at_ns: Option<u64>,
     pub finalization: SupervisorShutdownFinalizationDispatch,
 }
 
+/// What exhausted a Critical service's restart budget.
+///
+/// The paths that watch a running service — its main job ending, a health
+/// check failing or timing out, the watchdog expiring — used to finalise the
+/// reboot inline, and named themselves in the console line and the
+/// `critical.failure` audit event. The runtime now leaves every reboot to the
+/// end of its turn, so that the turn's console output is written before the
+/// action that does not return (PEI-827); the trigger travels with it so the
+/// operator and the audit log still learn what happened, not just that the
+/// budget ran out.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CriticalRebootTrigger {
+    ServiceMainTerminal,
+    HealthCheckFailure,
+    WatchdogTimeout,
+    /// Exhausted by a failure before the service ran — a readiness, hook or
+    /// check timeout — where only the budget itself is the news.
+    RestartBudgetExhausted,
+}
+
+impl CriticalRebootTrigger {
+    /// The `trigger` field of the `critical.failure` audit event.
+    pub fn kmes_id(self) -> &'static str {
+        match self {
+            Self::ServiceMainTerminal => "service_main_terminal",
+            Self::HealthCheckFailure => "health_check_failure",
+            Self::WatchdogTimeout => "watchdog_timeout",
+            Self::RestartBudgetExhausted => "restart_budget_exhausted",
+        }
+    }
+
+    /// The reason in the "critical service X failed" console line, or `None`
+    /// where the budget line says all there is.
+    pub fn console_reason(self) -> Option<&'static str> {
+        match self {
+            Self::ServiceMainTerminal => Some("service main exited"),
+            Self::HealthCheckFailure => Some("health check failed"),
+            Self::WatchdogTimeout => Some("watchdog timeout"),
+            Self::RestartBudgetExhausted => None,
+        }
+    }
+}
+
+/// A Critical reboot a path observed but left to the reconciliation pass.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct DeferredCriticalReboot {
+    pub service: String,
+    pub trigger: CriticalRebootTrigger,
+    pub observed_at_ns: Option<u64>,
+}
+
+/// A Critical reboot the reconciliation pass would raise now.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CriticalRebootOwed {
+    pub service: String,
+    pub trigger: CriticalRebootTrigger,
+}
+
 impl Supervisor {
+    /// Remember a Critical reboot a path observed and was asked not to
+    /// finalise, so the reconciliation pass can name what caused it.
+    pub(super) fn note_deferred_critical_reboot(
+        &mut self,
+        service: &str,
+        trigger: CriticalRebootTrigger,
+        observed_at_ns: Option<u64>,
+    ) {
+        self.deferred_critical_reboot = Some(DeferredCriticalReboot {
+            service: service.to_string(),
+            trigger,
+            observed_at_ns,
+        });
+    }
+
+    /// The Critical reboot [`Self::process_due_critical_budget_reboot`] would
+    /// raise if called now, without raising it.
+    ///
+    /// For the runtime to announce the reboot on the console before it
+    /// happens: the action does not return, so anything said afterwards is
+    /// never heard.
+    pub fn critical_budget_reboot_owed(&self) -> Option<CriticalRebootOwed> {
+        if self.shutdown().is_some() {
+            return None;
+        }
+        let service = self
+            .services
+            .service_names()
+            .into_iter()
+            .find(|service| critical_budget_reboot_owed(&self.services, service))?
+            .to_string();
+        let trigger = self
+            .deferred_critical_reboot
+            .as_ref()
+            .filter(|deferred| deferred.service == service)
+            .map_or(CriticalRebootTrigger::RestartBudgetExhausted, |deferred| {
+                deferred.trigger
+            });
+        Some(CriticalRebootOwed { service, trigger })
+    }
+
     /// Reboot if a Critical service has exhausted its restart budget.
     ///
     /// Runs once per runtime turn, after the turn's events have been applied.
@@ -76,21 +180,22 @@ impl Supervisor {
     where
         F: ShutdownFinalizer + ?Sized,
     {
-        if self.shutdown().is_some() {
-            return Ok(None);
-        }
-        let Some(service) = self
-            .services
-            .service_names()
-            .into_iter()
-            .find(|service| critical_budget_reboot_owed(&self.services, service))
-            .map(ToString::to_string)
-        else {
+        let Some(owed) = self.critical_budget_reboot_owed() else {
+            // Whatever was deferred is settled: either the shutdown that was
+            // installed for it is under way, or the service has moved on.
+            self.deferred_critical_reboot = None;
             return Ok(None);
         };
+        let observed_at_ns = self
+            .deferred_critical_reboot
+            .take()
+            .filter(|deferred| deferred.service == owed.service)
+            .and_then(|deferred| deferred.observed_at_ns);
         let finalization = self.critical_reboot(finalizer, now_ns)?;
         Ok(Some(SupervisorCriticalBudgetRebootDispatch {
-            service,
+            service: owed.service,
+            trigger: owed.trigger,
+            observed_at_ns,
             finalization,
         }))
     }

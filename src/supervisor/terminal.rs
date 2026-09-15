@@ -4,6 +4,7 @@ use crate::execution::start::StartReadyContext;
 use crate::ids::JobId;
 use crate::job::JobExit;
 
+use super::critical_budget::CriticalRebootTrigger;
 use super::dispatch::SupervisorTerminalDispatch;
 use super::health::apply_health_scheduling_after_transitions;
 use super::relationships::apply_relationship_reactions_after_transitions;
@@ -140,7 +141,7 @@ impl Supervisor {
         self.apply_terminal_job_event(event, finalizer, &mut controller)
     }
 
-    fn apply_terminal_job_event_with_controller<F, P>(
+    pub(super) fn apply_terminal_job_event_with_controller<F, P>(
         &mut self,
         event: F,
         finalizer: Option<&mut dyn ShutdownFinalizer>,
@@ -215,6 +216,13 @@ impl Supervisor {
             let critical_reboot = if let Some(finalizer) = finalizer {
                 Some(self.critical_reboot(finalizer, terminal_event_time)?)
             } else {
+                if let Some(service) = terminal.job_event.service.as_deref() {
+                    self.note_deferred_critical_reboot(
+                        service,
+                        CriticalRebootTrigger::ServiceMainTerminal,
+                        terminal.job_event.ended_at_ns,
+                    );
+                }
                 None
             };
             return Ok(SupervisorTerminalDispatch {

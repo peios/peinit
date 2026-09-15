@@ -9,8 +9,8 @@ use crate::control::system::{ControlSecurityDescriptor, SystemAccessChecker};
 use crate::runtime::{
     RuntimeEventRegistrar, RuntimeEventRegistrationError, RuntimeEventSource,
     RuntimeEventSourceDecodeError, RuntimeEventdLogFlush, RuntimeShutdownEventContext,
-    RuntimeShutdownEventTurn, RuntimeShutdownEventTurnError, RuntimeWorkPumpConfig,
-    RuntimeWorkPumpContext, RuntimeWorkPumpError, RuntimeWorkPumpTurn,
+    RuntimeShutdownEventTurn, RuntimeShutdownEventTurnError, RuntimeShutdownFinalizationTurn,
+    RuntimeWorkPumpConfig, RuntimeWorkPumpContext, RuntimeWorkPumpError, RuntimeWorkPumpTurn,
 };
 
 const EPOLL_WAIT_FOREVER_MS: i32 = -1;
@@ -180,6 +180,10 @@ pub struct RuntimeShutdownLoopTurn {
     pub turns: Vec<RuntimeShutdownEventTurn>,
     pub post_work: RuntimeWorkPumpTurn,
     pub eventd_flush: RuntimeEventdLogFlush,
+    /// The final action the turn ended in, if one was due and returned.
+    /// Taken by the Linux runtime after the turn's console output is
+    /// written, so it is set there and not by the source processing.
+    pub finalization: Option<RuntimeShutdownFinalizationTurn>,
 }
 
 #[derive(Debug)]
@@ -194,6 +198,9 @@ pub enum RuntimeShutdownLoopError {
     OperationMaintenance(crate::supervisor::SupervisorError),
     /// Applying an exit that was reaped before its job carried a pid.
     DeferredChildReap(crate::supervisor::SupervisorError),
+    /// The final action at the end of the turn: a shutdown's, or the reboot
+    /// for a Critical service out of restart budget.
+    Finalization(crate::supervisor::SupervisorError),
     ControlWait(crate::supervisor::SupervisorControlWaitFlushError),
     JobsWait(crate::runtime::RuntimeJobsChannelError),
     Event {

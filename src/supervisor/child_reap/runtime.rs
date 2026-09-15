@@ -7,18 +7,17 @@ use super::model::SupervisorChildReapDispatch;
 use super::signal::signal_failure_cause;
 
 impl Supervisor {
-    pub(super) fn apply_runtime_reaped_job<P, F>(
+    pub(super) fn apply_runtime_reaped_job<P>(
         &mut self,
         job_id: JobId,
         job_type: JobType,
         status: ChildExitStatus,
         ended_at_ns: u64,
         controller: &mut P,
-        finalizer: &mut F,
+        finalizer: Option<&mut dyn ShutdownFinalizer>,
     ) -> Result<SupervisorChildReapDispatch, SupervisorError>
     where
         P: ProcessController + ?Sized,
-        F: ShutdownFinalizer,
     {
         match job_type {
             JobType::ServiceMain => Ok(SupervisorChildReapDispatch::Runtime(Box::new(
@@ -81,60 +80,73 @@ impl Supervisor {
             JobType::HealthCheck => Ok(SupervisorChildReapDispatch::HealthCheck(Box::new(
                 match status {
                     ChildExitStatus::Exited { code } => self
-                        .complete_health_check_job_with_shutdown_finalizer(
+                        .apply_health_check_terminal_job_event(
                             job_id,
                             ended_at_ns,
-                            code,
                             controller,
                             finalizer,
+                            |jobs| jobs.complete_job(job_id, ended_at_ns, code),
                         )?,
                     ChildExitStatus::Signaled {
                         signal,
                         core_dumped,
-                    } => self.fail_running_health_check_job_with_shutdown_finalizer(
-                        job_id,
-                        ended_at_ns,
-                        Some(JobExit::Signal(signal)),
-                        signal_failure_cause(signal, core_dumped),
-                        controller,
-                        finalizer,
-                    )?,
+                    } => {
+                        let failure_cause = signal_failure_cause(signal, core_dumped);
+                        self.apply_health_check_terminal_job_event(
+                            job_id,
+                            ended_at_ns,
+                            controller,
+                            finalizer,
+                            |jobs| {
+                                jobs.fail_running_job(
+                                    job_id,
+                                    ended_at_ns,
+                                    Some(JobExit::Signal(signal)),
+                                    failure_cause,
+                                )
+                            },
+                        )?
+                    }
                 },
             ))),
         }
     }
 
-    fn apply_service_main_reap<P, F>(
+    fn apply_service_main_reap<P>(
         &mut self,
         job_id: JobId,
         status: ChildExitStatus,
         ended_at_ns: u64,
         controller: &mut P,
-        finalizer: &mut F,
+        finalizer: Option<&mut dyn ShutdownFinalizer>,
     ) -> Result<super::super::dispatch::SupervisorTerminalDispatch, SupervisorError>
     where
         P: ProcessController + ?Sized,
-        F: ShutdownFinalizer,
     {
         match status {
-            ChildExitStatus::Exited { code } => self.complete_job_with_runtime_context(
-                job_id,
-                ended_at_ns,
-                code,
-                controller,
+            ChildExitStatus::Exited { code } => self.apply_terminal_job_event_with_controller(
+                |jobs| jobs.complete_job(job_id, ended_at_ns, code),
                 finalizer,
+                controller,
             ),
             ChildExitStatus::Signaled {
                 signal,
                 core_dumped,
-            } => self.fail_running_job_with_runtime_context(
-                job_id,
-                ended_at_ns,
-                Some(JobExit::Signal(signal)),
-                signal_failure_cause(signal, core_dumped),
-                controller,
-                finalizer,
-            ),
+            } => {
+                let failure_cause = signal_failure_cause(signal, core_dumped);
+                self.apply_terminal_job_event_with_controller(
+                    |jobs| {
+                        jobs.fail_running_job(
+                            job_id,
+                            ended_at_ns,
+                            Some(JobExit::Signal(signal)),
+                            failure_cause,
+                        )
+                    },
+                    finalizer,
+                    controller,
+                )
+            }
         }
     }
 }

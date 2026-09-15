@@ -40,16 +40,21 @@ impl Supervisor {
             .collect()
     }
 
-    pub fn apply_reaped_child<P, F>(
+    /// Apply a reaped child's exit to the job that owns its pid.
+    ///
+    /// The finalizer is for the reboot a Critical service earns by running
+    /// out of restart budget here; given `None`, that reboot is left to
+    /// [`Self::process_due_critical_budget_reboot`], which the runtime runs
+    /// at the end of its turn once the turn's console output is written.
+    pub fn apply_reaped_child<P>(
         &mut self,
         child: ChildReap,
         ended_at_ns: u64,
         controller: &mut P,
-        finalizer: &mut F,
+        finalizer: Option<&mut dyn ShutdownFinalizer>,
     ) -> Result<SupervisorChildReapTurn, SupervisorError>
     where
         P: ProcessController + ?Sized,
-        F: ShutdownFinalizer,
     {
         let Some(job_id) = self.jobs.active_job_by_pid(child.pid) else {
             // No job carries this pid *yet*. A launched process is only findable

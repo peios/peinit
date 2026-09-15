@@ -115,7 +115,6 @@ where
             &mut *sources.deadline_timer,
             context.clock,
             context.controller,
-            context.finalizer,
         ),
         RuntimeEventSource::LifecycleDeadlineTimer => process_lifecycle_deadline_timer_event(
             supervisor,

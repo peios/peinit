@@ -33,7 +33,6 @@ where
     let RuntimeShutdownEventContext {
         clock,
         controller,
-        finalizer,
         registrar,
         boot_attempt_counter,
         ..
@@ -46,11 +45,13 @@ where
             let now_ns = clock.monotonic_ns().map_err(|error| {
                 RuntimeShutdownEventTurnError::Supervisor(SupervisorError::Clock(error))
             })?;
+            // No finalizer: a Critical reboot a deadline earns is left to the
+            // end of the turn, after the console has been written (PEI-827).
             let dispatch = supervisor
                 .process_due_lifecycle_deadlines_with_finalizer(
                     controller,
                     boot_attempt_counter,
-                    Some(finalizer),
+                    None,
                     now_ns,
                 )
                 .map_err(RuntimeShutdownEventTurnError::Supervisor)?;

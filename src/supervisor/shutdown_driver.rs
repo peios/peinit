@@ -1,7 +1,7 @@
 use crate::boundary::{ProcessController, ShutdownFinalizer};
 use crate::shutdown::{ShutdownDeadline, ShutdownDeadlineKind, ShutdownFinalizationState};
 
-use super::dispatch::SupervisorShutdownDriveDispatch;
+use super::dispatch::{SupervisorShutdownDriveDispatch, SupervisorShutdownFinalizationDispatch};
 use super::state::{Supervisor, SupervisorError};
 
 impl Supervisor {
@@ -65,25 +65,30 @@ impl Supervisor {
             .min_by_key(|deadline| (deadline.due_at_ns, deadline_sort_key(&deadline.kind)))
     }
 
-    pub fn drive_shutdown<P, F>(
+    /// Process the shutdown work due at `now_ns`: the stop and post-kill
+    /// timeouts, and — given a finalizer — the final action if it is due.
+    ///
+    /// Given `None`, the final action is left for
+    /// [`Self::finalize_due_shutdown`]. The runtime drives its turn that way,
+    /// so the turn's console output can be written before an action that
+    /// does not return (PEI-827).
+    pub fn drive_shutdown<P>(
         &mut self,
         controller: &mut P,
-        finalizer: &mut F,
+        finalizer: Option<&mut dyn ShutdownFinalizer>,
         now_ns: u64,
     ) -> Result<Option<SupervisorShutdownDriveDispatch>, SupervisorError>
     where
         P: ProcessController + ?Sized,
-        F: ShutdownFinalizer + ?Sized,
     {
         if self.shutdown.is_none() {
             return Ok(None);
         }
 
         let timeout = self.process_due_shutdown_timeouts(controller, now_ns)?;
-        let finalization = if shutdown_finalization_due(self, now_ns) {
-            Some(self.finalize_shutdown(finalizer, now_ns)?)
-        } else {
-            None
+        let finalization = match finalizer {
+            Some(finalizer) => self.finalize_due_shutdown(finalizer, now_ns)?,
+            None => None,
         };
 
         if timeout.is_none() && finalization.is_none() {
@@ -95,15 +100,33 @@ impl Supervisor {
             }))
         }
     }
-}
 
-fn shutdown_finalization_due(supervisor: &Supervisor, now_ns: u64) -> bool {
-    match supervisor.shutdown().map(|shutdown| &shutdown.finalization) {
-        Some(ShutdownFinalizationState::Ready) => true,
-        Some(ShutdownFinalizationState::Failed {
-            next_retry_at_ns, ..
-        }) => now_ns >= *next_retry_at_ns,
-        _ => false,
+    /// Run the final action if the shutdown is ready for it, or a failed one
+    /// is due its retry; nothing otherwise.
+    pub fn finalize_due_shutdown<F>(
+        &mut self,
+        finalizer: &mut F,
+        now_ns: u64,
+    ) -> Result<Option<SupervisorShutdownFinalizationDispatch>, SupervisorError>
+    where
+        F: ShutdownFinalizer + ?Sized,
+    {
+        if self.shutdown_finalization_due(now_ns) {
+            Ok(Some(self.finalize_shutdown(finalizer, now_ns)?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Whether [`Self::finalize_due_shutdown`] would act now.
+    pub fn shutdown_finalization_due(&self, now_ns: u64) -> bool {
+        match self.shutdown().map(|shutdown| &shutdown.finalization) {
+            Some(ShutdownFinalizationState::Ready) => true,
+            Some(ShutdownFinalizationState::Failed {
+                next_retry_at_ns, ..
+            }) => now_ns >= *next_retry_at_ns,
+            _ => false,
+        }
     }
 }
 
