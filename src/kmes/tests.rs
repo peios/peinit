@@ -106,6 +106,7 @@ fn encodes_operation_terminal_payload() {
         caller: Some(token("SYSTEM")),
         result: Some("started".to_string()),
         merged_into: None,
+        service_security: None,
     })
     .expect("operation event");
 

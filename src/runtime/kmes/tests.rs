@@ -197,6 +197,7 @@ fn completed_operation(id: crate::ids::OperationId, service: &str) -> OperationE
         caller: None,
         result: Some("timed out".to_string()),
         merged_into: None,
+        service_security: None,
     })
     .expect("completed operation")
 }
@@ -214,6 +215,7 @@ fn requested_operation(id: crate::ids::OperationId, service: &str) -> OperationE
         caller: None,
         result: None,
         merged_into: None,
+        service_security: None,
     })
 }
 

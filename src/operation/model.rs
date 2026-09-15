@@ -1,5 +1,6 @@
 use crate::ids::OperationId;
 use crate::security::TokenSummary;
+use crate::service::ServiceSecurityDescriptor;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OperationType {
@@ -60,6 +61,19 @@ pub struct OperationRecord {
     pub caller: Option<TokenSummary>,
     pub result: Option<String>,
     pub merged_into: Option<OperationId>,
+    /// The target service's effective `ServiceSecurity` when the operation
+    /// was created.
+    ///
+    /// A terminal operation is retained after its service can have been
+    /// discarded — a restart aborted because its definition was withdrawn
+    /// mid-stop is the documented case (§8.2) — and `operation-status`
+    /// checks `SERVICE_QUERY_STATUS` against the target. With the service
+    /// gone there was nothing to check against, and the query answered
+    /// `UNKNOWN_SERVICE` for an operation peinit still held (PEI-1076).
+    /// Recorded here so the operation stays queryable by exactly whoever
+    /// could have queried the service while it existed. `None` only until
+    /// the supervisor commits the transaction that created the record.
+    pub service_security: Option<ServiceSecurityDescriptor>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

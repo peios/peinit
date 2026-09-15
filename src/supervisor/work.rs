@@ -110,8 +110,13 @@ impl SupervisorWork {
     pub fn commit(self, supervisor: &mut Supervisor) {
         let mut fd_store = self.fd_store;
         fd_store.retain_services(&self.services.service_names());
+        // Every operation is requested inside a transaction, so this is the
+        // one place an operation created anywhere learns its target's
+        // descriptor while the target is still in the table (PEI-1076).
+        let mut operations = self.operations;
+        operations.adopt_service_security(&self.services);
         supervisor.services = self.services;
-        supervisor.operations = self.operations;
+        supervisor.operations = operations;
         supervisor.jobs = self.jobs;
         supervisor.graph = self.graph;
         supervisor.control = self.control;

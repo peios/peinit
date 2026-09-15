@@ -25,6 +25,7 @@ impl OperationRecord {
             caller,
             result: None,
             merged_into: None,
+            service_security: None,
         }
     }
 }
