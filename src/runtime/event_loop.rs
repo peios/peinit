@@ -7,7 +7,9 @@ pub use model::{
     RuntimeEventWaiter, RuntimeShutdownLoopContext, RuntimeShutdownLoopError,
     RuntimeShutdownLoopTurn,
 };
-pub(crate) use prepare::{prepare_runtime_shutdown_loop_turn, resume_buffered_control_frames};
+pub(crate) use prepare::prepare_runtime_shutdown_loop_turn;
+#[cfg(any(test, feature = "peios-boundary"))]
+pub(crate) use prepare::resume_buffered_control_frames;
 #[cfg(any(test, feature = "peios-boundary"))]
 pub(crate) use sources::process_runtime_shutdown_sources_with_registry;
 
