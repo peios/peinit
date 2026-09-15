@@ -252,6 +252,7 @@ fn an_undecodable_definition_fails_only_that_service() {
     let other = ServiceDefinition::simple_system_boot("other", "/sbin/other");
     let undecodable = [UndecodableService {
         name: "broken".to_string(),
+        field: None,
         message: "unclosed double quote in ImagePath".to_string(),
     }];
 
@@ -296,6 +297,7 @@ fn a_dependent_of_an_undecodable_definition_fails_through_dependency_failure() {
     let unrelated = ServiceDefinition::simple_system_boot("unrelated", "/sbin/unrelated");
     let undecodable = [UndecodableService {
         name: "broken".to_string(),
+        field: None,
         message: "invalid service name".to_string(),
     }];
 

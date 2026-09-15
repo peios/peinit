@@ -508,3 +508,44 @@ fn jobs_socket_path_is_a_separate_global() {
         std::path::PathBuf::from(crate::control::socket::CONTROL_SOCKET_PATH)
     );
 }
+
+/// PEI-621: the human rendering of a reload says which keys would not
+/// decode, and why, rather than leaving the operator with a count.
+#[test]
+fn human_reload_config_lists_undecodable_definitions() {
+    let Some(server) = MockControlServer::start(
+        |request| {
+            assert_eq!(request["command"], "reload-config");
+        },
+        r#"{"status":"ok","summary":{"added":["new"],"updated":[],"restored":[],"marked_removed":[],"discarded":[],"undecodable":["broken","worse"]},"undecodable":[{"service":"broken","field":"ImagePath","message":"MalformedString { field: \"ImagePath\", reason: MissingTerminator }"},{"service":"worse","field":null,"message":"MissingImagePath"}],"warnings":[]}"#,
+    ) else {
+        return;
+    };
+
+    let mut out = Vec::new();
+    let mut err = Vec::new();
+    let code = run_with_io(
+        [
+            OsString::from("svctl"),
+            OsString::from("--socket"),
+            server.path().into_os_string(),
+            OsString::from("reload-config"),
+        ],
+        &mut out,
+        &mut err,
+    );
+
+    assert_eq!(code, 0);
+    let out = String::from_utf8(out).expect("stdout utf8");
+    assert!(out.starts_with("configuration reloaded\n"), "{out}");
+    assert!(out.contains("added: 1\n"), "{out}");
+    assert!(out.contains("undecodable: 2\n"), "{out}");
+    assert!(
+        out.contains(
+            "undecodable definitions:\n  broken (ImagePath): MalformedString { field: \"ImagePath\", reason: MissingTerminator }\n  worse: MissingImagePath\n"
+        ),
+        "{out}"
+    );
+    assert!(err.is_empty());
+    server.join();
+}

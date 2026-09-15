@@ -1,8 +1,8 @@
-use crate::boundary::{BoundaryError, RegistryClient};
+use crate::boundary::{RegistryClient, UndecodableService};
 use crate::logging::RuntimeLogConfig;
 use crate::registry::services_schema_warnings;
 use crate::registry::{RegistryConfigWarning, read_log_config_from_registry};
-use crate::service::{ServiceTable, validate_service_graph};
+use crate::service::{ServiceDefinition, ServiceTable, validate_service_graph};
 use crate::shutdown::ShutdownSettings;
 
 use super::model::{ReloadConfigError, ReloadConfigOutcome};
@@ -17,16 +17,14 @@ where
     let services_schema_version = registry
         .read_services_schema_version()
         .map_err(ReloadConfigError::Registry)?;
+    // Per key, as the boot read is (§2.5): a key that will not decode fails
+    // that one service and the rest of the batch still loads. Refusing the
+    // whole reload instead meant one typo silently stopped every unrelated
+    // definition the operator was actually trying to load (PEI-621).
     let definitions_read = registry
         .read_service_definitions_partial()
         .map_err(ReloadConfigError::Registry)?;
-    // The strict view, until PEI-621: any undecodable key fails the whole
-    // reload, so the transaction aborts and the running configuration stands.
-    if let Some(first) = definitions_read.undecodable.first() {
-        return Err(ReloadConfigError::Registry(BoundaryError::Registry(
-            format!("service {} failed to decode: {}", first.name, first.message),
-        )));
-    }
+    let undecodable = definitions_read.undecodable;
     let mut definitions = definitions_read.definitions;
     // The compiled-in registryd is absent from every registry snapshot, and a
     // reload that changes the Services-key descriptor has to reach it as it
@@ -52,10 +50,17 @@ where
         .read_global_environment()
         .map_err(ReloadConfigError::Registry)?;
     let eventd_log_socket_path = registry.read_eventd_log_socket_path().unwrap_or(None);
-    let validation = validate_service_graph(&definitions).map_err(ReloadConfigError::Validation)?;
+    // Validated with a stand-in for each undecodable key, so that a
+    // dependent's `Requires` on one is not a missing hard dependency that
+    // refuses the reload: the boot path blocks such a dependent and carries
+    // on, and the dependent here fails the same way, through the ordinary
+    // propagation from a Failed target, when it is next asked to start.
+    let validation =
+        validate_service_graph(&definitions_with_placeholders(&definitions, &undecodable))
+            .map_err(ReloadConfigError::Validation)?;
     let mut next_services = services.clone();
     let summary = next_services
-        .apply_definition_snapshot(definitions)
+        .apply_definition_snapshot_with_undecodable(definitions, &undecodable)
         .map_err(ReloadConfigError::ServiceTable)?;
 
     *services = next_services;
@@ -74,7 +79,21 @@ where
         global_environment,
         eventd_log_socket_path,
         warnings: validation.warnings,
+        undecodable,
     })
+}
+
+fn definitions_with_placeholders(
+    definitions: &[ServiceDefinition],
+    undecodable: &[UndecodableService],
+) -> Vec<ServiceDefinition> {
+    definitions
+        .iter()
+        .cloned()
+        .chain(undecodable.iter().map(|service| {
+            ServiceDefinition::undecodable_placeholder(&service.name, &service.message)
+        }))
+        .collect()
 }
 
 fn read_log_config<R>(

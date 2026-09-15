@@ -3,7 +3,8 @@ use crate::control::lifecycle::LifecycleCommandOutcome;
 use crate::control::reload_config::{ReloadConfigError, ReloadConfigOutcome};
 use crate::kmes::{
     encode_graph_validation_error_event, encode_graph_validation_warning_event,
-    encode_service_access_denied_event, encode_system_access_denied_event,
+    encode_reload_undecodable_service_event, encode_service_access_denied_event,
+    encode_system_access_denied_event,
 };
 use crate::supervisor::{
     SupervisorControlCommandBodyError, SupervisorControlCommandDispatch,
@@ -150,6 +151,12 @@ fn collect_reload_config_warnings(
     outcome: &ReloadConfigOutcome,
     out: &mut Vec<KmesEvent>,
 ) -> Result<(), BoundaryError> {
+    // A key that would not decode has failed its service (§2.5), and that
+    // is a validation error for the audit trail exactly as it is at boot
+    // (PEI-621).
+    for service in &outcome.undecodable {
+        out.push(encode_reload_undecodable_service_event(service)?);
+    }
     for warning in &outcome.warnings {
         out.push(encode_graph_validation_warning_event(
             "reload_config",

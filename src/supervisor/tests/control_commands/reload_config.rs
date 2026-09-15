@@ -4,6 +4,7 @@ use crate::control::socket::ControlSocketLimits;
 use crate::control::system::ControlPeer;
 use crate::control::system::ControlSecurityDescriptor;
 use crate::service::ServiceEnvironmentVariable;
+use crate::service::runtime::{ServiceState, TransitionCause};
 use crate::shutdown::ShutdownKind;
 use crate::supervisor::{
     SupervisorControlCommandBodyContext, SupervisorControlCommandBodyResponse,
@@ -306,4 +307,64 @@ fn status_query_is_allowed_during_shutdown() {
 
 fn control_peer() -> ControlPeer {
     super::support::control_peer()
+}
+
+/// PEI-621: the wire response names each key that would not decode, with
+/// the field and the problem, so the operator learns which and why rather
+/// than `INTERNAL_ERROR: control request failed` — and the reload is
+/// accepted, with the well-formed definitions in the same batch applied.
+#[test]
+fn reload_config_reports_undecodable_definitions_in_the_response() {
+    let mut supervisor = booted_supervisor(vec![inactive_alive_service("app")]);
+    let mut registry = StaticRegistry::services(vec![
+        inactive_alive_service("app"),
+        inactive_alive_service("new"),
+    ])
+    .with_undecodable("broken", "MalformedString { field: \"ImagePath\" }");
+    let mut access = TestAccessChecker::allow_all();
+    let mut controller = TestProcessController::default();
+    let mut clock = ScriptedClock::new([2_001]);
+    let peer = control_peer();
+
+    let response = supervisor
+        .run_checked_control_body_with_response(
+            br#"{"command":"reload-config"}"#,
+            SupervisorControlCommandBodyContext {
+                peer: &peer,
+                control_security: &DEFAULT_CONTROL_SECURITY,
+                access_checker: &mut access,
+                controller: &mut controller,
+                clock: &mut clock,
+                registry: Some(&mut registry),
+            },
+        )
+        .expect("response");
+
+    let SupervisorControlCommandBodyResponse::Accepted {
+        response_line: Some(response_line),
+        ..
+    } = response
+    else {
+        panic!("expected an accepted reload-config, got {response:?}");
+    };
+    let json = response_json(&response_line);
+    assert_eq!(json["status"], "ok");
+    assert_eq!(json["summary"]["added"], serde_json::json!(["new"]));
+    assert_eq!(
+        json["summary"]["undecodable"],
+        serde_json::json!(["broken"])
+    );
+    assert_eq!(
+        json["undecodable"],
+        serde_json::json!([{
+            "service": "broken",
+            "field": null,
+            "message": "MalformedString { field: \"ImagePath\" }",
+        }])
+    );
+    assert!(supervisor.services().get("new").is_some());
+    let broken = supervisor.service_status("broken").expect("placeholder");
+    assert_eq!(broken.state, ServiceState::Failed);
+    assert_eq!(broken.cause, Some(TransitionCause::ValidationError));
+    assert!(broken.definition_removed);
 }

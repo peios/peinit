@@ -105,6 +105,41 @@ pub enum ServiceRegistryDecodeError {
     },
 }
 
+impl ServiceRegistryDecodeError {
+    /// The registry value the failure is about, when it is about one value.
+    ///
+    /// `None` for faults of the key as a whole — an invalid service name, a
+    /// missing `ImagePath`, a bad trigger or reload signal — where naming a
+    /// field would point the operator at the wrong thing (PEI-621).
+    pub fn field(&self) -> Option<&'static str> {
+        match self {
+            Self::MissingProvisionedPathField { field, .. }
+            | Self::DuplicateField { field }
+            | Self::TypeMismatch { field, .. }
+            | Self::MalformedString { field, .. }
+            | Self::MalformedMultiString { field, .. }
+            | Self::MalformedDword { field, .. }
+            | Self::UnknownDword { field, .. }
+            | Self::InvalidListEntry { field, .. }
+            | Self::InvalidServiceReference { field, .. }
+            | Self::InvalidAbsolutePath { field, .. }
+            | Self::InvalidRuntimeDirectory { field, .. }
+            | Self::InvalidExecutableCommand { field, .. }
+            | Self::InvalidCheck { field, .. }
+            | Self::NonCachedRegistryCheck { field, .. }
+            | Self::FieldRequiresTtyPath { field } => Some(field),
+            Self::InvalidServiceName { .. }
+            | Self::InvalidProvisionedPathName { .. }
+            | Self::MissingImagePath
+            | Self::InvalidSuccessExitCode { .. }
+            | Self::InvalidEnvironmentVariable { .. }
+            | Self::InvalidTrigger { .. }
+            | Self::InvalidProvisionedPathKind { .. }
+            | Self::InvalidReloadSignal { .. } => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RegistryStringDecodeError {
     MissingTerminator,

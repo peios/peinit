@@ -1,7 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::boundary::UndecodableService;
 use crate::service::definition::{ServiceDefinition, ServiceSecurityDescriptor};
-use crate::service::runtime::ServiceRuntimeSnapshot;
+use crate::service::runtime::{ServiceRuntimeSnapshot, TransitionCause};
 use crate::service::synthesise_role_dependencies;
 
 use super::ServiceTable;
@@ -14,6 +15,27 @@ impl ServiceTable {
         &mut self,
         definitions: Vec<ServiceDefinition>,
     ) -> Result<ServiceReloadSummary, ServiceTableError> {
+        self.apply_definition_snapshot_with_undecodable(definitions, &[])
+    }
+
+    /// Apply a registry snapshot in which some keys exist but would not
+    /// decode.
+    ///
+    /// Each undecodable key gets the treatment the boot planner gives it
+    /// (§2.5): the service is Failed with `ValidationError` behind a
+    /// placeholder definition, marked definition-removed so nothing can
+    /// start it until a reload re-reads a repaired key. A service that is
+    /// running when its key stops decoding cannot be failed — there is a
+    /// process to supervise — so it is treated as a service whose definition
+    /// was withdrawn: left running, marked definition-removed, discarded when
+    /// it drains. Either way the name is reported in `undecodable`, not in
+    /// `marked_removed` or `discarded`, because the key is still there
+    /// (PEI-621).
+    pub fn apply_definition_snapshot_with_undecodable(
+        &mut self,
+        definitions: Vec<ServiceDefinition>,
+        undecodable: &[UndecodableService],
+    ) -> Result<ServiceReloadSummary, ServiceTableError> {
         let incoming = map_definitions(definitions)?;
         let mut summary = ServiceReloadSummary {
             added: Vec::new(),
@@ -21,6 +43,7 @@ impl ServiceTable {
             restored: Vec::new(),
             marked_removed: Vec::new(),
             discarded: Vec::new(),
+            undecodable: Vec::new(),
         };
 
         for (name, definition) in &incoming {
@@ -51,9 +74,13 @@ impl ServiceTable {
         }
 
         let incoming_names = incoming.keys().cloned().collect::<BTreeSet<_>>();
+        let undecodable_names = undecodable
+            .iter()
+            .map(|service| service.name.as_str())
+            .collect::<BTreeSet<_>>();
         let existing_names = self.entries.keys().cloned().collect::<Vec<_>>();
         for name in existing_names {
-            if incoming_names.contains(&name) {
+            if incoming_names.contains(&name) || undecodable_names.contains(name.as_str()) {
                 continue;
             }
             let Some(entry) = self.entries.get_mut(&name) else {
@@ -87,8 +114,39 @@ impl ServiceTable {
             summary.discarded.push(name);
         }
 
+        for service in undecodable {
+            if incoming_names.contains(&service.name) {
+                // The read cannot report a key as both; if it ever does, the
+                // definition that decoded wins and the entry above stands.
+                continue;
+            }
+            self.apply_undecodable(service)?;
+            summary.undecodable.push(service.name.clone());
+        }
+
         Ok(summary)
     }
+
+    fn apply_undecodable(&mut self, service: &UndecodableService) -> Result<(), ServiceTableError> {
+        if let Some(entry) = self.entries.get_mut(&service.name)
+            && retains_definition_after_removal(entry.runtime.state)
+        {
+            entry.definition_removed = true;
+            entry.pending_definition = None;
+            return Ok(());
+        }
+        self.insert_undecodable_placeholder(
+            &service.name,
+            TransitionCause::ValidationError,
+            &undecodable_message(service),
+        )
+    }
+}
+
+/// The description a placeholder carries: the same wording the boot planner
+/// gives a blocked undecodable key, so `status` reads alike either way.
+pub fn undecodable_message(service: &UndecodableService) -> String {
+    format!("Service definition failed to decode: {}", service.message)
 }
 
 impl ServiceTable {

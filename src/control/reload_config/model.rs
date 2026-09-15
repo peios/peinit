@@ -1,4 +1,4 @@
-use crate::boundary::BoundaryError;
+use crate::boundary::{BoundaryError, UndecodableService};
 use crate::control::socket::ControlSocketLimits;
 use crate::control::system::ControlSecurityDescriptor;
 use crate::jobs::socket::JobsSocketLimits;
@@ -23,6 +23,10 @@ pub struct ReloadConfigOutcome {
     pub global_environment: Vec<ServiceEnvironmentVariable>,
     pub eventd_log_socket_path: Option<String>,
     pub warnings: Vec<ServiceGraphWarning>,
+    /// The keys that would not decode, with the field and the problem, so
+    /// the operator is told which and why rather than "control request
+    /// failed" (PEI-621). The names alone are also in `summary.undecodable`.
+    pub undecodable: Vec<UndecodableService>,
 }
 
 impl ReloadConfigOutcome {

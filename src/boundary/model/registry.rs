@@ -66,6 +66,9 @@ pub enum TimerLastRunWriteOutcome {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UndecodableService {
     pub name: String,
+    /// The registry value the decode failed on, when the fault is a single
+    /// field's — so an operator is told *which* value to repair (PEI-621).
+    pub field: Option<String>,
     pub message: String,
 }
 
@@ -90,12 +93,13 @@ pub trait RegistryClient {
 
     /// Read definitions, reporting undecodable keys instead of failing.
     ///
-    /// Boot uses this; reload-config deliberately does not. Reload is atomic
-    /// and has somewhere to fall back to — the configuration already running —
-    /// so refusing the whole transaction is right there. Boot has no such
-    /// fallback, which is why the same all-or-nothing policy has the opposite
-    /// consequence: one typo in one service key took the machine to the
-    /// recovery console.
+    /// Boot and reload-config both use this, and treat an undecodable key
+    /// the same way: that service fails with `ValidationError`, every other
+    /// definition loads, and dependents fail through ordinary propagation
+    /// (§2.5). Reload used to refuse the whole transaction instead, on the
+    /// grounds that it had the running configuration to fall back to — but
+    /// that meant one typo in one key silently stopped every unrelated
+    /// definition in the same batch from loading (PEI-621).
     ///
     /// The default is the conservative one, so an implementation that has not
     /// thought about partial reads keeps its existing behaviour.

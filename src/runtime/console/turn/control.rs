@@ -91,8 +91,29 @@ fn collect_control_command_dispatch_console_messages(
         SupervisorControlCommandDispatch::Lifecycle(dispatch) => {
             collect_lifecycle_dispatch_console_messages(dispatch, out);
         }
-        SupervisorControlCommandDispatch::ReloadConfig(_)
-        | SupervisorControlCommandDispatch::Job(_) => {}
+        SupervisorControlCommandDispatch::ReloadConfig(outcome) => {
+            collect_reload_config_console_messages(outcome, out);
+        }
+        SupervisorControlCommandDispatch::Job(_) => {}
+    }
+}
+
+/// The reload failed a service over a key that would not decode: said on the
+/// console as a boot says it for a blocked service, because the reload's own
+/// answer went to one svctl and this is what everyone else sees (PEI-621).
+pub(super) fn collect_reload_config_console_messages(
+    outcome: &crate::control::reload_config::ReloadConfigOutcome,
+    out: &mut Vec<ConsoleMessage>,
+) {
+    for service in &outcome.undecodable {
+        crate::runtime::console::push_error(
+            out,
+            format!(
+                "peinit: service {} failed: ValidationError ({})\n",
+                service.name,
+                crate::service::undecodable_message(service),
+            ),
+        );
     }
 }
 

@@ -266,6 +266,7 @@ fn write_reload_config(out: &mut dyn Write, value: &Value) -> io::Result<()> {
             "restored",
             "marked_removed",
             "discarded",
+            "undecodable",
         ] {
             let count = summary
                 .get(key)
@@ -274,7 +275,30 @@ fn write_reload_config(out: &mut dyn Write, value: &Value) -> io::Result<()> {
             writeln!(out, "{key}: {count}")?;
         }
     }
+    write_undecodable(out, value)?;
     write_warnings(out, value)
+}
+
+/// One line per key that would not decode: the service, the field when the
+/// fault is one value's, and the problem. These services are Failed, and an
+/// operator reading only the counts above would not know why (PEI-621).
+fn write_undecodable(out: &mut dyn Write, value: &Value) -> io::Result<()> {
+    let Some(undecodable) = value.get("undecodable").and_then(Value::as_array) else {
+        return Ok(());
+    };
+    if undecodable.is_empty() {
+        return Ok(());
+    }
+    writeln!(out, "undecodable definitions:")?;
+    for entry in undecodable {
+        let service = str_field(entry, "service").unwrap_or("?");
+        let message = str_field(entry, "message").unwrap_or("");
+        match str_field(entry, "field") {
+            Some(field) => writeln!(out, "  {service} ({field}): {message}")?,
+            None => writeln!(out, "  {service}: {message}")?,
+        }
+    }
+    Ok(())
 }
 
 fn write_warnings(out: &mut dyn Write, value: &Value) -> io::Result<()> {

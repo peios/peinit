@@ -93,6 +93,92 @@ fn a_reset_that_leaves_the_abandoned_cgroup_leaked_warns_on_the_console() {
     );
 }
 
+/// PEI-621: a reload that failed a service over a key that would not decode
+/// says so on the console, as a boot says it for a blocked service. The
+/// reload's own answer went to one svctl; this is what everyone else sees.
+#[test]
+fn a_reload_that_fails_an_undecodable_service_says_so_on_the_console() {
+    let mut outcome = crate::control::reload_config::ReloadConfigOutcome {
+        summary: crate::service::ServiceReloadSummary {
+            added: Vec::new(),
+            updated: Vec::new(),
+            restored: Vec::new(),
+            marked_removed: Vec::new(),
+            discarded: Vec::new(),
+            undecodable: vec!["broken".to_string()],
+        },
+        services_schema_version: 1,
+        config_warnings: Vec::new(),
+        control_security: crate::control::system::ControlSecurityDescriptor::Default,
+        control_limits: crate::control::socket::ControlSocketLimits::default(),
+        jobs_limits: crate::jobs::socket::JobsSocketLimits::default(),
+        log_config: crate::logging::RuntimeLogConfig::default(),
+        shutdown_settings: crate::shutdown::ShutdownSettings::default(),
+        global_environment: Vec::new(),
+        eventd_log_socket_path: None,
+        warnings: Vec::new(),
+        undecodable: Vec::new(),
+    };
+    outcome
+        .undecodable
+        .push(crate::boundary::UndecodableService {
+            name: "broken".to_string(),
+            field: Some("ImagePath".to_string()),
+            message: "MissingTerminator".to_string(),
+        });
+    let turn = control_dispatch_turn(
+        crate::supervisor::SupervisorControlCommandDispatch::ReloadConfig(Box::new(outcome)),
+    );
+
+    let messages = collect_messages(
+        &RuntimeWorkPumpTurn::default(),
+        &[turn],
+        &RuntimeWorkPumpTurn::default(),
+    );
+
+    assert_eq!(
+        messages,
+        vec![
+            "peinit: service broken failed: ValidationError (Service definition failed to decode: MissingTerminator)\n"
+        ],
+    );
+}
+
+fn control_dispatch_turn(
+    dispatch: crate::supervisor::SupervisorControlCommandDispatch,
+) -> RuntimeShutdownEventTurn {
+    RuntimeShutdownEventTurn::ControlConnection {
+        fd: 44,
+        supervisor: Box::new(crate::supervisor::SupervisorControlConnectionTableTurn {
+            fd: 44,
+            turn: crate::supervisor::SupervisorControlConnectionTurn {
+                read: crate::control::connection::ControlConnectionReadTurn::WouldBlock {
+                    buffered_bytes: 0,
+                },
+                frames: vec![crate::supervisor::SupervisorControlConnectionFrameTurn {
+                    frame: crate::supervisor::SupervisorControlFrameTurn::CommandAccepted {
+                        response_line: None,
+                        dispatch: Some(Box::new(dispatch)),
+                        wait: None,
+                        access_denials: Vec::new(),
+                        job_access_denials: Vec::new(),
+                        remaining_bytes: 0,
+                    },
+                    pending_write_bytes: 0,
+                    close_after_write: false,
+                }],
+                write: crate::control::connection::ControlConnectionWriteTurn::Idle {
+                    close_after_write: false,
+                },
+                close_connection: false,
+            },
+            removed: false,
+            active_connections: 1,
+        }),
+        deadline_timer: None,
+    }
+}
+
 // PEI-359. §5.3 asks for a warning when a service announces RELOADING=1 and
 // never completes the reload. That string existed only as an *operation
 // result*, returned to a `wait=true` caller — and `reload` defaults to

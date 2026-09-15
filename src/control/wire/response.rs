@@ -188,7 +188,18 @@ pub fn control_reload_config_response_line(
             "restored": &outcome.summary.restored,
             "marked_removed": &outcome.summary.marked_removed,
             "discarded": &outcome.summary.discarded,
+            "undecodable": &outcome.summary.undecodable,
         },
+        // Which key, which field, and why: the detail the operator needs to
+        // repair it, which "INTERNAL_ERROR: control request failed" withheld
+        // (PEI-621).
+        "undecodable": outcome.undecodable.iter().map(|service| {
+            json!({
+                "service": service.name.as_str(),
+                "field": service.field.as_deref(),
+                "message": service.message.as_str(),
+            })
+        }).collect::<Vec<_>>(),
         "warnings": outcome.warning_messages(),
     });
     response_line(&response)
