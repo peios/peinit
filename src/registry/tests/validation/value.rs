@@ -71,3 +71,21 @@ fn malformed_multi_strings_are_rejected() {
         }
     );
 }
+
+/// PEI-621: the field a decode failure names is what the operator repairs.
+/// An illegal service name is the key's own name.
+#[test]
+fn decode_error_field_names_the_service_name_for_an_illegal_name() {
+    assert_eq!(
+        ServiceRegistryDecodeError::InvalidServiceName {
+            service: "pt bad".to_string(),
+        }
+        .field(),
+        Some("name")
+    );
+    assert_eq!(ServiceRegistryDecodeError::MissingImagePath.field(), None);
+    assert_eq!(
+        ServiceRegistryDecodeError::DuplicateField { field: "ImagePath" }.field(),
+        Some("ImagePath")
+    );
+}
