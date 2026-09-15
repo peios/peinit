@@ -227,11 +227,34 @@ pub fn encode_boot_blocked_service_event(
     service: &str,
     reason: &BlockedReason,
 ) -> Result<KmesEvent, BoundaryError> {
-    const PHASE: &str = "boot";
+    encode_blocked_service_event("boot", service, reason)
+}
+
+/// A key a reload found but could not decode: the same `validation_error`
+/// finding the boot emits for one, under the `reload_config` phase, so a
+/// consumer sees the service fail the same way whichever path read it
+/// (PEI-621).
+pub fn encode_reload_undecodable_service_event(
+    service: &crate::boundary::UndecodableService,
+) -> Result<KmesEvent, BoundaryError> {
+    encode_blocked_service_event(
+        "reload_config",
+        &service.name,
+        &BlockedReason::ValidationError {
+            message: crate::service::undecodable_message(service),
+        },
+    )
+}
+
+fn encode_blocked_service_event(
+    phase: &str,
+    service: &str,
+    reason: &BlockedReason,
+) -> Result<KmesEvent, BoundaryError> {
     match reason {
-        BlockedReason::CycleDetected { services } => encode_graph_cycle_error(PHASE, services),
+        BlockedReason::CycleDetected { services } => encode_graph_cycle_error(phase, services),
         BlockedReason::HardDependencyUnavailable { target, kind } => encode_boot_dependency_error(
-            PHASE,
+            phase,
             "missing_hard_dependency",
             service,
             target,
@@ -239,7 +262,7 @@ pub fn encode_boot_blocked_service_event(
             &format!("service {service} has missing hard dependency {target}"),
         ),
         BlockedReason::HardDependencyBlocked { target, kind } => encode_boot_dependency_error(
-            PHASE,
+            phase,
             "hard_dependency_blocked",
             service,
             target,
@@ -249,7 +272,7 @@ pub fn encode_boot_blocked_service_event(
         BlockedReason::ConflictingBootService { target } => {
             let mut writer = Writer::new();
             writer.write_map(5);
-            write_str_field(&mut writer, "phase", PHASE);
+            write_str_field(&mut writer, "phase", phase);
             write_str_field(&mut writer, "finding", "conflicting_boot_services");
             write_str_field(&mut writer, "service", service);
             write_str_field(&mut writer, "target", target);
@@ -263,7 +286,7 @@ pub fn encode_boot_blocked_service_event(
         BlockedReason::ValidationError { message } => {
             let mut writer = Writer::new();
             writer.write_map(5);
-            write_str_field(&mut writer, "phase", PHASE);
+            write_str_field(&mut writer, "phase", phase);
             write_str_field(&mut writer, "finding", "validation_error");
             write_str_field(&mut writer, "service", service);
             write_str_field(&mut writer, "detail", message);

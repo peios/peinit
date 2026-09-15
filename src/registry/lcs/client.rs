@@ -33,9 +33,9 @@ pub struct LcsTimerLastRunWriter;
 impl RegistryClient for LcsRegistryClient {
     fn read_service_definitions(&mut self) -> Result<Vec<ServiceDefinition>, BoundaryError> {
         let read = self.read_service_definitions_partial()?;
-        // The strict view, for reload-config: any undecodable key fails the
-        // whole read, so the transaction aborts and the running configuration
-        // stands.
+        // The strict view: any undecodable key fails the whole read. Neither
+        // boot nor reload-config uses it any more (PEI-621); it remains the
+        // trait's required method, for a caller that wants all or nothing.
         if let Some(first) = read.undecodable.first() {
             return Err(BoundaryError::Registry(format!(
                 "service {} failed to decode: {}",

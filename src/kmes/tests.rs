@@ -27,8 +27,8 @@ use super::{
     encode_graph_validation_warning_event, encode_init_recovery_events, encode_job_event,
     encode_notify_applied_field_events, encode_notify_rejection_event,
     encode_on_failure_loop_suppressed_event, encode_operation_event,
-    encode_service_access_denied_event, encode_shutdown_abandoned_event,
-    encode_system_access_denied_event,
+    encode_reload_undecodable_service_event, encode_service_access_denied_event,
+    encode_shutdown_abandoned_event, encode_system_access_denied_event,
 };
 
 const OBSERVED_AT_NS: u64 = 1_717_171_717_123_456_789;
@@ -272,6 +272,28 @@ fn encodes_graph_validation_audit_payloads() {
     assert_eq!(
         read_str(&timer_error.payload, "parse_error"),
         "fractional seconds are not supported",
+    );
+}
+
+/// PEI-621: a key a reload could not decode is audited as the same
+/// `validation_error` finding the boot emits for one, under the
+/// `reload_config` phase.
+#[test]
+fn encodes_reload_undecodable_service_as_a_validation_error() {
+    let event = encode_reload_undecodable_service_event(&crate::boundary::UndecodableService {
+        name: "broken".to_string(),
+        field: Some("ImagePath".to_string()),
+        message: "MalformedString { field: \"ImagePath\" }".to_string(),
+    })
+    .expect("undecodable event");
+
+    assert_eq!(event.event_type, "graph.validation_error");
+    assert_eq!(read_str(&event.payload, "phase"), "reload_config");
+    assert_eq!(read_str(&event.payload, "finding"), "validation_error");
+    assert_eq!(read_str(&event.payload, "service"), "broken");
+    assert_eq!(
+        read_str(&event.payload, "detail"),
+        "Service definition failed to decode: MalformedString { field: \"ImagePath\" }"
     );
 }
 

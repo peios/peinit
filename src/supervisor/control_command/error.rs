@@ -176,10 +176,11 @@ fn reload_config_error_response(
                 failure.findings
             )),
         ),
-        // A read the registry refused, which for reload-config includes a
-        // definition that will not decode: the error already names the
-        // service and the decode problem (TRM §10.4), so hand it on rather
-        // than flatten it to "control request failed". The code stays
+        // A read the registry refused as a whole — the Services root that
+        // will not open, say. A definition that will not decode is no longer
+        // one of these (PEI-621: it fails that service and the reload is
+        // accepted), but the registry's own message still says more than
+        // "control request failed" (TRM §10.4), so hand it on. The code stays
         // INTERNAL_ERROR: the vocabulary (PSPU §4.10) has nothing closer, since
         // INVALID_STATE is about the service's state or a shutdown, and
         // UNKNOWN_SERVICE would say the service does not exist when it does.
@@ -238,24 +239,23 @@ mod tests {
 
     use super::SupervisorControlCommandBodyError;
 
-    /// TRM §10.4: a reload refused for an undecodable key answers with an
-    /// error naming the service and the decode problem, not "control
-    /// request failed" (PEI-1075).
+    /// TRM §10.4: a reload the registry refused answers with the registry's
+    /// own message, not "control request failed" (PEI-1075). An undecodable
+    /// key no longer refuses the reload at all (PEI-621); this is the read
+    /// that fails as a whole — the Services root that will not open.
     #[test]
-    fn reload_config_registry_error_names_the_service_and_the_decode_problem() {
-        let error = SupervisorControlCommandBodyError::ReloadConfig(Box::new(
-            ReloadConfigError::Registry(BoundaryError::Registry(
-                "service app failed to decode: ExecStart: malformed string".to_string(),
-            )),
-        ));
+    fn reload_config_registry_error_carries_the_registry_message() {
+        let error =
+            SupervisorControlCommandBodyError::ReloadConfig(Box::new(ReloadConfigError::Registry(
+                BoundaryError::Registry("OpenRoot(Os { code: 2, kind: NotFound })".to_string()),
+            )));
 
         let (code, message) = error.response_error();
 
         assert_eq!(code, ControlErrorCode::InternalError);
         assert_eq!(
             message,
-            "configuration reload failed: service app failed to decode: \
-             ExecStart: malformed string"
+            "configuration reload failed: OpenRoot(Os { code: 2, kind: NotFound })"
         );
     }
 

@@ -88,6 +88,7 @@ impl StaticRegistry {
     fn with_undecodable(mut self, name: &str, message: &str) -> Self {
         self.undecodable.push(crate::boundary::UndecodableService {
             name: name.to_string(),
+            field: None,
             message: message.to_string(),
         });
         self

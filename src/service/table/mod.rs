@@ -16,6 +16,7 @@ pub use model::{
 };
 
 use reload::map_definitions;
+pub use reload::undecodable_message;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct ServiceTable {

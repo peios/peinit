@@ -1,7 +1,8 @@
 mod atomicity;
 mod success;
+mod undecodable;
 
-use crate::boundary::{BoundaryError, RegistryClient};
+use crate::boundary::{BoundaryError, RegistryClient, ServiceDefinitionsRead, UndecodableService};
 use crate::control::socket::ControlSocketLimits;
 use crate::control::system::ControlSecurityDescriptor;
 use crate::registry::SUPPORTED_SERVICES_SCHEMA_VERSION;
@@ -20,6 +21,8 @@ struct StaticRegistry {
     shutdown_timeout_secs: Option<u32>,
     global_environment: Vec<ServiceEnvironmentVariable>,
     eventd_log_socket_path: Option<String>,
+    /// Keys the partial read reports as present but undecodable.
+    undecodable: Vec<UndecodableService>,
     reads: usize,
 }
 
@@ -37,6 +40,7 @@ impl StaticRegistry {
             shutdown_timeout_secs: None,
             global_environment: Vec::new(),
             eventd_log_socket_path: None,
+            undecodable: Vec::new(),
             reads: 0,
         }
     }
@@ -54,6 +58,7 @@ impl StaticRegistry {
             shutdown_timeout_secs: None,
             global_environment: Vec::new(),
             eventd_log_socket_path: None,
+            undecodable: Vec::new(),
             reads: 0,
         }
     }
@@ -88,6 +93,15 @@ impl StaticRegistry {
         self.eventd_log_socket_path = Some(path.into());
         self
     }
+
+    fn undecodable(mut self, name: &str, field: Option<&str>, message: &str) -> Self {
+        self.undecodable.push(UndecodableService {
+            name: name.to_string(),
+            field: field.map(ToString::to_string),
+            message: message.to_string(),
+        });
+        self
+    }
 }
 
 impl StaticRegistry {
@@ -116,6 +130,16 @@ impl RegistryClient for StaticRegistry {
     fn read_service_definitions(&mut self) -> Result<Vec<ServiceDefinition>, BoundaryError> {
         self.reads += 1;
         self.result.clone()
+    }
+
+    fn read_service_definitions_partial(
+        &mut self,
+    ) -> Result<ServiceDefinitionsRead, BoundaryError> {
+        Ok(ServiceDefinitionsRead {
+            definitions: self.read_service_definitions()?,
+            undecodable: self.undecodable.clone(),
+            inherited_service_security: None,
+        })
     }
 
     fn read_services_schema_version(&mut self) -> Result<u32, BoundaryError> {

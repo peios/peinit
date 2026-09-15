@@ -30,4 +30,5 @@ pub use role::{AUTHN_ROLE, synthesise_role_dependencies};
 pub use table::{
     RestartBackoffDeadline, RestartWindowResetDeadline, ServiceActivationSnapshot, ServiceEntry,
     ServiceReloadSummary, ServiceTable, ServiceTableError, ServiceTableTransition,
+    undecodable_message,
 };

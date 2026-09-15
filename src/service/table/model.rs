@@ -80,6 +80,10 @@ pub struct ServiceReloadSummary {
     pub restored: Vec<String>,
     pub marked_removed: Vec<String>,
     pub discarded: Vec<String>,
+    /// Services whose key exists but would not decode. Each is Failed with
+    /// `ValidationError` as the boot path fails it (§2.5), or, if it was
+    /// running, left running with its definition marked removed (PEI-621).
+    pub undecodable: Vec<String>,
 }
 
 impl ServiceReloadSummary {
@@ -89,6 +93,7 @@ impl ServiceReloadSummary {
             && self.restored.is_empty()
             && self.marked_removed.is_empty()
             && self.discarded.is_empty()
+            && self.undecodable.is_empty()
     }
 }
 

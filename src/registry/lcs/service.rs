@@ -46,6 +46,7 @@ pub(super) fn read_lcs_service_definitions() -> Result<ServiceDefinitionsRead, L
             Ok(definition) => definitions.push(definition),
             Err(error) => undecodable.push(UndecodableService {
                 name,
+                field: undecodable_field(&error).map(ToString::to_string),
                 message: format!("{error:?}"),
             }),
         }
@@ -57,6 +58,14 @@ pub(super) fn read_lcs_service_definitions() -> Result<ServiceDefinitionsRead, L
         undecodable,
         inherited_service_security: inherited_security,
     })
+}
+
+/// The value a decode failure is about, if it is about one value.
+fn undecodable_field(error: &LcsRegistryReadError) -> Option<&'static str> {
+    match error {
+        LcsRegistryReadError::DecodeService { source, .. } => source.field(),
+        _ => None,
+    }
 }
 
 fn unique_sorted_service_names(mut names: Vec<String>) -> Vec<String> {

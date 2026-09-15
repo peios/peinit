@@ -72,6 +72,7 @@ pub(super) fn reload_config_outcome() -> ReloadConfigOutcome {
             restored: Vec::new(),
             marked_removed: Vec::new(),
             discarded: Vec::new(),
+            undecodable: Vec::new(),
         },
         services_schema_version: 2,
         config_warnings: vec![RegistryConfigWarning::NewerServicesSchemaVersion {
@@ -88,5 +89,6 @@ pub(super) fn reload_config_outcome() -> ReloadConfigOutcome {
             service: "app".to_string(),
             dependents: vec!["api".to_string()],
         }],
+        undecodable: Vec::new(),
     }
 }
