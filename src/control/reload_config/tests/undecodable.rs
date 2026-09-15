@@ -178,3 +178,46 @@ fn a_reload_that_repairs_the_key_restores_the_service() {
     assert!(!restored.definition_removed);
     assert_eq!(restored.definition.image_path, "/sbin/broken-fixed");
 }
+
+/// A key whose name is not a service name (`[A-Za-z0-9._-]{1,128}`) is an
+/// undecodable key like any other: reported by its raw name with the
+/// grammar problem, failed singly, and the rest of the batch loads. It used
+/// to refuse the whole reload — the validation stand-in for it carried the
+/// illegal name, and that was an `InvalidServiceName` finding.
+#[test]
+fn an_illegal_service_name_is_an_undecodable_key_not_a_refused_reload() {
+    let mut services = service_table(&["app"]);
+    let mut registry = StaticRegistry::services(vec![
+        service("app", "/sbin/app-v2"),
+        service("new", "/sbin/new"),
+    ]);
+    for name in ["pt bad", "pt!bad", "pt:bad", "pt+bad"] {
+        registry = registry.undecodable(
+            name,
+            Some("name"),
+            &format!("InvalidServiceName {{ service: {name:?} }}"),
+        );
+    }
+
+    let outcome = reload_config(&mut registry, &mut services).expect("the reload is not refused");
+
+    assert_eq!(outcome.summary.added, vec!["new"]);
+    assert_eq!(outcome.summary.updated, vec!["app"]);
+    assert_eq!(
+        outcome.summary.undecodable,
+        vec!["pt bad", "pt!bad", "pt:bad", "pt+bad"]
+    );
+    assert_eq!(outcome.undecodable.len(), 4);
+    assert_eq!(outcome.undecodable[0].name, "pt bad");
+    assert_eq!(outcome.undecodable[0].field.as_deref(), Some("name"));
+    for name in ["pt bad", "pt!bad", "pt:bad", "pt+bad"] {
+        let broken = services.get(name).expect("a placeholder entry");
+        assert_eq!(broken.runtime.state, ServiceState::Failed);
+        assert_eq!(broken.runtime.cause, Some(TransitionCause::ValidationError));
+        assert!(broken.definition_removed);
+    }
+    assert_eq!(
+        services.definition("app").expect("app").image_path,
+        "/sbin/app-v2"
+    );
+}

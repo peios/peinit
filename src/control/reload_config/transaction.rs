@@ -2,7 +2,9 @@ use crate::boundary::{RegistryClient, UndecodableService};
 use crate::logging::RuntimeLogConfig;
 use crate::registry::services_schema_warnings;
 use crate::registry::{RegistryConfigWarning, read_log_config_from_registry};
-use crate::service::{ServiceDefinition, ServiceTable, validate_service_graph};
+use crate::service::{
+    ServiceDefinition, ServiceTable, is_valid_service_name, validate_service_graph,
+};
 use crate::shutdown::ShutdownSettings;
 
 use super::model::{ReloadConfigError, ReloadConfigOutcome};
@@ -99,6 +101,16 @@ where
     })
 }
 
+/// The definitions to validate: the ones that decoded, plus a stand-in for
+/// each undecodable key so that a `Requires` on one is not a missing hard
+/// dependency.
+///
+/// A key whose *name* is the fault gets no stand-in. Nothing can declare a
+/// dependency on it — a reference to it fails that dependent's own decode —
+/// and a placeholder carrying the illegal name would be an
+/// `InvalidServiceName` finding that refused the whole reload, which is the
+/// wholesale refusal PEI-621 removed. Boot validates without any of its
+/// undecodable keys and fails each of them singly; this is the same rule.
 fn definitions_with_placeholders(
     definitions: &[ServiceDefinition],
     undecodable: &[UndecodableService],
@@ -106,9 +118,14 @@ fn definitions_with_placeholders(
     definitions
         .iter()
         .cloned()
-        .chain(undecodable.iter().map(|service| {
-            ServiceDefinition::undecodable_placeholder(&service.name, &service.message)
-        }))
+        .chain(
+            undecodable
+                .iter()
+                .filter(|service| is_valid_service_name(&service.name))
+                .map(|service| {
+                    ServiceDefinition::undecodable_placeholder(&service.name, &service.message)
+                }),
+        )
         .collect()
 }
 

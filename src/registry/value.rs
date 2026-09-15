@@ -108,11 +108,13 @@ pub enum ServiceRegistryDecodeError {
 impl ServiceRegistryDecodeError {
     /// The registry value the failure is about, when it is about one value.
     ///
-    /// `None` for faults of the key as a whole — an invalid service name, a
-    /// missing `ImagePath`, a bad trigger or reload signal — where naming a
-    /// field would point the operator at the wrong thing (PEI-621).
+    /// `None` for faults of the key as a whole — a missing `ImagePath`, a
+    /// bad trigger or reload signal — where naming a field would point the
+    /// operator at the wrong thing (PEI-621). An illegal service name is the
+    /// key's own name, reported as `name`: that is the thing to repair.
     pub fn field(&self) -> Option<&'static str> {
         match self {
+            Self::InvalidServiceName { .. } => Some("name"),
             Self::MissingProvisionedPathField { field, .. }
             | Self::DuplicateField { field }
             | Self::TypeMismatch { field, .. }
@@ -128,8 +130,7 @@ impl ServiceRegistryDecodeError {
             | Self::InvalidCheck { field, .. }
             | Self::NonCachedRegistryCheck { field, .. }
             | Self::FieldRequiresTtyPath { field } => Some(field),
-            Self::InvalidServiceName { .. }
-            | Self::InvalidProvisionedPathName { .. }
+            Self::InvalidProvisionedPathName { .. }
             | Self::MissingImagePath
             | Self::InvalidSuccessExitCode { .. }
             | Self::InvalidEnvironmentVariable { .. }
