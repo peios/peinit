@@ -7,7 +7,8 @@ use crate::runtime::{
     RuntimeShutdownEventSources, RuntimeShutdownEventTurn, RuntimeShutdownLoopContext,
     RuntimeShutdownLoopTurn, RuntimeWorkPumpConfig, process_runtime_shutdown_sources_with_registry,
 };
-use crate::supervisor::Supervisor;
+use crate::service::runtime::ServiceState;
+use crate::supervisor::{Supervisor, SupervisorSettings};
 
 use super::super::fixture::shutdown_fixture;
 use super::support::{
@@ -15,8 +16,8 @@ use super::support::{
     FakeDeadlineTimer, FakeNotifySource, FakeRegistrar, FakeSignalSource, RuntimeFinalizer,
 };
 use crate::supervisor::tests::{
-    ScriptedClock, StaticRegistry, TestProcessController, TestProcessLauncher, TestTokenProvider,
-    alive_service,
+    APP_LAUNCH_NS, BOOT_NS, ScriptedClock, StaticRegistry, TestProcessController,
+    TestProcessLauncher, TestTokenProvider, alive_service, process, settings,
 };
 
 #[test]
@@ -108,6 +109,18 @@ fn run_registry_watch_turn(
     registry: &mut StaticRegistry,
     watch: &mut FakeRegistryWatchSource,
 ) -> (RuntimeShutdownLoopTurn, Vec<i32>) {
+    run_registry_watch_turn_launching(supervisor, registry, watch, Vec::new(), Vec::new())
+}
+
+/// The registry-watch turn, with the work pump able to launch: the clock
+/// readings and processes the launches it makes will consume.
+fn run_registry_watch_turn_launching(
+    supervisor: &mut Supervisor,
+    registry: &mut StaticRegistry,
+    watch: &mut FakeRegistryWatchSource,
+    clock_times: Vec<u64>,
+    processes: Vec<crate::boundary::LaunchedProcess>,
+) -> (RuntimeShutdownLoopTurn, Vec<i32>) {
     let mut signal = FakeSignalSource::would_block();
     let mut child_reaper = FakeChildReaper::empty();
     let mut notify = FakeNotifySource::empty();
@@ -119,13 +132,13 @@ fn run_registry_watch_turn(
     let mut filesystem_check_reader =
         crate::supervisor::tests::TestFilesystemCheckReader::default();
     let mut log_pipes = crate::runtime::RuntimeServiceLogPipes::default();
-    let mut clock = ScriptedClock::new([]);
+    let mut clock = ScriptedClock::new(clock_times);
     let mut controller = TestProcessController::default();
     let mut finalizer = RuntimeFinalizer::default();
     let mut access = AllowAccessChecker::default();
     let mut registrar = FakeRegistrar::default();
     let mut tokens = TestTokenProvider::default();
-    let mut launcher = TestProcessLauncher::new(Vec::new());
+    let mut launcher = TestProcessLauncher::new(processes);
     let mut filesystem_check_launcher =
         crate::supervisor::tests::TestFilesystemCheckLauncher::default();
     let mut boot_attempt_counter = FakeBootAttemptCounter::default();
@@ -197,4 +210,91 @@ impl RegistryWatchSource for FakeRegistryWatchSource {
     ) -> Result<Vec<RegistryWatchEvent>, BoundaryError> {
         self.result.clone()
     }
+}
+
+/// PEI-350 (§3.7): a watch event during the boot window does not reload; it
+/// is counted, and the one reload it asks for runs at the turn boundary
+/// that observes the boot plan draining — here the same turn, because the
+/// work pump after the sources launches the last boot-plan service.
+#[test]
+fn runtime_registry_watch_event_during_the_boot_window_is_deferred_and_coalesced_after_it() {
+    let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
+    let mut boot_registry = StaticRegistry::services(vec![alive_service("app")]);
+    supervisor
+        .run_phase2_boot(&mut boot_registry, &mut ScriptedClock::new([BOOT_NS]))
+        .expect("boot");
+    assert!(supervisor.boot_plan_in_progress());
+    let mut registry = StaticRegistry::services(vec![alive_service("app"), alive_service("fresh")]);
+    let mut watch = FakeRegistryWatchSource::events(vec![RegistryWatchEvent {
+        root: RegistryWatchRoot::Services,
+        kind: RegistryWatchEventKind::ValueSet,
+        name: "ImagePath".to_string(),
+        path: vec!["fresh".to_string()],
+    }]);
+
+    let (turn, _) = run_registry_watch_turn_launching(
+        &mut supervisor,
+        &mut registry,
+        &mut watch,
+        vec![APP_LAUNCH_NS],
+        vec![process(4242, 9)],
+    );
+
+    // First the watch event, held back because the plan had not drained
+    // when it was read...
+    let RuntimeShutdownEventTurn::RegistryWatch {
+        fd: 91,
+        turn:
+            RuntimeRegistryWatchTurn::DeferredUntilBootDrains {
+                fd: 91,
+                events,
+                overflow: false,
+            },
+    } = &turn.turns[0]
+    else {
+        panic!(
+            "expected a deferred registry-watch turn, got {:?}",
+            turn.turns
+        );
+    };
+    assert_eq!(events.len(), 1);
+    // ...then the pump launched app (Alive readiness: Active at once, the
+    // plan drained), and the coalesced reload followed the drain.
+    assert_eq!(turn.post_work.service_launches.len(), 1);
+    assert!(!supervisor.boot_plan_in_progress());
+    let RuntimeShutdownEventTurn::DeferredRegistryReload { turn: reload } = &turn.turns[1] else {
+        panic!("expected the coalesced reload, got {:?}", turn.turns);
+    };
+    assert_eq!(turn.turns.len(), 2);
+    assert_eq!(
+        reload.deferred,
+        crate::supervisor::DeferredRegistryReload {
+            watch_fd: Some(91),
+            watch_events: 1,
+            overflow: false,
+            explicit_requests: 0,
+        }
+    );
+    let outcome = reload.outcome.as_ref().as_ref().expect("reload outcome");
+    assert_eq!(outcome.summary.added, vec!["fresh".to_string()]);
+    assert!(supervisor.services().get("fresh").is_some());
+    // app started from the boot's snapshot; the reload did not touch the
+    // running activation.
+    assert_eq!(
+        supervisor.service_status("app").expect("app").state,
+        ServiceState::Active
+    );
+    assert!(!supervisor.has_deferred_registry_reload());
+
+    // Once, not again.
+    let mut quiet_watch = FakeRegistryWatchSource::events(Vec::new());
+    let (turn, _) = run_registry_watch_turn(&mut supervisor, &mut registry, &mut quiet_watch);
+    assert_eq!(turn.turns.len(), 1);
+    assert!(matches!(
+        &turn.turns[0],
+        RuntimeShutdownEventTurn::RegistryWatch {
+            turn: RuntimeRegistryWatchTurn::NoEvents { .. },
+            ..
+        }
+    ));
 }

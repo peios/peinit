@@ -16,6 +16,7 @@ use crate::runtime::{
     drain_runtime_work_queues, process_registry_watch_event,
     process_runtime_control_connection_event, process_runtime_shutdown_event,
     register_filesystem_check_helper_sources, register_process_setup_sources,
+    run_deferred_registry_reload,
 };
 
 pub(super) fn process_runtime_shutdown_sources<I, L, S, H, N, D, M, C, P, F, A, R, T, K, B>(
@@ -165,6 +166,12 @@ where
             wait_flush_realtime_ns,
         )
         .map_err(RuntimeShutdownLoopError::ControlWait)?;
+    // The sources above, or the pump after them, may have drained the boot
+    // plan: the reload the boot window deferred runs now (PEI-350).
+    turns.extend(run_deferred_registry_reload(
+        supervisor,
+        control_registry.as_deref_mut(),
+    ));
     turns.extend(super::prepare::resume_buffered_control_frames(
         supervisor,
         event_sources.control_connections,

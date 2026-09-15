@@ -32,11 +32,24 @@ where
                     let overflow = events
                         .iter()
                         .any(|event| event.kind == RegistryWatchEventKind::Overflow);
-                    let outcome = supervisor.reload_config_from_registry(registry);
-                    RuntimeRegistryWatchTurn::ReloadConfig {
-                        events,
-                        overflow,
-                        outcome: Box::new(outcome),
+                    if supervisor.boot_plan_in_progress() {
+                        // §3.7: the boot executes against its snapshot. The
+                        // batch is drained (so the watch stays readable) and
+                        // counted; the reload it asks for runs once, after
+                        // the plan drains (PEI-350).
+                        supervisor.defer_registry_watch_reload(fd, events.len(), overflow);
+                        RuntimeRegistryWatchTurn::DeferredUntilBootDrains {
+                            fd,
+                            events,
+                            overflow,
+                        }
+                    } else {
+                        let outcome = supervisor.reload_config_from_registry(registry);
+                        RuntimeRegistryWatchTurn::ReloadConfig {
+                            events,
+                            overflow,
+                            outcome: Box::new(outcome),
+                        }
                     }
                 }
                 Err(error) => {

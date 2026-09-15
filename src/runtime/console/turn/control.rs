@@ -165,3 +165,44 @@ fn collect_timer_dispatch_console_messages(
         collect_start_dispatches_console_messages(start_dispatches, out);
     }
 }
+
+/// The one reload that followed the boot window: what it did, so the
+/// operator who saw the deferral sees it land (PEI-350). Each undecodable
+/// key is reported as it is for any other reload.
+pub(super) fn collect_deferred_registry_reload_console_messages(
+    turn: &crate::runtime::RuntimeDeferredRegistryReloadTurn,
+    out: &mut Vec<ConsoleMessage>,
+) {
+    match turn.outcome.as_ref() {
+        Ok(outcome) => {
+            let summary = &outcome.summary;
+            crate::runtime::console::push_ok(
+                out,
+                format!(
+                    "peinit: configuration reloaded after the boot plan drained \
+                     ({} registry event(s) and {} reload request(s) deferred): \
+                     added {}, updated {}, restored {}, marked removed {}, discarded {}, \
+                     undecodable {}\n",
+                    turn.deferred.watch_events,
+                    turn.deferred.explicit_requests,
+                    summary.added.len(),
+                    summary.updated.len(),
+                    summary.restored.len(),
+                    summary.marked_removed.len(),
+                    summary.discarded.len(),
+                    summary.undecodable.len(),
+                ),
+            );
+            collect_reload_config_console_messages(outcome, out);
+        }
+        Err(error) => {
+            crate::runtime::console::push_error(
+                out,
+                format!(
+                    "peinit warning: the configuration reload deferred by the boot window \
+                     failed: {error:?}\n"
+                ),
+            );
+        }
+    }
+}

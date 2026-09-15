@@ -20,5 +20,8 @@ pub use internal_error::{
 };
 pub use on_failure::encode_on_failure_loop_suppressed_event;
 pub use recovery::encode_init_recovery_events;
-pub use reload::encode_reload_unconfirmed_event;
+pub use reload::{
+    encode_registry_reload_coalesced_event, encode_registry_reload_deferred_event,
+    encode_reload_unconfirmed_event,
+};
 pub use shutdown::{encode_critical_failure_event, encode_shutdown_abandoned_event};

@@ -27,6 +27,7 @@ use super::{
     encode_graph_validation_warning_event, encode_init_recovery_events, encode_job_event,
     encode_notify_applied_field_events, encode_notify_rejection_event,
     encode_on_failure_loop_suppressed_event, encode_operation_event,
+    encode_registry_reload_coalesced_event, encode_registry_reload_deferred_event,
     encode_reload_undecodable_service_event, encode_service_access_denied_event,
     encode_shutdown_abandoned_event, encode_system_access_denied_event,
 };
@@ -272,6 +273,69 @@ fn encodes_graph_validation_audit_payloads() {
     assert_eq!(
         read_str(&timer_error.payload, "parse_error"),
         "fractional seconds are not supported",
+    );
+}
+
+/// PEI-350: the boot window's deferral and the coalesced reload that follows
+/// it are both on the audit trail, so a consumer can tell when the boot's
+/// snapshot was let go of.
+#[test]
+fn encodes_the_boot_window_deferral_and_the_coalesced_reload() {
+    let deferred = encode_registry_reload_deferred_event(3, true).expect("deferred event");
+    assert_eq!(deferred.event_type, "config.reload_deferred");
+    assert_eq!(read_uint(&deferred.payload, "events"), 3);
+    assert_eq!(read_str(&deferred.payload, "overflow"), "true");
+
+    let outcome = crate::control::reload_config::ReloadConfigOutcome {
+        summary: crate::service::ServiceReloadSummary {
+            added: vec!["new".to_string()],
+            updated: Vec::new(),
+            restored: Vec::new(),
+            marked_removed: Vec::new(),
+            discarded: Vec::new(),
+            undecodable: vec!["broken".to_string()],
+        },
+        services_schema_version: 1,
+        config_warnings: Vec::new(),
+        control_security: crate::control::system::ControlSecurityDescriptor::Default,
+        control_limits: crate::control::socket::ControlSocketLimits::default(),
+        jobs_limits: crate::jobs::socket::JobsSocketLimits::default(),
+        log_config: crate::logging::RuntimeLogConfig::default(),
+        shutdown_settings: crate::shutdown::ShutdownSettings::default(),
+        global_environment: Vec::new(),
+        eventd_log_socket_path: None,
+        warnings: Vec::new(),
+        undecodable: Vec::new(),
+    };
+    let coalesced = encode_registry_reload_coalesced_event(
+        &crate::supervisor::DeferredRegistryReload {
+            watch_fd: Some(91),
+            watch_events: 3,
+            overflow: true,
+            explicit_requests: 1,
+        },
+        &Ok(outcome),
+    )
+    .expect("coalesced event");
+    assert_eq!(coalesced.event_type, "config.reload_coalesced");
+    assert_eq!(read_uint(&coalesced.payload, "watch_events"), 3);
+    assert_eq!(read_uint(&coalesced.payload, "explicit_requests"), 1);
+    assert_eq!(read_str(&coalesced.payload, "overflow"), "true");
+    assert_eq!(read_str(&coalesced.payload, "result"), "ok");
+    assert_eq!(read_uint(&coalesced.payload, "added"), 1);
+    assert_eq!(read_uint(&coalesced.payload, "undecodable"), 1);
+
+    let failed = encode_registry_reload_coalesced_event(
+        &crate::supervisor::DeferredRegistryReload::default(),
+        &Err(crate::control::reload_config::ReloadConfigError::Registry(
+            crate::boundary::BoundaryError::Registry("offline".to_string()),
+        )),
+    )
+    .expect("failed coalesced event");
+    assert_eq!(read_str(&failed.payload, "result"), "error");
+    assert_eq!(
+        read_str(&failed.payload, "error"),
+        "Registry(Registry(\"offline\"))"
     );
 }
 

@@ -368,3 +368,50 @@ fn reload_config_reports_undecodable_definitions_in_the_response() {
     assert_eq!(broken.cause, Some(TransitionCause::ValidationError));
     assert!(broken.definition_removed);
 }
+
+/// PEI-350 (§3.7): an explicit `reload-config` during the boot window is
+/// refused with INVALID_STATE, and the refusal says why. Its intent is
+/// honoured by the coalesced reload once the plan drains.
+#[test]
+fn reload_config_during_the_boot_window_is_refused_with_invalid_state() {
+    // `alive_service` carries the boot trigger: `app` is in the plan and
+    // still waiting for its launch, so the plan has not drained.
+    let mut supervisor = booted_supervisor(vec![super::super::alive_service("app")]);
+    assert!(supervisor.boot_plan_in_progress());
+    let mut registry = StaticRegistry::services(vec![
+        super::super::alive_service("app"),
+        inactive_alive_service("new"),
+    ]);
+    let mut access = TestAccessChecker::allow_all();
+    let mut controller = TestProcessController::default();
+    let mut clock = ScriptedClock::new([2_001]);
+    let peer = control_peer();
+
+    let response = supervisor
+        .run_checked_control_body_with_response(
+            br#"{"command":"reload-config"}"#,
+            SupervisorControlCommandBodyContext {
+                peer: &peer,
+                control_security: &DEFAULT_CONTROL_SECURITY,
+                access_checker: &mut access,
+                controller: &mut controller,
+                clock: &mut clock,
+                registry: Some(&mut registry),
+            },
+        )
+        .expect("response");
+
+    let SupervisorControlCommandBodyResponse::Rejected { response_line, .. } = response else {
+        panic!("expected the reload to be refused, got {response:?}");
+    };
+    let json = response_json(&response_line);
+    assert_eq!(json["status"], "error");
+    assert_eq!(json["code"], "INVALID_STATE");
+    assert_eq!(
+        json["message"],
+        "configuration reload deferred: the boot plan has not drained, and the registry is \
+         re-read once it has"
+    );
+    assert!(supervisor.services().get("new").is_none());
+    assert!(supervisor.has_deferred_registry_reload());
+}

@@ -8,6 +8,7 @@
 mod control_connection;
 mod control_listener;
 mod deadline;
+mod deferred_reload;
 mod dispatch;
 mod event_sources;
 mod finalize;
@@ -23,6 +24,7 @@ mod process_setup;
 mod registry_watch;
 mod signal;
 
+pub(crate) use deferred_reload::run_deferred_registry_reload;
 pub(crate) use dispatch::process_runtime_control_connection_event;
 pub use dispatch::process_runtime_shutdown_event;
 pub(crate) use event_sources::NoRuntimeRegistryClient;
@@ -32,12 +34,13 @@ pub use finalize::{
     pending_shutdown_finalization,
 };
 pub use model::{
-    RuntimeCalendarTimerTurn, RuntimeEventRegistrar, RuntimeEventRegistrationError,
-    RuntimeFilesystemCheckHelperTurn, RuntimeLifecycleDeadlineTimer, RuntimeNotifyDatagram,
-    RuntimeNotifyRead, RuntimeNotifyRejection, RuntimeNotifySource, RuntimeNotifySupervisorTurn,
-    RuntimePid1SignalSource, RuntimePowerButtonSource, RuntimePowerButtonTurn,
-    RuntimeProcessSetupTurn, RuntimeRegistryWatchTurn, RuntimeShutdownDeadlineTimer,
-    RuntimeShutdownEventContext, RuntimeShutdownEventTurn, RuntimeShutdownEventTurnError,
+    RuntimeCalendarTimerTurn, RuntimeDeferredRegistryReloadTurn, RuntimeEventRegistrar,
+    RuntimeEventRegistrationError, RuntimeFilesystemCheckHelperTurn, RuntimeLifecycleDeadlineTimer,
+    RuntimeNotifyDatagram, RuntimeNotifyRead, RuntimeNotifyRejection, RuntimeNotifySource,
+    RuntimeNotifySupervisorTurn, RuntimePid1SignalSource, RuntimePowerButtonSource,
+    RuntimePowerButtonTurn, RuntimeProcessSetupTurn, RuntimeRegistryWatchTurn,
+    RuntimeShutdownDeadlineTimer, RuntimeShutdownEventContext, RuntimeShutdownEventTurn,
+    RuntimeShutdownEventTurnError,
 };
 pub(crate) use pre_start_check::register_filesystem_check_helper_sources;
 pub(crate) use process_setup::register_process_setup_sources;
