@@ -1,7 +1,7 @@
 use crate::boot::BootMode;
 use crate::boundary::UndecodableService;
 use crate::ids::{JobIdAllocator, OperationIdAllocator};
-use crate::service::{ServiceDefinition, validate_service_graph};
+use crate::service::{ServiceDefinition, synthesise_role_dependencies, validate_service_graph};
 
 use super::graph::{BlockedServiceDraft, build_phase2_boot_graph, safe_mode_downgrade_findings};
 use super::model::{
@@ -66,6 +66,16 @@ pub(crate) fn prepare_phase2_boot_plan_with_retained(
             warnings: Vec::new(),
         });
     }
+
+    // The plan is built from the definitions as they will be executed. Role
+    // synthesis — the authority edge a non-SYSTEM identity implies, and
+    // `network:routed` rewritten onto whichever service provides `network`
+    // — is applied when the service table is built and when a reload
+    // validates, and used to be applied everywhere except here, so a derived
+    // edge did not pull its provider into the boot closure and a role
+    // reference was failed as a missing dependency on a service literally
+    // called `network` (PEI-829). One synthesis, shared with those paths.
+    let services = &synthesise_role_dependencies(services.to_vec());
 
     // The findings are kept, not just the verdict: the Safe-mode rebuild
     // discards the Full-mode graph, so this is the only point at which what

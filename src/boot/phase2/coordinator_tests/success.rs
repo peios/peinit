@@ -67,6 +67,51 @@ fn run_phase2_boot_reads_snapshot_plans_and_dispatches_operations_atomically() {
     );
 }
 
+/// PEI-829. The coordinator reads raw definitions from the registry; the plan
+/// it builds from them must carry the same derived edges the service table it
+/// builds beside it does, or the provider is missing from the boot closure
+/// while the table says the dependent requires it.
+#[test]
+fn the_boot_plan_carries_the_edges_the_service_table_derives() {
+    let mut resolvd = service("resolvd", "/sbin/resolvd");
+    resolvd.identity = crate::security::LOCAL_SERVICE_IDENTITY.to_string();
+    let mut authd = service("authd", "/sbin/authd");
+    authd.triggers.clear();
+    authd.provides = vec![crate::service::AUTHN_ROLE.to_string()];
+    let mut registry = StaticRegistry::services(vec![resolvd, authd]);
+    let mut clock = FixedClock::at(OBSERVED_AT_NS);
+    let mut operation_ids = OperationIdAllocator::new();
+    let mut job_ids = JobIdAllocator::new();
+    let mut operations = OperationStore::new();
+
+    let run = run_phase2_boot(
+        settings(),
+        &mut registry,
+        &mut clock,
+        &mut operation_ids,
+        &mut job_ids,
+        &mut operations,
+    )
+    .expect("phase2 boot");
+
+    assert_eq!(
+        run.service_table
+            .definition("resolvd")
+            .expect("resolvd definition")
+            .requires,
+        vec!["authd".to_string()],
+    );
+    assert!(run.plan.blocked.is_empty(), "{:?}", run.plan.blocked);
+    assert_eq!(
+        run.plan
+            .starts
+            .iter()
+            .map(|start| start.service.as_str())
+            .collect::<Vec<_>>(),
+        vec!["authd", "resolvd"],
+    );
+}
+
 /// The boot set is exactly what the registry defines. console, authd, lpsd and
 /// login were once appended here from compiled-in definitions when
 /// `peios.console=1` / `peios.login=1` were on the command line; they are
