@@ -69,7 +69,10 @@ format = "peipkg"
 # PEI-827 (control conflict rows, timers, boot roles, notify, pidfd release,
 # abandoned resets, readiness budget, eventd batching, control frames, jobs
 # handles, wait deadlines, init console, shutdown waves and finalisation).
-version      = "{{version}}-4"
+# 0.0.5-5 (2026-09-15): two follow-ups the full run found — a readiness for
+# a setup a shutdown cancelled is stale, not EBADF (PEI-826); a fraction in
+# any calendar time field is fractional seconds (PEI-845).
+version      = "{{version}}-5"
 architecture = "x86_64"
 license      = "MIT"
 license_class = "free"
