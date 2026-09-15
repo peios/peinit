@@ -42,7 +42,11 @@ where
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SupervisorControlConnectionTurn {
     pub read: ControlConnectionReadTurn,
-    pub frame: Option<SupervisorControlConnectionFrameTurn>,
+    /// Every frame the turn processed, in arrival order. A read can carry
+    /// several frames; all of them are answered before the turn ends unless
+    /// one registers a wait, so a connection is never left holding a
+    /// complete request that nothing will come back for.
+    pub frames: Vec<SupervisorControlConnectionFrameTurn>,
     pub write: ControlConnectionWriteTurn,
     pub close_connection: bool,
 }

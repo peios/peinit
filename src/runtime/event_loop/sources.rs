@@ -165,6 +165,13 @@ where
             wait_flush_realtime_ns,
         )
         .map_err(RuntimeShutdownLoopError::ControlWait)?;
+    turns.extend(super::prepare::resume_buffered_control_frames(
+        supervisor,
+        event_sources.control_connections,
+        control_registry,
+        event_sources.deadline_timer,
+        context.event_context(),
+    )?);
     super::prepare::flush_jobs_waits(supervisor, event_sources.jobs_channel, context.clock)?;
     let eventd_flush = event_sources.log_pipes.sync_eventd_forwarding(
         eventd_active(supervisor),

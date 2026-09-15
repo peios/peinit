@@ -1,5 +1,6 @@
 use crate::control::connection::{
-    ControlConnectionRecord, ControlConnectionTable, ControlOperationWait, ControlPendingWait,
+    ControlConnectionReadTurn, ControlConnectionRecord, ControlConnectionTable,
+    ControlOperationWait, ControlPendingWait,
 };
 use crate::control::socket::ControlSocketRead;
 use crate::ids::OperationIdAllocator;
@@ -61,7 +62,7 @@ fn start_default_wait_registers_connection_wait_and_flushes_on_terminal_operatio
         )
         .expect("connection turn");
 
-    let frame = turn.turn.frame.expect("frame").frame;
+    let frame = turn.turn.frames.into_iter().next().expect("frame").frame;
     let SupervisorControlFrameTurn::CommandAccepted {
         response_line: None,
         wait: Some(wait),
@@ -156,7 +157,7 @@ fn pending_wait_defers_later_frames_on_same_connection() {
         )
         .expect("first connection turn");
     assert!(matches!(
-        first.turn.frame.expect("frame").frame,
+        first.turn.frames.into_iter().next().expect("frame").frame,
         SupervisorControlFrameTurn::CommandAccepted { wait: Some(_), .. }
     ));
 
@@ -177,13 +178,201 @@ fn pending_wait_defers_later_frames_on_same_connection() {
         )
         .expect("second connection turn");
 
-    assert!(second.turn.frame.is_none());
+    assert!(second.turn.frames.is_empty());
     let record = connections.get(44).expect("connection");
     assert!(record.state().pending_wait().is_some());
     assert_eq!(
         record.state().read_buffer().len(),
         b"{\"command\":\"list\"}\n".len(),
     );
+}
+
+#[test]
+fn two_frames_in_one_read_are_both_answered_in_order() {
+    let mut supervisor = booted_supervisor(vec![
+        inactive_alive_service("app"),
+        inactive_alive_service("db"),
+    ]);
+    let mut access = TestAccessChecker::allow_all();
+    let mut controller = TestProcessController::default();
+    let mut clock = ScriptedClock::new([LIFECYCLE_COMMAND_NS, LIFECYCLE_COMMAND_NS + 1]);
+    let mut connections = ControlConnectionTable::new(4);
+    connections
+        .admit(
+            44,
+            ControlConnectionRecord::new(
+                FakeConnectionIo::scripted_reads([ControlSocketRead::Bytes(
+                    b"{\"command\":\"status\",\"service\":\"app\"}\n\
+                      {\"command\":\"status\",\"service\":\"db\"}\n"
+                        .to_vec(),
+                )]),
+                control_peer(),
+            ),
+        )
+        .expect("admit connection");
+
+    let turn = supervisor
+        .process_control_connection_table_turn(
+            &mut connections,
+            44,
+            SupervisorControlConnectionTurnContext {
+                control_security: &DEFAULT_CONTROL_SECURITY,
+                access_checker: &mut access,
+                controller: &mut controller,
+                clock: &mut clock,
+                registry: None,
+                max_read_bytes: 1024,
+                max_request_bytes: crate::control::socket::DEFAULT_MAX_REQUEST_SIZE_BYTES,
+                observed_at_ns: 123,
+            },
+        )
+        .expect("connection turn");
+
+    assert_eq!(turn.turn.frames.len(), 2);
+    assert!(turn.turn.frames.iter().all(|frame| matches!(
+        frame.frame,
+        SupervisorControlFrameTurn::CommandAccepted { .. }
+    )));
+    let record = connections.get(44).expect("connection");
+    assert!(record.state().read_buffer().is_empty());
+    let writes = record.io().writes.borrow();
+    let written = writes.concat();
+    let responses = written
+        .split_inclusive(|byte| *byte == b'\n')
+        .map(response_json)
+        .collect::<Vec<_>>();
+    assert_eq!(responses.len(), 2);
+    assert_eq!(responses[0]["status"], "ok");
+    assert_eq!(responses[0]["service"], "app");
+    assert_eq!(responses[1]["status"], "ok");
+    assert_eq!(responses[1]["service"], "db");
+}
+
+#[test]
+fn frame_buffered_behind_wait_is_answered_once_the_wait_clears() {
+    let mut supervisor = booted_supervisor(vec![inactive_alive_service("app")]);
+    let mut access = TestAccessChecker::allow_all();
+    let mut controller = TestProcessController::default();
+    let mut clock = ScriptedClock::new(
+        (0..16)
+            .map(|offset| LIFECYCLE_COMMAND_NS + offset)
+            .collect::<Vec<_>>(),
+    );
+    let mut connections = ControlConnectionTable::new(4);
+    connections
+        .admit(
+            44,
+            ControlConnectionRecord::new(
+                FakeConnectionIo::scripted_reads([ControlSocketRead::Bytes(
+                    b"{\"command\":\"start\",\"service\":\"app\"}\n\
+                      {\"command\":\"status\",\"service\":\"app\"}\n"
+                        .to_vec(),
+                )]),
+                control_peer(),
+            ),
+        )
+        .expect("admit connection");
+
+    let first = supervisor
+        .process_control_connection_table_turn(
+            &mut connections,
+            44,
+            SupervisorControlConnectionTurnContext {
+                control_security: &DEFAULT_CONTROL_SECURITY,
+                access_checker: &mut access,
+                controller: &mut controller,
+                clock: &mut clock,
+                registry: None,
+                max_read_bytes: 1024,
+                max_request_bytes: crate::control::socket::DEFAULT_MAX_REQUEST_SIZE_BYTES,
+                observed_at_ns: 123,
+            },
+        )
+        .expect("first connection turn");
+
+    // The wait holds the status request back; it is buffered, not lost.
+    assert_eq!(first.turn.frames.len(), 1);
+    assert!(matches!(
+        first.turn.frames[0].frame,
+        SupervisorControlFrameTurn::CommandAccepted { wait: Some(_), .. }
+    ));
+    let record = connections.get(44).expect("connection");
+    assert!(record.state().pending_wait().is_some());
+    assert_eq!(
+        record.state().read_buffer().len(),
+        b"{\"command\":\"status\",\"service\":\"app\"}\n".len(),
+    );
+    assert!(connections.fds_with_runnable_frames().is_empty());
+    assert_eq!(connections.next_idle_deadline_ns(5), None);
+
+    let mut tokens = TestTokenProvider::default();
+    let mut launcher = TestProcessLauncher::new(vec![process(9000, 90)]);
+    let mut filesystem_check_launcher =
+        crate::supervisor::tests::TestFilesystemCheckLauncher::default();
+    drain_runtime_work_queues(
+        &mut supervisor,
+        &mut RuntimeWorkPumpContext {
+            clock: &mut clock,
+            controller: &mut controller,
+            token_provider: &mut tokens,
+            process_launcher: &mut launcher,
+            filesystem_check_launcher: &mut filesystem_check_launcher,
+            config: RuntimeWorkPumpConfig::default(),
+        },
+    )
+    .expect("drain work");
+    let flush = supervisor
+        .flush_terminal_control_waits(&mut connections, 124, 0)
+        .expect("flush waits");
+    assert_eq!(flush.completed.len(), 1);
+
+    // The wait has cleared, so the buffered request is runnable, and it keeps
+    // the connection out of the idle count until it has been answered.
+    assert_eq!(connections.fds_with_runnable_frames(), vec![44]);
+    assert_eq!(connections.next_idle_deadline_ns(5), None);
+
+    let resumed = supervisor
+        .process_control_connection_table_turn(
+            &mut connections,
+            44,
+            SupervisorControlConnectionTurnContext {
+                control_security: &DEFAULT_CONTROL_SECURITY,
+                access_checker: &mut access,
+                controller: &mut controller,
+                clock: &mut clock,
+                registry: None,
+                max_read_bytes: 1024,
+                max_request_bytes: crate::control::socket::DEFAULT_MAX_REQUEST_SIZE_BYTES,
+                observed_at_ns: 125,
+            },
+        )
+        .expect("resumed connection turn");
+
+    // Nothing new to read: the frame the turn answers was already buffered.
+    assert!(matches!(
+        resumed.turn.read,
+        ControlConnectionReadTurn::WouldBlock { buffered_bytes } if buffered_bytes > 0
+    ));
+    assert_eq!(resumed.turn.frames.len(), 1);
+    assert!(matches!(
+        resumed.turn.frames[0].frame,
+        SupervisorControlFrameTurn::CommandAccepted { wait: None, .. }
+    ));
+    let record = connections.get(44).expect("connection");
+    assert!(record.state().read_buffer().is_empty());
+    assert_eq!(
+        record.state().idle_deadline_ns(5),
+        Some(125 + 5_000_000_000)
+    );
+    let writes = record.io().writes.borrow();
+    assert_eq!(writes.len(), 2);
+    let wait_answer = response_json(&writes[0]);
+    assert_eq!(wait_answer["status"], "ok");
+    assert!(wait_answer["operation_id"].is_string());
+    let status = response_json(&writes[1]);
+    assert_eq!(status["status"], "ok");
+    assert_eq!(status["service"], "app");
+    assert_eq!(status["state"], "active");
 }
 
 #[test]
@@ -224,7 +413,7 @@ fn wait_true_lifecycle_command_flushes_operation_timeout_error() {
         )
         .expect("connection turn");
 
-    let frame = turn.turn.frame.expect("frame").frame;
+    let frame = turn.turn.frames.into_iter().next().expect("frame").frame;
     let SupervisorControlFrameTurn::CommandAccepted {
         response_line: None,
         wait: Some(wait),

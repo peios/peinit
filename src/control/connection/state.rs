@@ -91,8 +91,19 @@ impl ControlConnectionState {
         self.last_activity_ns
     }
 
+    /// A complete frame is buffered and nothing stops it being processed:
+    /// the connection needs another turn, not another readable event.
+    pub fn holds_runnable_frame(&self) -> bool {
+        self.pending_wait.is_none() && self.read_buffer.holds_complete_frame()
+    }
+
+    /// Idle means nothing in flight (TRM §10.1): no wait pending, no answer
+    /// unwritten, and no request read but not yet processed.
     pub fn idle_deadline_ns(&self, timeout_secs: u64) -> Option<u64> {
-        if self.pending_wait.is_some() || !self.write_buffer.is_empty() {
+        if self.pending_wait.is_some()
+            || !self.write_buffer.is_empty()
+            || self.read_buffer.holds_complete_frame()
+        {
             return None;
         }
         self.last_activity_ns.map(|last_activity_ns| {

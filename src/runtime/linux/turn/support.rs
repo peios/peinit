@@ -174,17 +174,15 @@ pub(in crate::runtime::linux::turn) fn reload_config_succeeded(
         RuntimeShutdownEventTurn::ControlConnection {
             supervisor: supervisor_turn,
             ..
-        } => matches!(
-            supervisor_turn
-                .turn
-                .frame
-                .as_ref()
-                .map(|frame| &frame.frame),
-            Some(SupervisorControlFrameTurn::CommandAccepted {
-                dispatch: Some(dispatch),
-                ..
-            }) if matches!(&**dispatch, SupervisorControlCommandDispatch::ReloadConfig(_))
-        ),
+        } => supervisor_turn.turn.frames.iter().any(|frame| {
+            matches!(
+                &frame.frame,
+                SupervisorControlFrameTurn::CommandAccepted {
+                    dispatch: Some(dispatch),
+                    ..
+                } if matches!(&**dispatch, SupervisorControlCommandDispatch::ReloadConfig(_))
+            )
+        }),
         _ => false,
     })
 }

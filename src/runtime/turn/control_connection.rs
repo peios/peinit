@@ -79,11 +79,13 @@ where
 }
 
 fn control_connection_started_shutdown(turn: &SupervisorControlConnectionTableTurn) -> bool {
-    matches!(
-        turn.turn.frame.as_ref().map(|frame| &frame.frame),
-        Some(SupervisorControlFrameTurn::CommandAccepted {
-            dispatch: Some(dispatch),
-            ..
-        }) if matches!(&**dispatch, SupervisorControlCommandDispatch::Shutdown(_)),
-    )
+    turn.turn.frames.iter().any(|frame| {
+        matches!(
+            &frame.frame,
+            SupervisorControlFrameTurn::CommandAccepted {
+                dispatch: Some(dispatch),
+                ..
+            } if matches!(&**dispatch, SupervisorControlCommandDispatch::Shutdown(_)),
+        )
+    })
 }

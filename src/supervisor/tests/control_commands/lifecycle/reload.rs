@@ -67,7 +67,7 @@ fn failed_reload_wait_response_includes_failed_mode() {
         .expect("connection turn");
     let SupervisorControlFrameTurn::CommandAccepted {
         wait: Some(wait), ..
-    } = turn.turn.frame.expect("frame").frame
+    } = turn.turn.frames.into_iter().next().expect("frame").frame
     else {
         panic!("expected reload wait");
     };

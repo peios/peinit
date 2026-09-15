@@ -1,4 +1,4 @@
-use crate::boundary::{Clock, ProcessController, RealtimeClock};
+use crate::boundary::{Clock, ProcessController, RealtimeClock, RegistryClient};
 use crate::control::connection::{
     ControlConnectionIo, ControlConnectionReadTurn, ControlConnectionRecord,
     ControlConnectionWriteTurn,
@@ -31,7 +31,7 @@ impl Supervisor {
             access_checker,
             controller,
             clock,
-            registry,
+            mut registry,
             max_read_bytes,
             max_request_bytes,
             observed_at_ns,
@@ -40,14 +40,20 @@ impl Supervisor {
         let read = connection
             .read(max_read_bytes)
             .map_err(SupervisorControlConnectionTurnError::Read)?;
-        let frame = if read == ControlConnectionReadTurn::Eof
-            || connection.state().pending_wait().is_some()
+        let mut frames = Vec::new();
+        // One read can carry several frames, and a frame can be left over
+        // from an earlier read that a wait held back. Keep going until the
+        // buffer holds no complete frame, a wait blocks the connection, or a
+        // rejection has scheduled its close; a readable event is not coming
+        // for bytes that are already here (PEI-1073).
+        while read != ControlConnectionReadTurn::Eof
+            && connection.state().pending_wait().is_none()
+            && !connection.state().close_after_write()
+            && (frames.is_empty() || connection.state().read_buffer().holds_complete_frame())
         {
-            None
-        } else {
             let (peer, state) = connection.peer_and_state_mut();
-            Some(
-                self.process_next_control_connection_frame(
+            let frame = self
+                .process_next_control_connection_frame(
                     state,
                     SupervisorControlFrameContext {
                         peer,
@@ -55,24 +61,26 @@ impl Supervisor {
                         access_checker,
                         controller,
                         clock,
-                        registry,
+                        registry: registry
+                            .as_deref_mut()
+                            .map(|registry| registry as &mut dyn RegistryClient),
                         max_request_bytes,
                     },
                 )
-                .map_err(SupervisorControlConnectionTurnError::Frame)?,
-            )
-        };
+                .map_err(SupervisorControlConnectionTurnError::Frame)?;
+            frames.push(frame);
+        }
         let write = connection
             .flush()
             .map_err(SupervisorControlConnectionTurnError::Write)?;
         let close_connection = should_close_connection(&read, &write);
-        if control_connection_observed_activity(&read, frame.as_ref(), &write) {
+        if control_connection_observed_activity(&read, &frames, &write) {
             connection.state_mut().mark_activity(observed_at_ns);
         }
 
         Ok(SupervisorControlConnectionTurn {
             read,
-            frame,
+            frames,
             write,
             close_connection,
         })
@@ -81,11 +89,11 @@ impl Supervisor {
 
 pub(super) fn control_connection_observed_activity<T>(
     read: &ControlConnectionReadTurn,
-    frame: Option<&T>,
+    frames: &[T],
     write: &ControlConnectionWriteTurn,
 ) -> bool {
     matches!(read, ControlConnectionReadTurn::Bytes { read_bytes, .. } if *read_bytes > 0)
-        || frame.is_some()
+        || !frames.is_empty()
         || matches!(
             write,
             ControlConnectionWriteTurn::Complete { written, .. }

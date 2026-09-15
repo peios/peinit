@@ -116,6 +116,16 @@ impl<I> ControlConnectionTable<ControlConnectionRecord<I>> {
             .any(|record| record.state().pending_wait().is_some())
     }
 
+    /// Connections holding a complete, unprocessed frame that no pending
+    /// wait is holding back. They arrive here when a wait clears with a
+    /// request buffered behind it; no readable event will come for them.
+    pub fn fds_with_runnable_frames(&self) -> Vec<i32> {
+        self.records
+            .iter()
+            .filter_map(|(fd, record)| record.state().holds_runnable_frame().then_some(*fd))
+            .collect()
+    }
+
     pub fn idle_fds(&self, now_ns: u64, timeout_secs: u64) -> Vec<i32> {
         self.records
             .iter()

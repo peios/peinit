@@ -7,7 +7,7 @@ pub use model::{
     RuntimeEventWaiter, RuntimeShutdownLoopContext, RuntimeShutdownLoopError,
     RuntimeShutdownLoopTurn,
 };
-pub(crate) use prepare::prepare_runtime_shutdown_loop_turn;
+pub(crate) use prepare::{prepare_runtime_shutdown_loop_turn, resume_buffered_control_frames};
 #[cfg(any(test, feature = "peios-boundary"))]
 pub(crate) use sources::process_runtime_shutdown_sources_with_registry;
 
@@ -54,12 +54,18 @@ where
     K: ProcessLauncher,
     B: FilesystemCheckHelperLauncher + ?Sized,
 {
-    let pre_work = prepare_runtime_shutdown_loop_turn(supervisor, event_sources, &mut context)?;
+    let prepared = prepare_runtime_shutdown_loop_turn(
+        supervisor,
+        event_sources,
+        None::<&mut super::NoRuntimeRegistryClient>,
+        &mut context,
+    )?;
     let sources = waiter
         .wait_runtime_events(context.max_events)
         .map_err(RuntimeShutdownLoopError::Wait)?;
     let mut turn = process_runtime_shutdown_sources(supervisor, sources, event_sources, context)?;
-    turn.pre_work = pre_work;
+    turn.pre_work = prepared.pre_work;
+    turn.turns.splice(0..0, prepared.resumed_control_turns);
     Ok(turn)
 }
 

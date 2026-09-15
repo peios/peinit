@@ -61,7 +61,7 @@ impl Supervisor {
             .flush()
             .map_err(SupervisorShutdownControlConnectionTurnError::Write)?;
         let close_connection = should_close_connection(&read, &write);
-        if control_connection_observed_activity(&read, frame.as_ref(), &write) {
+        if control_connection_observed_activity(&read, frame.as_slice(), &write) {
             connection.state_mut().mark_activity(observed_at_ns);
         }
 

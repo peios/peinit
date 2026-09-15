@@ -1,8 +1,10 @@
 use crate::boundary::{
     ChildReaper, Clock, FilesystemCheckHelperLauncher, ProcessController, ProcessLauncher,
-    RealtimeClock, ShutdownFinalizer, TokenProvider,
+    RealtimeClock, RegistryClient, ShutdownFinalizer, TokenProvider,
 };
-use crate::control::connection::{ControlConnectionIo, ControlListener};
+use crate::control::connection::{
+    ControlConnectionIo, ControlConnectionRecord, ControlConnectionTable, ControlListener,
+};
 use crate::control::service_security::ServiceAccessChecker;
 use crate::control::system::SystemAccessChecker;
 use crate::supervisor::Supervisor;
@@ -10,16 +12,73 @@ use crate::supervisor::Supervisor;
 use super::model::{RuntimeShutdownLoopContext, RuntimeShutdownLoopError};
 use crate::runtime::{
     RuntimeEventRegistrar, RuntimeEventSource, RuntimeLifecycleDeadlineTimer, RuntimeNotifySource,
-    RuntimePid1SignalSource, RuntimeShutdownDeadlineTimer, RuntimeShutdownEventSources,
-    RuntimeShutdownEventTurnError, RuntimeWorkPumpTurn, drain_runtime_work_queues,
+    RuntimePid1SignalSource, RuntimeShutdownDeadlineTimer, RuntimeShutdownEventContext,
+    RuntimeShutdownEventSources, RuntimeShutdownEventTurn, RuntimeShutdownEventTurnError,
+    RuntimeWorkPumpTurn, drain_runtime_work_queues, process_runtime_control_connection_event,
     register_filesystem_check_helper_sources, register_process_setup_sources,
 };
 
-pub(crate) fn prepare_runtime_shutdown_loop_turn<I, L, S, H, N, D, M, C, P, F, A, R, T, K, B>(
+/// Drive a turn for every control connection holding a complete frame that
+/// no wait is holding back.
+///
+/// A request read in the same call as a `wait` command sits in the
+/// connection's buffer until the wait clears, and no readable event will
+/// ever arrive for bytes peinit has already read. So each place that answers
+/// waits follows up here, and the buffered request is answered in the same
+/// loop turn (PEI-1073).
+pub(crate) fn resume_buffered_control_frames<I, D, C, P, F, A, R, G>(
+    supervisor: &mut Supervisor,
+    control_connections: &mut ControlConnectionTable<ControlConnectionRecord<I>>,
+    mut registry: Option<&mut G>,
+    deadline_timer: &mut D,
+    mut context: RuntimeShutdownEventContext<'_, C, P, F, A, R>,
+) -> Result<Vec<RuntimeShutdownEventTurn>, RuntimeShutdownLoopError>
+where
+    I: ControlConnectionIo,
+    D: RuntimeShutdownDeadlineTimer + ?Sized,
+    C: Clock + RealtimeClock + ?Sized,
+    P: ProcessController + ?Sized,
+    F: ShutdownFinalizer,
+    A: SystemAccessChecker
+        + ServiceAccessChecker
+        + crate::submitted::JobAccessChecker
+        + crate::submitted::JobDescriptorFactory
+        + ?Sized,
+    R: RuntimeEventRegistrar + ?Sized,
+    G: RegistryClient,
+{
+    let mut turns = Vec::new();
+    for fd in control_connections.fds_with_runnable_frames() {
+        let turn = process_runtime_control_connection_event(
+            supervisor,
+            fd,
+            control_connections,
+            registry.as_deref_mut(),
+            deadline_timer,
+            context.reborrow(),
+        )
+        .map_err(|error| RuntimeShutdownLoopError::Event {
+            source: RuntimeEventSource::ControlConnection { fd },
+            error,
+        })?;
+        turns.push(turn);
+    }
+    Ok(turns)
+}
+
+/// The work drained before this turn waits, and the turns of any control
+/// connection whose buffered request that work unblocked.
+pub(crate) struct RuntimePreparedLoopTurn {
+    pub pre_work: RuntimeWorkPumpTurn,
+    pub resumed_control_turns: Vec<RuntimeShutdownEventTurn>,
+}
+
+pub(crate) fn prepare_runtime_shutdown_loop_turn<I, L, S, H, N, D, M, C, P, F, A, R, T, K, B, G>(
     supervisor: &mut Supervisor,
     event_sources: &mut RuntimeShutdownEventSources<'_, I, L, S, H, N, D, M>,
+    control_registry: Option<&mut G>,
     context: &mut RuntimeShutdownLoopContext<'_, C, P, F, A, R, T, K, B>,
-) -> Result<RuntimeWorkPumpTurn, RuntimeShutdownLoopError>
+) -> Result<RuntimePreparedLoopTurn, RuntimeShutdownLoopError>
 where
     I: ControlConnectionIo,
     L: ControlListener<Connection = I> + ?Sized,
@@ -40,6 +99,7 @@ where
     T: TokenProvider + ?Sized,
     K: ProcessLauncher,
     B: FilesystemCheckHelperLauncher + ?Sized,
+    G: RegistryClient,
 {
     let pre_work = drain_runtime_work_queues(supervisor, &mut context.work_pump_context())
         .map_err(RuntimeShutdownLoopError::Work)?;
@@ -73,6 +133,13 @@ where
             wait_flush_realtime_ns,
         )
         .map_err(RuntimeShutdownLoopError::ControlWait)?;
+    let resumed_control_turns = resume_buffered_control_frames(
+        supervisor,
+        event_sources.control_connections,
+        control_registry,
+        event_sources.deadline_timer,
+        context.event_context(),
+    )?;
     flush_jobs_waits(supervisor, event_sources.jobs_channel, context.clock)?;
     supervisor
         .sync_lifecycle_deadline_timer(event_sources.lifecycle_timer)
@@ -80,7 +147,10 @@ where
             source: RuntimeEventSource::LifecycleDeadlineTimer,
             error: RuntimeShutdownEventTurnError::Supervisor(error),
         })?;
-    Ok(pre_work)
+    Ok(RuntimePreparedLoopTurn {
+        pre_work,
+        resumed_control_turns,
+    })
 }
 
 /// Answer every jobs-channel wait whose condition now holds.

@@ -90,7 +90,7 @@ fn runtime_control_connection_event_accepts_shutdown_request_and_arms_deadline_t
         panic!("expected control connection turn");
     };
     assert!(matches!(
-        connection_turn.turn.frame.expect("frame").frame,
+        connection_turn.turn.frames.into_iter().next().expect("frame").frame,
         SupervisorControlFrameTurn::CommandAccepted {
             dispatch: Some(dispatch),
             ..
@@ -104,6 +104,77 @@ fn runtime_control_connection_event_accepts_shutdown_request_and_arms_deadline_t
         supervisor.shutdown().expect("shutdown").kind,
         ShutdownKind::Reboot,
     );
+}
+
+#[test]
+fn resuming_buffered_control_frames_answers_a_request_no_event_will_come_for() {
+    let mut supervisor = shutdown_fixture();
+    let mut connections = ControlConnectionTable::new(4);
+    connections
+        .admit(
+            46,
+            ControlConnectionRecord::new(
+                FakeAcceptedConnection::with_io(46, "admin", [], [ControlSocketWrite::Complete]),
+                control_peer("admin"),
+            ),
+        )
+        .expect("seed connection");
+    // A request that arrived in the same read as a wait, and sat behind it:
+    // already read, so the socket will never report it readable again.
+    connections
+        .get_mut(46)
+        .expect("connection")
+        .state_mut()
+        .read_buffer_mut()
+        .append(b"{\"command\":\"list\"}\n");
+    let mut deadline_timer = FakeDeadlineTimer::would_block();
+    let mut clock = ScriptedClock::new([123]);
+    let mut controller = TestProcessController::default();
+    let mut finalizer = RuntimeFinalizer::default();
+    let mut access = AllowAccessChecker::default();
+    let mut registrar = FakeRegistrar::default();
+    let mut boot_attempt_counter = FakeBootAttemptCounter::default();
+
+    let turns = crate::runtime::resume_buffered_control_frames(
+        &mut supervisor,
+        &mut connections,
+        None::<&mut crate::runtime::NoRuntimeRegistryClient>,
+        &mut deadline_timer,
+        context(
+            &mut clock,
+            &mut controller,
+            &mut finalizer,
+            &mut access,
+            &mut registrar,
+            &mut boot_attempt_counter,
+        ),
+    )
+    .expect("resume buffered frames");
+
+    assert_eq!(turns.len(), 1);
+    let RuntimeShutdownEventTurn::ControlConnection {
+        fd: 46,
+        supervisor: connection_turn,
+        deadline_timer: None,
+    } = &turns[0]
+    else {
+        panic!("expected a control connection turn for the buffered request");
+    };
+    assert_eq!(connection_turn.turn.frames.len(), 1);
+    assert!(matches!(
+        connection_turn.turn.frames[0].frame,
+        SupervisorControlFrameTurn::CommandAccepted {
+            response_line: Some(_),
+            ..
+        }
+    ));
+    assert!(matches!(
+        connection_turn.turn.write,
+        crate::control::connection::ControlConnectionWriteTurn::Complete { written, .. } if written > 0
+    ));
+    let record = connections.get(46).expect("connection");
+    assert!(record.state().read_buffer().is_empty());
+    assert!(connections.fds_with_runnable_frames().is_empty());
 }
 
 #[test]

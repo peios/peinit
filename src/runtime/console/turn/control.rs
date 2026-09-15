@@ -30,7 +30,7 @@ pub(super) fn collect_control_connection_table_turn_console_messages(
     turn: &SupervisorControlConnectionTableTurn,
     out: &mut Vec<ConsoleMessage>,
 ) {
-    if let Some(frame) = &turn.turn.frame {
+    for frame in &turn.turn.frames {
         collect_control_frame_turn_console_messages(&frame.frame, out);
     }
 }

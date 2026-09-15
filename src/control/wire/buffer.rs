@@ -24,6 +24,13 @@ impl ControlConnectionBuffer {
         control_frame_decision(&self.bytes, max_request_bytes)
     }
 
+    /// Whether a whole frame (up to and including its newline) is buffered
+    /// and waiting to be processed, regardless of whether it would be
+    /// accepted or rejected once it is.
+    pub fn holds_complete_frame(&self) -> bool {
+        self.bytes.contains(&b'\n')
+    }
+
     pub fn consume(&mut self, count: usize) -> Result<(), ControlBufferConsumeError> {
         if count > self.bytes.len() {
             return Err(ControlBufferConsumeError::TooMany {

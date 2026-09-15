@@ -115,6 +115,47 @@ fn idle_deadlines_ignore_pending_waits_and_pending_writes() {
 }
 
 #[test]
+fn buffered_frame_keeps_a_connection_out_of_the_idle_count() {
+    let mut table = ControlConnectionTable::new(4);
+    table
+        .admit(10, record_with_activity(1_000_000_000))
+        .expect("idle connection");
+    table
+        .admit(11, record_with_activity(1_000_000_000))
+        .expect("connection with a buffered request");
+    table
+        .admit(12, record_with_activity(1_000_000_000))
+        .expect("connection with a partial request");
+    table
+        .get_mut(11)
+        .expect("buffered connection")
+        .state_mut()
+        .read_buffer_mut()
+        .append(b"{\"command\":\"list\"}\n");
+    table
+        .get_mut(12)
+        .expect("partial connection")
+        .state_mut()
+        .read_buffer_mut()
+        .append(b"{\"command\":\"li");
+
+    // A complete request that nothing has answered is work in flight; a
+    // partial one is not, so a stalled writer still times out.
+    assert_eq!(table.fds_with_runnable_frames(), vec![11]);
+    assert_eq!(table.idle_fds(6_000_000_000, 5), vec![10, 12]);
+    assert_eq!(table.next_idle_deadline_ns(5), Some(6_000_000_000));
+
+    table
+        .get_mut(11)
+        .expect("buffered connection")
+        .state_mut()
+        .read_buffer_mut()
+        .clear();
+    assert!(table.fds_with_runnable_frames().is_empty());
+    assert_eq!(table.idle_fds(6_000_000_000, 5), vec![10, 11, 12]);
+}
+
+#[test]
 fn zero_second_idle_timeout_expires_immediately_after_activity() {
     let mut table = ControlConnectionTable::new(1);
     table
