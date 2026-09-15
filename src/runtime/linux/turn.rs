@@ -287,6 +287,7 @@ impl LinuxShutdownRuntime {
         let critical_budget_reboot = process_due_critical_budget_reboot_at(
             supervisor,
             &mut self.finalizer,
+            &mut self.deadline_timer,
             after_sources_ns,
         )?;
         let resumed_after_sources = self.flush_operation_waits_and_resume_at(
@@ -357,9 +358,9 @@ impl LinuxShutdownRuntime {
             );
         }
         if let Some(reboot) = &critical_budget_reboot {
-            crate::runtime::console::push_critical_budget_reboot_message(
+            crate::runtime::console::push_critical_budget_reboot_messages(
                 &mut console_messages,
-                &reboot.service,
+                &reboot.dispatch,
             );
         }
         // Records that could not fit one eventd datagram are gone for good,

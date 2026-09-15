@@ -234,11 +234,22 @@ pub(super) fn push_critical_service_failure(
 /// The machine is rebooting because a Critical service ran out of restart
 /// budget. Critical, and phrased so the reason is on the same line as the
 /// consequence: this is the last thing the operator sees before the reboot.
-pub(crate) fn push_critical_budget_reboot_message(out: &mut Vec<ConsoleMessage>, service: &str) {
+///
+/// Followed by the outcome of the final action, which is only ever seen when
+/// `reboot(2)` returned: the operator then needs to know the machine is still
+/// up and retrying, not rebooting (PEI-1087).
+pub(crate) fn push_critical_budget_reboot_messages(
+    out: &mut Vec<ConsoleMessage>,
+    dispatch: &crate::supervisor::SupervisorCriticalBudgetRebootDispatch,
+) {
     push_critical(
         out,
-        format!("peinit: critical service {service} exhausted its restart budget; rebooting\n"),
+        format!(
+            "peinit: critical service {} exhausted its restart budget; rebooting\n",
+            dispatch.service
+        ),
     );
+    collect_shutdown_finalization_state_console_message(&dispatch.finalization.finalization, out);
 }
 
 pub(super) fn collect_shutdown_finalization_state_console_message(

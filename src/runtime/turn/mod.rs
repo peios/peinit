@@ -7,6 +7,7 @@
 
 mod control_connection;
 mod control_listener;
+mod critical_budget;
 mod deadline;
 mod dispatch;
 mod event_sources;
@@ -22,6 +23,7 @@ mod process_setup;
 mod registry_watch;
 mod signal;
 
+pub use critical_budget::{RuntimeCriticalBudgetRebootTurn, process_due_critical_budget_reboot};
 pub(crate) use dispatch::process_runtime_control_connection_event;
 pub use dispatch::process_runtime_shutdown_event;
 pub(crate) use event_sources::NoRuntimeRegistryClient;
