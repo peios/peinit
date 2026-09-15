@@ -50,6 +50,7 @@ where
             service: registration.service,
             schedule: registration.schedule,
             storage: registration.storage,
+            persistent: registration.persistent,
             calendar,
             next_scheduled_ns: registration.next_scheduled_ns,
             armed_deadline_ns,
