@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use crate::boundary::BoundaryError;
 use crate::control::lifecycle::LifecycleCommandError;
 use crate::control::query::QueryError;
 use crate::control::reload_config::ReloadConfigError;
@@ -175,9 +176,27 @@ fn reload_config_error_response(
                 failure.findings
             )),
         ),
-        ReloadConfigError::Registry(_) | ReloadConfigError::ServiceTable(_) => {
-            internal_control_error()
-        }
+        // A read the registry refused, which for reload-config includes a
+        // definition that will not decode: the error already names the
+        // service and the decode problem (TRM §10.4), so hand it on rather
+        // than flatten it to "control request failed". The code stays
+        // INTERNAL_ERROR: the vocabulary (PSPU §4.10) has nothing closer, since
+        // INVALID_STATE is about the service's state or a shutdown, and
+        // UNKNOWN_SERVICE would say the service does not exist when it does.
+        ReloadConfigError::Registry(BoundaryError::Registry(message)) => (
+            ControlErrorCode::InternalError,
+            Cow::Owned(format!("configuration reload failed: {message}")),
+        ),
+        ReloadConfigError::Registry(error) => (
+            ControlErrorCode::InternalError,
+            Cow::Owned(format!("configuration reload failed: {error:?}")),
+        ),
+        ReloadConfigError::ServiceTable(error) => (
+            ControlErrorCode::InternalError,
+            Cow::Owned(format!(
+                "configuration reload failed to apply the service table: {error:?}"
+            )),
+        ),
     }
 }
 
@@ -207,5 +226,51 @@ fn service_access_label(access: ServiceAccess) -> &'static str {
         0x0006 => "SERVICE_START|SERVICE_STOP",
         0x000f => "SERVICE_ALL",
         _ => "SERVICE_ACCESS",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::boundary::BoundaryError;
+    use crate::control::reload_config::ReloadConfigError;
+    use crate::control::wire::ControlErrorCode;
+    use crate::service::ServiceTableError;
+
+    use super::SupervisorControlCommandBodyError;
+
+    /// TRM §10.4: a reload refused for an undecodable key answers with an
+    /// error naming the service and the decode problem, not "control
+    /// request failed" (PEI-1075).
+    #[test]
+    fn reload_config_registry_error_names_the_service_and_the_decode_problem() {
+        let error = SupervisorControlCommandBodyError::ReloadConfig(Box::new(
+            ReloadConfigError::Registry(BoundaryError::Registry(
+                "service app failed to decode: ExecStart: malformed string".to_string(),
+            )),
+        ));
+
+        let (code, message) = error.response_error();
+
+        assert_eq!(code, ControlErrorCode::InternalError);
+        assert_eq!(
+            message,
+            "configuration reload failed: service app failed to decode: \
+             ExecStart: malformed string"
+        );
+    }
+
+    #[test]
+    fn reload_config_service_table_error_keeps_its_detail() {
+        let error = SupervisorControlCommandBodyError::ReloadConfig(Box::new(
+            ReloadConfigError::ServiceTable(ServiceTableError::DuplicateService {
+                service: "app".to_string(),
+            }),
+        ));
+
+        let (code, message) = error.response_error();
+
+        assert_eq!(code, ControlErrorCode::InternalError);
+        assert!(message.contains("DuplicateService"), "{message}");
+        assert!(message.contains("app"), "{message}");
     }
 }
