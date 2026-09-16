@@ -28,13 +28,7 @@ pub fn encode_graph_validation_warning_event(
             );
             write_str_field(&mut writer, "service", service);
             write_string_array_field(&mut writer, "dependents", dependents);
-            write_str_field(
-                &mut writer,
-                "message",
-                &format!(
-                    "service {service} uses Alive readiness while hard dependents require readiness"
-                ),
-            );
+            write_str_field(&mut writer, "message", &warning.message());
             finish_event("graph.validation_warning", writer)
         }
         ServiceGraphWarning::UnfilledRole { role, services } => {
@@ -44,11 +38,7 @@ pub fn encode_graph_validation_warning_event(
             write_str_field(&mut writer, "warning", "unfilled_role");
             write_str_field(&mut writer, "role", role);
             write_string_array_field(&mut writer, "services", services);
-            write_str_field(
-                &mut writer,
-                "message",
-                &format!("no service provides {role}, which other services need to start"),
-            );
+            write_str_field(&mut writer, "message", &warning.message());
             finish_event("graph.validation_warning", writer)
         }
     }

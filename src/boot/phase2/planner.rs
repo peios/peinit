@@ -96,10 +96,13 @@ pub(crate) fn prepare_phase2_boot_plan_with_retained(
     // whole graph the way a reload does, and the blocking below is what
     // produces those. The warnings are the part a boot has no other way
     // to surface, so they are carried out on the plan and emitted with
-    // the rest of its audit record.
-    let warnings = validate_service_graph(services)
-        .map(|validation| validation.warnings)
-        .unwrap_or_default();
+    // the rest of its audit record. Both branches carry them: a failure
+    // names the services the blocking below will block, and says nothing
+    // about the warnings for the services that will start (PEI-1124).
+    let warnings = match validate_service_graph(services) {
+        Ok(validation) => validation.warnings,
+        Err(failure) => failure.warnings,
+    };
 
     let graph = build_phase2_boot_graph(effective_mode, services)?;
     // Keys that exist but will not decode are Failed with ValidationError,

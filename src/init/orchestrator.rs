@@ -490,6 +490,16 @@ where
     for warning in &dispatch.config_warnings {
         log_console_warn(platform, &format!("peinit warning: {warning}\n"));
     }
+    // Graph validation warnings: the boot goes on regardless, and the
+    // operator is the only one who can act on them, so §2.5's "logged" has
+    // to mean the console as well as the audit event (PEI-1124). Same words
+    // as the `graph.validation_warning` event carries.
+    for warning in &dispatch.plan.warnings {
+        log_console_warn(
+            platform,
+            &format!("peinit warning: {}\n", warning.message()),
+        );
+    }
     for blocked in &dispatch.plan.blocked {
         log_console_error(
             platform,

@@ -1,9 +1,49 @@
 use crate::boot::BootMode;
 use crate::ids::{JobIdAllocator, OperationIdAllocator};
-use crate::service::ServiceDefinition;
+use crate::service::{Readiness, ServiceDefinition, ServiceGraphWarning};
 
 use super::super::{BlockedReason, Phase2BootPlanError, prepare_phase2_boot_plan};
 use super::OBSERVED_AT_NS;
+
+#[test]
+fn a_blocked_service_does_not_silence_the_graph_warnings() {
+    // PEI-1124: the plan blocks `orphan` for its missing dependency and
+    // still carries the warning about `db`, which is about to start and
+    // release `app` on an Alive promise.
+    let mut orphan = ServiceDefinition::simple_system_boot("orphan", "/sbin/orphan");
+    orphan.requires.push("missing".to_string());
+    let mut app = ServiceDefinition::simple_system_boot("app", "/sbin/app");
+    app.requires.push("db".to_string());
+    let mut db = ServiceDefinition::simple_system_boot("db", "/sbin/db");
+    db.readiness = Readiness::Alive;
+    let mut operations = OperationIdAllocator::new();
+    let mut jobs = JobIdAllocator::new();
+
+    let boot = prepare_phase2_boot_plan(
+        BootMode::Full,
+        &[orphan, app, db],
+        10,
+        OBSERVED_AT_NS,
+        &mut operations,
+        &mut jobs,
+    )
+    .expect("boot plan with a blocked orphan");
+
+    assert_eq!(
+        boot.blocked
+            .iter()
+            .map(|blocked| blocked.service.as_str())
+            .collect::<Vec<_>>(),
+        vec!["orphan"],
+    );
+    assert_eq!(
+        boot.warnings,
+        vec![ServiceGraphWarning::AliveReadinessWithHardDependents {
+            service: "db".to_string(),
+            dependents: vec!["app".to_string()],
+        }]
+    );
+}
 
 #[test]
 fn zero_parallel_start_limit_is_rejected() {

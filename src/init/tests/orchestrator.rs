@@ -310,6 +310,53 @@ fn configuration_warnings_are_tagged_warn_not_failed() {
     assert_eq!(*tag, ConsoleTag::Warn);
 }
 
+/// §2.5: a graph validation warning is logged and does not prevent boot. At
+/// boot "logged" means the console as well as the audit event, and it holds
+/// beside a finding: the orphan is blocked, db and app start, and the warning
+/// about db is exactly what the operator needs to hear (PEI-1124).
+#[test]
+fn graph_validation_warnings_reach_the_console_beside_the_findings() {
+    use crate::console_style::ConsoleTag;
+
+    let mut orphan = service("orphan");
+    orphan.requires.push("missing".to_string());
+    let mut app = service("app");
+    app.requires.push("db".to_string());
+    let mut db = service("db");
+    db.readiness = crate::service::Readiness::Alive;
+    let mut platform = Platform::new();
+    let mut registry = Registry::with_services([orphan, app, db]);
+    let mut clock = ClockAt(10);
+    let mut runtime = Runtime::default();
+
+    run_init(
+        InitConfig::default(),
+        &mut platform,
+        &mut registry,
+        &mut clock,
+        &mut runtime,
+    )
+    .expect("runtime");
+
+    let (tag, message) = platform
+        .console_tags
+        .iter()
+        .find(|(_, message)| message.contains("Alive readiness"))
+        .expect("the graph warning reached the console");
+    assert_eq!(
+        message,
+        "peinit warning: service db uses Alive readiness while hard dependents require readiness\n"
+    );
+    assert_eq!(*tag, ConsoleTag::Warn);
+    assert!(
+        platform
+            .console_tags
+            .iter()
+            .any(|(_, message)| message == "peinit: service orphan failed: DependencyFailure\n"),
+        "and the finding was still reported as the block it is"
+    );
+}
+
 #[test]
 fn device_node_policy_failures_are_warnings_not_recovery() {
     let report = DeviceNodePolicyReport {
