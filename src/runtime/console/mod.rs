@@ -184,6 +184,19 @@ pub(super) fn collect_service_transition_console_message(
             out,
             format!("peinit: service {} abandoned\n", event.service),
         ),
+        // Leaving Skipped is the one edge out of a terminal-looking state
+        // that is not itself news of a failure, and the manual promises it
+        // is reported like any other transition (§10.3): a `start` or
+        // `reset` clears Skipped before anything else happens, and without
+        // this line the service is seen to jump from Skipped straight to
+        // running (PEI-1123).
+        ServiceState::Inactive if event.from == ServiceState::Skipped => push_message(
+            out,
+            format!(
+                "peinit: service {} left skipped: {:?}\n",
+                event.service, event.cause
+            ),
+        ),
         _ => {}
     }
 }
