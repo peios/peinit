@@ -27,6 +27,33 @@ fn valid_graph_reports_service_count_and_readiness_warnings() {
 }
 
 #[test]
+fn findings_do_not_discard_the_warnings() {
+    // PEI-1124: a boot blocks the services its findings name and starts the
+    // rest, so the warnings about the rest have to survive the findings.
+    let mut orphan = service("orphan");
+    orphan.requires.push("missing".to_string());
+    let mut app = service("app");
+    app.requires.push("db".to_string());
+    let mut db = service("db");
+    db.readiness = Readiness::Alive;
+
+    let failure = validate_service_graph(&[orphan, app, db]).expect_err("missing hard dep");
+
+    assert!(matches!(
+        failure.findings.as_slice(),
+        [ServiceGraphFinding::MissingHardDependency { service, target, .. }]
+            if service == "orphan" && target == "missing"
+    ));
+    assert_eq!(
+        failure.warnings,
+        vec![ServiceGraphWarning::AliveReadinessWithHardDependents {
+            service: "db".to_string(),
+            dependents: vec!["app".to_string()],
+        }]
+    );
+}
+
+#[test]
 fn duplicate_service_names_are_validation_findings() {
     let failure = validate_service_graph(&[service("app"), service("app")]).expect_err("duplicate");
 

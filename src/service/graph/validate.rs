@@ -35,12 +35,18 @@ pub fn validate_service_graph(
     findings.extend(invalid_timer_schedule_findings(definitions));
     findings.extend(cycle_findings(&index.by_name));
 
-    if !findings.is_empty() {
-        return Err(ServiceGraphValidationFailure { findings });
-    }
-
+    // Warnings are computed whether or not there are findings. A boot does
+    // not refuse a graph with findings: it blocks the services they name and
+    // starts everything else, and a warning about everything else is exactly
+    // what it then needs to say (PEI-1124). Computing them only on the clean
+    // path meant one missing dependency anywhere silenced every warning.
     let mut warnings = readiness_warnings(&index.by_name);
     warnings.extend(unfilled_role_warnings(definitions));
+
+    if !findings.is_empty() {
+        return Err(ServiceGraphValidationFailure { findings, warnings });
+    }
+
     Ok(ServiceGraphValidation {
         service_count: index.by_name.len(),
         warnings,
