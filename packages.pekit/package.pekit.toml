@@ -87,7 +87,10 @@ format = "peipkg"
 # frozen (PEI-350); an illegal service name is an undecodable key (PEI-621).
 # 0.0.5-9 (2026-09-16): a held member with no job record yet is frozen, not
 # counted as launched (PEI-350).
-version      = "{{version}}-9"
+# 0.0.5-10 (2026-09-16): a boot's graph warnings survive its findings and
+# are said on the console (PEI-1124); leaving Skipped is reported
+# (PEI-1123).
+version      = "{{version}}-10"
 architecture = "x86_64"
 license      = "MIT"
 license_class = "free"
