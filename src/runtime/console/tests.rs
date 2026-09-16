@@ -434,6 +434,41 @@ fn service_launch_emits_console_progress() {
 }
 
 #[test]
+fn leaving_skipped_is_said_on_the_console() {
+    // PEI-1123: a start or reset on a Skipped service clears it first, and
+    // §10.3 promises the clear is reported like any other transition.
+    for cause in [
+        TransitionCause::ExplicitStart,
+        TransitionCause::ExplicitReset,
+    ] {
+        let mut out = Vec::new();
+        super::collect_service_transition_console_message(
+            &transition("task", ServiceState::Skipped, ServiceState::Inactive, cause),
+            &mut out,
+        );
+        assert_eq!(
+            out.iter()
+                .map(|message| message.text.as_str())
+                .collect::<Vec<_>>(),
+            vec![format!("peinit: service task left skipped: {cause:?}\n")],
+        );
+    }
+
+    // Any other arrival at Inactive stays as quiet as it was.
+    let mut out = Vec::new();
+    super::collect_service_transition_console_message(
+        &transition(
+            "task",
+            ServiceState::Completed,
+            ServiceState::Inactive,
+            TransitionCause::ExplicitReset,
+        ),
+        &mut out,
+    );
+    assert!(out.is_empty());
+}
+
+#[test]
 fn service_log_pipe_turn_does_not_echo_output_to_console() {
     let turn = RuntimeShutdownEventTurn::ServiceLogPipe {
         pipe: RuntimeLogPipeTurn::Read {
