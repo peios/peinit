@@ -250,6 +250,14 @@ test -n "$(find "$DEBUG_ROOT" -type f -print -quit)"
 
 '''
 
+# PID 1 runs at the PeiosTcb tier. It supervises services that are PIP-
+# protected (authd), and KACS refuses every signal, query and stop from a
+# caller that does not dominate the target, so an unsigned peinit cannot
+# verify a protected service's READY=1 or stop it (PEI-1153). The tier is
+# selected by the signing key.
+[build.main.sign.pip]
+"usr/bin/peinit2" = "tcb.priv"
+
 [build.main.dependencies.peipkg]
 "org.git.kernel.dash"      = "*"
 "org.gnu.bash"             = "*"
