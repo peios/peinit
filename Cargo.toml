@@ -1,6 +1,6 @@
 [package]
 name = "peinit2"
-version = "0.0.7"
+version = "0.0.8"
 description = "Replacement Peios PID 1 service-manager spine."
 edition = "2024"
 license = "MIT"

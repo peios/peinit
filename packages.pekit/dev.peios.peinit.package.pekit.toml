@@ -12,6 +12,7 @@ side_effects = ["man-db"]
 [package]
 name        = "dev.peios.peinit"
 description = "Peios real-root PID 1 service manager"
+license     = "((MIT OR Apache-2.0) AND Unicode-3.0) AND Apache-2.0 AND (Apache-2.0 OR MIT) AND BSD-3-Clause AND ISC AND MIT AND (MIT OR Unlicense)"
 
 [provides]
 # `init` is a role rather than the historical package identity.
@@ -30,5 +31,6 @@ path = "/usr/sbin/registryd"
 
 [files]
 "@source:LICENSE" = "usr/share/licenses/dev.peios.peinit/LICENSE"
+":licenses/**"     = "usr/share/licenses/dev.peios.peinit/third-party"
 ":usr/bin/peinit2" = "usr/bin/peinit2"
 ":usr/share/man/man8/peinit2.8.gz" = "usr/share/man/man8/peinit2.8.gz"

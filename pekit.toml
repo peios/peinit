@@ -102,7 +102,7 @@ TARGET=$PEKIT_OUT/target-a
 # and peios-rs carry no package-local notice; ship the reviewed notices of
 # those same pinned sources.
 LICENSE_ROOT=$PEKIT_OUT/licenses
-for definition in dev.peios.peinit-svctl dev.peios.libpeinit \
+for definition in dev.peios.peinit dev.peios.peinit-svctl dev.peios.libpeinit \
   dev.peios.peinit-debuginfo dev.peios.peinit-debugsource
 do
   /usr/libexec/peios-packaging/collect-rust-licences \
