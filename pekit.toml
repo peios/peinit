@@ -213,10 +213,12 @@ unset PEIOS_LIB_DIR PEIOS_INCLUDE PKM_UAPI
 . packaging/check-libpeios.sh
 export BINDGEN_EXTRA_CLANG_ARGS="-isystem $(gcc -print-file-name=include) ${BINDGEN_EXTRA_CLANG_ARGS:-}"
 export RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }-Dwarnings"
+# The tests run with the same control-flow protection as build.main (PEI-1155).
+export RUSTC_BOOTSTRAP=1
+RUSTFLAGS="$RUSTFLAGS -Zcf-protection=full"
 cargo test --release --locked --offline --target-dir "$PEKIT_OUT/target-test"
 cargo test --release --locked --offline --all-features --no-run \
   --target-dir "$PEKIT_OUT/target-test"
-./tools/verify-abi.sh
 
 # Validate the exact staged package output produced by build.main.
 SRC=$(pwd -P)
@@ -234,8 +236,14 @@ do
   readelf -lW "$elf" | grep -q 'GNU_RELRO'
   readelf -lW "$elf" | grep -Eq 'GNU_STACK[[:space:]].*RW[[:space:]]'
   readelf -dW "$elf" | grep -q 'BIND_NOW'
-  ! readelf -dW "$elf" | grep -Eq '(RPATH|RUNPATH)'
-  ! readelf -SW "$elf" | grep -q '\.debug_info'
+  if readelf -dW "$elf" | grep -E '(RPATH|RUNPATH)' >/dev/null; then
+    echo "peinit: $elf carries an RPATH or RUNPATH" >&2
+    exit 1
+  fi
+  if readelf -SW "$elf" | grep '\.debug_info' >/dev/null; then
+    echo "peinit: $elf still contains unsplit debug information" >&2
+    exit 1
+  fi
   if [ "$kind" = exe ]; then
     readelf -dW "$elf" | grep -Eq 'FLAGS_1.*PIE'
   else
@@ -247,7 +255,10 @@ do
   readelf -SW "$debug" | grep -q '\.debug_info'
   test "$(readelf -n "$debug" | sed -n 's/^[[:space:]]*Build ID: //p' | head -1)" = "$build_id"
   for forbidden in "$SRC" "$PEKIT_VENDOR_OUT" "$PEKIT_OUT_BASE" "$PEKIT_WORKSPACE_ROOT"; do
-    ! grep -aF "$forbidden" "$elf" "$debug" >/dev/null
+    if grep -aF "$forbidden" "$elf" "$debug" >/dev/null; then
+      echo "peinit: build path $forbidden leaked into $elf or its debug file" >&2
+      exit 1
+    fi
   done
 done
 

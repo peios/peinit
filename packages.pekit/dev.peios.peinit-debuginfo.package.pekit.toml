@@ -9,9 +9,9 @@ description = "Peios PID 1 service manager - debugging symbols"
 
 
 [dependencies]
-"dev.peios.peinit"       = "{{version}}-1"
-"dev.peios.peinit-svctl" = "{{version}}-1"
-"dev.peios.libpeinit"    = "{{version}}-1"
+"dev.peios.peinit"       = "= {{release}}"
+"dev.peios.peinit-svctl" = "= {{release}}"
+"dev.peios.libpeinit"    = "= {{release}}"
 
 [files]
 "@source:LICENSE"      = "usr/share/licenses/dev.peios.peinit-debuginfo/LICENSE"

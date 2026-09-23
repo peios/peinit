@@ -9,7 +9,7 @@ description = "Peios PID 1 service manager - debug sources"
 
 
 [dependencies]
-"dev.peios.peinit-debuginfo" = "{{version}}-1"
+"dev.peios.peinit-debuginfo" = "= {{release}}"
 
 [files]
 "@source:LICENSE"   = "usr/share/licenses/dev.peios.peinit-debugsource/LICENSE"
