@@ -12,7 +12,7 @@ description = "Peios service-manager client library development files"
 
 
 [dependencies]
-"dev.peios.libpeinit" = "{{version}}-1"
+"dev.peios.libpeinit" = "= {{release}}"
 
 [files]
 "@source:LICENSE" = "usr/share/licenses/dev.peios.libpeinit-devel/LICENSE"
