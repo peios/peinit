@@ -6,10 +6,14 @@ side_effects = ["man-db"]
 [package]
 name        = "dev.peios.peinit-svctl"
 description = "Peios service manager control and shutdown client"
+# The peinit2 crate closure svctl links; build.main's collect-rust-licences
+# --check holds this to what those crates declare.
+license     = "((MIT OR Apache-2.0) AND Unicode-3.0) AND Apache-2.0 AND (Apache-2.0 OR MIT) AND BSD-3-Clause AND ISC AND MIT AND (MIT OR Unlicense)"
 
 
 [files]
 "@source:LICENSE"   = "usr/share/licenses/dev.peios.peinit-svctl/LICENSE"
+":licenses/**"      = "usr/share/licenses/dev.peios.peinit-svctl/third-party"
 ":usr/bin/svctl"    = "usr/bin/svctl"
 ":usr/bin/reboot"   = "usr/bin/reboot"
 ":usr/bin/poweroff" = "usr/bin/poweroff"

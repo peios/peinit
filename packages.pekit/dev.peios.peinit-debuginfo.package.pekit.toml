@@ -5,6 +5,8 @@
 [package]
 name        = "dev.peios.peinit-debuginfo"
 description = "Peios PID 1 service manager - debugging symbols"
+# The peinit2 crate closure; checked by build.main.
+license     = "((MIT OR Apache-2.0) AND Unicode-3.0) AND Apache-2.0 AND (Apache-2.0 OR MIT) AND BSD-3-Clause AND ISC AND MIT AND (MIT OR Unlicense)"
 
 
 
@@ -15,4 +17,5 @@ description = "Peios PID 1 service manager - debugging symbols"
 
 [files]
 "@source:LICENSE"      = "usr/share/licenses/dev.peios.peinit-debuginfo/LICENSE"
+":licenses/**"         = "usr/share/licenses/dev.peios.peinit-debuginfo/third-party"
 ":debug/usr/lib/debug/**" = "usr/lib/debug/"
