@@ -229,14 +229,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "kacs-core"
-version = "0.1.0"
-source = "git+https://github.com/peios/pkm.git?rev=b5519e6da3ecd4ce854c6299af6844f0a6ce05dd#b5519e6da3ecd4ce854c6299af6844f0a6ce05dd"
-dependencies = [
- "peios-uapi",
-]
-
-[[package]]
 name = "libauthd"
 version = "0.0.14"
 source = "git+https://github.com/peios/authd.git?rev=3386525989f49f84facc555968d6fc5f5d5e3d53#3386525989f49f84facc555968d6fc5f5d5e3d53"
@@ -258,17 +250,6 @@ checksum = "d7c4b02199fee7c5d21a5ae7d8cfa79a6ef5bb2fc834d6e9058e89c825efdc55"
 dependencies = [
  "cfg-if",
  "windows-link",
-]
-
-[[package]]
-name = "libpeios"
-version = "0.5.0"
-source = "git+https://github.com/peios/libpeios.git?rev=4e7104773b618ada060e3e91c1609545f32a0e1b#4e7104773b618ada060e3e91c1609545f32a0e1b"
-dependencies = [
- "kacs-core",
- "libc",
- "peios-cabi",
- "peios-uapi",
 ]
 
 [[package]]
@@ -306,7 +287,6 @@ dependencies = [
  "jiff",
  "libauthd",
  "libc",
- "libpeios",
  "peios",
  "serde_json",
  "sha1",
@@ -323,14 +303,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "peios-cabi"
-version = "0.1.0"
-source = "git+https://github.com/peios/peios-cabi.git?rev=ed2540d6b32a4caa55226d89df42e55beb09ef77#ed2540d6b32a4caa55226d89df42e55beb09ef77"
-dependencies = [
- "libc",
-]
-
-[[package]]
 name = "peios-sys"
 version = "0.3.0"
 source = "git+https://github.com/peios/peios-rs.git?rev=f4309f78fbaa878a14429a5e07d778dba9ddfab7#f4309f78fbaa878a14429a5e07d778dba9ddfab7"
@@ -338,11 +310,6 @@ dependencies = [
  "bindgen",
  "pkg-config",
 ]
-
-[[package]]
-name = "peios-uapi"
-version = "0.1.0"
-source = "git+https://github.com/peios/pkm.git?rev=b5519e6da3ecd4ce854c6299af6844f0a6ce05dd#b5519e6da3ecd4ce854c6299af6844f0a6ce05dd"
 
 [[package]]
 name = "pkg-config"
