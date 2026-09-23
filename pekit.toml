@@ -95,6 +95,24 @@ cmp "$PEKIT_OUT/target-a/release/svctl" "$PEKIT_OUT/target-b/release/svctl"
 cmp "$PEKIT_OUT/target-a/release/libpeinit.so" "$PEKIT_OUT/target-b/release/libpeinit.so"
 TARGET=$PEKIT_OUT/target-a
 
+# peinit2, svctl and libpeinit are all the peinit2 crate built with
+# --all-features, so they link one crate closure. Their packages, the shared
+# symbols and the debug sources ship its notices and declare the conjunction
+# of its licences; --check holds each definition to it (PEI-1163). libauthd
+# and peios-rs carry no package-local notice; ship the reviewed notices of
+# those same pinned sources.
+LICENSE_ROOT=$PEKIT_OUT/licenses
+for definition in dev.peios.peinit-svctl dev.peios.libpeinit \
+  dev.peios.peinit-debuginfo dev.peios.peinit-debugsource
+do
+  /usr/libexec/peios-packaging/collect-rust-licences \
+    --licence-root "$LICENSE_ROOT" --root peinit2 --all-features \
+    --notice "git+https://github.com/peios/authd.git=third-party/authd-LICENSE" \
+    --notice "git+https://github.com/peios/peios-rs.git=third-party/peios-rs-LICENSE" \
+    --check "packages.pekit/$definition.package.pekit.toml"
+done
+test -s "$LICENSE_ROOT/crate-licenses.tsv"
+
 mkdir -p "$PEKIT_OUT/usr/bin" "$PEKIT_OUT/usr/sbin" \
   "$PEKIT_OUT/$LIBDIR" "$PEKIT_OUT/usr/include/peinit" \
   "$PEKIT_OUT/$LIBDIR/pkgconfig" "$PEKIT_OUT/usr/share/man/man8"
@@ -122,6 +140,12 @@ done
 # shipped one combined peinit-debuginfo artifact, and preserving that migration
 # capability without ambiguous multiple providers matters more than splitting
 # three small symbol files. Runtime/client/library payloads remain independent.
+# The split stays local rather than using
+# /usr/libexec/peios-packaging/split-debug: symbols go to their own debuginfo
+# tree, and the RUSTFLAGS remap already rewrote the vendor target's crates (a
+# separate output tree) to the vendor/ prefix, which split-debug, copying only
+# sources under one build root, would drop; the loop below resolves them back
+# to $PEKIT_VENDOR_OUT.
 : > "$PEKIT_OUT/.debug-sources"
 split_debug() {
   component=$1
@@ -196,6 +220,7 @@ test -n "$(find "$DEBUG_ROOT" -type f -print -quit)"
 "dev.peios.libpeios-devel" = ">= 0.5.0"
 "dev.peios.kernel-headers" = ">= 0.20.1-rc13"
 "org.iana.tzdata"          = ">= 2026c"
+"dev.peios.packaging-tools" = ">= 1.0.1"
 
 [test]
 gate = true

@@ -5,6 +5,8 @@
 name         = "dev.peios.peinit-debugsource"
 architecture = "noarch"
 description = "Peios PID 1 service manager - debug sources"
+# The peinit2 crate closure; checked by build.main.
+license      = "((MIT OR Apache-2.0) AND Unicode-3.0) AND Apache-2.0 AND (Apache-2.0 OR MIT) AND BSD-3-Clause AND ISC AND MIT AND (MIT OR Unlicense)"
 
 
 
@@ -13,4 +15,5 @@ description = "Peios PID 1 service manager - debug sources"
 
 [files]
 "@source:LICENSE"   = "usr/share/licenses/dev.peios.peinit-debugsource/LICENSE"
+":licenses/**"      = "usr/share/licenses/dev.peios.peinit-debugsource/third-party"
 ":usr/src/debug/**" = "usr/src/debug/"
