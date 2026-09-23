@@ -3,10 +3,3 @@
 # ambiguity and duplication without changing build-ID lookup.
 [elf]
 debuginfo = "dev.peios.peinit-debuginfo"
-
-[allow]
-# libpeinit-devel contains an ABI-specific linker symlink below the Peios
-# x86_64 triplet and exactly depends on that runtime. Conversely debugsource is
-# source-only; lint mistakes its conventional src/bin directory for an
-# installed executable directory.
-"package.architecture" = "libpeinit-devel is tied to the x86_64 ABI path and runtime, while debugsource's src/bin path contains Rust source rather than host executables"
