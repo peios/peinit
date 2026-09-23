@@ -104,16 +104,6 @@ fi
 "dev.peios.peiosutils" = ">= 0.8.5"
 "org.gnu.grep" = "*"
 
-[build.vendor.dependencies.apt]
-cargo           = "*"
-git             = "*"
-ca-certificates = "*"
-findutils       = "*"
-dash            = "*"
-grep            = "*"
-curl            = "*"
-xz-utils        = "*"
-
 [build.main]
 needs = ["vendor"]
 command = '''
@@ -288,25 +278,6 @@ test -n "$(find "$DEBUG_ROOT" -type f -print -quit)"
 "dev.peios.kernel-headers" = ">= 0.20.1-rc13"
 "org.iana.tzdata"          = ">= 2026c"
 
-[build.main.dependencies.apt]
-dash         = "*"
-bash         = "*"
-coreutils    = "*"
-diffutils    = "*"
-findutils    = "*"
-gawk         = "*"
-grep         = "*"
-gzip         = "*"
-sed          = "*"
-gcc          = "*"
-"g++"        = "*"
-pkg-config   = "*"
-libclang-dev = "*"
-binutils     = "*"
-debugedit    = "*"
-python3      = "*"
-tzdata       = "*"
-
 [test]
 gate = true
 needs = ["main", "vendor"]
@@ -391,25 +362,6 @@ PKG_CONFIG_PATH="$PEKIT_OUT/$LIBDIR/pkgconfig" \
 "dev.peios.libpeios-devel" = ">= 0.5.0"
 "dev.peios.kernel-headers" = ">= 0.20.1-rc13"
 "org.iana.tzdata"          = ">= 2026c"
-
-[test.dependencies.apt]
-dash         = "*"
-bash         = "*"
-coreutils    = "*"
-diffutils    = "*"
-findutils    = "*"
-gawk         = "*"
-grep         = "*"
-gzip         = "*"
-sed          = "*"
-gcc          = "*"
-"g++"        = "*"
-pkg-config   = "*"
-libclang-dev = "*"
-binutils     = "*"
-debugedit    = "*"
-python3      = "*"
-tzdata       = "*"
 
 [clean]
 command = "cargo clean"
