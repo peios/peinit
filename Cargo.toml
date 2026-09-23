@@ -27,15 +27,6 @@ peios = { git = "https://github.com/peios/peios-rs.git", rev = "f4309f78fbaa878a
 serde_json = "1"
 sha1 = "0.10"
 
-# The Debian reference environment cannot install Peios packages. Keep the
-# exact released libpeios source in Cargo.lock and the vendor closure without
-# ever linking it as a Rust dependency: pekit builds a private reference DSO
-# from this source only when the native pkg-config interface is unavailable.
-# `any()` is always false, so production/native Cargo feature selection cannot
-# accidentally pull this packaging-only input into Peinit.
-[target.'cfg(any())'.dependencies]
-libpeios-reference = { package = "libpeios", git = "https://github.com/peios/libpeios.git", rev = "4e7104773b618ada060e3e91c1609545f32a0e1b" }
-
 [features]
 default = []
 peios-boundary = ["dep:peios", "dep:libauthd"]

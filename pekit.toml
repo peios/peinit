@@ -10,90 +10,14 @@ name = "dev.peios.peinit-source"
 [build.vendor]
 command = '''
 set -eu
-LIBPEIOS_REV=4e7104773b618ada060e3e91c1609545f32a0e1b
-PKM_REV=b5519e6da3ecd4ce854c6299af6844f0a6ce05dd
-PKM_SHORT=$(printf %.7s "$PKM_REV")
 CARGO_HOME=$(mktemp -d)
 trap 'rm -rf "$CARGO_HOME"' EXIT
 export CARGO_HOME
 mkdir -p "$PEKIT_OUT"
 
-grep -F "libpeios.git?rev=$LIBPEIOS_REV#$LIBPEIOS_REV" Cargo.lock >/dev/null
-grep -F "pkm.git?rev=$PKM_REV#$PKM_REV" Cargo.lock >/dev/null
 cargo vendor --locked "$PEKIT_OUT/vendor" > "$PEKIT_OUT/cargo-config.toml"
 test -s "$PEKIT_OUT/cargo-config.toml"
 test -n "$(find "$PEKIT_OUT/vendor" -mindepth 1 -maxdepth 1 -type d -print -quit)"
-
-# Cargo's always-false packaging dependency places the exact libpeios source
-# and its dependencies in the offline closure without making it part of any
-# Peinit feature. Give the reference build its own copy and exact lock; the
-# primary lock's selected libc is pinned explicitly so this step cannot drift
-# as crates.io advances.
-test -f "$PEKIT_OUT/vendor/libpeios/include/peios.h"
-cp -R "$PEKIT_OUT/vendor/libpeios" "$PEKIT_OUT/libpeios-reference"
-rm -f "$PEKIT_OUT/libpeios-reference/.cargo-checksum.json" \
-      "$PEKIT_OUT/libpeios-reference/Cargo.lock"
-cargo generate-lockfile --offline \
-  --manifest-path "$PEKIT_OUT/libpeios-reference/Cargo.toml"
-cargo update --offline \
-  --manifest-path "$PEKIT_OUT/libpeios-reference/Cargo.toml" \
-  -p libc --precise 0.2.189
-grep -F 'version = "0.2.189"' "$PEKIT_OUT/libpeios-reference/Cargo.lock" >/dev/null
-
-# libpeios's public headers include the PKM userspace UAPI which sits outside
-# Cargo's selected peios-uapi crate. Copy it from the same locked Git checkout.
-PKM_ROOT=
-for candidate in "$CARGO_HOME"/git/checkouts/pkm-*/*; do
-  test -d "$candidate/uapi/pkm" || continue
-  test "$(basename "$candidate")" = "$PKM_SHORT" || continue
-  test -z "$PKM_ROOT" || {
-    echo "peinit: multiple PKM checkouts match $PKM_REV" >&2
-    exit 1
-  }
-  PKM_ROOT=$candidate
-done
-test -n "$PKM_ROOT" || {
-  echo "peinit: Cargo did not materialize PKM $PKM_REV" >&2
-  exit 1
-}
-cp -R "$PKM_ROOT/uapi" "$PEKIT_OUT/pkm-uapi"
-test -f "$PEKIT_OUT/pkm-uapi/pkm/pkm.h"
-
-# Debian stable's compiler is intentionally only a bootstrap for vendoring: it
-# predates stabilized let-chains used by Peinit.  Reference builds therefore
-# use the exact upstream 1.98.1 binary release, fetched in this network-enabled
-# stage and verified against the pinned upstream digest.  Native builds must
-# continue to consume org.rust-lang.rust from their dependency root.
-if [ "${PEKIT_DEPENDENCY_PROVIDER:-}" = apt ]; then
-  RUST_VERSION=1.98.1
-  RUST_ARCHIVE=rust-$RUST_VERSION-x86_64-unknown-linux-gnu.tar.xz
-  RUST_SHA256=5326b36c53de11d148c8f8dab6553a3d1006c2cfd32123683073fad3c302605b
-  curl -fL --retry 3 --proto '=https' --tlsv1.2 \
-    -o "$PEKIT_OUT/$RUST_ARCHIVE" \
-    "https://static.rust-lang.org/dist/$RUST_ARCHIVE"
-  printf '%s  %s\n' "$RUST_SHA256" "$PEKIT_OUT/$RUST_ARCHIVE" | sha256sum -c -
-  tar -xJf "$PEKIT_OUT/$RUST_ARCHIVE" -C "$PEKIT_OUT"
-  "$PEKIT_OUT/rust-$RUST_VERSION-x86_64-unknown-linux-gnu/install.sh" \
-    --prefix="$PEKIT_OUT/reference-rust" \
-    --disable-ldconfig \
-    --components=rustc,cargo,rust-std-x86_64-unknown-linux-gnu
-  rm -rf "$PEKIT_OUT/$RUST_ARCHIVE" \
-    "$PEKIT_OUT/rust-$RUST_VERSION-x86_64-unknown-linux-gnu"
-  test "$("$PEKIT_OUT/reference-rust/bin/rustc" --version | awk '{print $2}')" = "$RUST_VERSION"
-
-  # Debian's cbindgen 0.27 cannot verify the committed 0.29.2 ABI snapshot.
-  # Pin Mozilla's official x86_64 release asset by the digest published in its
-  # release metadata; this tool participates only in the reference ABI gate.
-  CBINDGEN_SHA256=a513332aff361143077ac3680c424fa9569c4310d3098fe3a1308c201d2ea23b
-  mkdir -p "$PEKIT_OUT/reference-tools"
-  curl -fL --retry 3 --proto '=https' --tlsv1.2 \
-    -o "$PEKIT_OUT/reference-tools/cbindgen" \
-    "https://github.com/mozilla/cbindgen/releases/download/0.29.2/cbindgen-ubuntu22.04"
-  printf '%s  %s\n' "$CBINDGEN_SHA256" \
-    "$PEKIT_OUT/reference-tools/cbindgen" | sha256sum -c -
-  chmod 0755 "$PEKIT_OUT/reference-tools/cbindgen"
-  test "$("$PEKIT_OUT/reference-tools/cbindgen" --version | awk '{print $2}')" = 0.29.2
-fi
 '''
 
 [build.vendor.dependencies.peipkg]
@@ -118,8 +42,6 @@ export CARGO_HOME="$PEKIT_OUT/cargo-home"
 mkdir -p "$CARGO_HOME"
 cp "$PEKIT_VENDOR_OUT/cargo-config.toml" "$CARGO_HOME/config.toml"
 
-. packaging/prepare-rust.sh
-
 for tool in cargo rustc gcc g++ pkg-config cbindgen objcopy strip readelf debugedit python3; do
   command -v "$tool" >/dev/null || {
     echo "peinit: missing required build tool: $tool" >&2
@@ -127,13 +49,10 @@ for tool in cargo rustc gcc g++ pkg-config cbindgen objcopy strip readelf debuge
   }
 done
 
-# Production consumes only the packaged C ABI. Debian builds an exact private
-# copy from the locked public source solely because apt cannot install a Peios
-# package. No sibling checkout or mutable Cargo cache is visible in either
-# environment, and the provider check prevents the fallback masking a broken
-# native dependency root.
+# Production consumes only the packaged C ABI. No sibling checkout or mutable
+# Cargo cache is visible to the build.
 unset PEIOS_LIB_DIR PEIOS_INCLUDE PKM_UAPI
-. packaging/prepare-libpeios.sh
+. packaging/check-libpeios.sh
 export BINDGEN_EXTRA_CLANG_ARGS="-isystem $(gcc -print-file-name=include) ${BINDGEN_EXTRA_CLANG_ARGS:-}"
 
 cargo metadata --locked --offline --no-deps --format-version 1 |
@@ -288,9 +207,10 @@ LIBDIR="usr/lib/$TRIPLET"
 export CARGO_HOME="$PEKIT_OUT/cargo-home"
 mkdir -p "$CARGO_HOME"
 cp "$PEKIT_VENDOR_OUT/cargo-config.toml" "$CARGO_HOME/config.toml"
-. packaging/prepare-rust.sh
+command -v rustc >/dev/null
+command -v cargo >/dev/null
 unset PEIOS_LIB_DIR PEIOS_INCLUDE PKM_UAPI
-. packaging/prepare-libpeios.sh
+. packaging/check-libpeios.sh
 export BINDGEN_EXTRA_CLANG_ARGS="-isystem $(gcc -print-file-name=include) ${BINDGEN_EXTRA_CLANG_ARGS:-}"
 export RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }-Dwarnings"
 cargo test --release --locked --offline --target-dir "$PEKIT_OUT/target-test"
