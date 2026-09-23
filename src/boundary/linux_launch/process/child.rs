@@ -121,6 +121,20 @@ pub(super) fn child_exec(token: &Token, command: &mut LaunchCommand, spec: Child
         fail_child_setup(exec_error_write_fd, ProcessPreExecStep::ResetSignals, errno);
     }
 
+    // Resource limits and OOM immunity are peinit's policy, not authority the
+    // service holds, so they are applied under peinit's credentials before the
+    // token drops them. Raising a hard limit or lowering oom_score_adj needs
+    // CAP_SYS_RESOURCE (SeIncreaseQuotaPrivilege); after the install, a
+    // Critical service narrowed by RequiredPrivileges could not start
+    // (PEI-1150).
+    if let Err(errno) = set_rlimits(limit_nofile, limit_core) {
+        fail_child_setup(exec_error_write_fd, ProcessPreExecStep::SetRlimits, errno);
+    }
+
+    if let Err(errno) = set_oom_score_adj(oom_score_adj) {
+        fail_child_setup(exec_error_write_fd, ProcessPreExecStep::SetOomScore, errno);
+    }
+
     if let Err(error) = token.install() {
         fail_child_setup(
             exec_error_write_fd,
@@ -129,14 +143,6 @@ pub(super) fn child_exec(token: &Token, command: &mut LaunchCommand, spec: Child
         );
     }
     close_fd(token.as_raw_fd());
-
-    if let Err(errno) = set_rlimits(limit_nofile, limit_core) {
-        fail_child_setup(exec_error_write_fd, ProcessPreExecStep::SetRlimits, errno);
-    }
-
-    if let Err(errno) = set_oom_score_adj(oom_score_adj) {
-        fail_child_setup(exec_error_write_fd, ProcessPreExecStep::SetOomScore, errno);
-    }
 
     if let Err(errno) = change_working_directory(command.working_directory_ptr()) {
         fail_child_setup(
