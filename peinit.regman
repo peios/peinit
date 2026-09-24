@@ -1,0 +1,1174 @@
+--- machine\system\services
+canonical: Machine\System\Services
+
+Every service this machine knows about. One subkey per service, named by
+the service; the values inside it are the definition. peinit reads the
+whole subtree once at boot to build the dependency graph, and again on
+`reload-config`; between those it works from an in-memory copy and learns
+about edits through a registry watch on this key.
+
+A change is therefore **picked up, not pushed** — and when it takes
+effect depends on the field, which is what each value's `applies` says.
+`reload-config` is the explicit, atomic way to make peinit re-read
+everything: it builds and validates a whole new graph and swaps it in only
+if validation passes, without disturbing running services.
+
+peinit creates this key on first boot if it is absent, so a fresh image
+has somewhere to install into.
+
+Default security: inherits the Machine hive root (SYSTEM and
+Administrators full, Authenticated Users read). Who may manage a given
+service is a separate question, answered by that service's
+`ServiceSecurity`.
+
+--- machine\system\services schemaversion
+canonical: Machine\System\Services SchemaVersion
+type: REG_DWORD
+default: 1 (stamped by peinit when absent)
+valid: 1
+applies: n/a
+
+The version of the service-definition schema in this subtree.
+
+peinit stamps `1` on first boot if the value is absent, and never
+overwrites one that is present, so a future migration that bumps it is not
+silently downgraded by an older peinit booting once. A version newer
+than peinit supports is a warning, not a refusal: peinit logs it and
+carries on decoding what it understands, because refusing to boot over a
+schema bump would be a worse failure than ignoring a field.
+
+--- machine\system\services\<name>
+canonical: Machine\System\Services\<name>
+
+One service definition. The key name is the service name, and the values
+in it are the whole definition — only `ImagePath` is required.
+
+A service name is 1 to 128 bytes of ASCII letters, digits, `.`, `_` and
+`-`. Nothing else: no spaces, no slashes, no colons. The same grammar
+governs a `Provides` role, because virtual and real names share one
+namespace.
+
+Unknown values are ignored, so a field from a newer schema costs nothing.
+A value that is recognised but malformed is an error for the whole
+definition, not a field that falls back to its default — a service whose
+`Identity` you typoed must not quietly start as `LocalService`.
+
+When an edit takes effect is per field, and every value below says so in
+`applies`:
+
+- `restart` — only a fresh process picks it up. What the process **is or
+  runs as**: `ImagePath`, `Type`, `Identity`, `RequiredPrivileges`,
+  `ErrorControl`.
+- `next start` — the graph is rebuilt, but a running service is left
+  alone: the dependency fields and the start-time checks.
+- `live` — peinit consults it the next time it acts. Timeouts, restart
+  policy, health checks, the hooks, and everything else.
+
+`ServiceSecurity` is the one re-read on every control request, so an
+access-control change binds on the very next command.
+
+--- machine\system\services\<name> imagepath
+canonical: Machine\System\Services\<name> ImagePath
+type: REG_SZ
+default: (required)
+valid: an absolute path
+applies: restart
+
+The service binary. The one required value in a definition.
+
+Must begin with `/`. It is the path peinit executes, not a command line —
+arguments belong in `Arguments`, and there is no shell, no `PATH` search
+and no word splitting here.
+
+--- machine\system\services\<name> arguments
+canonical: Machine\System\Services\<name> Arguments
+type: REG_MULTI_SZ
+default: (none)
+valid: any strings; each element is one argument
+applies: live
+
+Arguments passed to `ImagePath`, one list element per argument.
+
+Because each element is one argument, an element containing spaces arrives
+as a single argument rather than being split — which is what you want for
+a path with a space in it, and what catches people who write the whole
+command line into one element.
+
+--- machine\system\services\<name> workingdirectory
+canonical: Machine\System\Services\<name> WorkingDirectory
+type: REG_SZ
+default: /
+valid: a non-empty absolute path
+applies: live
+
+The working directory the service starts in.
+
+--- machine\system\services\<name> ttypath
+canonical: Machine\System\Services\<name> TTYPath
+type: REG_SZ
+default: (none — no terminal)
+valid: an absolute path, or empty for none
+applies: live
+
+A terminal to attach as the service's stdio and controlling terminal,
+e.g. `/dev/console` or `/dev/tty1`.
+
+Absent or **empty** means the daemon default: `/dev/null` on stdin, output
+captured and forwarded to the log. Empty is meaningful rather than
+malformed, so a seeded or inherited `TTYPath` can be switched off without
+deleting the value.
+
+Attaching a terminal suppresses log capture — the output goes to the
+terminal instead, because it cannot go to both.
+
+--- machine\system\services\<name> ttyprecedence
+canonical: Machine\System\Services\<name> TTYPrecedence
+type: REG_DWORD
+default: 0
+valid: any; rejected without a TTYPath
+applies: live
+
+Who wins the terminal when several services want it at the same moment.
+
+Higher wins; ties break on service name, so the outcome is stable rather
+than a race. Setting it without a `TTYPath` is refused rather than
+ignored: it can only be a mistake, and a silently inert value is one
+nobody finds.
+
+--- machine\system\services\<name> environment
+canonical: Machine\System\Services\<name> Environment
+type: REG_MULTI_SZ
+default: (none)
+valid: KEY=VALUE per element; KEY non-empty, no NUL
+applies: live
+
+Environment variables added to the service's environment.
+
+Each element is split at the **first** `=`, so a value may contain further
+`=` signs. An element with no `=` at all is an error. These are added to
+the machine-wide defaults under `Init\EnvVars`, and win where both name
+the same variable.
+
+--- machine\system\services\<name> runtimedirectories
+canonical: Machine\System\Services\<name> RuntimeDirectories
+type: REG_MULTI_SZ
+default: (none)
+valid: one bare name per element; no /, \, ., .. or controls
+applies: live
+
+Directories created directly under `/run` just before the main process
+starts.
+
+Each element is a plain relative name — `foo`, never `foo/bar` and never
+`/run/foo`. For `foo`, peinit creates `/run/foo` and applies a descriptor
+granting full access to SYSTEM, Administrators and this service's own SID.
+If it cannot create or secure it, the start fails with
+`ParentSetupFailure`.
+
+peinit does **not** remove these when the service stops. `/run` is a
+boot-scoped tmpfs and the next boot clears it for you.
+
+--- machine\system\services\<name> limitnofile
+canonical: Machine\System\Services\<name> LimitNOFILE
+type: REG_DWORD
+default: (inherited from peinit)
+valid: any
+applies: live
+
+`RLIMIT_NOFILE` for the service: how many file descriptors it may hold.
+
+--- machine\system\services\<name> limitcore
+canonical: Machine\System\Services\<name> LimitCORE
+type: REG_DWORD
+default: (inherited from peinit)
+valid: any, in bytes
+applies: live
+
+`RLIMIT_CORE` for the service, in bytes: the largest core dump it may
+write. `0` disables core dumps for this service.
+
+--- machine\system\services\<name> type
+canonical: Machine\System\Services\<name> Type
+type: REG_DWORD
+default: 0 (Simple)
+valid: 0 or 1
+applies: restart
+
+What shape of process this is.
+
+- `0` — **Simple**: a long-running process. It is expected to stay up, and
+  its exit is an event the restart policy answers.
+- `1` — **Oneshot**: a process that does a job and exits. A successful
+  exit is the normal outcome, not a failure.
+
+Any other value refuses the definition rather than falling back to Simple.
+
+--- machine\system\services\<name> readiness
+canonical: Machine\System\Services\<name> Readiness
+type: REG_DWORD
+default: 0 (Notify)
+valid: 0 or 1
+applies: live
+
+How peinit decides the service is ready, for Simple services.
+
+- `0` — **Notify**: wait for `READY=1` over the notify socket. The service
+  says when it is ready, which is the only way to be right about it.
+- `1` — **Alive**: ready as soon as the process is running. For a service
+  that cannot be taught to notify.
+
+Ignored for Oneshot, where readiness is the exit.
+
+--- machine\system\services\<name> remainafterexit
+canonical: Machine\System\Services\<name> RemainAfterExit
+type: REG_DWORD
+default: 0
+valid: 0 or 1
+applies: live
+
+Oneshot only: stay Completed after a successful exit rather than going
+inactive.
+
+What it is for is dependencies — a Oneshot that sets something up stays
+"done" so services that `Requires` it keep their satisfaction after it has
+exited.
+
+--- machine\system\services\<name> successexitcodes
+canonical: Machine\System\Services\<name> SuccessExitCodes
+type: REG_MULTI_SZ
+default: (none — only 0 is success)
+valid: decimal 0-255 per element; duplicates ignored
+applies: live
+
+Non-zero exit codes to treat as success.
+
+For the programs that report something other than failure through a
+non-zero status — "nothing to do", "already applied". Without this every
+non-zero exit is a failure and the restart policy acts on it.
+
+--- machine\system\services\<name> triggers
+canonical: Machine\System\Services\<name> Triggers
+type: REG_MULTI_SZ
+default: (none — demand-only)
+valid: boot, boot:settled, tty:released, timer:<schedule>
+applies: live
+
+What starts this service without anybody asking.
+
+- `boot` — start it as part of the boot set.
+- `boot:settled` — start it once the boot set has stopped moving, bounded
+  by `Boot\SettleTimeout`. For things that should not compete with boot.
+- `tty:released` — start it when the terminal named by `TTYPath` is given
+  up by whoever held it. Refused without a `TTYPath`.
+- `timer:<schedule>` — start it on a schedule. See `TimerPersistent`,
+  `TimerJitter` and the `TimerState` subkey.
+
+Absent means demand-only: it starts when something starts it. Bare `tty`
+and bare `timer` are errors, not shorthands, and an unrecognised
+sub-trigger (`boot:setled`) is an error rather than a silently unknown
+kind.
+
+--- machine\system\services\<name> disabled
+canonical: Machine\System\Services\<name> Disabled
+type: REG_DWORD
+default: 0
+valid: 0 or 1
+applies: live
+
+If `1`, triggers must not activate this service.
+
+It does not make the service unstartable — an administrator can still
+start it by hand, and a dependency still pulls it in. It switches off the
+automatic paths only, which is the difference between "off" and "gone".
+
+--- machine\system\services\<name> safemode
+canonical: Machine\System\Services\<name> SafeMode
+type: REG_DWORD
+default: 0
+valid: 0 or 1
+applies: live
+
+If `1`, attempt to start this service in Safe mode as well as normal boot.
+
+`ErrorControl = 1` (Critical) implies it: a service the machine cannot
+boot without is by definition one Safe mode needs.
+
+--- machine\system\services\<name> conditions
+canonical: Machine\System\Services\<name> Conditions
+type: REG_MULTI_SZ
+default: (none)
+valid: path:, file:, directory: or registry: with an argument
+applies: next start
+
+Start-time checks whose failure **skips** the service.
+
+A skip is not a failure: nothing goes red, dependants are not failed, and
+the next trigger tries again. Use it for "only if this applies to this
+machine".
+
+A `registry:` check may only name a key under `Machine\System\Services` or
+`Machine\System\Init` — the two subtrees peinit already holds in memory.
+Anything else is refused, because evaluating it would mean a synchronous
+registry read in the middle of a start.
+
+--- machine\system\services\<name> asserts
+canonical: Machine\System\Services\<name> Asserts
+type: REG_MULTI_SZ
+default: (none)
+valid: same grammar as Conditions
+applies: next start
+
+Start-time checks whose failure **fails** the service.
+
+Same checks as `Conditions`, opposite verdict: this is for a precondition
+whose absence means something is wrong, not something is inapplicable.
+
+--- machine\system\services\<name> prestartchecktimeout
+canonical: Machine\System\Services\<name> PreStartCheckTimeout
+type: REG_DWORD
+default: 5
+valid: seconds
+applies: live
+
+Seconds allowed for the helper that evaluates filesystem `Conditions` and
+`Asserts`.
+
+If it overruns it is killed and the check counts as **not satisfied** — so
+a Condition skips and an Assert fails. Erring that way is deliberate: a
+check that did not answer is not a check that passed.
+
+--- machine\system\services\<name> timerpersistent
+canonical: Machine\System\Services\<name> TimerPersistent
+type: REG_DWORD
+default: 1
+valid: 0 or 1
+applies: live
+
+Whether a missed timer run is caught up after a reboot.
+
+With `1`, a machine that was off when the timer should have fired runs it
+once on the next boot, using the timestamp in `LastTimerRun` or
+`TimerState`. With `0`, a missed firing is simply missed.
+
+--- machine\system\services\<name> timerjitter
+canonical: Machine\System\Services\<name> TimerJitter
+type: REG_DWORD
+default: 0
+valid: seconds
+applies: live
+
+Maximum random delay added to each firing, in seconds.
+
+The delay is drawn fresh per firing in `0..=TimerJitter`. It exists to
+stop a fleet configured from one image from hitting the same server in the
+same second; on a single machine it has no purpose.
+
+--- machine\system\services\<name> identity
+canonical: Machine\System\Services\<name> Identity
+type: REG_SZ
+default: LocalService
+valid: a principal name or SID; empty means the default
+applies: restart
+
+The principal the service token is minted for.
+
+A well-known name (`SYSTEM`, `LocalService`, `NetworkService`) or a
+literal SID. Whatever it is, the token also carries the `S-1-5-80` service
+SID derived from the service name, which is how a record under
+`Machine\Generic\Authn\Policy` can grant a privilege to this service alone
+rather than to everything running as `LocalService`.
+
+--- machine\system\services\<name> requiredprivileges
+canonical: Machine\System\Services\<name> RequiredPrivileges
+type: REG_MULTI_SZ
+default: (none — every privilege removed)
+valid: privilege names; no empty element
+applies: restart
+
+The privileges the service keeps. Everything else is removed from its
+token.
+
+This is an allow-list, not an addition: the default of absent means the
+service runs with none of them. Naming too few is the common mistake and
+an awkward one to diagnose — `SeChangeNotifyPrivilege` in particular is
+what lets a process traverse a directory to open a file, so a daemon
+granted only the privilege it obviously needs may not be able to read its
+own state.
+
+--- machine\system\services\<name> hookidentity
+canonical: Machine\System\Services\<name> HookIdentity
+type: REG_SZ
+default: (the service's own Identity)
+valid: a principal name or SID; empty means the default
+applies: live
+
+The identity `ExecStartPre` and `ExecStartPost` run as.
+
+For the case where the setup step needs more authority than the daemon
+should keep — the hook runs as one principal and the service as another,
+instead of the service holding the union for its whole life.
+
+--- machine\system\services\<name> requires
+canonical: Machine\System\Services\<name> Requires
+type: REG_MULTI_SZ
+default: (none)
+valid: service or service:level; level 1-64 graphic ASCII
+applies: next start
+
+Hard dependencies: this service does not start until each of these is
+satisfied, and fails if one cannot be.
+
+An entry may name a readiness **level** — `netd:routed`,
+`timed:synchronised` — to wait for a particular state rather than merely
+for the service to be up. The level vocabulary belongs to the service
+publishing it.
+
+An entry may also name a role rather than a service: anything another
+service lists in `Provides` is satisfied by that service.
+
+--- machine\system\services\<name> wants
+canonical: Machine\System\Services\<name> Wants
+type: REG_MULTI_SZ
+default: (none)
+valid: same grammar as Requires
+applies: next start
+
+Soft dependencies: start these first if they can start, but do not fail if
+they cannot.
+
+--- machine\system\services\<name> bindsto
+canonical: Machine\System\Services\<name> BindsTo
+type: REG_MULTI_SZ
+default: (none)
+valid: same grammar as Requires
+applies: next start
+
+Runtime coupling: `Requires`, plus this service stops when the named
+service stops.
+
+The difference from `Requires` is what happens after a successful start.
+`Requires` is a start-ordering statement; `BindsTo` keeps holding, so a
+service bound to a device or a network that goes away goes away with it.
+
+--- machine\system\services\<name> conflicts
+canonical: Machine\System\Services\<name> Conflicts
+type: REG_MULTI_SZ
+default: (none)
+valid: same grammar as Requires; a level is inert here
+applies: next start
+
+Mutual exclusion: starting this service stops the named ones, and they
+cannot run together.
+
+A level on a `Conflicts` entry parses but means nothing — conflicting with
+a service at one readiness level and not another is not something peinit
+can act on. It is accepted rather than specially rejected because a
+grammar rule that holds for three of four list fields is one people get
+wrong.
+
+--- machine\system\services\<name> provides
+canonical: Machine\System\Services\<name> Provides
+type: REG_MULTI_SZ
+default: (none)
+valid: bare role names, service-name grammar; no level
+applies: next start
+
+Virtual names this service fills, so other services can depend on the
+**role** without naming the implementation.
+
+A role is validated against the ordinary service-name grammar because
+virtual and real names share one namespace: `Requires = ["authn"]` is
+satisfied either by a service literally called `authn` or by any service
+providing it, and that only works while both sides admit the same strings.
+
+A level is refused rather than ignored. `netd:routed` names a condition on
+a service, and a role is not a service, so there is nothing for the level
+to qualify.
+
+--- machine\system\services\<name> onfailure
+canonical: Machine\System\Services\<name> OnFailure
+type: REG_SZ
+default: (none)
+valid: one service name, no level
+applies: next start
+
+A service to start when this one enters Failed.
+
+For the recovery action — a notifier, a fallback, a cleanup. It fires on
+entry to Failed, which is after the restart policy has given up, not on
+each failed attempt.
+
+--- machine\system\services\<name> errorcontrol
+canonical: Machine\System\Services\<name> ErrorControl
+type: REG_DWORD
+default: 0 (Normal)
+valid: 0 or 1
+applies: restart
+
+How much the machine depends on this service.
+
+- `0` — **Normal**: its failure is its own.
+- `1` — **Critical**: the machine cannot usefully run without it. An
+  irrecoverable failure syncs the disks and reboots, and boot is not
+  called successful until it has held a satisfying state for
+  `Boot\BootSuccessGrace`. Critical implies `SafeMode`.
+
+Reach for Critical rarely and deliberately: it converts a service fault
+into a reboot loop if the fault is persistent.
+
+--- machine\system\services\<name> restartpolicy
+canonical: Machine\System\Services\<name> RestartPolicy
+type: REG_DWORD
+default: 1 (OnFailure)
+valid: 0, 1 or 2
+applies: live
+
+When peinit restarts the service after it exits.
+
+- `0` — **Never**.
+- `1` — **OnFailure**: restart on a failing exit, leave a successful one
+  alone. The default, and right for almost everything.
+- `2` — **Always**: restart whatever the exit status. For a process whose
+  clean exit still means the machine has lost the service.
+
+--- machine\system\services\<name> restartmaxretries
+canonical: Machine\System\Services\<name> RestartMaxRetries
+type: REG_DWORD
+default: 5
+valid: consecutive attempts
+applies: live
+
+Consecutive restarts before the service is declared Failed.
+
+The counter resets after the service has been healthy for
+`RestartWindow` — so a service that fails once a day forever is restarted
+every time, and one that fails five times in a minute is failed.
+
+--- machine\system\services\<name> restartwindow
+canonical: Machine\System\Services\<name> RestartWindow
+type: REG_DWORD
+default: 120
+valid: seconds
+applies: live
+
+Seconds of healthy running that reset the restart counter.
+
+This is what separates a flapping service from an occasionally unlucky
+one, and the value worth tuning if your service takes longer than two
+minutes to prove itself.
+
+--- machine\system\services\<name> restartdelay
+canonical: Machine\System\Services\<name> RestartDelay
+type: REG_DWORD
+default: 1
+valid: seconds; the backoff base
+applies: live
+
+The backoff base, in seconds: how long peinit waits before the first
+restart.
+
+It doubles per consecutive failure and is capped at 60 seconds, so the
+default gives 1, 2, 4, 8, 16, 32, 60, 60 …
+
+--- machine\system\services\<name> healthcheck
+canonical: Machine\System\Services\<name> HealthCheck
+type: REG_SZ
+default: (none — no health checking)
+valid: an absolute executable, with arguments
+applies: live
+
+A command run periodically to decide whether the service is healthy.
+
+The executable must be absolute. Arguments are split on whitespace, and a
+double-quoted run is kept together — there is no shell, so no globbing, no
+variable expansion and no pipelines. Exit `0` is healthy.
+
+--- machine\system\services\<name> healthcheckinterval
+canonical: Machine\System\Services\<name> HealthCheckInterval
+type: REG_DWORD
+default: 30
+valid: seconds
+applies: live
+
+Seconds between health checks.
+
+--- machine\system\services\<name> healthchecktimeout
+canonical: Machine\System\Services\<name> HealthCheckTimeout
+type: REG_DWORD
+default: 5
+valid: seconds
+applies: live
+
+Seconds before a running health check is killed and counted as a failure.
+
+Keep it comfortably below `HealthCheckInterval`: a check that can outlive
+its own interval makes the interval meaningless.
+
+--- machine\system\services\<name> healthcheckretries
+canonical: Machine\System\Services\<name> HealthCheckRetries
+type: REG_DWORD
+default: 3
+valid: consecutive failures
+applies: live
+
+Consecutive failed health checks before the service is unhealthy.
+
+--- machine\system\services\<name> watchdogtimeout
+canonical: Machine\System\Services\<name> WatchdogTimeout
+type: REG_DWORD
+default: 0 (disabled)
+valid: seconds; 0 disables
+applies: live
+
+Seconds peinit will wait between `WATCHDOG=1` pings before acting.
+
+The service must send them itself over the notify socket, so this is only
+useful for a service built to. It catches the hang a health check cannot:
+a process that is up, answering nothing, and would pass any check that
+merely looks at it from outside.
+
+--- machine\system\services\<name> execstartpre
+canonical: Machine\System\Services\<name> ExecStartPre
+type: REG_MULTI_SZ
+default: (none)
+valid: an absolute executable per element, with arguments
+applies: live
+
+Commands run before the service binary, in order.
+
+Any failure aborts the start — these are preparation, and a start that
+proceeds on half-done preparation is worse than one that does not
+proceed. They run as `HookIdentity` if set, otherwise as the service's own
+`Identity`. Same command grammar as `HealthCheck`: absolute executable, no
+shell.
+
+--- machine\system\services\<name> execstartpost
+canonical: Machine\System\Services\<name> ExecStartPost
+type: REG_MULTI_SZ
+default: (none)
+valid: an absolute executable per element, with arguments
+applies: live
+
+Commands run after the service becomes ready, or after a Oneshot exits
+successfully.
+
+A failure here is logged and **not** fatal, which is the opposite of
+`ExecStartPre` and deliberate: by this point the service is up, and
+tearing it down because a notification step failed would trade a working
+service for a tidy status.
+
+--- machine\system\services\<name> execreload
+canonical: Machine\System\Services\<name> ExecReload
+type: REG_SZ
+default: (none — SIGHUP)
+valid: an absolute executable, or signal:<NAME>
+applies: live
+
+What `reload` does to this service.
+
+Absent, peinit sends SIGHUP. `signal:SIGUSR1` sends that signal instead —
+the name must be a real signal, spelled with its `SIG` prefix. Anything
+else is a command, run under the same absolute-executable rule as the
+other hooks.
+
+--- machine\system\services\<name> starttimeout
+canonical: Machine\System\Services\<name> StartTimeout
+type: REG_DWORD
+default: 30
+valid: seconds
+applies: live
+
+Seconds for the whole start sequence — hooks, exec, and readiness
+together.
+
+Not just the binary: a service with slow `ExecStartPre` commands is
+spending this budget before its own process has begun.
+
+--- machine\system\services\<name> stoptimeout
+canonical: Machine\System\Services\<name> StopTimeout
+type: REG_DWORD
+default: 10
+valid: seconds
+applies: live
+
+Seconds between SIGTERM and SIGKILL when the service is asked to stop.
+
+A service that needs to flush state on the way down needs this long enough
+to do it; one that ignores SIGTERM only makes shutdown slower.
+
+--- machine\system\services\<name> notifyaccess
+canonical: Machine\System\Services\<name> NotifyAccess
+type: REG_DWORD
+default: 0 (Main)
+valid: 0
+applies: live
+
+Who may send readiness and watchdog notifications for this service.
+
+`0` (Main — the main process only) is the sole supported value; anything
+else refuses the definition. The value exists so that widening it later is
+a value change rather than a schema change.
+
+--- machine\system\services\<name> fdstoremax
+canonical: Machine\System\Services\<name> FdStoreMax
+type: REG_DWORD
+default: 0 (disabled)
+valid: descriptors; 0 disables
+applies: live
+
+How many file descriptors peinit will hold for this service across a
+restart.
+
+For the service that wants to keep a listening socket or an open device
+over a restart instead of racing to reacquire it. `0` means no store at
+all.
+
+--- machine\system\services\<name> servicesecurity
+canonical: Machine\System\Services\<name> ServiceSecurity
+type: REG_BINARY
+default: (absent — inherits the parent key)
+valid: a self-relative Peios security descriptor
+applies: live
+
+Who may manage this service: start it, stop it, query it.
+
+Re-read on **every** control request rather than cached with the
+definition, so a change binds on the very next command without touching
+the running process. That makes it the right tool for delegating one
+service to a team without handing over service control generally.
+
+Note what it does not govern: editing the definition. That is a registry
+write, gated by this key's own descriptor.
+
+--- machine\system\services\<name> displayname
+canonical: Machine\System\Services\<name> DisplayName
+type: REG_SZ
+default: (the service name)
+valid: any string; empty means absent
+applies: live
+
+A human-readable name for status output.
+
+--- machine\system\services\<name> description
+canonical: Machine\System\Services\<name> Description
+type: REG_SZ
+default: (none)
+valid: any string; empty means absent
+applies: live
+
+What this service is for, in a sentence, for whoever finds it in a status
+listing at three in the morning.
+
+--- machine\system\services\<name> lasttimerrun
+canonical: Machine\System\Services\<name> LastTimerRun
+type: REG_QWORD
+default: (absent until the timer has fired)
+valid: written by peinit
+applies: n/a
+
+When this service's timer last fired, for a service with exactly one timer
+trigger.
+
+Written by peinit, not configuration. It is what `TimerPersistent` reads
+to decide whether a firing was missed while the machine was off. A service
+with several timer triggers uses the `TimerState` subkey instead, because
+one value cannot record several schedules.
+
+Deleting it makes the next boot treat the timer as never having run.
+
+--- machine\system\services\<name>\timerstate
+canonical: Machine\System\Services\<name>\TimerState
+
+Per-trigger last-run timestamps, for a service with more than one timer
+trigger.
+
+One value per schedule, so each trigger is caught up independently. Like
+`LastTimerRun` this is peinit's record rather than configuration; the key
+appears once the service has fired.
+
+--- machine\system\services\<name>\timerstate <schedule>
+canonical: Machine\System\Services\<name>\TimerState <schedule>
+type: REG_QWORD
+default: (absent until that trigger has fired)
+valid: written by peinit
+applies: n/a
+
+When one particular timer trigger last fired.
+
+The value **name** is the schedule string from `Triggers`, percent-encoded:
+everything outside ASCII letters, digits, `.`, `_` and `-` becomes `%XX`
+with uppercase hex. So the trigger `timer:--* 03:00:00` records against
+the value name `%2A-%2A-%2A%2003%3A00%3A00`.
+
+The encoding exists because a schedule contains characters a value name
+cannot carry, and it is reversible so the two can always be matched up.
+
+--- machine\system\boot
+canonical: Machine\System\Boot
+
+How boot and shutdown are paced. Five values, all optional, all read by
+peinit at the point it needs them.
+
+Nothing here describes what boots — that is the `Triggers` on each
+service. This key is about the bounds: how much may happen at once, how
+long a thing is given before peinit stops waiting for it.
+
+Unlike `Services` and `Init`, **this key is not watched**. peinit does not
+notice an edit here the way it notices one to a service definition, and
+does not create the key if it is absent. Each value below says what it
+actually takes: most of them the next boot, `ShutdownTimeout` an explicit
+`reload-config`.
+
+Default security: inherits the Machine hive root (SYSTEM and
+Administrators full, Authenticated Users read).
+
+--- machine\system\boot maxparallelstarts
+canonical: Machine\System\Boot MaxParallelStarts
+type: REG_DWORD
+default: 10
+valid: greater than 0; 0 sends boot to Recovery
+applies: next boot
+
+The most services peinit will have starting concurrently.
+
+Absent means the default. **Zero is not** — a plan that may start nothing
+can never finish, so rather than silently substituting the default peinit
+treats it as an unbootable configuration and goes to Recovery, where you
+can fix it.
+
+Lower it on a machine whose boot is I/O-bound and thrashing; raising it
+past what the storage can feed rarely helps.
+
+--- machine\system\boot bootsuccessgrace
+canonical: Machine\System\Boot BootSuccessGrace
+type: REG_DWORD
+default: 30
+valid: seconds
+applies: next boot
+
+Seconds a Critical service must hold a satisfying state before boot counts
+as successful.
+
+The point is to catch the service that starts, reports ready, and dies
+eight seconds later. Without a grace period that boot would be recorded as
+good and the machine would keep booting into it.
+
+--- machine\system\boot shutdowntimeout
+canonical: Machine\System\Boot ShutdownTimeout
+type: REG_DWORD
+default: 90
+valid: seconds
+applies: reload-config
+
+Maximum seconds for the whole graceful shutdown.
+
+It bounds the shutdown as a whole; each service's own `StopTimeout` bounds
+its part of it, and `PostKillTimeout` bounds the last stage. When this
+expires peinit stops waiting and finishes the shutdown regardless.
+
+The one value on this key that a running peinit will pick up — but only
+when something makes it re-read its configuration. `Boot` is not watched,
+so an edit sits there until an explicit `reload-config` or the next boot.
+
+--- machine\system\boot settletimeout
+canonical: Machine\System\Boot SettleTimeout
+type: REG_DWORD
+default: 5
+valid: seconds
+applies: next boot
+
+Seconds to wait for the boot set to stop moving before starting
+`boot:settled` services anyway.
+
+It bounds the wait so that one service stuck in Starting delays a console
+prompt rather than denying it.
+
+--- machine\system\boot postkilltimeout
+canonical: Machine\System\Boot PostKillTimeout
+type: REG_DWORD
+default: 5
+valid: seconds
+applies: next boot
+
+Seconds peinit waits for a service's cgroup to drain after SIGKILL before
+treating it as stuck.
+
+`ShutdownTimeout` bounds the shutdown as a whole; this bounds one
+service's last stage of it. A cgroup that will not empty usually means a
+process in uninterruptible sleep, which no further signal will move.
+
+--- machine\system\init
+canonical: Machine\System\Init
+
+peinit's own operational parameters: its two sockets, its logging, its
+control descriptor, and the two subkeys that hold machine-wide environment
+defaults and boot-time path provisioning.
+
+Everything here is optional and has a compiled-in default, so an empty key
+is a working machine. peinit watches this key along with `Services`, and
+creates it on first boot if it is absent.
+
+Note the division against `Machine\System\Boot`: this key is about how
+peinit runs, that one about how boot and shutdown are paced. The practical
+difference is the watch — an edit here is noticed and applied, an edit
+there generally waits for the next boot.
+
+Default security: inherits the Machine hive root (SYSTEM and
+Administrators full, Authenticated Users read). The `EnvVars` subkey is
+security-critical and should be tighter — see its page.
+
+--- machine\system\init controlsecurity
+canonical: Machine\System\Init ControlSecurity
+type: REG_BINARY
+default: SYSTEM full; Administrators shutdown and reload-config
+valid: a self-relative Peios security descriptor
+applies: live
+
+Who may perform system-level control operations — shutdown, reboot,
+`reload-config`.
+
+This is the machine-wide door. Who may manage one particular service is
+that service's `ServiceSecurity`, a separate descriptor with a separate
+answer. Absent or malformed, the compiled default above applies.
+
+--- machine\system\init maxcontrolconnections
+canonical: Machine\System\Init MaxControlConnections
+type: REG_DWORD
+default: 32
+valid: concurrent connections
+applies: live
+
+Maximum concurrent connections to the control socket.
+
+--- machine\system\init maxrequestsize
+canonical: Machine\System\Init MaxRequestSize
+type: REG_DWORD
+default: 65536
+valid: bytes
+applies: live
+
+Maximum size of a single control-socket request, in bytes.
+
+--- machine\system\init connectiontimeout
+canonical: Machine\System\Init ConnectionTimeout
+type: REG_DWORD
+default: 30
+valid: seconds
+applies: live
+
+Seconds an idle control connection is held before it is closed.
+
+--- machine\system\init maxjobsconnections
+canonical: Machine\System\Init MaxJobsConnections
+type: REG_DWORD
+default: 64
+valid: concurrent connections
+applies: live
+
+Maximum concurrent connections to the jobs socket.
+
+The jobs socket is the other door — where submitted work arrives — and it
+is bounded separately from control because the two have different callers
+and different appetites.
+
+--- machine\system\init maxjobmessagesize
+canonical: Machine\System\Init MaxJobMessageSize
+type: REG_DWORD
+default: 32768
+valid: bytes
+applies: live
+
+Maximum size of one jobs-socket message, in bytes.
+
+This bounds a submission's whole definition, so a submitter with a very
+large `Environment` or argument list meets it first.
+
+--- machine\system\init jobsconnectiontimeout
+canonical: Machine\System\Init JobsConnectionTimeout
+type: REG_DWORD
+default: 30
+valid: seconds
+applies: live
+
+Seconds an idle jobs connection is held before it is closed.
+
+--- machine\system\init maxjobspersubmitter
+canonical: Machine\System\Init MaxJobsPerSubmitter
+type: REG_DWORD
+default: 64
+valid: live jobs per SID
+applies: live
+
+How many live submitted jobs one submitting SID may hold at once.
+
+A fairness bound, so one caller cannot fill the job table and deny
+everybody else. SYSTEM is exempt — the exemption exists so that the
+machine's own recovery work is not blocked by a quota meant for its
+callers.
+
+--- machine\system\init maxloglinelength
+canonical: Machine\System\Init MaxLogLineLength
+type: REG_DWORD
+default: 8192
+valid: at least 256 bytes
+applies: live
+
+Maximum bytes of one service output line before it is truncated.
+
+Below the minimum the value is ignored, the default is used, and peinit
+warns. A logging knob must not be able to decide how the machine boots, so
+it is kept rather than fatal; warned rather than silent, because an
+operator who sets a value and sees no change has no way to tell the
+setting from their diagnosis. The same rule governs the three values
+below.
+
+--- machine\system\init maxlogbufferperservice
+canonical: Machine\System\Init MaxLogBufferPerService
+type: REG_DWORD
+default: 65536
+valid: at least 4096 bytes (one page)
+applies: live
+
+Maximum bytes buffered per service output pipe before back-pressure.
+
+The floor is real rather than judgement: this is applied with
+`F_SETPIPE_SZ`, whose kernel minimum is one page and which rounds up
+regardless. Asking for less is not a smaller pipe, it is the same pipe and
+a misleading number in the registry.
+
+--- machine\system\init logreadbytesperevent
+canonical: Machine\System\Init LogReadBytesPerEvent
+type: REG_DWORD
+default: 16384
+valid: at least 512 bytes
+applies: live
+
+Bytes drained from a service's output pipe per readable event.
+
+Larger favours throughput on a chatty service; smaller favours fairness
+between services, because peinit moves on to the next pipe sooner.
+
+--- machine\system\init preeventdbuffer
+canonical: Machine\System\Init PreEventdBuffer
+type: REG_DWORD
+default: 1048576
+valid: at least 4096 bytes
+applies: live
+
+Total bytes of service output held in memory before eventd is up to
+receive it.
+
+Early boot produces log lines before the thing that stores them exists.
+Overflow drops the **oldest** output and never blocks a service — a
+service must not be slowed by the machine's inability to record what it
+said. Raise it where early services are noisy, lower it where boot-time
+memory is tight.
+
+--- machine\system\init\envvars
+canonical: Machine\System\Init\EnvVars
+
+Machine-wide default environment variables, injected into every Phase 2
+service.
+
+The value **name** is the variable and its `REG_SZ` data is the value — no
+`KEY=VALUE` packing, unlike a service's own `Environment`, which is a list
+and has to. Where both name the same variable the service's own wins.
+
+This key is security-critical and deserves a tighter descriptor than it
+inherits. A variable here is read by every service on the machine,
+including privileged ones, so write access to it is close to write access
+to what those services do.
+
+--- machine\system\init\envvars <variable>
+canonical: Machine\System\Init\EnvVars <variable>
+type: REG_SZ
+default: (none)
+valid: name non-empty and free of =; data any string
+applies: next start
+
+One machine-wide environment variable: the value name is the variable
+name, the data is its value.
+
+A name that is empty or contains `=` is refused — the `=` rule because a
+name carrying one could not round-trip into an environment block
+unambiguously.
+
+Services already running keep the environment they were started with;
+there is no way to change a live process's environment, so this applies at
+the next start.
+
+--- machine\system\init\provisionedpaths
+canonical: Machine\System\Init\ProvisionedPaths
+
+Boot-time path provisioning: directories and files peinit creates and
+secures after registryd starts and before Phase 2.
+
+One subkey per entry. This is the registry-backed equivalent of
+`tmpfiles.d` — the place to declare the directory your service needs to
+exist, owned correctly, before it runs.
+
+A malformed entry is logged and skipped rather than blocking boot. Only an
+entry marked `Required = 1` can send boot to Recovery, and only when it
+genuinely cannot be created or secured.
+
+--- machine\system\init\provisionedpaths\<name>
+canonical: Machine\System\Init\ProvisionedPaths\<name>
+
+One path to provision. The subkey name is a label of your choosing,
+validated against the service-name grammar; the object itself is named by
+`Path`.
+
+`Kind` and `Path` are both required and an entry missing either is
+skipped. Two things worth knowing before relying on this: `Kind = file`
+never truncates an existing file — it only makes sure the file is
+present — and peinit does **not** create missing parent directories.
+Declare each directory as its own entry, or depend on the package that
+owns the parent.
+
+--- machine\system\init\provisionedpaths\<name> kind
+canonical: Machine\System\Init\ProvisionedPaths\<name> Kind
+type: REG_SZ
+default: (required)
+valid: directory or file, lowercase
+applies: next boot
+
+What to create at `Path`.
+
+Matched exactly and in lowercase; `Directory` is not accepted. An
+unrecognised kind skips the entry with a warning.
+
+--- machine\system\init\provisionedpaths\<name> path
+canonical: Machine\System\Init\ProvisionedPaths\<name> Path
+type: REG_SZ
+default: (required)
+valid: an absolute path
+applies: next boot
+
+The path to create or verify.
+
+--- machine\system\init\provisionedpaths\<name> security
+canonical: Machine\System\Init\ProvisionedPaths\<name> Security
+type: REG_BINARY
+default: SYSTEM and Administrators full, users read and traverse
+valid: a self-relative Peios file security descriptor
+applies: next boot
+
+The descriptor applied to the object once it exists.
+
+It is applied whether or not peinit created the object this boot, so an
+entry is also a way to keep a path's security correct rather than merely
+to create it.
+
+--- machine\system\init\provisionedpaths\<name> required
+canonical: Machine\System\Init\ProvisionedPaths\<name> Required
+type: REG_DWORD
+default: 0
+valid: 0 or 1
+applies: next boot
+
+If `1`, failing to provision this entry sends boot to Recovery before
+Phase 2 starts.
+
+Reserve it for a path without which the machine is not usable. Everything
+else should be allowed to fail loudly in the log and let the rest of boot
+proceed.
