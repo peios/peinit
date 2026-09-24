@@ -34,3 +34,7 @@ path = "/usr/sbin/registryd"
 ":licenses/**"     = "usr/share/licenses/dev.peios.peinit/third-party"
 ":usr/bin/peinit2" = "usr/bin/peinit2"
 ":usr/share/man/man8/peinit2.8.gz" = "usr/share/man/man8/peinit2.8.gz"
+# regman documentation for the three registry roots peinit owns: the service
+# definitions, Boot, and Init. Hand-written beside the recipe rather than
+# generated, so it is taken from source with no build target involved.
+"@source:peinit.regman" = "usr/share/regman/peinit.regman"
