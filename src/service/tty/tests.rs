@@ -217,3 +217,20 @@ fn a_running_waiter_is_not_offered_the_terminal_again() {
         Some("login-console")
     );
 }
+
+#[test]
+fn kernel_console_is_pinned_independently_of_foreground_switches() {
+    use super::console_from_active;
+    assert_eq!(console_from_active("tty0\n").as_deref(), Some("/dev/tty1"));
+    assert_eq!(
+        console_from_active("ttyS0 tty0\n").as_deref(),
+        Some("/dev/ttyS0")
+    );
+    assert_eq!(
+        console_from_active("tty0 ttyS0\n").as_deref(),
+        Some("/dev/tty1")
+    );
+    assert_eq!(console_from_active("hvc0\n").as_deref(), Some("/dev/hvc0"));
+    assert_eq!(console_from_active(""), None);
+    assert_eq!(console_from_active("../tty1"), None);
+}

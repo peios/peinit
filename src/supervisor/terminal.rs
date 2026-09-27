@@ -171,6 +171,18 @@ impl Supervisor {
         let mut work = SupervisorWork::from_supervisor(self);
 
         let job_event = event(&mut work.jobs).map_err(SupervisorError::JobStore)?;
+        // A terminal main process exiting ends its session. Kill descendants
+        // before releasing its terminal or scheduling a fresh login prompt.
+        // Ordinary daemons retain their existing lifecycle behavior.
+        if self
+            .jobs
+            .get(job_event.job_id)
+            .is_some_and(|job| job.console_path.is_some())
+        {
+            cleanup_controller
+                .kill_reload_cgroup(&job_event.cgroup_id)
+                .map_err(SupervisorError::ProcessControl)?;
+        }
         let mut terminal = apply_service_main_job_terminal(
             &mut StartReadyContext {
                 services: &mut work.services,
