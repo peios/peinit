@@ -69,6 +69,9 @@ pub fn begin_due_restart_policy_relaunch(
     let context_id = next_graph
         .create_on_demand_context(&admission, &next_services)
         .map_err(RestartPolicyRelaunchError::GraphContext)?;
+    next_services
+        .consume_restart_backoff(&request.service)
+        .map_err(RestartPolicyRelaunchError::ServiceTable)?;
     let mut start_dispatches = Vec::new();
     let mut context_ids = VecDeque::from([context_id]);
     while let Some(context_id) = context_ids.pop_front() {
@@ -174,6 +177,7 @@ fn pending_deferred_operation(
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RestartPolicyRelaunchError {
     Admission(RestartPolicyAdmissionError),
+    ServiceTable(crate::service::ServiceTableError),
     GraphContext(GraphContextBuildError),
     GraphExecution(GraphExecutionError),
     MissingStartCredentials { service: String },

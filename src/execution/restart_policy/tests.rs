@@ -143,3 +143,79 @@ fn job_ids_after_boot_start() -> JobIdAllocator {
         .expect("skip boot job id");
     job_ids
 }
+
+/// A restart with a path condition queues an asynchronous helper while the
+/// service still holds its terminal in Backoff. Its elapsed timer must be
+/// consumed, or the lifecycle loop repeatedly admits the same restart and
+/// never returns to launch that helper (PEI-1187).
+#[test]
+fn console_logout_consumes_backoff_while_filesystem_check_is_pending() {
+    use crate::service::{RestartPolicy, ServiceCheck, ServiceCheckKind};
+    let mut app = service("app", ServiceType::Simple);
+    app.console_path = Some("/dev/tty2".into());
+    app.restart_policy = RestartPolicy::Always;
+    app.conditions = vec![ServiceCheck {
+        kind: ServiceCheckKind::Path,
+        argument: "/dev/tty2".into(),
+    }];
+    let mut services = crate::service::ServiceTable::from_boot_snapshot(vec![app]).unwrap();
+    for to in [ServiceState::Starting, ServiceState::Active] {
+        services
+            .transition_service(
+                "app",
+                crate::service::runtime::ServiceTransition {
+                    to,
+                    cause: TransitionCause::ExplicitStart,
+                },
+            )
+            .unwrap();
+    }
+    services
+        .transition_service_to_restart_backoff(
+            "app",
+            TransitionCause::CleanExitRestart,
+            RESTART_AT_NS,
+        )
+        .unwrap();
+    let mut operations = crate::operation::store::OperationStore::new();
+    let mut graph = crate::execution::graph::GraphExecutionStore::new();
+    let mut jobs = crate::job::JobStore::new();
+    let mut start = StartExecutionStore::new();
+    let mut operation_ids = OperationIdAllocator::new();
+    let mut job_ids = JobIdAllocator::new();
+    let dispatch = begin_due_restart_policy_relaunch(
+        &mut RestartPolicyRelaunchContext {
+            services: &mut services,
+            operations: &mut operations,
+            graph: &mut graph,
+            jobs: &mut jobs,
+            start_store: &mut start,
+            operation_ids: &mut operation_ids,
+            job_ids: &mut job_ids,
+        },
+        RestartPolicyRelaunchRequest {
+            service: "app".into(),
+            observed_at_ns: RESTART_AT_NS,
+            max_parallel_starts: 10,
+        },
+    )
+    .unwrap();
+    assert!(dispatch.start_dispatches.is_empty());
+    assert_eq!(start.pending_pre_start_check_launches().len(), 1);
+    assert_eq!(
+        services.runtime("app").unwrap().state,
+        ServiceState::Backoff
+    );
+    assert!(
+        services.next_restart_backoff_deadline().is_none(),
+        "the queued check owns progress now, not the expired backoff timer"
+    );
+    assert_eq!(
+        services
+            .runtime("app")
+            .unwrap()
+            .consecutive_restart_failures,
+        0,
+        "clean logouts must not consume the crash budget"
+    );
+}
