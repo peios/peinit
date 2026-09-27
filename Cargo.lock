@@ -230,8 +230,8 @@ dependencies = [
 
 [[package]]
 name = "libauthd"
-version = "0.0.14"
-source = "git+https://github.com/peios/authd.git?rev=3386525989f49f84facc555968d6fc5f5d5e3d53#3386525989f49f84facc555968d6fc5f5d5e3d53"
+version = "0.0.22"
+source = "git+https://github.com/peios/authd.git?rev=5966669b523585c2e901b4c27d8bba6547691fc8#5966669b523585c2e901b4c27d8bba6547691fc8"
 dependencies = [
  "libc",
 ]
