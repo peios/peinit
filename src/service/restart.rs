@@ -45,6 +45,17 @@ pub fn evaluate_restart_after_failure(
     {
         return fail(cause);
     }
+    // A normal console logout is neither a crash nor a failed start. Keep
+    // respawning its prompt without consuming the failure budget/backoff.
+    if cause == TransitionCause::CleanExitRestart && definition.console_path.is_some() {
+        return RestartEvaluation {
+            action: RestartEvaluationAction::Backoff {
+                cause,
+                delay_secs: definition.restart_delay_secs.min(MAX_RESTART_DELAY_SECS),
+                next_consecutive_failures: 0,
+            },
+        };
+    }
     if consecutive_failures >= definition.restart_max_retries {
         return fail(TransitionCause::RestartBudgetExhausted);
     }
