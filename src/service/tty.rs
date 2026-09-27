@@ -139,7 +139,9 @@ mod tests;
 /// VT alias, so login services pin it to tty1 instead of following VT switches.
 #[cfg(any(test, feature = "peios-registry", feature = "peios-boundary"))]
 pub(crate) fn console_from_active(active: &str) -> Option<String> {
-    let name = active.split_whitespace().next()?;
+    // sysfs show_cons_active prints the console list in reverse order;
+    // console_device uses the first eligible console in the original list.
+    let name = active.split_whitespace().last()?;
     if !name
         .bytes()
         .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
