@@ -43,24 +43,7 @@ pub(super) fn read_lcs_service_definitions() -> Result<ServiceDefinitionsRead, L
         // service Failed with ValidationError and continues, which is what
         // the state machine already has a cause for.
         match read_lcs_service_definition(&name) {
-            Ok(mut definition) => {
-                if definition.console_path.as_deref() == Some("/dev/console") {
-                    match crate::service::tty::system_console_path() {
-                        Ok(path) => definition.console_path = Some(path),
-                        Err(message) => {
-                            undecodable.push(UndecodableService {
-                                name,
-                                field: Some("TTYPath".into()),
-                                message,
-                            });
-                            continue;
-                        }
-                    }
-                } else if definition.console_path.as_deref() == Some("/dev/tty0") {
-                    definition.console_path = Some("/dev/tty1".into());
-                }
-                definitions.push(definition);
-            }
+            Ok(definition) => definitions.push(definition),
             Err(error) => undecodable.push(UndecodableService {
                 name,
                 field: undecodable_field(&error).map(ToString::to_string),

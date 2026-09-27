@@ -78,10 +78,6 @@ fn is_peinit_console(tty_path: &str) -> bool {
     if tty_path == CONSOLE_PATH {
         return true;
     }
-    #[cfg(feature = "peios-boundary")]
-    if crate::service::tty::system_console_path().is_ok_and(|path| path == tty_path) {
-        return true;
-    }
     match (device_of(tty_path), device_of(CONSOLE_PATH)) {
         (Some(a), Some(b)) => a == b,
         // Unstattable: fall back to refusing the match rather than assuming it.
