@@ -134,32 +134,3 @@ fn waits_for_tty(definition: &ServiceDefinition, tty: &str) -> bool {
 
 #[cfg(test)]
 mod tests;
-
-/// Resolve the kernel console to a fixed endpoint. tty0 is a moving foreground
-/// VT alias, so login services pin it to tty1 instead of following VT switches.
-#[cfg(any(test, feature = "peios-registry", feature = "peios-boundary"))]
-pub(crate) fn console_from_active(active: &str) -> Option<String> {
-    let name = active.split_whitespace().next()?;
-    if !name
-        .bytes()
-        .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
-    {
-        return None;
-    }
-    Some(format!(
-        "/dev/{}",
-        if name == "tty0" { "tty1" } else { name }
-    ))
-}
-
-#[cfg(any(feature = "peios-registry", feature = "peios-boundary"))]
-pub(crate) fn system_console_path() -> Result<String, String> {
-    // Stable for this boot, including registry reloads after a VT switch.
-    static PATH: std::sync::OnceLock<Result<String, String>> = std::sync::OnceLock::new();
-    PATH.get_or_init(|| {
-        let active = std::fs::read_to_string("/sys/class/tty/console/active")
-            .map_err(|e| format!("read kernel console: {e}"))?;
-        console_from_active(&active).ok_or_else(|| "kernel console has no valid endpoint".into())
-    })
-    .clone()
-}

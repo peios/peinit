@@ -356,38 +356,3 @@ fn two_boot_plan_services_naming_one_terminal_start_one_and_skip_the_other() {
         .current_operation;
     assert!(skipped.is_none(), "{skipped:?}");
 }
-
-#[test]
-fn terminal_exit_kills_only_its_own_descendants_before_releasing_the_tty() {
-    use super::TestProcessController;
-    let mut supervisor = Supervisor::new(SupervisorSettings::new(settings()));
-    let mut first = console_service("login-tty2", 0);
-    first.console_path = Some("/dev/tty2".into());
-    let mut second = console_service("login-tty3", 0);
-    second.console_path = Some("/dev/tty3".into());
-    let mut registry = StaticRegistry::services(vec![first, second]);
-    let mut clock = ScriptedClock::new([BOOT_NS, ADMIN_START_NS, ON_DEMAND_APP_LAUNCH_NS]);
-    supervisor
-        .run_phase2_boot(&mut registry, &mut clock)
-        .unwrap();
-    supervisor
-        .start_service("login-tty2", None, &mut clock)
-        .unwrap();
-    launch(&mut supervisor, DB_LAUNCH_NS, 9300, 130);
-    supervisor
-        .start_service("login-tty3", None, &mut clock)
-        .unwrap();
-    launch(&mut supervisor, ON_DEMAND_APP_LAUNCH_NS + 1, 9301, 131);
-    let job_id = current_job(&supervisor, "login-tty2");
-    let expected = supervisor.jobs.get(job_id).unwrap().cgroup_id.clone();
-    let mut controller = TestProcessController::default();
-    supervisor
-        .apply_terminal_job_event_with_controller(
-            |jobs| jobs.complete_job(job_id, ON_DEMAND_APP_LAUNCH_NS + 2, 0),
-            None,
-            &mut controller,
-        )
-        .unwrap();
-    assert_eq!(controller.cgroup_kills, vec![expected]);
-    assert_eq!(state(&supervisor, "login-tty3"), ServiceState::Active);
-}

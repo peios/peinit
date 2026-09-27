@@ -91,37 +91,3 @@ fn success_exit_codes_are_not_failures_for_on_failure_policy() {
 fn service() -> ServiceDefinition {
     ServiceDefinition::simple_system_boot("app", "/sbin/app")
 }
-
-#[test]
-fn ordinary_console_logouts_do_not_exhaust_the_crash_budget() {
-    let mut definition = service();
-    definition.console_path = Some("/dev/tty2".into());
-    definition.restart_policy = RestartPolicy::Always;
-    definition.restart_delay_secs = 1;
-    for previous in [0, 1, 100, u32::MAX] {
-        assert_eq!(
-            evaluate_restart_after_failure(
-                &definition,
-                TransitionCause::CleanExitRestart,
-                Some(0),
-                previous
-            )
-            .action,
-            RestartEvaluationAction::Backoff {
-                cause: TransitionCause::CleanExitRestart,
-                delay_secs: 1,
-                next_consecutive_failures: 0,
-            }
-        );
-    }
-    assert!(matches!(
-        evaluate_restart_after_failure(
-            &definition,
-            TransitionCause::ProcessCrash,
-            Some(1),
-            u32::MAX
-        )
-        .action,
-        RestartEvaluationAction::Fail { .. }
-    ));
-}
