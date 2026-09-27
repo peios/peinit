@@ -22,10 +22,28 @@ impl ServiceTable {
             },
         )?;
         let entry = self.require_entry_mut(service)?;
-        entry.runtime.consecutive_restart_failures =
-            entry.runtime.consecutive_restart_failures.saturating_add(1);
+        entry.runtime.consecutive_restart_failures = if cause == TransitionCause::CleanExitRestart
+            && entry.definition.console_path.is_some()
+        {
+            0
+        } else {
+            entry.runtime.consecutive_restart_failures.saturating_add(1)
+        };
         entry.runtime.restart_backoff_until_ns = Some(backoff_until_ns);
         Ok(transition)
+    }
+
+    /// An admitted restart may wait for an asynchronous pre-start check or a
+    /// dependency while still in Backoff. Consume its timer at admission so
+    /// the lifecycle loop can return and make that work progress.
+    pub(crate) fn consume_restart_backoff(
+        &mut self,
+        service: &str,
+    ) -> Result<(), ServiceTableError> {
+        self.require_entry_mut(service)?
+            .runtime
+            .restart_backoff_until_ns = None;
+        Ok(())
     }
 
     pub fn due_restart_backoffs(&self, now_ns: u64) -> Vec<RestartBackoffDeadline> {
