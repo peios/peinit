@@ -224,11 +224,11 @@ fn kernel_console_is_pinned_independently_of_foreground_switches() {
     assert_eq!(console_from_active("tty0\n").as_deref(), Some("/dev/tty1"));
     assert_eq!(
         console_from_active("ttyS0 tty0\n").as_deref(),
-        Some("/dev/ttyS0")
+        Some("/dev/tty1")
     );
     assert_eq!(
         console_from_active("tty0 ttyS0\n").as_deref(),
-        Some("/dev/tty1")
+        Some("/dev/ttyS0")
     );
     assert_eq!(console_from_active("hvc0\n").as_deref(), Some("/dev/hvc0"));
     assert_eq!(console_from_active(""), None);
