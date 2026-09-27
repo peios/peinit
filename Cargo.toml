@@ -22,7 +22,7 @@ libc = "0.2"
 # message: a second implementation of a security-critical wire format is the
 # hazard authd's own service_sid module documents at length, and this is the
 # message that mints identity.
-libauthd = { git = "https://github.com/peios/authd.git", rev = "3386525989f49f84facc555968d6fc5f5d5e3d53", optional = true }
+libauthd = { git = "https://github.com/peios/authd.git", rev = "5966669b523585c2e901b4c27d8bba6547691fc8", optional = true }
 peios = { git = "https://github.com/peios/peios-rs.git", rev = "f4309f78fbaa878a14429a5e07d778dba9ddfab7", optional = true }
 serde_json = "1"
 sha1 = "0.10"
