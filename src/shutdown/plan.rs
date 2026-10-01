@@ -95,6 +95,21 @@ fn dependents_by_target<'a>(
 ) -> Result<BTreeMap<String, BTreeSet<String>>, ShutdownPlanError> {
     let candidates = candidates.cloned().collect::<BTreeSet<_>>();
     let mut dependents = BTreeMap::<String, BTreeSet<String>>::new();
+    // The compiled-in Phase-1 services (registryd) are what every service
+    // defined in the registry rests on, though none declares it: each stops
+    // after everything else, as it started before everything else. Stopped
+    // in the first wave instead, registryd went while the services still
+    // running needed it, ignored SIGTERM until its stop timeout killed it,
+    // and held that wave the while (PEI-1216).
+    let rests_on = candidates
+        .iter()
+        .filter(|service| {
+            services
+                .definition(service)
+                .is_some_and(|definition| definition.compiled_in)
+        })
+        .cloned()
+        .collect::<Vec<_>>();
     for dependent in &candidates {
         let definition =
             services
@@ -102,6 +117,14 @@ fn dependents_by_target<'a>(
                 .ok_or_else(|| ShutdownPlanError::MissingDefinition {
                     service: dependent.clone(),
                 })?;
+        if !definition.compiled_in {
+            for target in &rests_on {
+                dependents
+                    .entry(target.clone())
+                    .or_default()
+                    .insert(dependent.clone());
+            }
+        }
         for dependency in hard_dependencies(definition) {
             if candidates.contains(&dependency.target) {
                 dependents
