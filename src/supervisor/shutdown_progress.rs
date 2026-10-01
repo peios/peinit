@@ -72,6 +72,39 @@ where
     Ok(dispatches)
 }
 
+/// Everything that keeps the shutdown from finalizing, for the console: the
+/// participants not yet stopped (with their state, or that the service table
+/// no longer knows them), the stop and post-kill checks still pending, and the
+/// submitted jobs still live (PEI-1216).
+pub(in crate::supervisor) fn shutdown_waiting_for(work: &SupervisorWork) -> Vec<String> {
+    let Some(shutdown) = &work.shutdown else {
+        return Vec::new();
+    };
+    let mut waiting = Vec::new();
+    for (index, wave) in shutdown.plan.stop_waves.iter().enumerate() {
+        for participant in &wave.services {
+            if let Some(runtime) = work.services.runtime(&participant.service)
+                && !service_done_for_shutdown(runtime.state)
+            {
+                waiting.push(format!(
+                    "{} ({:?}, wave {index})",
+                    participant.service, runtime.state
+                ));
+            }
+        }
+    }
+    for deadline in &shutdown.stop_deadlines {
+        waiting.push(format!("stop timeout of {}", deadline.service));
+    }
+    for deadline in &shutdown.post_kill_deadlines {
+        waiting.push(format!("post-kill check of {}", deadline.service));
+    }
+    for job_id in work.submitted.live_ids() {
+        waiting.push(format!("job {job_id}"));
+    }
+    waiting
+}
+
 fn current_wave_complete(work: &SupervisorWork, shutdown: &ShutdownRuntime) -> bool {
     wave_complete(work, shutdown, shutdown.current_wave)
 }
@@ -82,11 +115,24 @@ fn wave_complete(work: &SupervisorWork, shutdown: &ShutdownRuntime, wave_index: 
             && shutdown.post_kill_deadlines.is_empty()
             && !live_submitted_jobs_remain(work);
     };
-    wave.services.iter().all(|participant| {
-        work.services
-            .runtime(&participant.service)
-            .is_some_and(|runtime| service_done_for_shutdown(runtime.state))
-    })
+    wave.services
+        .iter()
+        .all(|participant| participant_done_for_shutdown(work, &participant.service))
+}
+
+/// Whether the shutdown has nothing left to do for this participant: it is
+/// stopped, or the service table no longer has it. A service whose
+/// definition was withdrawn while it ran is discarded from the table once it
+/// stops, and a shutdown stops it: first-boot setup's oobe-tui is withdrawn
+/// that way. Counting it as not done held its wave open until the global
+/// timeout, which could not finish it either (PEI-1216).
+pub(in crate::supervisor) fn participant_done_for_shutdown(
+    work: &SupervisorWork,
+    service: &str,
+) -> bool {
+    work.services
+        .runtime(service)
+        .is_none_or(|runtime| service_done_for_shutdown(runtime.state))
 }
 
 pub(super) fn service_done_for_shutdown(state: ServiceState) -> bool {

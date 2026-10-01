@@ -10,7 +10,7 @@ use crate::service::runtime::{
 use crate::shutdown::{ShutdownError, ShutdownPlan, ShutdownStopDeadline};
 
 use super::dispatch::SupervisorShutdownStopDispatch;
-use super::shutdown_progress::service_done_for_shutdown;
+use super::shutdown_progress::participant_done_for_shutdown;
 use super::work::SupervisorWork;
 
 use deadline::{retained_stop_deadline, stop_deadline_ns};
@@ -129,7 +129,5 @@ where
 }
 
 fn participant_done(work: &SupervisorWork, service: &str) -> bool {
-    work.services
-        .runtime(service)
-        .is_some_and(|runtime| service_done_for_shutdown(runtime.state))
+    participant_done_for_shutdown(work, service)
 }

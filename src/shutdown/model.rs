@@ -57,6 +57,10 @@ pub struct ShutdownRuntime {
     pub kind: ShutdownKind,
     pub initiated_at_ns: u64,
     pub global_deadline_ns: u64,
+    /// The global timeout has fired. It fires once: what it killed is then
+    /// governed by the post-kill timeouts, which abandon whatever survives
+    /// them, and the shutdown goes on without it (PEI-1216).
+    pub global_timeout_fired: bool,
     pub plan: ShutdownPlan,
     pub current_wave: usize,
     pub stop_deadlines: Vec<ShutdownStopDeadline>,

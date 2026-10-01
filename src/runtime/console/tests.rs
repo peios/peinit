@@ -896,6 +896,7 @@ fn shutdown_runtime(kind: ShutdownKind) -> ShutdownRuntime {
         kind,
         initiated_at_ns: 1,
         global_deadline_ns: 90,
+        global_timeout_fired: false,
         plan: ShutdownPlan {
             completed_to_clear: Vec::new(),
             starting_to_kill: Vec::new(),

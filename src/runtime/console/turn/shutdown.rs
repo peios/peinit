@@ -6,6 +6,7 @@ use crate::supervisor::{
     SupervisorShutdownKillDispatch, SupervisorShutdownSignalAction,
     SupervisorShutdownSignalDispatch, SupervisorShutdownStopDispatch,
     SupervisorShutdownTerminalDispatch, SupervisorShutdownTimeoutDispatch,
+    SupervisorSubmittedDeadlineDispatch,
 };
 
 use crate::runtime::console::{collect_shutdown_finalization_state_console_message, push_message};
@@ -32,6 +33,12 @@ pub(super) fn collect_shutdown_dispatch_console_messages(
     }
     for stop in &dispatch.first_wave {
         collect_shutdown_stop_console_message(stop, out);
+    }
+    for stop in &dispatch.submitted_stops {
+        push_message(
+            out,
+            format!("peinit: shutdown stopping job {}\n", stop.job_id),
+        );
     }
     collect_shutdown_finalization_state_console_message(&dispatch.runtime.finalization, out);
 }
@@ -109,7 +116,17 @@ fn collect_shutdown_timeout_console_messages(
     out: &mut Vec<ConsoleMessage>,
 ) {
     if dispatch.global_timeout {
-        push_message(out, "peinit: shutdown global timeout expired\n");
+        if dispatch.waiting_for.is_empty() {
+            push_message(out, "peinit: shutdown global timeout expired\n");
+        } else {
+            push_message(
+                out,
+                format!(
+                    "peinit: shutdown global timeout expired waiting for {}\n",
+                    dispatch.waiting_for.join(", "),
+                ),
+            );
+        }
     }
     for killed in &dispatch.cgroup_kills {
         collect_shutdown_cgroup_kill_console_message(killed, out);
@@ -120,8 +137,33 @@ fn collect_shutdown_timeout_console_messages(
             format!("peinit: shutdown abandoned {}\n", abandoned.service),
         );
     }
+    // The jobs a shutdown waits for as it waits for services: what became of
+    // one that would not stop is the operator's answer to why it took so
+    // long (PEI-1216).
+    for submitted in &dispatch.submitted {
+        match submitted {
+            SupervisorSubmittedDeadlineDispatch::Killed { job_id } => {
+                push_message(out, format!("peinit: shutdown killing job {job_id}\n"));
+            }
+            SupervisorSubmittedDeadlineDispatch::Abandoned { job_event, .. } => push_message(
+                out,
+                format!("peinit: shutdown abandoned job {}\n", job_event.job_id),
+            ),
+            SupervisorSubmittedDeadlineDispatch::Stop(_)
+            | SupervisorSubmittedDeadlineDispatch::CgroupCleanup { .. } => {}
+        }
+    }
     for stop in &dispatch.next_wave {
         collect_shutdown_stop_console_message(stop, out);
+    }
+    if !dispatch.still_waiting_for.is_empty() {
+        push_message(
+            out,
+            format!(
+                "peinit: shutdown still waiting for {}\n",
+                dispatch.still_waiting_for.join(", "),
+            ),
+        );
     }
     collect_shutdown_finalization_state_console_message(&dispatch.finalization, out);
 }
