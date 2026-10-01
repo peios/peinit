@@ -77,6 +77,13 @@ pub struct SupervisorShutdownTerminalDispatch {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SupervisorShutdownTimeoutDispatch {
     pub global_timeout: bool,
+    /// What the shutdown was waiting for when the global timeout fired,
+    /// before it killed anything; empty on other turns.
+    pub waiting_for: Vec<String>,
+    /// What the shutdown is still waiting for after this turn, once the
+    /// global timeout has fired: nothing should outlast its post-kill
+    /// checks, so anything here is the reason a shutdown has not finished.
+    pub still_waiting_for: Vec<String>,
     pub cgroup_kills: Vec<SupervisorShutdownCgroupKillDispatch>,
     pub job_events: Vec<JobEvent>,
     pub abandoned: Vec<SupervisorShutdownAbandonedDispatch>,

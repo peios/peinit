@@ -96,6 +96,7 @@ fn immediate_runtime(kind: ShutdownKind, now_ns: u64) -> ShutdownRuntime {
         kind,
         initiated_at_ns: now_ns,
         global_deadline_ns: now_ns,
+        global_timeout_fired: true,
         plan: ShutdownPlan {
             completed_to_clear: Vec::new(),
             starting_to_kill: Vec::new(),

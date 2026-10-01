@@ -1,7 +1,8 @@
 use crate::boundary::ProcessController;
+use crate::shutdown::ShutdownFinalizationState;
 
 use super::dispatch::SupervisorShutdownTimeoutDispatch;
-use super::shutdown_progress::{advance_shutdown_progress, ensure_shutdown};
+use super::shutdown_progress::{advance_shutdown_progress, ensure_shutdown, shutdown_waiting_for};
 use super::shutdown_timeout_actions::{
     kill_all_remaining_services, process_due_post_kill_deadlines, process_due_stop_deadlines,
     shutdown_global_timeout_due,
@@ -26,9 +27,14 @@ impl Supervisor {
         let mut abandoned = Vec::new();
         let mut submitted = Vec::new();
         let mut global_timeout = false;
+        let mut waiting_for = Vec::new();
 
         if shutdown_global_timeout_due(&work, now_ns) {
             global_timeout = true;
+            waiting_for = shutdown_waiting_for(&work);
+            if let Some(shutdown) = work.shutdown.as_mut() {
+                shutdown.global_timeout_fired = true;
+            }
             for job_id in kill_all_live_submitted_jobs(
                 &mut work,
                 controller,
@@ -91,15 +97,21 @@ impl Supervisor {
 
         let next_wave = advance_shutdown_progress(&mut work, controller, now_ns)
             .map_err(SupervisorError::Shutdown)?;
-        let finalization = work
-            .shutdown()
-            .map_err(SupervisorError::Shutdown)?
-            .finalization
-            .clone();
+        let shutdown = work.shutdown().map_err(SupervisorError::Shutdown)?;
+        let finalization = shutdown.finalization.clone();
+        let still_waiting_for = if shutdown.global_timeout_fired
+            && finalization == ShutdownFinalizationState::WaitingForServices
+        {
+            shutdown_waiting_for(&work)
+        } else {
+            Vec::new()
+        };
         work.commit(self);
 
         Ok(Some(SupervisorShutdownTimeoutDispatch {
             global_timeout,
+            waiting_for,
+            still_waiting_for,
             cgroup_kills,
             job_events,
             abandoned,

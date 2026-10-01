@@ -3,7 +3,7 @@ use crate::job::JobExit;
 use crate::service::runtime::{ServiceState, TransitionCause};
 use crate::shutdown::{ShutdownFinalizationState, ShutdownKind};
 
-use super::super::TestProcessController;
+use super::super::{StaticRegistry, TestProcessController};
 use super::SHUTDOWN_NS;
 use super::fixture::{job_for, later_wave_pair_fixture, shutdown_fixture};
 
@@ -140,4 +140,65 @@ fn shutdown_terminal_events_advance_reverse_dependency_waves() {
         supervisor.shutdown().expect("shutdown").finalization,
         ShutdownFinalizationState::Ready,
     );
+}
+
+// PEI-1216. First-boot setup withdraws its own service's definition while the
+// service still runs; the entry is kept, marked definition-removed, and
+// discarded from the table once it stops. A shutdown stops it, and the
+// participant the plan holds then names a service the table no longer has.
+// Counted as not done, it held its wave open, so nothing after it was ever
+// stopped and the shutdown never finalized.
+#[test]
+fn a_participant_discarded_from_the_table_as_it_stops_does_not_hold_its_wave() {
+    let mut supervisor = later_wave_pair_fixture();
+    let front_job = job_for(&supervisor, "front");
+    let left_job = job_for(&supervisor, "left");
+    let right_job = job_for(&supervisor, "right");
+    let mut controller = TestProcessController::default();
+    supervisor
+        .begin_shutdown(ShutdownKind::Reboot, &mut controller, SHUTDOWN_NS)
+        .expect("begin shutdown");
+
+    // front's definition is withdrawn; it is kept while it stops.
+    let kept = ["left", "right"]
+        .iter()
+        .map(|service| {
+            supervisor
+                .services()
+                .definition(service)
+                .expect(service)
+                .clone()
+        })
+        .collect();
+    let outcome = supervisor
+        .reload_config_from_registry(&mut StaticRegistry::services(kept))
+        .expect("reload without front");
+    assert_eq!(outcome.summary.marked_removed, vec!["front".to_string()]);
+
+    let front_done = supervisor
+        .complete_shutdown_job(front_job, SHUTDOWN_NS + 1, 0, &mut controller)
+        .expect("complete front");
+    assert!(
+        supervisor.services().get("front").is_none(),
+        "discarded as it stopped"
+    );
+    let mut next = front_done
+        .next_wave
+        .iter()
+        .map(|stop| stop.service.as_str())
+        .collect::<Vec<_>>();
+    next.sort();
+    assert_eq!(
+        next,
+        vec!["left", "right"],
+        "wave 1 begins once front has gone"
+    );
+
+    supervisor
+        .complete_shutdown_job(left_job, SHUTDOWN_NS + 2, 0, &mut controller)
+        .expect("complete left");
+    let right_done = supervisor
+        .complete_shutdown_job(right_job, SHUTDOWN_NS + 3, 0, &mut controller)
+        .expect("complete right");
+    assert_eq!(right_done.finalization, ShutdownFinalizationState::Ready);
 }

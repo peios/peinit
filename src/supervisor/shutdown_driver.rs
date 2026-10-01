@@ -9,10 +9,12 @@ impl Supervisor {
         let shutdown = self.shutdown.as_ref()?;
         let mut deadlines = Vec::new();
 
-        if matches!(
-            shutdown.finalization,
-            ShutdownFinalizationState::WaitingForServices
-        ) {
+        if !shutdown.global_timeout_fired
+            && matches!(
+                shutdown.finalization,
+                ShutdownFinalizationState::WaitingForServices
+            )
+        {
             deadlines.push(ShutdownDeadline {
                 due_at_ns: shutdown.global_deadline_ns,
                 kind: ShutdownDeadlineKind::GlobalTimeout,

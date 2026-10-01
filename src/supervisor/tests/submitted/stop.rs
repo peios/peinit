@@ -360,3 +360,58 @@ fn shutdown_stops_every_live_job_at_once_and_records_the_cause() {
     assert_eq!(view.cause, Some(SubmittedJobCause::Shutdown));
     assert!(supervisor.shutdown().is_some());
 }
+
+/// PEI-1216: the global timeout re-fired on every turn after it expired,
+/// killing a surviving job again and moving its post-kill check out each
+/// time, so the job was never abandoned and the shutdown never finished.
+#[test]
+fn a_job_that_survives_the_global_timeout_is_abandoned_and_the_shutdown_goes_on() {
+    let mut supervisor = submitted_supervisor();
+    supervisor.settings.shutdown.global_timeout_secs = 1;
+    let mut boundaries = Boundaries::at([SUBMIT_NS]);
+    let job_id = running_job(&mut supervisor, &mut boundaries, 9000, real_pidfd());
+    supervisor
+        .begin_shutdown(ShutdownKind::Reboot, &mut boundaries.controller, STOP_NS)
+        .expect("shutdown");
+    let global_due = supervisor.shutdown().expect("shutdown").global_deadline_ns;
+    let post_kill_ns = supervisor.settings.shutdown.post_kill_timeout_secs * 1_000_000_000;
+
+    // The test controller's cgroups stay populated: the job outlives SIGKILL.
+    let fired = supervisor
+        .process_due_shutdown_timeouts(&mut boundaries.controller, global_due)
+        .expect("global timeout")
+        .expect("global timeout dispatch");
+    assert!(fired.global_timeout);
+    assert_eq!(boundaries.controller.cgroup_kills.len(), 1);
+
+    // Later turns before the post-kill check do not fire it again.
+    for now in [global_due + 1, global_due + post_kill_ns / 2] {
+        let again = supervisor
+            .process_due_shutdown_timeouts(&mut boundaries.controller, now)
+            .expect("later turn");
+        assert!(again.is_none_or(|dispatch| !dispatch.global_timeout));
+    }
+    assert_eq!(boundaries.controller.cgroup_kills.len(), 1);
+    assert_eq!(
+        supervisor
+            .next_shutdown_deadline()
+            .map(|deadline| deadline.due_at_ns),
+        Some(global_due + post_kill_ns),
+    );
+
+    let abandoned = supervisor
+        .process_due_shutdown_timeouts(&mut boundaries.controller, global_due + post_kill_ns)
+        .expect("post-kill check")
+        .expect("post-kill dispatch");
+    assert!(abandoned.submitted.iter().any(|dispatch| matches!(
+        dispatch,
+        crate::supervisor::SupervisorSubmittedDeadlineDispatch::Abandoned { job_event, .. }
+            if job_event.job_id == job_id
+    )));
+    let view = supervisor.submitted_job_view(job_id).expect("view");
+    assert_eq!(view.state.state, JobState::Abandoned);
+    assert_eq!(
+        supervisor.shutdown().expect("shutdown").finalization,
+        crate::shutdown::ShutdownFinalizationState::Ready,
+    );
+}

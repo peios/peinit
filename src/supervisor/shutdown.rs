@@ -73,6 +73,7 @@ impl Supervisor {
                 now_ns,
                 self.settings.shutdown.global_timeout_secs,
             ),
+            global_timeout_fired: false,
             plan,
             current_wave: 0,
             stop_deadlines,
