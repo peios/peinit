@@ -29,6 +29,32 @@ fn stop_waves_are_reverse_hard_dependency_order() {
     );
 }
 
+/// PEI-1216: nothing declares a dependency on registryd, which put it in the
+/// first wave, under everything still running that needed it.
+#[test]
+fn the_compiled_in_registryd_stops_after_every_other_service() {
+    let db = service("db");
+    let mut app = service("app");
+    app.requires.push("db".to_string());
+    let loner = service("loner");
+    let registryd = ServiceDefinition::compiled_in_registryd();
+    let mut services = table(vec![db, app, loner, registryd]);
+    for service in ["db", "app", "loner", "registryd"] {
+        activate(&mut services, service);
+    }
+
+    let plan = plan_graceful_shutdown(&services).expect("shutdown plan");
+
+    assert_eq!(
+        wave_services(&plan),
+        vec![
+            vec!["app".to_string(), "loner".to_string()],
+            vec!["db".to_string()],
+            vec!["registryd".to_string()],
+        ],
+    );
+}
+
 #[test]
 fn classification_matches_shutdown_state_rules() {
     let mut services = table(vec![
