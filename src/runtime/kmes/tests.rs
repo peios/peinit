@@ -78,6 +78,8 @@ fn runtime_loop_collector_preserves_phase_order_for_maintenance_events_and_calen
             timeout: Some(SupervisorShutdownTimeoutDispatch {
                 submitted: Vec::new(),
                 global_timeout: false,
+                waiting_for: Vec::new(),
+                still_waiting_for: Vec::new(),
                 cgroup_kills: Vec::new(),
                 job_events: Vec::new(),
                 abandoned: vec![abandoned_dispatch("abandoned")],
