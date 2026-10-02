@@ -60,9 +60,10 @@ pub const SERVICE_GENERIC_MAPPING: ServiceGenericMapping = ServiceGenericMapping
 
 /// The descriptor a service takes when neither its definition nor the
 /// Services key carries one (§4.6), in SDDL: SYSTEM and Administrators may
-/// do everything. The boundary builds the same descriptor, and a test holds
-/// the two to the same bytes.
-pub const DEFAULT_SERVICE_SECURITY_SDDL: &str = "O:SYG:BAD:(A;;0xf;;;SY)(A;;0xf;;;BA)";
+/// do everything, and everyone authenticated may see its state. The boundary
+/// builds the same descriptor, and a test holds the two to the same bytes.
+pub const DEFAULT_SERVICE_SECURITY_SDDL: &str =
+    "O:SYG:BAD:(A;;0xf;;;SY)(A;;0xf;;;BA)(A;;0x1;;;AU)";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ServiceAccessCheckRequest<'a> {

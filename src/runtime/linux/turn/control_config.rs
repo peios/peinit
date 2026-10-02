@@ -10,6 +10,8 @@ impl LinuxShutdownRuntime {
         let control_limits = supervisor.control_limits();
         self.control_connections
             .set_max_connections(control_limits.max_connections);
+        self.control_connections
+            .set_max_connections_per_caller(control_limits.max_connections_per_user);
         self.config.max_control_connections = control_limits.max_connections;
         self.config.control_limits.max_request_bytes = control_limits.max_request_bytes;
         self.config.control_limits.connection_timeout_secs = control_limits.connection_timeout_secs;

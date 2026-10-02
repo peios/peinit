@@ -36,6 +36,7 @@ fn reloads_schema_guard_control_security_and_limits() {
     let mut services = service_table(&["app"]);
     let registry_limits = ControlSocketLimits {
         max_connections: 9,
+        max_connections_per_user: 3,
         max_request_bytes: 16_384,
         connection_timeout_secs: 11,
     };

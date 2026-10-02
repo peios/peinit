@@ -30,6 +30,9 @@ pub enum ControlConnectionTableError {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ControlConnectionTable<R> {
     max_connections: usize,
+    /// The most one caller may hold, where the connections say who holds
+    /// them (the control socket's do); no bound until it is set.
+    max_connections_per_caller: usize,
     records: BTreeMap<i32, R>,
 }
 
@@ -37,6 +40,7 @@ impl<R> ControlConnectionTable<R> {
     pub fn new(max_connections: usize) -> Self {
         Self {
             max_connections,
+            max_connections_per_caller: usize::MAX,
             records: BTreeMap::new(),
         }
     }
@@ -47,6 +51,14 @@ impl<R> ControlConnectionTable<R> {
 
     pub fn set_max_connections(&mut self, max_connections: usize) {
         self.max_connections = max_connections;
+    }
+
+    pub fn max_connections_per_caller(&self) -> usize {
+        self.max_connections_per_caller
+    }
+
+    pub fn set_max_connections_per_caller(&mut self, max_connections_per_caller: usize) {
+        self.max_connections_per_caller = max_connections_per_caller;
     }
 
     pub fn len(&self) -> usize {

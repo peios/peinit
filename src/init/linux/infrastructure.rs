@@ -23,19 +23,22 @@ pub(super) fn setup_linux_phase1_infrastructure() -> Result<Phase1Infrastructure
     Ok(infrastructure)
 }
 
-/// The control socket is reachable by SYSTEM and Administrators.
+/// The control socket is reachable by every authenticated principal (§10.1).
 ///
-/// peinit's own default ControlSecurity grants Administrators full access, and
-/// its default ServiceSecurity grants them query and stop -- but both ACEs
-/// were unreachable while the socket carried the Phase 1 `/run` seed, which is
-/// SYSTEM only. `connect()` is checked by `inode_permission` before
-/// `kacs_open_peer_token` and AccessCheck ever run, so an admin token was
-/// refused before its descriptor was consulted, making the whole
-/// ServiceSecurity layer decorative for any non-SYSTEM principal.
+/// This is the reachability gate only. What a caller may then *do* is
+/// decided by ControlSecurity and by each service's ServiceSecurity, against
+/// the token captured at accept, for every command. `connect()` is checked by
+/// `inode_permission` before `kacs_open_peer_token` and AccessCheck ever run,
+/// so a principal the socket refused could never reach a ServiceSecurity that
+/// granted it something: with the socket SYSTEM and Administrators only, a
+/// service could not be delegated to anyone else. `FW` is the file-write
+/// generic right, which is what a Unix `connect()` on a pathname socket
+/// needs, as on the jobs socket.
 ///
-/// This is the reachability gate only. What an admin may then *do* is still
-/// decided by ControlSecurity and ServiceSecurity, as it always was.
-const CONTROL_SOCKET_SDDL: &str = "O:SYG:SYD:(A;;GA;;;SY)(A;;GA;;;BA)";
+/// What one caller may hold open is bounded per caller
+/// (`MaxControlConnectionsPerUser`), so admitting everyone does not let one of
+/// them take the connections everyone shares.
+const CONTROL_SOCKET_SDDL: &str = "O:SYG:SYD:(A;;GA;;;SY)(A;;GA;;;BA)(A;;FW;;;AU)";
 
 /// The descriptor on `/run/services/peinit`, which is the parent of *both*
 /// peinit sockets.
