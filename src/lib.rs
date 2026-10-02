@@ -6,7 +6,8 @@
 //! boundaries.
 //!
 //! The public crate surface is deliberately small: the binary entrypoint lives in
-//! `init`, while service-manager internals stay crate-private. Within the crate
+//! `init`, and `client` is what a program that manages services from outside
+//! may use, while service-manager internals stay crate-private. Within the crate
 //! the architecture is layered as:
 //!
 //! - data/state models: `service`, `operation`, `job`, `timer`, `logging`
@@ -24,6 +25,7 @@ pub mod boot;
 pub mod boundary;
 #[doc(hidden)]
 pub mod capi;
+pub mod client;
 #[doc(hidden)]
 pub mod cli;
 /// The console line format: the tag column, its colours, and the stage

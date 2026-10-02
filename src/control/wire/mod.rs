@@ -15,6 +15,9 @@ pub use model::{
     ControlRequestParseError, ControlResponseStatus, ParsedControlRequest,
 };
 pub use parser::parse_control_request;
+pub(crate) use response::{
+    operation_state_from_wire, service_health_from_wire, service_state_from_wire,
+};
 pub use response::{
     ControlResponseTimeProjection, control_client_error_message, control_error_response_line,
     control_lifecycle_ack_response_line, control_lifecycle_ack_response_line_with_mode,

@@ -1,3 +1,4 @@
+use crate::control::lifecycle::LifecycleCommand;
 use crate::control::query::ServiceListItem;
 use crate::control::service_security::{
     ServiceAccess, ServiceAccessCheckRequest, ServiceAccessChecker, ServiceAccessDecision,
@@ -204,11 +205,11 @@ fn service_access_for_command(
     command: ControlCommand,
 ) -> Result<ServiceAccess, SupervisorControlCommandBodyError> {
     match command {
-        ControlCommand::Start => Ok(ServiceAccess::START),
-        ControlCommand::Stop => Ok(ServiceAccess::STOP),
-        ControlCommand::Restart => Ok(ServiceAccess::START.union(ServiceAccess::STOP)),
-        ControlCommand::Reload => Ok(ServiceAccess::INTERROGATE),
-        ControlCommand::Reset => Ok(ServiceAccess::STOP),
+        ControlCommand::Start => Ok(ServiceAccess::for_command(LifecycleCommand::Start)),
+        ControlCommand::Stop => Ok(ServiceAccess::for_command(LifecycleCommand::Stop)),
+        ControlCommand::Restart => Ok(ServiceAccess::for_command(LifecycleCommand::Restart)),
+        ControlCommand::Reload => Ok(ServiceAccess::for_command(LifecycleCommand::Reload)),
+        ControlCommand::Reset => Ok(ServiceAccess::for_command(LifecycleCommand::Reset)),
         ControlCommand::Status => Ok(ServiceAccess::QUERY_STATUS),
         _ => Err(SupervisorControlCommandBodyError::InvalidArguments),
     }
