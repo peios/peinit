@@ -28,4 +28,9 @@ pub enum SupervisorTimerAction {
     Disabled,
     /// The firing was ignored because a shutdown is in progress.
     ShutdownInProgress,
+    /// The service is no longer in the table: its definition was deleted
+    /// while it ran, and it was discarded when it stopped, which no reload
+    /// followed to re-plan its timers (PEI-1234). The firing does nothing,
+    /// and the runtime neither records it nor arms the timer again.
+    ServiceGone,
 }
