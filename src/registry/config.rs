@@ -29,6 +29,7 @@ const LOG_READ_BYTES_PER_EVENT_FIELD: &str = "LogReadBytesPerEvent";
 const PRE_EVENTD_BUFFER_FIELD: &str = "PreEventdBuffer";
 const CONTROL_SECURITY_FIELD: &str = "ControlSecurity";
 const MAX_CONTROL_CONNECTIONS_FIELD: &str = "MaxControlConnections";
+const MAX_CONTROL_CONNECTIONS_PER_USER_FIELD: &str = "MaxControlConnectionsPerUser";
 const MAX_REQUEST_SIZE_FIELD: &str = "MaxRequestSize";
 const CONNECTION_TIMEOUT_FIELD: &str = "ConnectionTimeout";
 const MAX_JOBS_CONNECTIONS_FIELD: &str = "MaxJobsConnections";
@@ -303,6 +304,9 @@ pub fn build_control_socket_limits_from_registry_values(
         max_connections: optional_init_dword(values, MAX_CONTROL_CONNECTIONS_FIELD)?
             .map(|value| value as usize)
             .unwrap_or(defaults.max_connections),
+        max_connections_per_user: optional_init_dword(values, MAX_CONTROL_CONNECTIONS_PER_USER_FIELD)?
+            .map(|value| value as usize)
+            .unwrap_or(defaults.max_connections_per_user),
         max_request_bytes: optional_init_dword(values, MAX_REQUEST_SIZE_FIELD)?
             .map(|value| value as usize)
             .unwrap_or(defaults.max_request_bytes),

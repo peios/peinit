@@ -60,6 +60,7 @@ fn reload_config_updates_live_control_security_and_limits() {
     let mut supervisor = booted_supervisor(vec![inactive_alive_service("app")]);
     let limits = ControlSocketLimits {
         max_connections: 4,
+        max_connections_per_user: 2,
         max_request_bytes: 2048,
         connection_timeout_secs: 5,
     };

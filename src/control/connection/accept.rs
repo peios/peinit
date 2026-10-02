@@ -3,6 +3,8 @@ use crate::control::socket::ControlSocketAcceptError;
 use crate::control::socket::{LinuxControlConnection, LinuxControlSocket};
 use crate::control::system::{ControlPeer, SystemAccessCheckError};
 
+const SYSTEM_SID: &str = "S-1-5-18";
+
 use super::{
     ControlConnectionAdmission, ControlConnectionIo, ControlConnectionRecord,
     ControlConnectionTable, ControlConnectionTableError,
@@ -51,6 +53,14 @@ pub enum ControlConnectionAcceptTurn {
         active_connections: usize,
         max_connections: usize,
     },
+    /// The caller holds as many connections as one caller may, and this one
+    /// is closed without an answer, as one over the overall limit is.
+    RejectedForCaller {
+        fd: i32,
+        caller_sid: String,
+        held: usize,
+        max_per_caller: usize,
+    },
     PeerRejected {
         fd: i32,
         error: SystemAccessCheckError,
@@ -93,6 +103,26 @@ where
         Ok(peer) => peer,
         Err(error) => return Ok(ControlConnectionAcceptTurn::PeerRejected { fd, error }),
     };
+
+    // One caller's connections are bounded, so that whoever can connect
+    // cannot take the connections everyone shares. SYSTEM is exempt, as it
+    // is from the jobs quota: what it does is the machine's.
+    let caller_sid = peer.summary.caller_sid().to_string();
+    if caller_sid != SYSTEM_SID {
+        let held = table
+            .records()
+            .filter(|record| record.peer().summary.caller_sid() == caller_sid)
+            .count();
+        let max_per_caller = table.max_connections_per_caller();
+        if held >= max_per_caller {
+            return Ok(ControlConnectionAcceptTurn::RejectedForCaller {
+                fd,
+                caller_sid,
+                held,
+                max_per_caller,
+            });
+        }
+    }
 
     let record = ControlConnectionRecord::new_with_activity(connection, peer, observed_at_ns);
     match table

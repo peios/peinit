@@ -6,13 +6,15 @@ use super::address::unix_socket_address;
 use super::{
     CONTROL_SOCKET_PATH, ControlSocketPathError, ControlSocketRead, ControlSocketWrite,
     DEFAULT_CONNECTION_TIMEOUT_SECS, DEFAULT_MAX_CONTROL_CONNECTIONS,
+    DEFAULT_MAX_CONTROL_CONNECTIONS_PER_USER,
     DEFAULT_MAX_REQUEST_SIZE_BYTES, LinuxControlSocket,
 };
 
 #[test]
 fn control_socket_constants_match_psd_007() {
     assert_eq!(CONTROL_SOCKET_PATH, "/run/services/peinit/control.sock");
-    assert_eq!(DEFAULT_MAX_CONTROL_CONNECTIONS, 32);
+    assert_eq!(DEFAULT_MAX_CONTROL_CONNECTIONS, 256);
+    assert_eq!(DEFAULT_MAX_CONTROL_CONNECTIONS_PER_USER, 16);
     assert_eq!(DEFAULT_MAX_REQUEST_SIZE_BYTES, 65_536);
     assert_eq!(DEFAULT_CONNECTION_TIMEOUT_SECS, 30);
 }

@@ -14,5 +14,6 @@ pub use model::{
     ControlSocketAcceptError, ControlSocketBindError, ControlSocketLimits, ControlSocketPathError,
     ControlSocketRead, ControlSocketReadError, ControlSocketWrite, ControlSocketWriteError,
     DEFAULT_CONNECTION_TIMEOUT_SECS, DEFAULT_MAX_CONTROL_CONNECTIONS,
+    DEFAULT_MAX_CONTROL_CONNECTIONS_PER_USER,
     DEFAULT_MAX_REQUEST_SIZE_BYTES,
 };

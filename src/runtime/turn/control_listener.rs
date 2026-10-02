@@ -46,6 +46,7 @@ where
             Some(source)
         }
         ControlConnectionAcceptTurn::RejectedAtSocket { .. }
+        | ControlConnectionAcceptTurn::RejectedForCaller { .. }
         | ControlConnectionAcceptTurn::PeerRejected { .. }
         | ControlConnectionAcceptTurn::WouldBlock => None,
     };

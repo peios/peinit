@@ -93,6 +93,44 @@ fn accept_turn_rejects_at_socket_when_connection_table_is_full() {
 }
 
 #[test]
+fn accept_turn_rejects_a_caller_holding_as_many_as_one_caller_may() {
+    let mut listener = FakeControlListener::accepts([
+        FakeAccept::Connection(FakeAcceptedConnection::new(32, "S-1-5-21-1-2-3-1001")),
+        FakeAccept::Connection(FakeAcceptedConnection::new(33, "S-1-5-21-1-2-3-1002")),
+        FakeAccept::Connection(FakeAcceptedConnection::new(34, "SYSTEM")),
+        FakeAccept::Connection(FakeAcceptedConnection::new(35, "SYSTEM")),
+    ]);
+    let mut table = ControlConnectionTable::new(8);
+    table.set_max_connections_per_caller(2);
+    for (fd, who) in [(30, "S-1-5-21-1-2-3-1001"), (31, "S-1-5-21-1-2-3-1001"), (36, "SYSTEM"), (37, "SYSTEM")] {
+        table.admit(fd, accepted_record(fd, who)).expect("seed connection");
+    }
+
+    // Its third is refused, with the overall limit nowhere near.
+    assert_eq!(
+        accept_control_connection(&mut listener, &mut table).expect("accept"),
+        ControlConnectionAcceptTurn::RejectedForCaller {
+            fd: 32,
+            caller_sid: "S-1-5-21-1-2-3-1001".into(),
+            held: 2,
+            max_per_caller: 2,
+        },
+    );
+    // Someone else is let in.
+    assert!(matches!(
+        accept_control_connection(&mut listener, &mut table).expect("accept"),
+        ControlConnectionAcceptTurn::Accepted { fd: 33, .. },
+    ));
+    // SYSTEM is not counted.
+    for fd in [34, 35] {
+        assert!(matches!(
+            accept_control_connection(&mut listener, &mut table).expect("accept"),
+            ControlConnectionAcceptTurn::Accepted { fd: accepted, .. } if accepted == fd,
+        ));
+    }
+}
+
+#[test]
 fn accept_turn_reports_duplicate_connection_fd_as_table_error() {
     let mut listener = FakeControlListener::accepts([FakeAccept::Connection(
         FakeAcceptedConnection::new(44, "duplicate"),

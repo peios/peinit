@@ -934,11 +934,24 @@ answer. Absent or malformed, the compiled default above applies.
 --- machine\system\init maxcontrolconnections
 canonical: Machine\System\Init MaxControlConnections
 type: REG_DWORD
-default: 32
+default: 256
 valid: concurrent connections
 applies: live
 
-Maximum concurrent connections to the control socket.
+Maximum concurrent connections to the control socket, from everyone
+together. A bound on peinit's descriptors; what keeps one caller from
+taking the connections everyone shares is MaxControlConnectionsPerUser.
+
+--- machine\system\init maxcontrolconnectionsperuser
+canonical: Machine\System\Init MaxControlConnectionsPerUser
+type: REG_DWORD
+default: 16
+valid: concurrent connections
+applies: live
+
+Maximum concurrent connections to the control socket that one caller
+may hold, counted by the user SID of its token. SYSTEM is exempt. A
+connection over the limit is closed without a response.
 
 --- machine\system\init maxrequestsize
 canonical: Machine\System\Init MaxRequestSize
