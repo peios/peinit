@@ -173,6 +173,39 @@ impl Definition {
         }
         Ok(())
     }
+
+    /// When each `timer:` schedule next comes round after `after_realtime_ns`
+    /// (CLOCK_REALTIME), in the order the triggers are given: a time; `None`
+    /// for one that never comes round within the ten years peinit looks
+    /// (§9.2), which peinit will not arm; or why it cannot be told.
+    ///
+    /// A preview of what is written, for whoever is writing it: it is the
+    /// schedule's occurrence, before any `TimerJitter`, and says nothing of
+    /// whether peinit has armed it. What peinit has armed is `status`'s.
+    pub fn schedules(&self, after_realtime_ns: u64) -> Vec<(String, Result<Option<u64>, String>)> {
+        let Ok(decoded) = build_service_definition_from_registry_values(&self.name, &self.values) else {
+            return Vec::new();
+        };
+        decoded
+            .triggers
+            .iter()
+            .filter_map(|trigger| match trigger {
+                ServiceTrigger::Timer { schedule } => Some(schedule.clone()),
+                _ => None,
+            })
+            .map(|schedule| {
+                let next = match crate::timer::calendar::CalendarSchedule::parse(&schedule) {
+                    Ok(calendar) => match calendar.next_after_ns(after_realtime_ns) {
+                        Ok(next) => Ok(Some(next)),
+                        Err(crate::timer::calendar::CalendarNextError::NoFutureOccurrence) => Ok(None),
+                        Err(error) => Err(error.to_string()),
+                    },
+                    Err(error) => Err(error.to_string()),
+                };
+                (schedule, next)
+            })
+            .collect()
+    }
 }
 
 /// What turns `from` into `to`: each value set or taken away, compared by
@@ -304,6 +337,27 @@ mod tests {
         definition.set("Requires", "lpsd\n").unwrap();
         definition.set("Readiness", "alive").unwrap();
         definition
+    }
+
+    /// Each `timer:` schedule says when it next comes round, in the order
+    /// given; one that never does says so, rather than a time.
+    #[test]
+    fn each_schedule_says_when_it_next_comes_round() {
+        let mut definition = sshd();
+        definition
+            .set_list("Triggers", &["boot", "timer:*-*-* 02:00:00 UTC", "timer:*-02-30", "timer:hourly UTC"].map(String::from))
+            .unwrap();
+        // 2024-06-01T00:30:00Z.
+        let now = 1_717_201_800_000_000_000;
+        assert_eq!(
+            definition.schedules(now),
+            [
+                ("*-*-* 02:00:00 UTC".to_string(), Ok(Some(1_717_207_200_000_000_000))),
+                ("*-02-30".to_string(), Ok(None)),
+                ("hourly UTC".to_string(), Ok(Some(1_717_203_600_000_000_000))),
+            ]
+        );
+        assert!(sshd().schedules(now).is_empty());
     }
 
     #[test]
