@@ -12,10 +12,10 @@ use super::command::{
 };
 use super::output::{write_response, write_server_error};
 
-const EXIT_OK: i32 = 0;
-const EXIT_SERVER_ERROR: i32 = 1;
+pub(super) const EXIT_OK: i32 = 0;
+pub(super) const EXIT_SERVER_ERROR: i32 = 1;
 const EXIT_USAGE: i32 = 64;
-const EXIT_UNAVAILABLE: i32 = 69;
+pub(super) const EXIT_UNAVAILABLE: i32 = 69;
 const EXIT_PROTOCOL: i32 = 70;
 
 pub fn run_from_env() -> i32 {
@@ -132,6 +132,9 @@ impl From<JobsClientError> for SendError {
 }
 
 fn run_invocation(invocation: Invocation, out: &mut dyn Write, err: &mut dyn Write) -> i32 {
+    if let Command::Definition { action, service } = &invocation.command {
+        return super::definition::run(action, service, invocation.output, out, err);
+    }
     match send(&invocation) {
         Ok(response) => {
             if response.is_ok() {
@@ -182,6 +185,7 @@ fn send(invocation: &Invocation) -> Result<CliResponse, SendError> {
             let mut client = JobsClient::connect_path(&invocation.jobs_socket_path)?;
             send_jobs(&mut client, &invocation.command)
         }
+        Channel::Registry => unreachable!("a definition is read from the registry, not sent"),
     }
 }
 
@@ -212,6 +216,9 @@ fn send_control(client: &mut ControlClient, command: &Command) -> Result<CliResp
         }
         Command::JobSubmit { .. } | Command::JobWait { .. } | Command::JobSignal { .. } => {
             unreachable!("jobs-channel command routed to the control socket")
+        }
+        Command::Definition { .. } => {
+            unreachable!("a definition is read from the registry, not sent")
         }
     }?;
     Ok(response.into())

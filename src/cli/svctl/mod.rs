@@ -1,5 +1,6 @@
 mod args;
 mod command;
+mod definition;
 mod execute;
 mod output;
 

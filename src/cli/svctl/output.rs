@@ -50,6 +50,9 @@ fn write_human_response(out: &mut dyn Write, command: &Command, value: &Value) -
         | Command::JobSubmit { .. }
         | Command::JobWait { .. }
         | Command::JobSignal { .. } => write_job_view(out, value.get("job").unwrap_or(value)),
+        Command::Definition { .. } => {
+            unreachable!("a definition is written out by svctl::definition")
+        }
     }
 }
 
