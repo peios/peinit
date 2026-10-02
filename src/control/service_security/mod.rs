@@ -3,6 +3,7 @@ mod model;
 
 pub use access::ServiceAccessChecker;
 pub use model::{
-    ServiceAccess, ServiceAccessCheckError, ServiceAccessCheckRequest, ServiceAccessDecision,
-    ServiceAccessDenied,
+    DEFAULT_SERVICE_SECURITY_SDDL, SERVICE_GENERIC_MAPPING, ServiceAccess,
+    ServiceAccessCheckError, ServiceAccessCheckRequest, ServiceAccessDecision,
+    ServiceAccessDenied, ServiceGenericMapping,
 };

@@ -13,6 +13,9 @@ use labels::{
     job_type_wire, operation_source_wire, operation_state_wire, operation_type_wire,
     service_health_wire, service_state_wire, transition_cause_wire,
 };
+pub(crate) use labels::{
+    operation_state_from_wire, service_health_from_wire, service_state_from_wire,
+};
 pub use time::ControlResponseTimeProjection;
 
 mod labels;

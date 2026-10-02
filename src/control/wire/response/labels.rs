@@ -17,6 +17,49 @@ pub(super) fn service_state_wire(state: ServiceState) -> &'static str {
     }
 }
 
+/// The state a wire label names, for a client reading a response.
+pub(crate) fn service_state_from_wire(label: &str) -> Option<ServiceState> {
+    const ALL: [ServiceState; 10] = [
+        ServiceState::Inactive,
+        ServiceState::Starting,
+        ServiceState::Active,
+        ServiceState::Reloading,
+        ServiceState::Stopping,
+        ServiceState::Completed,
+        ServiceState::Backoff,
+        ServiceState::Failed,
+        ServiceState::Abandoned,
+        ServiceState::Skipped,
+    ];
+    ALL.into_iter().find(|state| service_state_wire(*state) == label)
+}
+
+/// The health a wire label names.
+pub(crate) fn service_health_from_wire(label: &str) -> Option<ServiceHealthStatus> {
+    [
+        ServiceHealthStatus::Unknown,
+        ServiceHealthStatus::Healthy,
+        ServiceHealthStatus::Unhealthy,
+    ]
+    .into_iter()
+    .find(|status| service_health_wire(*status) == label)
+}
+
+/// The operation state a wire label names.
+pub(crate) fn operation_state_from_wire(label: &str) -> Option<OperationState> {
+    [
+        OperationState::Pending,
+        OperationState::Running,
+        OperationState::Completed,
+        OperationState::Failed,
+        OperationState::Merged,
+        OperationState::Cancelled,
+        OperationState::Aborted,
+    ]
+    .into_iter()
+    .find(|state| operation_state_wire(*state) == label)
+}
+
 pub(super) fn service_health_wire(status: ServiceHealthStatus) -> &'static str {
     match status {
         ServiceHealthStatus::Unknown => "unknown",

@@ -42,6 +42,32 @@ pub fn start_is_already_satisfied(state: ServiceState) -> bool {
     matches!(classify_start(state), CommandAdmission::Already)
 }
 
+/// What a lifecycle command would come to against a service in a state, as
+/// the control interface would answer it (§10.3), for a client deciding what
+/// to offer before it asks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Admission {
+    /// It does something: an operation, or clearing a state at once.
+    Acts,
+    /// It is already so: a start of an active service.
+    Already,
+    /// It does nothing: a stop of an inactive service.
+    Nothing,
+    /// It is refused as invalid for the state.
+    Refused,
+}
+
+pub fn admission(command: LifecycleCommand, state: ServiceState) -> Admission {
+    match classify(command, state) {
+        CommandAdmission::Operation { .. } | CommandAdmission::SynchronousClear { .. } => {
+            Admission::Acts
+        }
+        CommandAdmission::Already => Admission::Already,
+        CommandAdmission::Noop => Admission::Nothing,
+        CommandAdmission::Invalid => Admission::Refused,
+    }
+}
+
 pub(super) fn classify(command: LifecycleCommand, state: ServiceState) -> CommandAdmission {
     match command {
         LifecycleCommand::Start => classify_start(state),

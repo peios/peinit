@@ -60,17 +60,9 @@ fn peios_check_service_access(
 
 #[cfg(feature = "peios-boundary")]
 fn service_security_generic_mapping() -> peios::security::GenericMapping {
-    use super::model::ServiceAccess;
+    use super::model::SERVICE_GENERIC_MAPPING as MAPPING;
 
-    let write_execute = ServiceAccess::START
-        .union(ServiceAccess::STOP)
-        .union(ServiceAccess::INTERROGATE);
-    peios::security::GenericMapping::new(
-        ServiceAccess::QUERY_STATUS.bits(),
-        write_execute.bits(),
-        write_execute.bits(),
-        ServiceAccess::ALL.bits(),
-    )
+    peios::security::GenericMapping::new(MAPPING.read, MAPPING.write, MAPPING.execute, MAPPING.all)
 }
 
 #[cfg(feature = "peios-boundary")]
@@ -94,4 +86,18 @@ fn default_service_security_descriptor() -> peios::Result<peios::security::Secur
         .group(&administrators)
         .dacl(&dacl)
         .build()
+}
+
+#[cfg(all(test, feature = "peios-boundary"))]
+mod tests {
+    use super::default_service_security_descriptor;
+    use crate::control::service_security::DEFAULT_SERVICE_SECURITY_SDDL;
+
+    /// The default a client is told in SDDL is the one peinit checks against.
+    #[test]
+    fn the_default_in_sddl_is_the_default_built() {
+        let built = default_service_security_descriptor().expect("build the default");
+        let said = peios::security::sddl::parse(DEFAULT_SERVICE_SECURITY_SDDL).expect("parse the SDDL");
+        assert_eq!(said.as_bytes(), built.as_bytes());
+    }
 }
