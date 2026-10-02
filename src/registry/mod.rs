@@ -23,6 +23,9 @@ pub use config::{
     build_settle_timeout_from_registry_values, build_shutdown_timeout_from_registry_values,
     read_log_config_from_registry, services_schema_warnings,
 };
+pub use fields::{
+    FieldGroup, FieldInfo, FieldKind, SERVICE_FIELD_INFO, TakesEffect, service_field,
+};
 pub use provisioning::{
     build_provisioned_path_from_registry_values, build_provisioned_path_registry_snapshot,
 };
@@ -37,8 +40,8 @@ pub use value::{
 
 #[cfg(feature = "peios-registry")]
 pub use lcs::{
-    LcsRegistryClient, LcsRegistryReadError, LcsRegistryWatch, LcsRegistryWatches,
-    LcsTimerLastRunWriter,
+    Deleted, LcsRegistryClient, LcsRegistryReadError, LcsRegistryWatch, LcsRegistryWatches,
+    LcsTimerLastRunWriter, delete_service_definition, read_service_values, write_service_changes,
 };
 
 pub const GLOBAL_ENV_VARS_KEY: &str = r"Machine\System\Init\EnvVars";

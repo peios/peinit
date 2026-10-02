@@ -26,11 +26,20 @@ svctl \- control Peios services, submitted jobs, and system shutdown
 .B job
 .I command
 .RI [ arguments ]
+.br
+.B svctl
+.RI [ --json ]
+.B definition
+.BR show | validate | create | edit | delete
+.I service
+.RI [ edits ]
 .SH DESCRIPTION
 .B svctl
 is the administrative client for the Peios service manager.  Service and
 system commands use the control socket.  Submitted-job commands use either
-the control socket or the jobs socket, as described below.
+the control socket or the jobs socket, as described below.  Definition
+commands read and write a service's definition in the registry, under
+.IR Machine\eSystem\eServices .
 .SH GLOBAL OPTIONS
 .TP
 .BI --socket " path"
@@ -125,6 +134,42 @@ Wait for a job to become ready or terminal.
 .TP
 .BI "job signal" " job-id signal"
 Send a signal to a job.
+.SH SERVICE DEFINITIONS
+.B def
+is short for
+.BR definition .
+Fields are named as in the registry, in any case.  A field is set from text:
+a number as digits, yes or no, a choice by its name
+.RB ( Type=Oneshot ),
+and a list by giving
+.B --set
+once for each item, in order.  A change is checked as peinit checks a
+definition, and nothing is written unless it passes.  Only the values that
+change are written, in one registry transaction, and it is refused if any of
+them changed since it was read.  Values that are not fields of a definition
+are kept as they are.
+.B ServiceSecurity
+is not set here.
+.TP
+.BI "definition show" " service"
+Show the fields that are set, by group, and whether peinit would take the
+definition.
+.TP
+.BI "definition validate" " service"
+Say whether peinit would take the definition, and if not, why.  Exits 1 if it
+would not.  Privilege names, the services a definition names and its identity
+are checked later, by peinit and authd, and are not checked here.
+.TP
+.BI "definition create" " service " "--set ImagePath=" "path " "[--set " field = value "]..."
+Define a new service.
+.TP
+.BI "definition edit" " service " "[--set " field = value "]... [--unset " field ]...
+Change a definition.  It says which of the changed fields a running service
+keeps as they were until it is restarted.
+.TP
+.BI "definition delete" " service"
+Delete a definition, and what is under its key.  A running service carries
+on until it stops.
 .SH MULTICALL NAMES
 The installed
 .BR reboot ,
@@ -145,7 +190,9 @@ and
 .BR "shutdown -H now" .
 .SH EXIT STATUS
 Zero indicates success.  Command-usage errors return 64.  A waited submitted
-job returns success only when the job completed successfully.
+job returns success only when the job completed successfully.  A definition
+command returns 1 when peinit would not take the definition or the change
+could not be written, and 69 when the registry could not be read.
 .SH FILES
 .TP
 .I /run/peinit/control.sock

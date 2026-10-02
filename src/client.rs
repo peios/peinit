@@ -3,8 +3,10 @@
 //!
 //! It covers what to ask the control socket and how to read the answers
 //! (PSPU §4), which right each command needs, what the generic rights mean on
-//! a service, the descriptor a service has when none is given (§4.6), and
-//! what a command would come to against a service in each state (§10.3).
+//! a service, the descriptor a service has when none is given (§4.6), what a
+//! command would come to against a service in each state (§10.3), and a
+//! service's definition: its fields, and whether peinit would take it
+//! (`Definition`).
 //!
 //! Everything here is what peinit itself uses, re-exported or read with
 //! peinit's own labels, never a copy, so a client cannot drift from the
@@ -17,7 +19,14 @@
 
 use serde_json::Value;
 
+mod definition;
+
+pub use definition::{Change, Definition, FIELDS, Problem, changes, problem};
 pub use crate::control::client::{ControlClient, ControlClientError};
+pub use crate::registry::{
+    FieldGroup, FieldInfo, FieldKind, RawRegistryValue, RegistryValueType,
+    ServiceRegistryDecodeError, TakesEffect, service_field,
+};
 pub use crate::control::lifecycle::{Admission, LifecycleCommand as Command, admission};
 pub use crate::control::service_security::{
     DEFAULT_SERVICE_SECURITY_SDDL, SERVICE_GENERIC_MAPPING, ServiceAccess, ServiceGenericMapping,

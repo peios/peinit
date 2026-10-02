@@ -11,11 +11,13 @@ pub struct Invocation {
     pub command: Command,
 }
 
-/// Which of peinit's two doors a command knocks on.
+/// Which of peinit's two doors a command knocks on, or the registry, which
+/// holds the definitions peinit reads.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Channel {
     Control,
     Jobs,
+    Registry,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -70,15 +72,38 @@ pub enum Command {
         job_id: String,
         signal: i32,
     },
+    /// A service's definition, in the registry.
+    Definition {
+        action: DefinitionAction,
+        service: String,
+    },
 }
 
 impl Command {
     pub fn channel(&self) -> Channel {
         match self {
             Self::JobSubmit { .. } | Self::JobWait { .. } | Self::JobSignal { .. } => Channel::Jobs,
+            Self::Definition { .. } => Channel::Registry,
             _ => Channel::Control,
         }
     }
+}
+
+/// What `svctl definition` does with a service's definition.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DefinitionAction {
+    Show,
+    Validate,
+    Create(Vec<Edit>),
+    Edit(Vec<Edit>),
+    Delete,
+}
+
+/// One `--set` or `--unset`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Edit {
+    Set { field: String, value: String },
+    Unset { field: String },
 }
 
 /// The `job-list` filters (PSPU §4.8), each optional.

@@ -6,7 +6,8 @@ use crate::jobs::socket::JOBS_SOCKET_PATH;
 use crate::shutdown::ShutdownKind;
 
 use super::command::{
-    Command, Invocation, JobListFilter, JobSubmission, OutputMode, ServiceAction,
+    Command, DefinitionAction, Edit, Invocation, JobListFilter, JobSubmission, OutputMode,
+    ServiceAction,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -154,6 +155,10 @@ fn parse_svctl_command(
             Ok(Command::Shutdown { kind })
         }
         "job" => parse_job_command(program, rest, wait),
+        "definition" | "def" => {
+            reject_wait(program, wait, "definition")?;
+            parse_definition_command(program, rest)
+        }
         "help" => Err(usage(program, "use --help to show usage")),
         other if other.starts_with('-') => Err(usage(program, format!("unknown option {other}"))),
         other => Err(usage(program, format!("unknown command {other}"))),
@@ -209,6 +214,84 @@ fn parse_job_command(
         other if other.starts_with('-') => Err(usage(program, format!("unknown option {other}"))),
         other => Err(usage(program, format!("unknown job subcommand {other}"))),
     }
+}
+
+fn parse_definition_command(program: &str, positionals: &[String]) -> Result<Command, UsageError> {
+    let Some(command) = positionals.first() else {
+        return Err(usage(
+            program,
+            "definition requires a subcommand: show, validate, create, edit, delete",
+        ));
+    };
+    let rest = &positionals[1..];
+    let (action, service) = match command.as_str() {
+        "show" => (
+            DefinitionAction::Show,
+            single_argument(program, rest, "definition show requires a service")?,
+        ),
+        "validate" => (
+            DefinitionAction::Validate,
+            single_argument(program, rest, "definition validate requires a service")?,
+        ),
+        "delete" => (
+            DefinitionAction::Delete,
+            single_argument(program, rest, "definition delete requires a service")?,
+        ),
+        "create" => {
+            let (service, edits) = parse_definition_edits(program, rest, "create")?;
+            (DefinitionAction::Create(edits), service)
+        }
+        "edit" => {
+            let (service, edits) = parse_definition_edits(program, rest, "edit")?;
+            if edits.is_empty() {
+                return Err(usage(program, "definition edit requires --set or --unset"));
+            }
+            (DefinitionAction::Edit(edits), service)
+        }
+        other if other.starts_with('-') => {
+            return Err(usage(program, format!("unknown option {other}")));
+        }
+        other => return Err(usage(program, format!("unknown definition subcommand {other}"))),
+    };
+    Ok(Command::Definition { action, service })
+}
+
+/// The service and the `--set FIELD=VALUE` and `--unset FIELD` of
+/// `definition create` or `edit`, in the order given.
+fn parse_definition_edits(
+    program: &str,
+    args: &[String],
+    what: &str,
+) -> Result<(String, Vec<Edit>), UsageError> {
+    let mut service = None;
+    let mut edits = Vec::new();
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        if let Some(value) = take_option_value(program, &mut iter, arg, "--set")? {
+            let Some((field, value)) = value.split_once('=').filter(|(field, _)| !field.is_empty())
+            else {
+                return Err(usage(program, "--set takes FIELD=VALUE"));
+            };
+            edits.push(Edit::Set {
+                field: field.to_string(),
+                value: value.to_string(),
+            });
+        } else if let Some(field) = take_option_value(program, &mut iter, arg, "--unset")? {
+            edits.push(Edit::Unset {
+                field: field.to_string(),
+            });
+        } else if arg.starts_with('-') {
+            return Err(usage(program, format!("unknown option {arg}")));
+        } else if service.is_none() {
+            service = Some(arg.clone());
+        } else {
+            return Err(usage(program, format!("definition {what} takes one service")));
+        }
+    }
+    let Some(service) = service else {
+        return Err(usage(program, format!("definition {what} requires a service")));
+    };
+    Ok((service, edits))
 }
 
 /// `--name value` or `--name=value`, consumed from `args`.
@@ -606,6 +689,15 @@ this process to the job under NAME; --output attaches standard output as the
 job's output sink; --wait waits for the job to end and exits 0 only if it
 completed.
 
+Service definitions, in the registry (def is short for definition):
+  {program} [--json] definition show SERVICE
+  {program} [--json] definition validate SERVICE
+  {program} [--json] definition create SERVICE --set ImagePath=PATH [--set FIELD=VALUE]...
+  {program} [--json] definition edit SERVICE [--set FIELD=VALUE]... [--unset FIELD]...
+  {program} [--json] definition delete SERVICE
+A list field is set by giving --set once for each item, in order. A change
+is checked as peinit checks it, and written in one transaction, or not at all.
+
 Immediate shutdown multicall forms are also supported:
   reboot
   poweroff
@@ -622,6 +714,38 @@ Immediate shutdown multicall forms are also supported:
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_a_definition_command_and_its_edits_in_order() {
+        let ParseOutcome::Run(invocation) = parse([
+            "svctl", "--json", "def", "edit", "web", "--set", "Arguments=-D", "--unset=Wants",
+            "--set=Arguments=--verbose",
+        ])
+        .expect("parse") else {
+            panic!("expected run");
+        };
+        assert_eq!(invocation.output, OutputMode::Json);
+        assert_eq!(
+            invocation.command,
+            Command::Definition {
+                action: DefinitionAction::Edit(vec![
+                    Edit::Set { field: "Arguments".into(), value: "-D".into() },
+                    Edit::Unset { field: "Wants".into() },
+                    Edit::Set { field: "Arguments".into(), value: "--verbose".into() },
+                ]),
+                service: "web".into(),
+            }
+        );
+        let error = |args: &[&str]| parse(args.iter().copied()).expect_err("usage error").message;
+        assert_eq!(error(&["svctl", "definition", "edit", "web"]), "definition edit requires --set or --unset");
+        assert_eq!(error(&["svctl", "definition", "edit", "web", "--set", "=x"]), "--set takes FIELD=VALUE");
+        assert_eq!(error(&["svctl", "definition", "show"]), "definition show requires a service");
+        assert_eq!(error(&["svctl", "--wait", "definition", "show", "web"]).contains("--wait"), true);
+        assert!(matches!(
+            parse(["svctl", "definition", "create", "web", "--set", "ImagePath=/x"]),
+            Ok(ParseOutcome::Run(invocation)) if matches!(invocation.command, Command::Definition { action: DefinitionAction::Create(_), .. })
+        ));
+    }
 
     #[test]
     fn parses_start_with_no_wait() {

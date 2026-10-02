@@ -1,5 +1,6 @@
 mod boot;
 mod client;
+mod definition;
 mod error;
 mod eventd;
 mod global_env;
@@ -13,6 +14,7 @@ mod value;
 mod watch;
 
 pub use client::{LcsRegistryClient, LcsTimerLastRunWriter};
+pub use definition::{Deleted, delete_service_definition, read_service_values, write_service_changes};
 pub use error::LcsRegistryReadError;
 pub use watch::{LcsRegistryWatch, LcsRegistryWatches};
 
