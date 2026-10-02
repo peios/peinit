@@ -2,7 +2,7 @@ use crate::boundary::{
     Clock, LinuxTimerFdRead, RealtimeClock, TimerLastRunWriteRequest, TimerLastRunWriter,
 };
 use crate::runtime::RuntimeCalendarTimerTurn;
-use crate::supervisor::Supervisor;
+use crate::supervisor::{Supervisor, SupervisorTimerAction};
 
 use super::error::LinuxCalendarTimerError;
 use super::random::jittered_deadline_ns;
@@ -146,10 +146,30 @@ impl LinuxCalendarTimerTable {
         let supervisor_dispatch = supervisor
             .handle_timer_firing(&service, &schedule, monotonic_now_ns)
             .map_err(LinuxCalendarTimerError::Supervisor)?;
+        // A service gone from the table, or whose definition was deleted
+        // while it runs on, has no key to record a firing in. Writing one
+        // would make the key again, under a definition nobody gave, which a
+        // reload would then find wanting (PEI-1234).
+        let gone = matches!(supervisor_dispatch.action, SupervisorTimerAction::ServiceGone);
+        let removed = gone
+            || supervisor
+                .services()
+                .get(&service)
+                .is_some_and(|entry| entry.definition_removed);
+        if gone {
+            // Not armed again: a fired absolute timer stays disarmed, and
+            // the next reload replaces the table without it.
+            return Ok(RuntimeCalendarTimerTurn::Read {
+                read,
+                supervisor: Some(Box::new(supervisor_dispatch)),
+                last_run_write: None,
+                next_scheduled_ns: None,
+            });
+        }
         // A TimerPersistent=0 trigger never reads its history (§9.3), so
         // writing it would only fork PID 1 for a value nothing consults
         // (PEI-1083).
-        let last_run_write = persistent.then(|| {
+        let last_run_write = (persistent && !removed).then(|| {
             writer.queue_timer_last_run_write(TimerLastRunWriteRequest {
                 service: service.clone(),
                 schedule: schedule.clone(),

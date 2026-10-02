@@ -230,6 +230,49 @@ fn insert_entry(
     fd
 }
 
+/// PEI-1234. A service deleted while it ran is discarded when it stops, and
+/// no reload follows to take its timer away. Its next firing used to come
+/// out as MissingStartCredentials and take PID 1 into recovery; it is a
+/// no-op now, records nothing, which would have made its key again, and is
+/// not armed again.
+#[test]
+fn a_firing_for_a_service_that_is_gone_does_nothing_and_is_not_armed_again() {
+    let scheduled_ns = ns_utc(2024, 5, 3, 12, 0, 0);
+    let mut supervisor = timer_supervisor(true, 0, scheduled_ns);
+    let mut table = LinuxCalendarTimerTable::new();
+    let fd = insert_entry(&mut table, true, 0, scheduled_ns);
+    table.entries.get_mut(&fd).expect("entry").service = "gone".to_string();
+    let mut writer = TimerWriteRecorder::default();
+    let mut clock = FixedClock {
+        monotonic_ns: 10_000,
+        realtime_ns: scheduled_ns,
+    };
+
+    let turn = table
+        .fire_and_rearm_with_realtime(
+            &mut supervisor,
+            fd,
+            LinuxTimerFdRead::Expired { expirations: 1 },
+            &mut clock,
+            &mut writer,
+            scheduled_ns,
+        )
+        .expect("a firing for a service that is gone is not an error");
+
+    assert!(writer.writes.is_empty(), "a firing for a gone service recorded a last run");
+    let RuntimeCalendarTimerTurn::Read {
+        supervisor: Some(dispatch),
+        last_run_write: None,
+        next_scheduled_ns: None,
+        ..
+    } = turn
+    else {
+        panic!("expected a no-op firing, not armed again, got {turn:?}");
+    };
+    assert_eq!(dispatch.action, SupervisorTimerAction::ServiceGone);
+    assert_eq!(table.entries[&fd].next_scheduled_ns, scheduled_ns, "re-armed");
+}
+
 /// What `status` reports of a timer is what the table has: a firing is its
 /// last, the occurrence after it its next, and a refused schedule is there
 /// too, saying why, rather than missing.

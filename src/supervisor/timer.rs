@@ -33,16 +33,20 @@ impl Supervisor {
                 action: SupervisorTimerAction::ShutdownInProgress,
             });
         }
-        let definition = self.services.definition(service).ok_or_else(|| {
-            SupervisorError::MissingStartCredentials {
+        // A service discarded since its timer was armed: deleted while it
+        // ran, and gone when it stopped. That is a timer outliving its
+        // service until the next reload, not an internal error, and it is
+        // answered as one more no-op for the same reason as a shutdown is
+        // (PEI-1234).
+        let (Some(definition), Some(runtime)) =
+            (self.services.definition(service), self.services.runtime(service))
+        else {
+            return Ok(SupervisorTimerDispatch {
                 service: service.to_string(),
-            }
-        })?;
-        let runtime = self.services.runtime(service).ok_or_else(|| {
-            SupervisorError::MissingStartCredentials {
-                service: service.to_string(),
-            }
-        })?;
+                schedule: schedule.to_string(),
+                action: SupervisorTimerAction::ServiceGone,
+            });
+        };
 
         let action = if definition.disabled {
             TimerFiringAction::Disabled
