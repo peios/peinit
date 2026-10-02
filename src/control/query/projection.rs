@@ -41,6 +41,8 @@ pub fn list_services(services: &ServiceTable) -> Vec<ServiceListItem> {
                     .as_ref()
                     .map(|_| entry.runtime.health.status),
                 definition_removed: entry.definition_removed,
+                // The Supervisor's to fill, as `timers` in a status.
+                next_timer_ns: None,
             })
         })
         .collect()
@@ -84,6 +86,8 @@ fn status_from_entry(
             .map(current_operation_view),
         warnings,
         lifecycle_warnings,
+        // The Supervisor's to fill: the runtime gives it the timers.
+        timers: Vec::new(),
     })
 }
 

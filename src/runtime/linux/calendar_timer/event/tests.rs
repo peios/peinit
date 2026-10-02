@@ -224,7 +224,77 @@ fn insert_entry(
             next_scheduled_ns,
             armed_deadline_ns,
             jitter_secs,
+            last_fired_ns: None,
         },
     );
     fd
+}
+
+/// What `status` reports of a timer is what the table has: a firing is its
+/// last, the occurrence after it its next, and a refused schedule is there
+/// too, saying why, rather than missing.
+#[test]
+fn the_views_are_what_the_table_has_armed_and_refused() {
+    use crate::control::query::{ServiceTimerArming, ServiceTimerView};
+
+    let scheduled_ns = ns_utc(2024, 5, 3, 12, 0, 0);
+    let mut supervisor = timer_supervisor(false, 0, scheduled_ns);
+    let mut table = LinuxCalendarTimerTable::new();
+    let fd = insert_entry(&mut table, false, 0, scheduled_ns);
+    table.rejected.push((
+        "app".to_string(),
+        "*-02-30".to_string(),
+        "calendar expression has no future occurrence".to_string(),
+    ));
+    let before = table.views();
+    assert_eq!(
+        before["app"][0].arming,
+        ServiceTimerArming::Armed {
+            scheduled_ns,
+            fires_ns: scheduled_ns,
+            last_fired_ns: None,
+        }
+    );
+
+    let mut clock = FixedClock {
+        monotonic_ns: 10_000,
+        realtime_ns: scheduled_ns,
+    };
+    table
+        .fire_and_rearm_with_realtime(
+            &mut supervisor,
+            fd,
+            LinuxTimerFdRead::Expired { expirations: 1 },
+            &mut clock,
+            &mut TimerWriteRecorder::default(),
+            scheduled_ns,
+        )
+        .expect("fire and rearm");
+
+    let views = table.views();
+    assert_eq!(
+        views["app"],
+        [
+            ServiceTimerView {
+                schedule: EVERY_MINUTE.to_string(),
+                arming: ServiceTimerArming::Armed {
+                    scheduled_ns: scheduled_ns + MINUTE_NS,
+                    fires_ns: scheduled_ns + MINUTE_NS,
+                    last_fired_ns: Some(scheduled_ns),
+                },
+            },
+            ServiceTimerView {
+                schedule: "*-02-30".to_string(),
+                arming: ServiceTimerArming::NotArmed {
+                    reason: "calendar expression has no future occurrence".to_string(),
+                },
+            },
+        ]
+    );
+    supervisor.set_calendar_timers(views);
+    assert_eq!(
+        supervisor.list_services()[0].next_timer_ns,
+        Some(scheduled_ns + MINUTE_NS)
+    );
+    assert_eq!(supervisor.service_status("app").unwrap().timers.len(), 2);
 }

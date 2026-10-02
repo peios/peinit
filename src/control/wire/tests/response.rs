@@ -55,6 +55,22 @@ fn serializes_status_response_shape_with_structured_warnings_and_timestamps() {
             detected_at_ns: 10_000_000_000,
         }],
         lifecycle_warnings: Vec::new(),
+        timers: vec![
+            ServiceTimerView {
+                schedule: "*-*-* 00:00:00".to_string(),
+                arming: ServiceTimerArming::Armed {
+                    scheduled_ns: 1_717_200_000_000_000_000,
+                    fires_ns: 1_717_200_090_000_000_000,
+                    last_fired_ns: None,
+                },
+            },
+            ServiceTimerView {
+                schedule: "*-02-30".to_string(),
+                arming: ServiceTimerArming::NotArmed {
+                    reason: "calendar expression has no future occurrence".to_string(),
+                },
+            },
+        ],
     };
 
     let line = control_status_response_line(&view, response_time()).expect("status response");
@@ -74,9 +90,25 @@ fn serializes_status_response_shape_with_structured_warnings_and_timestamps() {
             "state",
             "status",
             "status_text",
+            "timers",
             "uptime_seconds",
             "warnings",
         ],
+    );
+    // A timer's times are the wall clock's already, not projected.
+    assert_eq!(
+        sorted_keys(&response["timers"][0]),
+        ["fires_at", "last_fired_at", "not_armed", "schedule", "scheduled_at"],
+    );
+    assert_eq!(response["timers"][0]["schedule"], "*-*-* 00:00:00");
+    assert_eq!(response["timers"][0]["scheduled_at"], "2024-06-01T00:00:00.000000000Z");
+    assert_eq!(response["timers"][0]["fires_at"], "2024-06-01T00:01:30.000000000Z");
+    assert!(response["timers"][0]["last_fired_at"].is_null());
+    assert!(response["timers"][0]["not_armed"].is_null());
+    assert!(response["timers"][1]["fires_at"].is_null());
+    assert_eq!(
+        response["timers"][1]["not_armed"],
+        "calendar expression has no future occurrence"
     );
     assert_eq!(response["status"], "ok");
     assert_eq!(response["display_name"], "Application");
@@ -119,6 +151,7 @@ fn serializes_list_response_as_compact_query_authorized_summaries() {
         cause: Some(TransitionCause::ExplicitStart),
         health: None,
         definition_removed: true,
+        next_timer_ns: Some(1_717_200_090_000_000_000),
     }];
 
     let line = control_list_response_line(&services).expect("list response");
@@ -132,9 +165,14 @@ fn serializes_list_response_as_compact_query_authorized_summaries() {
             "description",
             "display_name",
             "health",
+            "next_timer_at",
             "service",
             "state"
         ],
+    );
+    assert_eq!(
+        response["services"][0]["next_timer_at"],
+        "2024-06-01T00:01:30.000000000Z"
     );
     assert_eq!(response["services"][0]["service"], "app");
     assert_eq!(response["services"][0]["display_name"], "Application");

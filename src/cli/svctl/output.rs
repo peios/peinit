@@ -192,8 +192,49 @@ fn write_status(out: &mut dyn Write, value: &Value) -> io::Result<()> {
     }
     write_current_job(out, value.get("current_job"))?;
     write_current_operation(out, value.get("current_operation"))?;
+    write_timers(out, value)?;
     write_warnings(out, value)?;
     Ok(())
+}
+
+/// Each calendar timer under its schedule: when it next comes round, when
+/// it fires, which jitter can make later, and when it last fired; or why
+/// peinit has not armed it.
+fn write_timers(out: &mut dyn Write, value: &Value) -> io::Result<()> {
+    let Some(timers) = value.get("timers").and_then(Value::as_array) else {
+        return Ok(());
+    };
+    if timers.is_empty() {
+        return Ok(());
+    }
+    writeln!(out, "timers:")?;
+    for timer in timers {
+        writeln!(out, "  {}", str_field(timer, "schedule").unwrap_or("?"))?;
+        if let Some(reason) = str_field(timer, "not_armed") {
+            writeln!(out, "    not armed: {reason}")?;
+            continue;
+        }
+        let scheduled = str_field(timer, "scheduled_at").map(to_the_second);
+        let fires = str_field(timer, "fires_at").map(to_the_second);
+        match (&scheduled, &fires) {
+            (Some(scheduled), Some(fires)) if scheduled != fires => {
+                writeln!(out, "    next: {scheduled}, firing at {fires} after jitter")?;
+            }
+            _ => write_optional_line(out, "    next", fires.or(scheduled).as_deref())?,
+        }
+        let last = str_field(timer, "last_fired_at").map(to_the_second);
+        writeln!(out, "    last fired: {}", last.as_deref().unwrap_or("never"))?;
+    }
+    Ok(())
+}
+
+/// A timer's time without the nanoseconds peinit writes, which a timer,
+/// precise to the second, never has.
+fn to_the_second(timestamp: &str) -> String {
+    match (timestamp.find('.'), timestamp.strip_suffix('Z')) {
+        (Some(dot), Some(_)) => format!("{}Z", &timestamp[..dot]),
+        _ => timestamp.to_string(),
+    }
 }
 
 fn write_current_job(out: &mut dyn Write, value: Option<&Value>) -> io::Result<()> {
@@ -232,6 +273,7 @@ fn write_list(out: &mut dyn Write, value: &Value) -> io::Result<()> {
         "STATE".to_string(),
         "HEALTH".to_string(),
         "CAUSE".to_string(),
+        "NEXT TIMER".to_string(),
     ]);
     for service in services {
         rows.push(vec![
@@ -239,6 +281,7 @@ fn write_list(out: &mut dyn Write, value: &Value) -> io::Result<()> {
             str_field(service, "state").unwrap_or("").to_string(),
             str_field(service, "health").unwrap_or("-").to_string(),
             str_field(service, "cause").unwrap_or("-").to_string(),
+            str_field(service, "next_timer_at").map_or_else(|| "-".to_string(), to_the_second),
         ]);
     }
     write_table(out, &rows)

@@ -81,6 +81,84 @@ fn human_list_renders_service_table() {
 }
 
 #[test]
+fn human_list_shows_each_service_next_timer() {
+    let Some(server) = MockControlServer::start(
+        |_| {},
+        r#"{"status":"ok","services":[{"service":"backup","state":"inactive","health":null,"cause":null,"next_timer_at":"2026-10-04T02:07:12.000000000Z"},{"service":"db","state":"active","health":null,"cause":null,"next_timer_at":null}]}"#,
+    ) else {
+        return;
+    };
+
+    let mut out = Vec::new();
+    let mut err = Vec::new();
+    let code = run_with_io(
+        [
+            OsString::from("svctl"),
+            OsString::from("--socket"),
+            server.path().into_os_string(),
+            OsString::from("list"),
+        ],
+        &mut out,
+        &mut err,
+    );
+
+    assert_eq!(code, 0);
+    let out = String::from_utf8(out).expect("stdout utf8");
+    let lines = out.lines().collect::<Vec<_>>();
+    assert!(lines[0].ends_with("NEXT TIMER"));
+    assert!(lines[1].starts_with("backup") && lines[1].ends_with("2026-10-04T02:07:12Z"));
+    assert!(lines[2].starts_with("db") && lines[2].ends_with("-"));
+    server.join();
+}
+
+#[test]
+fn human_status_shows_timers_armed_and_not() {
+    let Some(server) = MockControlServer::start(
+        |request| {
+            assert_eq!(request["command"], "status");
+        },
+        r#"{"status":"ok","service":"backup","state":"inactive","warnings":[],"timers":[
+            {"schedule":"*-*-* 02:00:00","scheduled_at":"2026-10-04T02:00:00.000000000Z","fires_at":"2026-10-04T02:07:12.000000000Z","last_fired_at":"2026-10-03T02:03:40.000000000Z","not_armed":null},
+            {"schedule":"hourly","scheduled_at":"2026-10-03T13:00:00.000000000Z","fires_at":"2026-10-03T13:00:00.000000000Z","last_fired_at":null,"not_armed":null},
+            {"schedule":"*-02-30","scheduled_at":null,"fires_at":null,"last_fired_at":null,"not_armed":"calendar expression has no future occurrence"}]}"#
+            .replace('\n', "")
+            .leak(),
+    ) else {
+        return;
+    };
+
+    let mut out = Vec::new();
+    let mut err = Vec::new();
+    let code = run_with_io(
+        [
+            OsString::from("svctl"),
+            OsString::from("--socket"),
+            server.path().into_os_string(),
+            OsString::from("status"),
+            OsString::from("backup"),
+        ],
+        &mut out,
+        &mut err,
+    );
+
+    assert_eq!(code, 0, "{}", String::from_utf8_lossy(&err));
+    assert_eq!(
+        String::from_utf8(out).expect("stdout utf8"),
+        "backup: inactive\n\
+         timers:\n\
+         \x20 *-*-* 02:00:00\n\
+         \x20   next: 2026-10-04T02:00:00Z, firing at 2026-10-04T02:07:12Z after jitter\n\
+         \x20   last fired: 2026-10-03T02:03:40Z\n\
+         \x20 hourly\n\
+         \x20   next: 2026-10-03T13:00:00Z\n\
+         \x20   last fired: never\n\
+         \x20 *-02-30\n\
+         \x20   not armed: calendar expression has no future occurrence\n",
+    );
+    server.join();
+}
+
+#[test]
 fn server_error_returns_failure_exit() {
     let Some(server) = MockControlServer::start(
         |request| {

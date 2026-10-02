@@ -2,7 +2,7 @@ use serde_json::json;
 
 use crate::control::query::{
     OperationStatusView, ServiceListItem, ServiceStatusView, ServiceStatusWarning,
-    ServiceStatusWarningType,
+    ServiceStatusWarningType, ServiceTimerArming, ServiceTimerView,
 };
 use crate::control::reload_config::ReloadConfigOutcome;
 use crate::ids::OperationId;
@@ -17,6 +17,7 @@ pub(crate) use labels::{
     operation_state_from_wire, service_health_from_wire, service_state_from_wire,
 };
 pub use time::ControlResponseTimeProjection;
+use time::realtime_ns_timestamp;
 
 mod labels;
 mod time;
@@ -71,8 +72,32 @@ pub fn control_status_response_line(
         "uptime_seconds": time.uptime_seconds(started_at_ns),
         "definition_removed": view.definition_removed,
         "warnings": view.warnings.iter().map(|warning| status_warning_json(warning, time)).collect::<Vec<_>>(),
+        "timers": view.timers.iter().map(status_timer_json).collect::<Vec<_>>(),
     });
     response_line(&response)
+}
+
+fn status_timer_json(timer: &ServiceTimerView) -> serde_json::Value {
+    match &timer.arming {
+        ServiceTimerArming::Armed {
+            scheduled_ns,
+            fires_ns,
+            last_fired_ns,
+        } => json!({
+            "schedule": timer.schedule.as_str(),
+            "scheduled_at": realtime_ns_timestamp(*scheduled_ns),
+            "fires_at": realtime_ns_timestamp(*fires_ns),
+            "last_fired_at": last_fired_ns.map(realtime_ns_timestamp),
+            "not_armed": null,
+        }),
+        ServiceTimerArming::NotArmed { reason } => json!({
+            "schedule": timer.schedule.as_str(),
+            "scheduled_at": null,
+            "fires_at": null,
+            "last_fired_at": null,
+            "not_armed": reason.as_str(),
+        }),
+    }
 }
 
 fn status_warning_json(
@@ -108,6 +133,7 @@ pub fn control_list_response_line(
                 "state": service_state_wire(item.state),
                 "cause": item.cause.map(transition_cause_wire),
                 "health": item.health.map(service_health_wire),
+                "next_timer_at": item.next_timer_ns.map(realtime_ns_timestamp),
             })
         })
         .collect::<Vec<_>>();

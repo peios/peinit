@@ -1,6 +1,6 @@
 pub(super) use crate::control::query::{
     CurrentJobView, CurrentOperationView, OperationStatusView, ServiceListItem, ServiceStatusView,
-    ServiceStatusWarning, ServiceStatusWarningType,
+    ServiceStatusWarning, ServiceStatusWarningType, ServiceTimerArming, ServiceTimerView,
 };
 pub(super) use crate::control::reload_config::ReloadConfigOutcome;
 pub(super) use crate::control::socket::ControlSocketLimits;

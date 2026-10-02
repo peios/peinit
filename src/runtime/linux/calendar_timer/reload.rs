@@ -9,7 +9,7 @@ use crate::timer::boot::plan_timer_reload;
 use super::entry::LinuxCalendarTimerEntry;
 use super::error::LinuxCalendarTimerError;
 use super::registration::{definitions_from_supervisor, register_calendar_timer};
-use super::table::LinuxCalendarTimerTable;
+use super::table::{LinuxCalendarTimerTable, rejected_trigger};
 
 impl LinuxCalendarTimerTable {
     pub(in crate::runtime::linux) fn reconfigure_timers<C, E>(
@@ -39,10 +39,25 @@ impl LinuxCalendarTimerTable {
         }
         let mut replacement = BTreeMap::new();
         let mut sources = Vec::new();
+        // A reload re-arms from now and reads no history (§9.3), but when a
+        // timer last fired is still so: a trigger kept across the reload keeps
+        // it.
+        let fired = self
+            .entries
+            .values()
+            .filter_map(|entry| {
+                entry
+                    .last_fired_ns
+                    .map(|ns| ((entry.service.clone(), entry.schedule.clone()), ns))
+            })
+            .collect::<BTreeMap<_, _>>();
 
         for registration in plan.registrations {
             match register_calendar_timer(registration, registrar) {
-                Ok((source, entry)) => {
+                Ok((source, mut entry)) => {
+                    entry.last_fired_ns = fired
+                        .get(&(entry.service.clone(), entry.schedule.clone()))
+                        .copied();
                     sources.push(source);
                     replacement.insert(entry.timer.as_raw_fd(), entry);
                 }
@@ -62,6 +77,7 @@ impl LinuxCalendarTimerTable {
         }
 
         self.entries = replacement;
+        self.rejected = plan.rejected.iter().map(rejected_trigger).collect();
         Ok(sources)
     }
 }
