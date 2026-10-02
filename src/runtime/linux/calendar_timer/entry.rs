@@ -16,4 +16,8 @@ pub(super) struct LinuxCalendarTimerEntry {
     pub(super) next_scheduled_ns: u64,
     pub(super) armed_deadline_ns: u64,
     pub(super) jitter_secs: u64,
+    /// When it last fired, CLOCK_REALTIME, for `status` to report: set by a
+    /// firing, carried across a reload, and for a persistent timer seeded at
+    /// boot from `LastTimerRun`.
+    pub(super) last_fired_ns: Option<u64>,
 }

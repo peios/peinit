@@ -20,13 +20,15 @@ impl LinuxShutdownRuntime {
         &mut self,
         supervisor: &mut Supervisor,
     ) -> Result<LinuxCalendarTimerBootRegistration, LinuxCalendarTimerError> {
-        self.calendar_timers.register_boot_timers(
+        let registration = self.calendar_timers.register_boot_timers(
             supervisor,
             &mut self.clock,
             &mut self.registry,
             &mut LcsTimerLastRunWriter,
             &mut self.epoll,
-        )
+        );
+        supervisor.set_calendar_timers(self.calendar_timers.views());
+        registration
     }
 
     #[cfg(feature = "peios-registry")]
@@ -67,11 +69,14 @@ impl LinuxShutdownRuntime {
     #[cfg(feature = "peios-registry")]
     pub(super) fn reconfigure_calendar_timers(
         &mut self,
-        supervisor: &Supervisor,
+        supervisor: &mut Supervisor,
     ) -> Result<Vec<RuntimeEventSource>, RuntimeShutdownLoopError> {
-        self.calendar_timers
+        let sources = self
+            .calendar_timers
             .reconfigure_timers(supervisor, &mut self.clock, &mut self.epoll)
-            .map_err(|error| RuntimeShutdownLoopError::CalendarTimerReconfigure(error.to_string()))
+            .map_err(|error| RuntimeShutdownLoopError::CalendarTimerReconfigure(error.to_string()));
+        supervisor.set_calendar_timers(self.calendar_timers.views());
+        sources
     }
 
     pub(super) fn process_calendar_timer_sources(
@@ -110,6 +115,9 @@ impl LinuxShutdownRuntime {
                 ),
             })?;
             turns.push((fd, turn));
+        }
+        if !turns.is_empty() {
+            supervisor.set_calendar_timers(self.calendar_timers.views());
         }
         Ok(turns)
     }

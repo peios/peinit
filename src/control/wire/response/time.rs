@@ -33,6 +33,12 @@ impl ControlResponseTimeProjection {
     }
 }
 
+/// A time already on the wall clock (CLOCK_REALTIME), as a calendar timer's
+/// are, which needs no projecting.
+pub(super) fn realtime_ns_timestamp(ns: u64) -> String {
+    rfc3339_from_unix_ns(ns)
+}
+
 fn rfc3339_from_unix_ns(ns: u64) -> String {
     let seconds = ns / 1_000_000_000;
     let nanos = ns % 1_000_000_000;

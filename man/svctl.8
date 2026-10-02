@@ -81,10 +81,13 @@ Reload a service.
 Clear the service's failed state.
 .TP
 .BI status " service"
-Show service status.
+Show service status. Each calendar timer is shown under its schedule,
+with its next occurrence, the time it fires when jitter delays that, and
+when it last fired; or, if peinit did not arm it, why not. Times are UTC.
 .TP
 .B list
-List services.
+List services, with each service's soonest timer firing under
+.BR "NEXT TIMER" .
 .TP
 .BI op " operation-id"
 Show an operation.

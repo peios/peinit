@@ -7,7 +7,7 @@ use crate::timer::boot::{TimerBootPlanError, plan_timer_boot};
 
 use super::error::LinuxCalendarTimerError;
 use super::registration::{definitions_from_supervisor, register_calendar_timer};
-use super::table::LinuxCalendarTimerTable;
+use super::table::{LinuxCalendarTimerTable, rejected_trigger};
 
 #[cfg(test)]
 mod tests;
@@ -45,11 +45,15 @@ impl LinuxCalendarTimerTable {
         let plan = plan_timer_boot(&definitions, registry, realtime_now_ns)
             .map_err(LinuxCalendarTimerError::BootPlan)?;
         let rejected = plan.rejected;
+        self.rejected = rejected.iter().map(rejected_trigger).collect();
         let mut sources = Vec::new();
         let mut catch_up_turns = Vec::new();
         for registration in plan.registrations {
-            let (source, entry) = register_calendar_timer(registration.clone(), registrar)?;
+            let (source, mut entry) = register_calendar_timer(registration.clone(), registrar)?;
             sources.push(source);
+            if registration.missed_firing {
+                entry.last_fired_ns = Some(realtime_now_ns);
+            }
             self.entries.insert(entry.timer.as_raw_fd(), entry);
             if registration.missed_firing {
                 let monotonic_now_ns = clock

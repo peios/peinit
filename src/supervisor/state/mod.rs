@@ -105,6 +105,10 @@ pub struct Supervisor {
     /// Registry changes and reload requests that arrived during the boot
     /// window, for the one reload that follows it.
     pub(super) deferred_registry_reload: Option<super::boot_window::DeferredRegistryReload>,
+    /// Every service's calendar timers, by service, for `status` and `list`
+    /// to report. The runtime arms them and gives them here whenever it arms
+    /// one; the Supervisor does nothing with them but answer.
+    pub(super) calendar_timers: BTreeMap<String, Vec<crate::control::query::ServiceTimerView>>,
 }
 
 impl Supervisor {
@@ -152,6 +156,7 @@ impl Supervisor {
             deferred_critical_reboot: None,
             boot_plan_context: None,
             deferred_registry_reload: None,
+            calendar_timers: BTreeMap::new(),
         }
     }
 }

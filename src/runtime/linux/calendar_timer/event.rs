@@ -157,6 +157,9 @@ impl LinuxCalendarTimerTable {
                 timestamp_realtime_ns: realtime_now_ns,
             })
         });
+        if let Some(entry) = self.entries.get_mut(&fd) {
+            entry.last_fired_ns = Some(realtime_now_ns);
+        }
         let next_scheduled_ns = self.rearm_after(fd, anchor_ns)?;
         Ok(RuntimeCalendarTimerTurn::Read {
             read,

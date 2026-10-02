@@ -55,6 +55,7 @@ where
             next_scheduled_ns: registration.next_scheduled_ns,
             armed_deadline_ns,
             jitter_secs: registration.jitter_secs,
+            last_fired_ns: registration.last_run_ns,
         },
     ))
 }

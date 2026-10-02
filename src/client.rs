@@ -52,6 +52,9 @@ pub struct Summary {
     pub cause: Option<String>,
     /// Only a service with a health check has a health.
     pub health: Option<Health>,
+    /// When the soonest of its calendar timers fires, if it has one armed.
+    /// RFC 3339, in UTC.
+    pub next_timer_at: Option<String>,
 }
 
 /// A service as `status` gives it.
@@ -68,6 +71,27 @@ pub struct Status {
     /// Its definition has gone from the registry while it still runs.
     pub definition_removed: bool,
     pub warnings: Vec<Warning>,
+    /// Its calendar timers, in the order of their schedules.
+    pub timers: Vec<Timer>,
+}
+
+/// One calendar timer trigger of a service, as peinit has it armed (§9).
+/// Times are RFC 3339, in UTC.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Timer {
+    /// The calendar expression, as the definition gives it.
+    pub schedule: String,
+    /// The schedule's next occurrence.
+    pub scheduled_at: Option<String>,
+    /// When it will fire: that occurrence, delayed by whatever of
+    /// `TimerJitter` was drawn for it.
+    pub fires_at: Option<String>,
+    /// When it last fired: this uptime, or for a persistent timer, the
+    /// firing recorded before it.
+    pub last_fired_at: Option<String>,
+    /// Why it is not armed, when it is not: its schedule will not parse,
+    /// or never comes round.
+    pub not_armed: Option<String>,
 }
 
 /// A service's main process.
@@ -179,7 +203,7 @@ impl ControlClient {
 
     pub fn status_of(&mut self, service: &str) -> Result<Status, Failure> {
         let answer = answered(self.service_status(service)?)?;
-        Ok(Status {
+        let mut status = Status {
             summary: summary(&answer)?,
             status_text: text(&answer, "status_text"),
             job: match &answer["current_job"] {
@@ -214,7 +238,30 @@ impl ControlClient {
                         .collect()
                 })
                 .unwrap_or_default(),
-        })
+            timers: answer["timers"]
+                .as_array()
+                .map(|timers| {
+                    timers
+                        .iter()
+                        .map(|timer| Timer {
+                            schedule: text(timer, "schedule").unwrap_or_default(),
+                            scheduled_at: text(timer, "scheduled_at"),
+                            fires_at: text(timer, "fires_at"),
+                            last_fired_at: text(timer, "last_fired_at"),
+                            not_armed: text(timer, "not_armed"),
+                        })
+                        .collect()
+                })
+                .unwrap_or_default(),
+        };
+        // As `list` would have it. peinit's times are all one width, in UTC,
+        // so the soonest is the least.
+        status.summary.next_timer_at = status
+            .timers
+            .iter()
+            .filter_map(|timer| timer.fires_at.clone())
+            .min();
+        Ok(status)
     }
 
     /// Asks for `command` on `service` and does not wait for it: what it
@@ -278,6 +325,7 @@ fn summary(value: &Value) -> Result<Summary, Failure> {
         state: state(value)?,
         cause: text(value, "cause"),
         health: value["health"].as_str().and_then(service_health_from_wire),
+        next_timer_at: text(value, "next_timer_at"),
     })
 }
 
@@ -356,6 +404,7 @@ mod tests {
                 cause: Some(TransitionCause::DependencyStart),
                 health: None,
                 definition_removed: false,
+                next_timer_ns: None,
             },
             ServiceListItem {
                 service: "sshd".into(),
@@ -365,6 +414,7 @@ mod tests {
                 cause: Some(TransitionCause::ProcessCrash),
                 health: Some(Health::Unhealthy),
                 definition_removed: false,
+                next_timer_ns: Some(1_717_200_000_000_000_000),
             },
         ];
         let mut client = answering("list", vec![control_list_response_line(&items).unwrap()]);
@@ -377,6 +427,75 @@ mod tests {
         assert_eq!(services[1].state, State::Failed);
         assert_eq!(services[1].health, Some(Health::Unhealthy));
         assert_eq!(services[1].description.as_deref(), Some("Secure shell"));
+        assert_eq!(services[0].next_timer_at, None);
+        assert_eq!(
+            services[1].next_timer_at.as_deref(),
+            Some("2024-06-01T00:00:00.000000000Z")
+        );
+    }
+
+    /// A status's timers are read back, the soonest of them standing for
+    /// the service as `list` would have it, and one not armed says why.
+    #[test]
+    fn a_status_is_read_with_its_timers() {
+        use crate::control::query::{ServiceStatusView, ServiceTimerArming, ServiceTimerView};
+        use crate::control::wire::{ControlResponseTimeProjection, control_status_response_line};
+
+        let armed = |schedule: &str, fires_ns: u64| ServiceTimerView {
+            schedule: schedule.into(),
+            arming: ServiceTimerArming::Armed {
+                scheduled_ns: fires_ns,
+                fires_ns,
+                last_fired_ns: Some(1_717_000_000_000_000_000),
+            },
+        };
+        let view = ServiceStatusView {
+            service: "backup".into(),
+            display_name: None,
+            description: None,
+            state: State::Inactive,
+            cause: None,
+            generation: 1,
+            status_text: None,
+            health: None,
+            definition_removed: false,
+            current_job: None,
+            current_operation: None,
+            warnings: Vec::new(),
+            lifecycle_warnings: Vec::new(),
+            timers: vec![
+                armed("*-*-* 03:00:00", 1_717_210_800_000_000_000),
+                armed("hourly", 1_717_203_600_000_000_000),
+                ServiceTimerView {
+                    schedule: "*-02-30".into(),
+                    arming: ServiceTimerArming::NotArmed {
+                        reason: "calendar expression has no future occurrence".into(),
+                    },
+                },
+            ],
+        };
+        let line =
+            control_status_response_line(&view, ControlResponseTimeProjection::new(0, 0)).unwrap();
+        let status = answering("status", vec![line]).status_of("backup").unwrap();
+        assert_eq!(status.timers.len(), 3);
+        assert_eq!(status.timers[0].schedule, "*-*-* 03:00:00");
+        assert_eq!(
+            status.timers[0].fires_at.as_deref(),
+            Some("2024-06-01T03:00:00.000000000Z")
+        );
+        assert_eq!(
+            status.timers[0].last_fired_at.as_deref(),
+            Some("2024-05-29T16:26:40.000000000Z")
+        );
+        assert_eq!(
+            status.summary.next_timer_at.as_deref(),
+            Some("2024-06-01T01:00:00.000000000Z")
+        );
+        assert_eq!(status.timers[2].fires_at, None);
+        assert_eq!(
+            status.timers[2].not_armed.as_deref(),
+            Some("calendar expression has no future occurrence")
+        );
     }
 
     /// A command not waited for comes back with the operation to follow,
