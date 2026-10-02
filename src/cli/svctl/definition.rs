@@ -6,6 +6,10 @@
 //! uses them. A change is checked before anything is written, only the
 //! values that change are written, and they are written in one transaction
 //! that is refused if any of them changed since it was read.
+//!
+//! Built without `peios-registry` there is no registry to reach, and what
+//! reaches it is used by the tests alone.
+#![cfg_attr(not(feature = "peios-registry"), allow(dead_code))]
 
 use std::io::Write;
 
