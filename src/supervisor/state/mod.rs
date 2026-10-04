@@ -109,6 +109,14 @@ pub struct Supervisor {
     /// to report. The runtime arms them and gives them here whenever it arms
     /// one; the Supervisor does nothing with them but answer.
     pub(super) calendar_timers: BTreeMap<String, Vec<crate::control::query::ServiceTimerView>>,
+    /// Lifecycle deadlines that raised, were contained, and could not be
+    /// removed from the store they are derived from, each with the time
+    /// before which it is not acted on again. The last resort against a
+    /// deadline that would otherwise be due on every timer turn: without it
+    /// the timer re-arms in the past, wakes at once, and the containment is
+    /// announced in a tight loop (PEI-1267).
+    pub(super) lifecycle_deadline_holdoffs:
+        Vec<super::lifecycle_deadline_timer::SupervisorLifecycleDeadlineHoldoff>,
 }
 
 impl Supervisor {
@@ -157,6 +165,7 @@ impl Supervisor {
             boot_plan_context: None,
             deferred_registry_reload: None,
             calendar_timers: BTreeMap::new(),
+            lifecycle_deadline_holdoffs: Vec::new(),
         }
     }
 }

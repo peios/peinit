@@ -89,6 +89,18 @@ impl SupervisorInternalErrorDispatch {
         self.subject.service.as_deref()
     }
 
+    /// Whether the containment found nothing left to settle: no job retired,
+    /// no operation failed, no transition, no start released. A repeat of an
+    /// error already announced that changed nothing tells the operator
+    /// nothing new (PEI-1267).
+    pub fn changed_nothing(&self) -> bool {
+        self.job_event.is_none()
+            && self.service_job_event.is_none()
+            && self.operation_event.is_none()
+            && self.service_transition.is_none()
+            && self.start_dispatches.is_empty()
+    }
+
     /// The one sentence the console prints and the audit event carries for
     /// this failure, so the two records read alike.
     pub fn message(&self) -> String {
@@ -342,7 +354,13 @@ fn fail_service(work: &mut SupervisorWork, service: &str) -> Option<ServiceTable
 /// commit, so its deadline is still there. Left in place it would fire again
 /// on the next timer turn, against a service that is now Failed, and raise
 /// again — for ever.
+///
+/// Readiness deadlines are dropped by service rather than by active
+/// operation: one armed by an operation that has since been aborted is no
+/// longer reachable through the active records, and was exactly the one that
+/// kept raising (PEI-1267).
 fn clear_service_deadlines(work: &mut SupervisorWork, service: &str) {
+    work.start.remove_readiness_deadlines_for_service(service);
     let operations = work
         .operations
         .active_records()

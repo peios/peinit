@@ -4,7 +4,30 @@ use super::SupervisorLifecycleDeadline;
 use crate::supervisor::state::{Supervisor, SupervisorError};
 
 impl Supervisor {
+    /// The next lifecycle deadline, as the timer should arm it.
+    ///
+    /// A deadline under a holdoff is reported no earlier than the holdoff's
+    /// end, so a deadline that raised and could not be removed is acted on
+    /// at most once per interval instead of on every turn (PEI-1267).
     pub fn next_lifecycle_deadline(&self) -> Option<SupervisorLifecycleDeadline> {
+        let mut deadline = self.next_scheduled_lifecycle_deadline()?;
+        deadline.due_at_ns = self.held_due_at_ns(&deadline);
+        Some(deadline)
+    }
+
+    /// When a scheduled deadline may be acted on: when it is due, or when
+    /// its holdoff ends if that is later.
+    pub(super) fn held_due_at_ns(&self, deadline: &SupervisorLifecycleDeadline) -> u64 {
+        self.lifecycle_deadline_holdoffs
+            .iter()
+            .find(|holdoff| holdoff.deadline == *deadline)
+            .map_or(deadline.due_at_ns, |holdoff| {
+                deadline.due_at_ns.max(holdoff.not_before_ns)
+            })
+    }
+
+    /// The next lifecycle deadline as its store holds it, holdoffs aside.
+    pub(super) fn next_scheduled_lifecycle_deadline(&self) -> Option<SupervisorLifecycleDeadline> {
         if self.shutdown().is_some() {
             return None;
         }

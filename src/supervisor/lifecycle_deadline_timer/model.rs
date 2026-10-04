@@ -11,6 +11,16 @@ pub struct SupervisorLifecycleDeadline {
     pub kind: SupervisorLifecycleDeadlineKind,
 }
 
+/// A deadline that raised and stayed, held back until `not_before_ns`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SupervisorLifecycleDeadlineHoldoff {
+    pub deadline: SupervisorLifecycleDeadline,
+    pub not_before_ns: u64,
+    /// What it raised last time, so an identical repeat is not announced
+    /// again.
+    pub error: String,
+}
+
 impl SupervisorLifecycleDeadline {
     pub(super) fn cmp_schedule(left: &Self, right: &Self) -> Ordering {
         left.due_at_ns

@@ -24,6 +24,24 @@ impl StartExecutionStore {
         self.readiness_deadlines.remove(&operation_id)
     }
 
+    /// Drop every readiness deadline held for the service, whichever
+    /// operation armed it.
+    pub fn remove_readiness_deadlines_for_service(
+        &mut self,
+        service: &str,
+    ) -> Vec<ReadinessDeadline> {
+        let operations = self
+            .readiness_deadlines
+            .values()
+            .filter(|deadline| deadline.service == service)
+            .map(|deadline| deadline.operation_id)
+            .collect::<Vec<_>>();
+        operations
+            .into_iter()
+            .filter_map(|operation_id| self.readiness_deadlines.remove(&operation_id))
+            .collect()
+    }
+
     pub fn readiness_deadline(&self, operation_id: OperationId) -> Option<ReadinessDeadline> {
         self.readiness_deadlines.get(&operation_id).cloned()
     }

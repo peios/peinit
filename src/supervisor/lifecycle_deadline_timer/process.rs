@@ -1,13 +1,21 @@
 use crate::boundary::{BootAttemptCounter, ProcessController, ShutdownFinalizer};
 
 use super::critical_reboot::annotate_critical_reboot_if_due;
-use super::{SupervisorLifecycleDeadlineDispatch, SupervisorLifecycleDeadlineKind};
+use super::{
+    SupervisorLifecycleDeadline, SupervisorLifecycleDeadlineDispatch,
+    SupervisorLifecycleDeadlineHoldoff, SupervisorLifecycleDeadlineKind,
+};
 use crate::control::lifecycle::LifecycleCommand;
 use crate::supervisor::SupervisorInternalErrorSubject;
 use crate::supervisor::dispatch::{
     SupervisorBootSettleDispatch, SupervisorBootSettleFailure, SupervisorBootSettleStart,
 };
 use crate::supervisor::state::{Supervisor, SupervisorError};
+
+/// How long a deadline that raised and could not be removed is held back
+/// before it is acted on — and its containment announced — again. The same
+/// once-a-second pacing as progress events.
+const RAISED_DEADLINE_RETRY_INTERVAL_NS: u64 = crate::submitted::PROGRESS_EVENT_INTERVAL_NS;
 
 impl Supervisor {
     pub fn process_due_lifecycle_deadlines<P, B>(
@@ -45,9 +53,22 @@ impl Supervisor {
 
         let mut dispatch = SupervisorLifecycleDeadlineDispatch::default();
         let mut contained = std::collections::BTreeSet::new();
-        while let Some(deadline) = self.next_lifecycle_deadline() {
-            if deadline.due_at_ns > now_ns {
+        // A holdoff outlives its end by one interval, so the retry it paced
+        // still finds it and can tell an identical repeat from news.
+        self.lifecycle_deadline_holdoffs.retain(|holdoff| {
+            holdoff
+                .not_before_ns
+                .saturating_add(RAISED_DEADLINE_RETRY_INTERVAL_NS)
+                > now_ns
+        });
+        // The deadline as its store holds it — the holdoffs are keyed by that,
+        // not by the time they push it to.
+        while let Some(deadline) = self.next_scheduled_lifecycle_deadline() {
+            if self.held_due_at_ns(&deadline) > now_ns {
                 break;
+            }
+            if self.drop_deadline_of_finished_operation(&deadline.kind) {
+                continue;
             }
             let subject = SupervisorInternalErrorSubject {
                 service: Some(deadline.kind.service().to_string()).filter(|s| !s.is_empty()),
@@ -55,7 +76,7 @@ impl Supervisor {
             };
             let key = (deadline.kind.rank(), subject.clone());
             let progressed = match self.process_due_lifecycle_deadline(
-                deadline.kind,
+                deadline.kind.clone(),
                 controller,
                 boot_attempt_counter,
                 now_ns,
@@ -64,10 +85,13 @@ impl Supervisor {
                 Ok(progressed) => progressed,
                 // A deadline about one service that peinit could not act on
                 // fails that service, not the loop (PEI-1125). Containment
-                // clears the service's deadlines; if the same one is still
-                // there afterwards, stop rather than spin on it — the next
-                // timer turn will see it again, and the operator has been
-                // told.
+                // clears the service's deadlines, and the deadline that
+                // raised is then removed outright: left in place it is due
+                // again on the very next turn, the timer re-arms in the past,
+                // and the same containment is announced for ever (PEI-1267).
+                // One the stores cannot drop is held off instead, so it is
+                // retried at most once an interval, and a retry that raises
+                // the same error and changes nothing is not announced again.
                 Err(error) if subject.is_attributable() && !contained.contains(&key) => {
                     contained.insert(key);
                     let failure = self.fail_after_internal_error(
@@ -77,10 +101,24 @@ impl Supervisor {
                         now_ns,
                         controller,
                     );
-                    dispatch.internal_errors.push(failure);
+                    let repeat = failure.changed_nothing()
+                        && self.lifecycle_deadline_holdoffs.iter().any(|holdoff| {
+                            holdoff.deadline == deadline && holdoff.error == failure.error
+                        });
+                    self.retire_raised_lifecycle_deadline(&deadline, &failure.error, now_ns);
+                    if !repeat {
+                        dispatch.internal_errors.push(failure);
+                    }
                     true
                 }
-                Err(_) if subject.is_attributable() => false,
+                // The same service raised again from this deadline kind in
+                // this turn: it has been announced and failed once already.
+                // Retire this one too, and leave the rest for the next turn
+                // rather than risk going round again here.
+                Err(error) if subject.is_attributable() => {
+                    self.retire_raised_lifecycle_deadline(&deadline, &format!("{error:?}"), now_ns);
+                    false
+                }
                 Err(error) => return Err(error),
             };
             if !progressed {
@@ -91,6 +129,105 @@ impl Supervisor {
         annotate_critical_reboot_if_due(self, &mut dispatch, finalizer, now_ns)?;
 
         Ok((!dispatch.is_empty()).then_some(dispatch))
+    }
+
+    /// Drop a due deadline whose operation has already ended, instead of
+    /// acting on it.
+    ///
+    /// A readiness deadline times out a start; once that start has been
+    /// aborted, cancelled or otherwise finished there is nothing left for it
+    /// to time out, and acting on it can only fail — the start-failure path
+    /// refuses an operation that is not Running, and that refusal was being
+    /// contained as an internal error against whatever the service was doing
+    /// by then (PEI-1267). Only readiness is dropped here: its deadline holds
+    /// nothing but itself. The other operation deadlines hold a hook job, a
+    /// check helper's descriptors or a reload command, which a bare drop
+    /// would orphan.
+    fn drop_deadline_of_finished_operation(
+        &mut self,
+        kind: &SupervisorLifecycleDeadlineKind,
+    ) -> bool {
+        let SupervisorLifecycleDeadlineKind::ReadinessTimeout { operation_id, .. } = kind else {
+            return false;
+        };
+        let finished = self
+            .operations
+            .get(*operation_id)
+            .is_none_or(|operation| operation.state.is_terminal());
+        finished
+            && self
+                .start
+                .remove_readiness_deadline(*operation_id)
+                .is_some()
+    }
+
+    /// Remove a deadline that raised from the store it is derived from, or
+    /// hold it off for an interval if no store can drop it.
+    ///
+    /// The holdoff is short on purpose: the next deadline is the earliest of
+    /// all of them, so while it is held every other deadline waits too.
+    fn retire_raised_lifecycle_deadline(
+        &mut self,
+        deadline: &SupervisorLifecycleDeadline,
+        error: &str,
+        now_ns: u64,
+    ) {
+        self.remove_lifecycle_deadline(&deadline.kind);
+        if self.next_scheduled_lifecycle_deadline().as_ref() != Some(deadline) {
+            return;
+        }
+        self.lifecycle_deadline_holdoffs
+            .retain(|holdoff| holdoff.deadline != *deadline);
+        self.lifecycle_deadline_holdoffs
+            .push(SupervisorLifecycleDeadlineHoldoff {
+                deadline: deadline.clone(),
+                not_before_ns: now_ns.saturating_add(RAISED_DEADLINE_RETRY_INTERVAL_NS),
+                error: error.to_string(),
+            });
+    }
+
+    fn remove_lifecycle_deadline(&mut self, kind: &SupervisorLifecycleDeadlineKind) {
+        match kind {
+            SupervisorLifecycleDeadlineKind::PreStartCheckTimeout { operation_id, .. } => {
+                self.start.remove_pre_start_check_deadline(*operation_id);
+            }
+            SupervisorLifecycleDeadlineKind::PreStartHookTimeout { operation_id, .. } => {
+                self.start.remove_pre_start_hook_deadline(*operation_id);
+            }
+            SupervisorLifecycleDeadlineKind::PostStartHookTimeout { operation_id, .. } => {
+                self.start.remove_post_start_hook_deadline(*operation_id);
+            }
+            SupervisorLifecycleDeadlineKind::ReadinessTimeout { operation_id, .. } => {
+                self.start.remove_readiness_deadline(*operation_id);
+            }
+            SupervisorLifecycleDeadlineKind::StopTimeout { operation_id, .. } => {
+                self.control.remove_stop_timeout(*operation_id);
+            }
+            SupervisorLifecycleDeadlineKind::ReloadDetection { operation_id, .. } => {
+                self.control.remove_reload_detection_deadline(*operation_id);
+            }
+            SupervisorLifecycleDeadlineKind::ReloadCommandTimeout { operation_id, .. } => {
+                self.control.remove_reload_command_deadline(*operation_id);
+            }
+            SupervisorLifecycleDeadlineKind::CgroupCleanup { cgroup_id, .. } => {
+                self.cgroup_cleanup.remove(cgroup_id);
+            }
+            SupervisorLifecycleDeadlineKind::HealthCheckInterval { service, .. }
+            | SupervisorLifecycleDeadlineKind::HealthCheckTimeout { service, .. } => {
+                self.health.cancel_service(service);
+            }
+            SupervisorLifecycleDeadlineKind::WatchdogTimeout { service, .. } => {
+                self.watchdog.cancel_service(service);
+            }
+            // Derived from state the containment has already moved on (a
+            // Backoff service is failed out of Backoff, a submitted job is
+            // retired) or not attributable to a service at all. If one is
+            // still due regardless, the holdoff paces it.
+            SupervisorLifecycleDeadlineKind::RestartBackoff { .. }
+            | SupervisorLifecycleDeadlineKind::SubmittedJob { .. }
+            | SupervisorLifecycleDeadlineKind::BootSuccess
+            | SupervisorLifecycleDeadlineKind::BootSettle => {}
+        }
     }
 
     fn process_due_lifecycle_deadline<P, B>(

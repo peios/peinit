@@ -247,3 +247,69 @@ fn a_deadline_for_a_job_that_already_ended_does_nothing() {
     assert_eq!(dispatch, None);
     assert!(boundaries.controller.signals.is_empty());
 }
+
+struct NoBootAttemptCounter;
+
+impl crate::boundary::BootAttemptCounter for NoBootAttemptCounter {
+    fn reset_boot_attempt_counter(&mut self) -> Result<(), crate::boundary::BoundaryError> {
+        Ok(())
+    }
+}
+
+/// PEI-1267's last resort. A submitted job's kill that keeps failing raises
+/// from a deadline containment cannot clear — the stop it belongs to is the
+/// submitted store's, not the job's. It must neither be retried on every
+/// timer turn (the timer re-arms in the past and wakes at once) nor be
+/// announced again each time it raises the same error to no new effect.
+#[test]
+fn a_deadline_that_keeps_raising_is_paced_and_announced_once() {
+    let mut supervisor = submitted_supervisor();
+    let mut boundaries = Boundaries::at([SUBMIT_NS]);
+    let peer = jobs_peer(SUBMITTER);
+    let job_id = submit(
+        &mut supervisor,
+        &mut boundaries,
+        &peer,
+        message(&submit_payload(r#""timeout":30,"stop_timeout":5"#)),
+    );
+    launch(&mut supervisor, &mut boundaries.controller, 9000, 90);
+    let mut counter = NoBootAttemptCounter;
+    let (_, due_at_ns) = deadline_kind(&supervisor);
+    supervisor
+        .process_due_lifecycle_deadlines(&mut boundaries.controller, &mut counter, due_at_ns)
+        .expect("timeout")
+        .expect("the stop began");
+    let (kind, kill_at_ns) = deadline_kind(&supervisor);
+    assert_eq!(kind, SubmittedJobDeadlineKind::StopKill);
+    boundaries.controller.set_cgroup_kill_error(
+        crate::job::submitted_job_cgroup_path(job_id),
+        "Device or resource busy (os error 16)",
+    );
+
+    let mut announced = 0;
+    let mut acted = 0;
+    let mut now_ns = kill_at_ns;
+    while now_ns < kill_at_ns + 10 * SECOND_NS {
+        if let Some(dispatch) = supervisor
+            .process_due_lifecycle_deadlines(&mut boundaries.controller, &mut counter, now_ns)
+            .expect("a per-job deadline never fails the loop")
+        {
+            acted += 1;
+            announced += dispatch.internal_errors.len();
+        }
+        let next = supervisor
+            .next_lifecycle_deadline()
+            .expect("the stuck deadline is still held");
+        assert!(
+            next.due_at_ns > now_ns,
+            "the timer must not be re-armed in the past"
+        );
+        now_ns += SECOND_NS / 10;
+    }
+
+    assert_eq!(announced, 1, "an identical repeat is announced once");
+    assert!(
+        acted <= 10,
+        "retried at most once a second, not on every turn: {acted}"
+    );
+}
