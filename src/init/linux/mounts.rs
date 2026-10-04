@@ -97,6 +97,16 @@ const PHASE1_SEED_SDDL: &str = concat!(
 /// kernel support for stamping the opener at materialisation; future work.
 const DEVPTS_SYNTH_SDDL: &str = "O:SYG:SYD:(A;;GA;;;SY)(A;;GA;;;BA)(A;;FRFWFX;;;AU)";
 
+/// The synthesised descriptor for securityfs inodes, which cannot store
+/// SDs either. KACS publishes `kacs/self` (anyone's own token) and
+/// `kacs/sessions` (the logon sessions) there; without a mount policy both
+/// are DENY_MISSING-locked. Authenticated Users may open and traverse:
+/// each KACS file then makes its own check on read, so `sessions` is still
+/// Administrators' and SYSTEM's alone. Only SYSTEM may write — `lockdown`
+/// is the one writable file here, and raising the lockdown level is not an
+/// administrator's routine.
+const SECURITYFS_SYNTH_SDDL: &str = "O:SYG:SYD:(A;;GA;;;SY)(A;;GRGX;;;AU)";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct Phase1VirtualMount {
     pub mount_point: &'static str,
@@ -114,7 +124,7 @@ pub(super) struct Phase1VirtualMount {
     synth_template: Option<&'static str>,
 }
 
-const PHASE1_VIRTUAL_MOUNTS: [Phase1VirtualMount; 7] = [
+const PHASE1_VIRTUAL_MOUNTS: [Phase1VirtualMount; 8] = [
     Phase1VirtualMount {
         mount_point: "/proc",
         filesystem: "proc",
@@ -176,6 +186,14 @@ const PHASE1_VIRTUAL_MOUNTS: [Phase1VirtualMount; 7] = [
         // (kernfs) stores the SD in a security xattr.
         seed_after_mount: true,
         synth_template: None,
+    },
+    Phase1VirtualMount {
+        mount_point: "/sys/kernel/security",
+        filesystem: "securityfs",
+        flags: libc::MS_NOSUID | libc::MS_NODEV | libc::MS_NOEXEC,
+        initramfs_provided: false,
+        seed_after_mount: false,
+        synth_template: Some(SECURITYFS_SYNTH_SDDL),
     },
 ];
 

@@ -125,6 +125,7 @@ fn skips_mounts_already_present_in_mountinfo() {
 5 0 0:5 / /dev/shm rw - tmpfs tmpfs rw
 6 0 0:6 / /run rw - tmpfs tmpfs rw
 7 0 0:7 / /sys/fs/cgroup rw - cgroup2 cgroup2 rw
+8 0 0:8 / /sys/kernel/security rw - securityfs securityfs rw
 ";
     let mut syscalls = FakeMountSyscalls::with_mountinfo(mountinfo);
 
@@ -338,24 +339,49 @@ fn seeds_fresh_managed_roots_after_mounting_them() {
 }
 
 #[test]
-fn sets_the_synth_policy_on_devpts_alone() {
+fn sets_the_synth_policy_on_devpts_and_securityfs_alone() {
     let mut syscalls = FakeMountSyscalls::with_mountinfo("");
     mount_phase1_virtual_filesystems(Path::new(DEFAULT_MOUNTINFO_PATH), &mut syscalls)
         .expect("mounts");
     let policies: Vec<_> = syscalls
         .calls
         .iter()
-        .filter(|c| matches!(c, MountCall::SynthPolicy(..)))
+        .filter_map(|c| match c {
+            MountCall::SynthPolicy(mount_point, template) => Some((mount_point, template)),
+            _ => None,
+        })
         .collect();
-    assert_eq!(policies.len(), 1);
-    let MountCall::SynthPolicy(mount_point, template) = policies[0] else {
-        unreachable!()
-    };
+    assert_eq!(policies.len(), 2);
+    let (mount_point, template) = policies[0];
     assert_eq!(mount_point, "/dev/pts");
     // Authenticated Users must be able to use a pty; SYSTEM and
     // Administrators keep full control.
     assert!(template.contains(";;;AU)"), "{template}");
     assert!(template.contains("(A;;GA;;;SY)"), "{template}");
+    let (mount_point, template) = policies[1];
+    assert_eq!(mount_point, "/sys/kernel/security");
+    // Anyone signed in may open and traverse, and KACS's files check
+    // reads themselves; only SYSTEM writes.
+    assert!(template.contains("(A;;GRGX;;;AU)"), "{template}");
+    assert!(template.contains("(A;;GA;;;SY)"), "{template}");
+    assert!(!template.contains(";;;BA)"), "{template}");
+}
+
+#[test]
+fn mounts_securityfs_beside_the_cgroup_tree_without_seeding_it() {
+    let mut syscalls = FakeMountSyscalls::with_mountinfo("");
+    mount_phase1_virtual_filesystems(Path::new(DEFAULT_MOUNTINFO_PATH), &mut syscalls)
+        .expect("mounts");
+    assert!(syscalls.calls.iter().any(|c| matches!(
+        c,
+        MountCall::Mount { mount_point, filesystem, .. }
+            if mount_point == "/sys/kernel/security" && filesystem == "securityfs"
+    )));
+    assert!(
+        !syscalls
+            .calls
+            .contains(&MountCall::Seed("/sys/kernel/security".to_string()))
+    );
 }
 
 #[test]
