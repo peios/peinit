@@ -1,8 +1,10 @@
 use crate::boundary::{Clock, RealtimeClock};
 use crate::control::service_security::{ServiceAccess, ServiceAccessChecker};
-use crate::control::system::ControlPeer;
+use crate::control::system::{
+    ControlPeer, ControlSecurityDescriptor, SystemAccess, SystemAccessChecker,
+};
 use crate::control::wire::{
-    ControlCommand, ParsedControlRequest, control_list_response_line,
+    ControlCommand, ParsedControlRequest, control_boot_response_line, control_list_response_line,
     control_operation_status_response_line, control_status_response_line,
 };
 use crate::ids::OperationId;
@@ -12,6 +14,32 @@ use super::time::response_time_projection;
 use super::{SupervisorControlCommandBodyError, SupervisorControlCommandBodyResponse};
 
 impl Supervisor {
+    /// `boot`: how this boot went. A question about the manager, so it is
+    /// checked against the control descriptor, for `SYSTEM_QUERY_STATUS`,
+    /// which the default descriptor grants every authenticated principal.
+    pub(super) fn run_control_boot_query<C, A>(
+        &self,
+        peer: &ControlPeer,
+        control_security: &ControlSecurityDescriptor,
+        access_checker: &mut A,
+        clock: &mut C,
+    ) -> Result<SupervisorControlCommandBodyResponse, SupervisorControlCommandBodyError>
+    where
+        C: Clock + RealtimeClock + ?Sized,
+        A: SystemAccessChecker + ?Sized,
+    {
+        self.check_system_access(
+            peer,
+            control_security,
+            access_checker,
+            SystemAccess::QUERY_STATUS,
+        )?;
+        Ok(SupervisorControlCommandBodyResponse::accepted_response(
+            control_boot_response_line(&self.boot_status(), response_time_projection(clock)?)
+                .map_err(SupervisorControlCommandBodyError::serialize)?,
+        ))
+    }
+
     pub(super) fn run_control_status_query<C, A>(
         &self,
         parsed: &ParsedControlRequest,

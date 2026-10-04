@@ -13,6 +13,10 @@ fn parses_command_vocabulary_exactly() {
         ("shutdown", ControlCommand::Shutdown),
         ("reload-config", ControlCommand::ReloadConfig),
         ("operation-status", ControlCommand::OperationStatus),
+        ("job-list", ControlCommand::JobList),
+        ("job-status", ControlCommand::JobStatus),
+        ("job-stop", ControlCommand::JobStop),
+        ("boot", ControlCommand::Boot),
     ] {
         assert_eq!(ControlCommand::parse(wire), Some(command));
         assert_eq!(command.as_str(), wire);

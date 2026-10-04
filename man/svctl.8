@@ -9,7 +9,7 @@ svctl \- control Peios services, submitted jobs, and system shutdown
 .br
 .B svctl
 .RI [ options ]
-.BR list | reload-config
+.BR list | reload-config | boot
 .br
 .B svctl
 .RI [ options ]
@@ -97,6 +97,20 @@ Reload service definitions from the registry.
 .TP
 .BI shutdown " poweroff|reboot|halt"
 Request an immediate system shutdown of the selected kind.
+.TP
+.B boot
+Show how this boot went: its mode
+.RB ( full
+or
+.BR safe ),
+why it is in that mode, how many boots before it started and never
+counted as a success, against the number that sends the machine to
+recovery, and whether this boot has counted yet.  A boot counts once
+every Critical service has kept running for the grace period; until then
+.B boot
+names the Critical services it is waiting for, or, once they are all
+running, when it will count.  Any signed-in user may ask, under the
+default control descriptor.
 .SH SUBMITTED JOBS
 .TP
 .B job list

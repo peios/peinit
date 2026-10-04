@@ -80,6 +80,8 @@ pub(super) struct TestAccessChecker {
     pub(super) observed_descriptors: Vec<crate::service::ServiceSecurityDescriptor>,
     /// Every right a service check asked for, in order.
     pub(super) observed_desired: Vec<ServiceAccess>,
+    /// Every right a system check asked for, in order.
+    pub(super) observed_system_desired: Vec<SystemAccess>,
     /// The rights an allowed service grants: all of them unless a test
     /// says otherwise with [`Self::granting`].
     granted: ServiceAccess,
@@ -92,6 +94,7 @@ impl TestAccessChecker {
             system_allowed,
             observed_descriptors: Vec::new(),
             observed_desired: Vec::new(),
+            observed_system_desired: Vec::new(),
             granted: ServiceAccess::ALL,
         }
     }
@@ -128,8 +131,9 @@ impl TestAccessChecker {
 impl SystemAccessChecker for TestAccessChecker {
     fn check_system_access(
         &mut self,
-        _request: SystemAccessCheckRequest<'_>,
+        request: SystemAccessCheckRequest<'_>,
     ) -> Result<SystemAccessDecision, SystemAccessCheckError> {
+        self.observed_system_desired.push(request.desired_access);
         Ok(SystemAccessDecision {
             allowed: self.system_allowed,
             granted_access_bits: if self.system_allowed {

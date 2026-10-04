@@ -335,6 +335,67 @@ fn serializes_operation_status_response_with_nulls_and_rfc3339_timestamps() {
 }
 
 #[test]
+fn serializes_boot_response_with_every_field_and_a_projected_time() {
+    let view = BootStatusView {
+        mode: BootMode::Safe,
+        reason: BootModeReason::SafeModeDowngrade,
+        downgrade: vec!["critical service in dependency cycle a -> b".to_string()],
+        attempts: 1,
+        max_attempts: 3,
+        confirmed: false,
+        grace_seconds: 30,
+        waiting_on: Vec::new(),
+        confirms_at_ns: Some(12_000_000_000),
+        confirm_error: None,
+    };
+
+    let response =
+        response_json(&control_boot_response_line(&view, response_time()).expect("boot response"));
+
+    assert_eq!(response["status"], "ok");
+    assert_eq!(
+        sorted_keys(&response["boot"]),
+        [
+            "attempts",
+            "confirm_error",
+            "confirmed",
+            "confirms_at",
+            "downgrade",
+            "grace_seconds",
+            "max_attempts",
+            "mode",
+            "reason",
+            "waiting_on",
+        ],
+    );
+    assert_eq!(response["boot"]["mode"], "safe");
+    assert_eq!(response["boot"]["reason"], "safe_mode_downgrade");
+    assert_eq!(
+        response["boot"]["downgrade"],
+        serde_json::json!(["critical service in dependency cycle a -> b"]),
+    );
+    assert_eq!(response["boot"]["waiting_on"], serde_json::json!([]));
+    assert_eq!(
+        response["boot"]["confirms_at"],
+        "2024-05-31T16:08:39.123456789Z"
+    );
+    assert!(response["boot"]["confirm_error"].is_null());
+}
+
+#[test]
+fn boot_mode_and_reason_labels_are_lower_snake_case() {
+    assert_eq!(BootMode::Full.wire(), "full");
+    assert_eq!(BootMode::Safe.wire(), "safe");
+    assert_eq!(BootMode::Recovery.wire(), "recovery");
+    assert_eq!(BootModeReason::Normal.wire(), "normal");
+    assert_eq!(BootModeReason::Requested.wire(), "requested");
+    assert_eq!(
+        BootModeReason::SafeModeDowngrade.wire(),
+        "safe_mode_downgrade"
+    );
+}
+
+#[test]
 fn serializes_lifecycle_and_reload_config_warning_arrays() {
     let operation_id = operation_id(4);
     let lifecycle = response_json(

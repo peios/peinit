@@ -128,6 +128,12 @@ impl ControlClient {
         }))
     }
 
+    /// `boot`: how this boot went — its mode, why, and whether it has
+    /// counted as a success yet (PSPU §4.15).
+    pub fn boot_status(&mut self) -> Result<ControlResponse, ControlClientError> {
+        self.request(json!({ "command": "boot" }))
+    }
+
     pub fn reload_config(&mut self) -> Result<ControlResponse, ControlClientError> {
         self.request(json!({ "command": "reload-config" }))
     }

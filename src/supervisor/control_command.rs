@@ -121,6 +121,9 @@ impl Supervisor {
             ControlCommand::JobStop => {
                 self.run_control_job_stop(&parsed, peer, access_checker, controller, clock)
             }
+            ControlCommand::Boot => {
+                self.run_control_boot_query(peer, control_security, access_checker, clock)
+            }
         }
     }
 }

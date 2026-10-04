@@ -44,6 +44,8 @@ pub enum Command {
     Shutdown {
         kind: ShutdownKind,
     },
+    /// `boot` on the control socket: how this boot went.
+    Boot,
     /// `job-list` on the control socket.
     JobList {
         filter: JobListFilter,

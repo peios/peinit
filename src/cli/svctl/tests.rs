@@ -663,3 +663,87 @@ fn human_reload_config_lists_undecodable_definitions() {
     assert!(err.is_empty());
     server.join();
 }
+
+fn run_boot(response: &'static str) -> Option<String> {
+    let server = MockControlServer::start(
+        |request| {
+            assert_eq!(request, serde_json::json!({"command": "boot"}));
+        },
+        response,
+    )?;
+    let mut out = Vec::new();
+    let mut err = Vec::new();
+    let code = run_with_io(
+        [
+            OsString::from("svctl"),
+            OsString::from("--socket"),
+            server.path().into_os_string(),
+            OsString::from("boot"),
+        ],
+        &mut out,
+        &mut err,
+    );
+    assert_eq!(code, 0);
+    assert!(err.is_empty());
+    server.join();
+    Some(String::from_utf8(out).expect("stdout utf8"))
+}
+
+/// A downgraded boot says what forced it, and one still waiting says for
+/// what.
+#[test]
+fn human_boot_explains_a_downgrade_and_what_it_waits_for() {
+    let Some(out) = run_boot(
+        r#"{"status":"ok","boot":{"mode":"safe","reason":"safe_mode_downgrade","downgrade":["critical service in dependency cycle a -> b"],"attempts":1,"max_attempts":3,"confirmed":false,"grace_seconds":30,"waiting_on":["a","store"],"confirms_at":null,"confirm_error":null}}"#,
+    ) else {
+        return;
+    };
+
+    assert_eq!(
+        out,
+        "boot: safe\n\
+         reason: downgraded from a full boot, because\n  \
+         critical service in dependency cycle a -> b\n\
+         unconfirmed boots before this one: 1 (recovery at 3)\n\
+         confirmed: no, waiting for a, store\n\
+         grace: 30s\n"
+    );
+}
+
+#[test]
+fn human_boot_says_when_a_boot_will_count_and_that_it_has() {
+    let Some(holding) = run_boot(
+        r#"{"status":"ok","boot":{"mode":"full","reason":"normal","downgrade":[],"attempts":0,"max_attempts":0,"confirmed":false,"grace_seconds":30,"waiting_on":[],"confirms_at":"2026-10-04T10:00:30.000000000Z","confirm_error":null}}"#,
+    ) else {
+        return;
+    };
+    assert_eq!(
+        holding,
+        "boot: full\n\
+         reason: normal\n\
+         unconfirmed boots before this one: 0 (recovery check off)\n\
+         confirmed: no, at 2026-10-04T10:00:30Z if the critical services keep running\n\
+         grace: 30s\n"
+    );
+
+    let Some(confirmed) = run_boot(
+        r#"{"status":"ok","boot":{"mode":"full","reason":"normal","downgrade":[],"attempts":2,"max_attempts":3,"confirmed":true,"grace_seconds":30,"waiting_on":[],"confirms_at":null,"confirm_error":null}}"#,
+    ) else {
+        return;
+    };
+    assert!(confirmed.contains("confirmed: yes\n"), "{confirmed}");
+}
+
+#[test]
+fn boot_takes_no_arguments_and_no_wait() {
+    for args in [
+        vec!["svctl", "boot", "extra"],
+        vec!["svctl", "--wait", "boot"],
+    ] {
+        let mut out = Vec::new();
+        let mut err = Vec::new();
+        let code = run_with_io(args.clone(), &mut out, &mut err);
+        assert_eq!(code, 64, "{args:?}");
+        assert!(out.is_empty());
+    }
+}

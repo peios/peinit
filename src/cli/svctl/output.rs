@@ -39,6 +39,7 @@ fn write_human_response(out: &mut dyn Write, command: &Command, value: &Value) -
         Command::OperationStatus { .. } => write_operation_status(out, value),
         Command::ReloadConfig => write_reload_config(out, value),
         Command::Shutdown { kind } => writeln!(out, "shutdown requested: {}", shutdown_name(*kind)),
+        Command::Boot => write_boot(out, value.get("boot").unwrap_or(value)),
         Command::Service {
             action,
             service,
@@ -54,6 +55,83 @@ fn write_human_response(out: &mut dyn Write, command: &Command, value: &Value) -
             unreachable!("a definition is written out by svctl::definition")
         }
     }
+}
+
+/// How this boot went (PSPU §4.15): the mode and why, the attempt count
+/// against the recovery threshold, and whether the boot has counted yet.
+fn write_boot(out: &mut dyn Write, boot: &Value) -> io::Result<()> {
+    writeln!(
+        out,
+        "boot: {}",
+        str_field(boot, "mode").unwrap_or("unknown")
+    )?;
+    match str_field(boot, "reason") {
+        Some("normal") => writeln!(out, "reason: normal")?,
+        Some("requested") => writeln!(out, "reason: asked for on the kernel command line")?,
+        Some("safe_mode_downgrade") => {
+            writeln!(out, "reason: downgraded from a full boot, because")?;
+            for finding in boot
+                .get("downgrade")
+                .and_then(Value::as_array)
+                .map(Vec::as_slice)
+                .unwrap_or(&[])
+            {
+                writeln!(out, "  {}", finding.as_str().unwrap_or("?"))?;
+            }
+        }
+        Some(other) => writeln!(out, "reason: {other}")?,
+        None => {}
+    }
+    if let Some(attempts) = boot.get("attempts").and_then(Value::as_u64) {
+        match boot.get("max_attempts").and_then(Value::as_u64) {
+            Some(0) => writeln!(
+                out,
+                "unconfirmed boots before this one: {attempts} (recovery check off)"
+            )?,
+            Some(max) => writeln!(
+                out,
+                "unconfirmed boots before this one: {attempts} (recovery at {max})"
+            )?,
+            None => writeln!(out, "unconfirmed boots before this one: {attempts}")?,
+        }
+    }
+    let confirmed = boot
+        .get("confirmed")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let waiting_on = boot
+        .get("waiting_on")
+        .and_then(Value::as_array)
+        .map(|services| {
+            services
+                .iter()
+                .filter_map(Value::as_str)
+                .collect::<Vec<_>>()
+                .join(", ")
+        })
+        .unwrap_or_default();
+    if confirmed {
+        writeln!(out, "confirmed: yes")?;
+    } else if let Some(error) = str_field(boot, "confirm_error") {
+        writeln!(
+            out,
+            "confirmed: no, the attempt count could not be reset: {error}"
+        )?;
+    } else if !waiting_on.is_empty() {
+        writeln!(out, "confirmed: no, waiting for {waiting_on}")?;
+    } else if let Some(at) = str_field(boot, "confirms_at") {
+        writeln!(
+            out,
+            "confirmed: no, at {} if the critical services keep running",
+            to_the_second(at)
+        )?;
+    } else {
+        writeln!(out, "confirmed: no")?;
+    }
+    if let Some(grace) = boot.get("grace_seconds").and_then(Value::as_u64) {
+        writeln!(out, "grace: {grace}s")?;
+    }
+    Ok(())
 }
 
 fn write_job_list(out: &mut dyn Write, value: &Value) -> io::Result<()> {

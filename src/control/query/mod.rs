@@ -5,8 +5,8 @@ mod projection;
 mod tests;
 
 pub use model::{
-    CurrentJobView, CurrentOperationView, OperationStatusView, QueryError, ServiceListItem,
-    ServiceStatusView, ServiceStatusWarning, ServiceStatusWarningType, ServiceTimerArming,
-    ServiceTimerView,
+    BootStatusView, CurrentJobView, CurrentOperationView, OperationStatusView, QueryError,
+    ServiceListItem, ServiceStatusView, ServiceStatusWarning, ServiceStatusWarningType,
+    ServiceTimerArming, ServiceTimerView,
 };
 pub use projection::{list_services, operation_status, service_status};

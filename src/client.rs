@@ -6,8 +6,9 @@
 //! a service, the descriptor a service has when none is given (§4.6), what a
 //! command would come to against a service in each state (§10.3), a
 //! service's definition: its fields, and whether peinit would take it
-//! (`Definition`), and which service or submitted job a running process
-//! belongs to, read from the cgroup peinit put it in (`cgroup_member`).
+//! (`Definition`), which service or submitted job a running process
+//! belongs to, read from the cgroup peinit put it in (`cgroup_member`), and
+//! how the machine booted (`Boot`).
 //!
 //! Everything here is what peinit itself uses, re-exported or read with
 //! peinit's own labels, never a copy, so a client cannot drift from the
@@ -218,6 +219,38 @@ pub struct Progress {
     pub unit: Option<String>,
 }
 
+/// How this boot went, as `boot` gives it (PSPU §4.15).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Boot {
+    /// `full`, `safe` or `recovery`. peinit does not serve the control
+    /// socket in recovery, so a client sees `full` or `safe`.
+    pub mode: String,
+    /// Why it is in that mode: `normal`, `requested` (`peios.safemode=1`)
+    /// or `safe_mode_downgrade`.
+    pub reason: String,
+    /// What forced a downgrade, one finding per entry, in words. Empty
+    /// unless the reason is `safe_mode_downgrade`.
+    pub downgrade: Vec<String>,
+    /// Boots before this one that started and never counted as a success,
+    /// as peinit counted them when this boot began.
+    pub attempts: u32,
+    /// How many such boots send the machine to recovery; 0 when the check
+    /// is off (`peios.bootattempts=0`).
+    pub max_attempts: u32,
+    /// This boot has counted as a success, and the count is back to 0.
+    pub confirmed: bool,
+    /// How long every Critical service must keep running before the boot
+    /// counts (`BootSuccessGrace`).
+    pub grace_seconds: u32,
+    /// The Critical services the boot is still waiting for.
+    pub waiting_on: Vec<String>,
+    /// When the boot will count if they all keep running. RFC 3339, in UTC.
+    pub confirms_at: Option<String>,
+    /// Why the count could not be put back to 0 when it should have been:
+    /// the next boot will count this one as a failure.
+    pub confirm_error: Option<String>,
+}
+
 /// Why a request came to nothing.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Failure {
@@ -360,6 +393,31 @@ impl ControlClient {
             "wait": false,
         }))?)?;
         submitted_job(&answer["job"])
+    }
+
+    /// How this boot went. Needs `SYSTEM_QUERY_STATUS` on the control
+    /// descriptor, which by default every signed-in principal holds.
+    pub fn boot(&mut self) -> Result<Boot, Failure> {
+        let answer = answered(self.boot_status()?)?;
+        let boot = &answer["boot"];
+        let count = |key: &str| {
+            boot[key]
+                .as_u64()
+                .and_then(|value| u32::try_from(value).ok())
+                .ok_or_else(|| garbled("a boot with no count"))
+        };
+        Ok(Boot {
+            mode: text(boot, "mode").ok_or_else(|| garbled("a boot in no mode"))?,
+            reason: text(boot, "reason").unwrap_or_default(),
+            downgrade: strings(&boot["downgrade"]),
+            attempts: count("attempts")?,
+            max_attempts: count("max_attempts")?,
+            confirmed: boot["confirmed"].as_bool().unwrap_or(false),
+            grace_seconds: count("grace_seconds")?,
+            waiting_on: strings(&boot["waiting_on"]),
+            confirms_at: text(boot, "confirms_at"),
+            confirm_error: text(boot, "confirm_error"),
+        })
     }
 
     pub fn operation(&mut self, id: &str) -> Result<Operation, Failure> {
@@ -522,6 +580,62 @@ mod tests {
         let client = ControlClient::connect_path(&path).expect("connect");
         let _ = std::fs::remove_file(&path);
         (client, requests)
+    }
+
+    /// What peinit writes for `boot` is read back whole, and a refusal is a
+    /// refusal rather than a boot with nothing in it.
+    #[test]
+    fn a_boot_is_read_as_peinit_writes_it() {
+        let view = crate::control::query::BootStatusView {
+            mode: crate::boot::BootMode::Safe,
+            reason: crate::boot::BootModeReason::SafeModeDowngrade,
+            downgrade: vec!["critical service in dependency cycle a -> b".to_string()],
+            attempts: 2,
+            max_attempts: 3,
+            confirmed: false,
+            grace_seconds: 30,
+            waiting_on: vec!["a".to_string()],
+            confirms_at_ns: None,
+            confirm_error: None,
+        };
+        let time = crate::control::wire::ControlResponseTimeProjection::new(0, 0);
+        let (mut client, requests) = answering_recording(
+            "boot",
+            vec![
+                crate::control::wire::control_boot_response_line(&view, time).unwrap(),
+                control_error_response_line(ControlErrorCode::AccessDenied, "access denied")
+                    .unwrap(),
+            ],
+        );
+
+        let boot = client.boot().unwrap();
+        assert_eq!(
+            requests.recv().unwrap(),
+            serde_json::json!({"command": "boot"})
+        );
+        assert_eq!(
+            boot,
+            Boot {
+                mode: "safe".to_string(),
+                reason: "safe_mode_downgrade".to_string(),
+                downgrade: vec!["critical service in dependency cycle a -> b".to_string()],
+                attempts: 2,
+                max_attempts: 3,
+                confirmed: false,
+                grace_seconds: 30,
+                waiting_on: vec!["a".to_string()],
+                confirms_at: None,
+                confirm_error: None,
+            }
+        );
+
+        assert_eq!(
+            client.boot(),
+            Err(Failure::Refused {
+                code: "ACCESS_DENIED".to_string(),
+                message: "access denied".to_string(),
+            })
+        );
     }
 
     /// A job list in PSPU §7.7's shape is read back whole.

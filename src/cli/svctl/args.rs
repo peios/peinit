@@ -154,6 +154,11 @@ fn parse_svctl_command(
             let kind = parse_shutdown_kind(program, &kind)?;
             Ok(Command::Shutdown { kind })
         }
+        "boot" => {
+            reject_wait(program, wait, "boot")?;
+            no_arguments(program, rest, "boot does not take arguments")?;
+            Ok(Command::Boot)
+        }
         "job" => parse_job_command(program, rest, wait),
         "definition" | "def" => {
             reject_wait(program, wait, "definition")?;
@@ -668,6 +673,7 @@ Usage:
   {program} [--socket PATH] [--json] op OPERATION_ID
   {program} [--socket PATH] [--json] reload-config
   {program} [--socket PATH] [--json] shutdown poweroff|reboot|halt
+  {program} [--socket PATH] [--json] boot
 
 Submitted jobs (list, status and stop use the control socket; submit, wait
 and signal use the jobs socket):

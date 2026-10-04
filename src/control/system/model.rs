@@ -44,7 +44,11 @@ pub struct SystemAccess(u32);
 impl SystemAccess {
     pub const SHUTDOWN: Self = Self(0x0001);
     pub const RELOAD_CONFIG: Self = Self(0x0002);
-    pub const ALL: Self = Self(Self::SHUTDOWN.0 | Self::RELOAD_CONFIG.0);
+    /// Read the manager's own status — how this boot went (`boot`). The
+    /// one right here that changes nothing, so `GENERIC_READ` maps to it and
+    /// the default descriptor grants it to every authenticated principal.
+    pub const QUERY_STATUS: Self = Self(0x0004);
+    pub const ALL: Self = Self(Self::SHUTDOWN.0 | Self::RELOAD_CONFIG.0 | Self::QUERY_STATUS.0);
 
     pub const fn bits(self) -> u32 {
         self.0

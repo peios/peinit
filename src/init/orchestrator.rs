@@ -270,6 +270,12 @@ where
         );
     }
 
+    // What the threshold was just checked against, for `boot` to report. Not
+    // recovery, so the counter was read (a forced recovery returned above).
+    settings.boot_attempts = crate::boot::BootAttempts {
+        counted: counter.unwrap_or(0),
+        threshold,
+    };
     let mut supervisor = Supervisor::new(settings.clone());
 
     if let Err(error) = platform.set_clock_from_rtc() {

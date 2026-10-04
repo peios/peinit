@@ -32,5 +32,6 @@ fn is_shutdown_allowed_query(command: ControlCommand) -> bool {
             | ControlCommand::JobStatus
             | ControlCommand::JobList
             | ControlCommand::JobStop
+            | ControlCommand::Boot
     )
 }

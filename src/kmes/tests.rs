@@ -387,6 +387,18 @@ fn encodes_access_denial_payloads_with_requested_rights() {
         read_str(&system.payload, "requested_right"),
         "SYSTEM_SHUTDOWN"
     );
+    // A `boot` denied under a descriptor that withholds it names its right
+    // too, rather than the catch-all.
+    let query = encode_system_access_denied_event(&SystemAccessDenied {
+        caller: token("S-1-5-21-client"),
+        desired_access: SystemAccess::QUERY_STATUS,
+        granted_access_bits: 0,
+    })
+    .expect("system query denial");
+    assert_eq!(
+        read_str(&query.payload, "requested_right"),
+        "SYSTEM_QUERY_STATUS"
+    );
     assert_eq!(service.event_type, "access.denied");
     assert_eq!(read_str(&service.payload, "target_type"), "service");
     assert_eq!(read_str(&service.payload, "target"), "app");
