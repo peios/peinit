@@ -1,5 +1,6 @@
 mod fd_store;
 mod level;
+mod progress;
 mod readiness;
 mod reload;
 mod shutdown;

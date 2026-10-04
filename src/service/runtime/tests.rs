@@ -2,6 +2,7 @@ use super::{
     ProcessPresence, RestartConsultation, ServiceRuntimeSnapshot, ServiceState, ServiceTransition,
     ServiceTransitionError, TransitionCause,
 };
+use crate::submitted::{JobProgress, JobProgressUnit};
 
 #[test]
 fn states_report_dependent_satisfaction() {
@@ -190,6 +191,65 @@ fn repeated_start_generation_increments_on_each_starting_transition() {
         .expect("restart completed oneshot");
 
     assert_eq!(snapshot.generation, 2);
+}
+
+/// PSPU §4.14: `status_text` and `progress` are cleared at the start of
+/// every activation generation, so what the last incarnation said of itself
+/// is never reported as describing the next one. The event bound restarts
+/// with the new sender.
+#[test]
+fn a_new_activation_generation_clears_status_text_and_progress() {
+    let mut snapshot = ServiceRuntimeSnapshot::inactive("indexer");
+    snapshot
+        .transition(ServiceTransition {
+            to: ServiceState::Starting,
+            cause: TransitionCause::ExplicitStart,
+        })
+        .expect("start");
+    snapshot.status_text = Some("Scanning".to_string());
+    snapshot.progress = Some(JobProgress {
+        current: 3,
+        total: Some(10),
+        bounded: true,
+    });
+    snapshot.progress_unit = Some(JobProgressUnit::Items);
+    snapshot.last_progress_event_ns = Some(1_000);
+
+    // Leaving Starting keeps them: they describe the process still running.
+    snapshot
+        .transition(ServiceTransition {
+            to: ServiceState::Active,
+            cause: TransitionCause::ExplicitStart,
+        })
+        .expect("ready");
+    assert_eq!(snapshot.status_text.as_deref(), Some("Scanning"));
+    assert!(snapshot.progress.is_some());
+    assert_eq!(snapshot.progress_unit, Some(JobProgressUnit::Items));
+
+    snapshot
+        .transition(ServiceTransition {
+            to: ServiceState::Stopping,
+            cause: TransitionCause::ExplicitStop,
+        })
+        .expect("stop");
+    snapshot
+        .transition(ServiceTransition {
+            to: ServiceState::Inactive,
+            cause: TransitionCause::ExplicitStop,
+        })
+        .expect("stopped");
+    snapshot
+        .transition(ServiceTransition {
+            to: ServiceState::Starting,
+            cause: TransitionCause::ExplicitStart,
+        })
+        .expect("start again");
+
+    assert_eq!(snapshot.generation, 2);
+    assert_eq!(snapshot.status_text, None);
+    assert_eq!(snapshot.progress, None);
+    assert_eq!(snapshot.progress_unit, None);
+    assert_eq!(snapshot.last_progress_event_ns, None);
 }
 
 #[test]

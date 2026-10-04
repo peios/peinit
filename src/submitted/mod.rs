@@ -29,7 +29,9 @@ pub use model::{
     SubmittedJobCause, SubmittedJobEntry, SubmittedJobOutcome, SubmittedJobStop,
     SubmittedJobStopPhase, SubmittedNotifyField,
 };
-pub use progress::{ProgressParseError, parse_progress, parse_progress_unit};
+pub use progress::{
+    PROGRESS_EVENT_INTERVAL_NS, ProgressParseError, parse_progress, parse_progress_unit,
+};
 pub use security::{
     JobAccess, JobAccessCheckError, JobAccessCheckRequest, JobAccessChecker, JobAccessDecision,
     JobAccessDenied, JobDescriptorError, JobDescriptorFactory, JobSecurityDescriptor,

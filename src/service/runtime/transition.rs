@@ -43,7 +43,12 @@ impl ServiceRuntimeSnapshot {
         let from = self.state;
         if transition.to == ServiceState::Starting {
             self.generation += 1;
+            // What the last incarnation said of itself describes a process
+            // that no longer exists (PSPU §4.14).
             self.status_text = None;
+            self.progress = None;
+            self.progress_unit = None;
+            self.last_progress_event_ns = None;
             self.stopping_acknowledged = false;
             self.pending_timer = false;
             self.health = super::model::ServiceHealthSnapshot::unknown();

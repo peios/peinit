@@ -18,8 +18,8 @@ pub use audit::{
 pub use encode::{
     JobEventTruncation, MAX_JOB_ENDED_ARGUMENTS_BYTES, encode_fd_store_rejection_event,
     encode_graph_event, encode_job_access_denied_event, encode_job_event, encode_job_event_bounded,
-    encode_job_status_event, encode_notify_applied_field_events, encode_notify_rejection_event,
-    encode_operation_event, encode_output_dropped_event,
+    encode_job_status_event, encode_notify_applied_field_events, encode_notify_progress_event,
+    encode_notify_rejection_event, encode_operation_event, encode_output_dropped_event,
 };
 
 #[cfg(test)]

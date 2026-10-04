@@ -2,6 +2,7 @@ use crate::ids::{JobId, OperationId};
 use crate::job::JobType;
 use crate::operation::{OperationSource, OperationState, OperationType};
 use crate::service::runtime::{ServiceHealthStatus, ServiceState, TransitionCause};
+use crate::submitted::{JobProgress, JobProgressUnit};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ServiceStatusView {
@@ -12,6 +13,10 @@ pub struct ServiceStatusView {
     pub cause: Option<TransitionCause>,
     pub generation: u64,
     pub status_text: Option<String>,
+    /// The most recent accepted `PROGRESS=` and `PROGRESS_UNIT=` (PSPU
+    /// §4.19), exposed as one `progress` object.
+    pub progress: Option<JobProgress>,
+    pub progress_unit: Option<JobProgressUnit>,
     pub health: Option<ServiceHealthStatus>,
     pub definition_removed: bool,
     pub current_job: Option<CurrentJobView>,

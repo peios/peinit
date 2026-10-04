@@ -25,8 +25,8 @@ use super::{
     encode_boot_blocked_service_event, encode_critical_failure_event,
     encode_fd_store_rejection_event, encode_graph_validation_error_event,
     encode_graph_validation_warning_event, encode_init_recovery_events, encode_job_event,
-    encode_notify_applied_field_events, encode_notify_rejection_event,
-    encode_on_failure_loop_suppressed_event, encode_operation_event,
+    encode_notify_applied_field_events, encode_notify_progress_event,
+    encode_notify_rejection_event, encode_on_failure_loop_suppressed_event, encode_operation_event,
     encode_registry_reload_coalesced_event, encode_registry_reload_deferred_event,
     encode_reload_undecodable_service_event, encode_service_access_denied_event,
     encode_shutdown_abandoned_event, encode_system_access_denied_event,
@@ -702,6 +702,73 @@ fn ready_and_reloading_are_still_not_separately_recorded() {
     .expect("notify events");
 
     assert!(events.is_empty());
+}
+
+/// PSPU §4.19: a service's PROGRESS is recorded as a structured event — not
+/// per line, but as one `notify.progress` carrying the retained value, in
+/// `job.status`'s fields, with the same attribution as `notify.status`.
+#[test]
+fn a_services_progress_is_recorded_as_an_event() {
+    use crate::service::runtime::ServiceProgressReport;
+    use crate::submitted::{JobProgress, JobProgressUnit};
+
+    let sender = AuthenticatedNotifySender {
+        service: "app".to_string(),
+        job_id: job_id(),
+        operation_id: None,
+        generation: 3,
+        job_created_at_ns: 1_000,
+        cgroup_generation: 7,
+    };
+
+    // The per-field encoder leaves progress to the bounded event.
+    let events = encode_notify_applied_field_events(
+        &sender,
+        &[NotifyAppliedField::Progress {
+            value: "3/10".to_string(),
+        }],
+    )
+    .expect("notify events");
+    assert!(events.is_empty());
+
+    let event = encode_notify_progress_event(
+        &sender,
+        &ServiceProgressReport {
+            progress: Some(JobProgress {
+                current: 3,
+                total: Some(10),
+                bounded: true,
+            }),
+            unit: Some(JobProgressUnit::Items),
+        },
+    )
+    .expect("progress event");
+    assert_eq!(event.event_type, "notify.progress");
+    assert_eq!(read_str(&event.payload, "service"), "app");
+    assert_eq!(
+        read_str(&event.payload, "job_id"),
+        sender.job_id.to_string()
+    );
+    assert_nil(&event.payload, "operation_id");
+    assert_eq!(read_uint(&event.payload, "generation"), 3);
+    assert_eq!(read_uint(&event.payload, "progress_current"), 3);
+    assert_eq!(read_uint(&event.payload, "progress_total"), 10);
+    assert!(read_bool(&event.payload, "progress_bounded"));
+    assert_eq!(read_str(&event.payload, "progress_unit"), "items");
+
+    // A unit alone: no figure yet.
+    let event = encode_notify_progress_event(
+        &sender,
+        &ServiceProgressReport {
+            progress: None,
+            unit: Some(JobProgressUnit::Bytes),
+        },
+    )
+    .expect("unit-only progress event");
+    assert_nil(&event.payload, "progress_current");
+    assert_nil(&event.payload, "progress_total");
+    assert_nil(&event.payload, "progress_bounded");
+    assert_eq!(read_str(&event.payload, "progress_unit"), "bytes");
 }
 
 /// PEI-1125, PEI-1082: the two audit records that keep a contained failure
