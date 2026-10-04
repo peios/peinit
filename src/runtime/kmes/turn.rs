@@ -1,7 +1,8 @@
 use crate::boundary::{BoundaryError, KmesEvent};
 use crate::kmes::{
     encode_fd_store_rejection_event, encode_notify_applied_field_events,
-    encode_notify_rejection_event, encode_on_failure_loop_suppressed_event,
+    encode_notify_progress_event, encode_notify_rejection_event,
+    encode_on_failure_loop_suppressed_event,
 };
 use crate::supervisor::{SupervisorFilesystemCheckCompletionDispatch, SupervisorNotifyDispatch};
 
@@ -291,6 +292,12 @@ fn collect_notify_dispatch(
         &dispatch.notify.sender,
         &dispatch.notify.applied_fields,
     )?);
+    if let Some(report) = &dispatch.notify.progress_event {
+        out.push(encode_notify_progress_event(
+            &dispatch.notify.sender,
+            report,
+        )?);
+    }
     push_operations(out, &dispatch.notify.operation_events)?;
     push_graphs(out, &dispatch.notify.graph_events)?;
     if let Some(job_event) = &dispatch.notify.post_start_hook {

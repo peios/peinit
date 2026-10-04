@@ -112,6 +112,41 @@ fn human_list_shows_each_service_next_timer() {
 }
 
 #[test]
+fn human_status_shows_a_services_progress() {
+    let Some(server) = MockControlServer::start(
+        |request| {
+            assert_eq!(request["command"], "status");
+        },
+        r#"{"status":"ok","service":"indexer","state":"starting","status_text":"Scanning","progress":{"current":3,"total":10,"bounded":true,"unit":"items"},"warnings":[],"timers":[]}"#,
+    ) else {
+        return;
+    };
+
+    let mut out = Vec::new();
+    let mut err = Vec::new();
+    let code = run_with_io(
+        [
+            OsString::from("svctl"),
+            OsString::from("--socket"),
+            server.path().into_os_string(),
+            OsString::from("status"),
+            OsString::from("indexer"),
+        ],
+        &mut out,
+        &mut err,
+    );
+
+    assert_eq!(code, 0, "{}", String::from_utf8_lossy(&err));
+    assert_eq!(
+        String::from_utf8(out).expect("stdout utf8"),
+        "indexer: starting\n\
+         status: Scanning\n\
+         progress: 3/10 items\n",
+    );
+    server.join();
+}
+
+#[test]
 fn human_status_shows_timers_armed_and_not() {
     let Some(server) = MockControlServer::start(
         |request| {

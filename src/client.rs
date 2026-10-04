@@ -65,6 +65,9 @@ pub struct Status {
     pub summary: Summary,
     /// What the service last said of itself (`STATUS=`).
     pub status_text: Option<String>,
+    /// How far it last said it had got (`PROGRESS=`), if it has said so
+    /// since it was last started.
+    pub progress: Option<Progress>,
     /// Its main process, while it has one.
     pub job: Option<Job>,
     /// The operation under way on it, if one is.
@@ -204,7 +207,7 @@ pub struct SubmittedJob {
     pub granted: Vec<String>,
 }
 
-/// How far a job says it has got (`PROGRESS=`).
+/// How far a service or a job says it has got (`PROGRESS=`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Progress {
     pub current: u64,
@@ -260,6 +263,7 @@ impl ControlClient {
         let mut status = Status {
             summary: summary(&answer)?,
             status_text: text(&answer, "status_text"),
+            progress: progress(&answer["progress"]),
             job: match &answer["current_job"] {
                 Value::Null => None,
                 job => Some(Job {
@@ -454,20 +458,25 @@ fn submitted_job(value: &Value) -> Result<SubmittedJob, Failure> {
         exit_code: value["exit_code"].as_i64(),
         exit_signal: value["exit_signal"].as_i64(),
         status_text: text(value, "status_text"),
-        progress: match &value["progress"] {
-            Value::Null => None,
-            progress => Some(Progress {
-                current: progress["current"].as_u64().unwrap_or(0),
-                total: progress["total"].as_u64(),
-                bounded: progress["bounded"].as_bool().unwrap_or(false),
-                unit: text(progress, "unit"),
-            }),
-        },
+        progress: progress(&value["progress"]),
         created_at: text(value, "created_at"),
         started_at: text(value, "started_at"),
         ended_at: text(value, "ended_at"),
         granted: strings(&value["granted"]),
     })
+}
+
+/// A `progress` object, a service's or a job's; null or absent is none.
+fn progress(value: &Value) -> Option<Progress> {
+    match value {
+        Value::Null => None,
+        progress => Some(Progress {
+            current: progress["current"].as_u64().unwrap_or(0),
+            total: progress["total"].as_u64(),
+            bounded: progress["bounded"].as_bool().unwrap_or(false),
+            unit: text(progress, "unit"),
+        }),
+    }
 }
 
 #[cfg(test)]
@@ -644,6 +653,8 @@ mod tests {
             cause: None,
             generation: 1,
             status_text: None,
+            progress: None,
+            progress_unit: None,
             health: None,
             definition_removed: false,
             current_job: None,
@@ -669,6 +680,7 @@ mod tests {
         .unwrap();
         let status = answering("status", vec![line]).status_of("backup").unwrap();
         assert_eq!(status.granted, ["query_status", "stop"]);
+        assert_eq!(status.progress, None);
         assert_eq!(status.timers.len(), 3);
         assert_eq!(status.timers[0].schedule, "*-*-* 03:00:00");
         assert_eq!(
@@ -688,6 +700,34 @@ mod tests {
             status.timers[2].not_armed.as_deref(),
             Some("calendar expression has no future occurrence")
         );
+    }
+
+    /// A service's progress is read back from its status as a job's is, and
+    /// a status from a peinit that does not report it reads as none.
+    #[test]
+    fn a_status_is_read_with_its_progress() {
+        let line = br#"{"status":"ok","service":"indexer","display_name":null,"description":null,"state":"starting","cause":"explicit_start","status_text":"Scanning","progress":{"current":3,"total":10,"bounded":true,"unit":"items"},"current_job":null,"current_operation":null,"health":null,"uptime_seconds":null,"definition_removed":false,"warnings":[],"timers":[],"granted":["query_status"]}
+"#;
+        let status = answering("status-progress", vec![line.to_vec()])
+            .status_of("indexer")
+            .unwrap();
+        assert_eq!(status.status_text.as_deref(), Some("Scanning"));
+        assert_eq!(
+            status.progress,
+            Some(Progress {
+                current: 3,
+                total: Some(10),
+                bounded: true,
+                unit: Some("items".to_string()),
+            })
+        );
+
+        let older = br#"{"status":"ok","service":"indexer","state":"active","cause":null}
+"#;
+        let status = answering("status-no-progress", vec![older.to_vec()])
+            .status_of("indexer")
+            .unwrap();
+        assert_eq!(status.progress, None);
     }
 
     /// A command not waited for comes back with the operation to follow,

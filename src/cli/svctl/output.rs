@@ -180,6 +180,11 @@ fn write_status(out: &mut dyn Write, value: &Value) -> io::Result<()> {
     write_optional_line(out, "cause", str_field(value, "cause"))?;
     write_optional_line(out, "health", str_field(value, "health"))?;
     write_optional_line(out, "status", str_field(value, "status_text"))?;
+    write_optional_line(
+        out,
+        "progress",
+        progress_text(value.get("progress")).as_deref(),
+    )?;
     if let Some(uptime) = value.get("uptime_seconds").and_then(Value::as_u64) {
         writeln!(out, "uptime: {uptime}s")?;
     }

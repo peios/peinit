@@ -2,12 +2,14 @@ use peios::msgpack::Writer;
 
 use crate::boundary::{BoundaryError, KmesEvent};
 use crate::execution::notify::{AuthenticatedNotifySender, NotifyAppliedField};
+use crate::service::runtime::ServiceProgressReport;
+use crate::submitted::JobProgressUnit;
 use crate::supervisor::SupervisorFdStoreRejectionDispatch;
 
 use super::super::labels::fd_store_outcome_label;
 use super::super::payload::{
     finish_event, write_optional_str_field, write_optional_string_field, write_optional_u32_field,
-    write_str_field, write_uint_field,
+    write_optional_u64_field, write_str_field, write_uint_field,
 };
 
 pub fn encode_notify_applied_field_events(
@@ -18,6 +20,40 @@ pub fn encode_notify_applied_field_events(
         .iter()
         .filter_map(|field| notify_field_event(sender, field))
         .collect()
+}
+
+/// `notify.progress` — the progress a service has retained after a datagram
+/// that carried `PROGRESS` or `PROGRESS_UNIT`, at most once a second per
+/// incarnation (PSPU §4.19, §4.A). The value fields are `job.status`'s.
+pub fn encode_notify_progress_event(
+    sender: &AuthenticatedNotifySender,
+    report: &ServiceProgressReport,
+) -> Result<KmesEvent, BoundaryError> {
+    let progress = report.progress;
+    let mut writer = Writer::new();
+    writer.write_map(8);
+    write_notify_sender(&mut writer, sender);
+    write_optional_u64_field(&mut writer, "progress_current", progress.map(|p| p.current));
+    write_optional_u64_field(
+        &mut writer,
+        "progress_total",
+        progress.and_then(|p| p.total),
+    );
+    writer.write_str("progress_bounded");
+    match progress {
+        Some(progress) => {
+            writer.write_bool(progress.bounded);
+        }
+        None => {
+            writer.write_nil();
+        }
+    }
+    write_optional_str_field(
+        &mut writer,
+        "progress_unit",
+        report.unit.map(JobProgressUnit::wire),
+    );
+    finish_event("notify.progress", writer)
 }
 
 pub fn encode_notify_rejection_event(

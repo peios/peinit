@@ -34,6 +34,8 @@ fn serializes_status_response_shape_with_structured_warnings_and_timestamps() {
         cause: Some(TransitionCause::ExplicitStart),
         generation: 99,
         status_text: Some("ready".to_string()),
+        progress: None,
+        progress_unit: None,
         health: Some(ServiceHealthStatus::Healthy),
         definition_removed: true,
         current_job: Some(CurrentJobView {
@@ -94,6 +96,7 @@ fn serializes_status_response_shape_with_structured_warnings_and_timestamps() {
             "display_name",
             "granted",
             "health",
+            "progress",
             "service",
             "state",
             "status",
@@ -103,6 +106,8 @@ fn serializes_status_response_shape_with_structured_warnings_and_timestamps() {
             "warnings",
         ],
     );
+    // Not applicable is present as null, not omitted (§4.9).
+    assert!(response["progress"].is_null());
     // A timer's times are the wall clock's already, not projected.
     assert_eq!(
         sorted_keys(&response["timers"][0]),
@@ -151,6 +156,72 @@ fn serializes_status_response_shape_with_structured_warnings_and_timestamps() {
         response["granted"],
         serde_json::json!(["query_status", "interrogate"])
     );
+}
+
+/// A service's retained progress is reported in the job view's form
+/// (§4.14, §7.7): `total` null for `N` and `N/`, `bounded` telling them
+/// apart, and `unit` null until a `PROGRESS_UNIT` arrives.
+#[test]
+fn status_reports_progress_in_the_job_view_form() {
+    let view = |progress, progress_unit| ServiceStatusView {
+        service: "indexer".to_string(),
+        display_name: None,
+        description: None,
+        state: ServiceState::Starting,
+        cause: Some(TransitionCause::ExplicitStart),
+        generation: 1,
+        status_text: Some("Scanning".to_string()),
+        progress,
+        progress_unit,
+        health: None,
+        definition_removed: false,
+        current_job: None,
+        current_operation: None,
+        warnings: Vec::new(),
+        lifecycle_warnings: Vec::new(),
+        timers: Vec::new(),
+    };
+    let progress_of = |view: &ServiceStatusView| {
+        let line = control_status_response_line(view, ServiceAccess::ALL, response_time())
+            .expect("status response");
+        response_json(&line)["progress"].clone()
+    };
+
+    assert_eq!(
+        progress_of(&view(
+            Some(JobProgress {
+                current: 3,
+                total: Some(10),
+                bounded: true,
+            }),
+            Some(JobProgressUnit::Items),
+        )),
+        serde_json::json!({"current": 3, "total": 10, "bounded": true, "unit": "items"}),
+    );
+    assert_eq!(
+        progress_of(&view(
+            Some(JobProgress {
+                current: 7,
+                total: None,
+                bounded: true,
+            }),
+            None,
+        )),
+        serde_json::json!({"current": 7, "total": null, "bounded": true, "unit": null}),
+    );
+    assert_eq!(
+        progress_of(&view(
+            Some(JobProgress {
+                current: 42,
+                total: None,
+                bounded: false,
+            }),
+            Some(JobProgressUnit::Bytes),
+        )),
+        serde_json::json!({"current": 42, "total": null, "bounded": false, "unit": "bytes"}),
+    );
+    // A unit with no figure is no progress.
+    assert!(progress_of(&view(None, Some(JobProgressUnit::Percent))).is_null());
 }
 
 /// A caller holding every service right is told all four, in §4.7's

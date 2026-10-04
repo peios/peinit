@@ -1,3 +1,5 @@
+use crate::submitted::{JobProgress, JobProgressUnit};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ServiceState {
     Inactive,
@@ -216,6 +218,13 @@ pub enum RestartConsultation {
     Never,
 }
 
+/// A service's retained progress, as it stood when it became due an event.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ServiceProgressReport {
+    pub progress: Option<JobProgress>,
+    pub unit: Option<JobProgressUnit>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ServiceRuntimeSnapshot {
     pub service: String,
@@ -227,6 +236,17 @@ pub struct ServiceRuntimeSnapshot {
     pub consecutive_restart_failures: u32,
     pub restart_backoff_until_ns: Option<u64>,
     pub status_text: Option<String>,
+    /// The most recent accepted `PROGRESS=` and `PROGRESS_UNIT=` (PSPU
+    /// §4.19). The types are the submitted job's: the grammar and the
+    /// exposed form are one and the same for a service and a job.
+    ///
+    /// Cleared with `status_text` at the start of every activation
+    /// generation (§4.14).
+    pub progress: Option<JobProgress>,
+    pub progress_unit: Option<JobProgressUnit>,
+    /// When this incarnation's progress last became a `notify.progress`
+    /// event, for the once-a-second bound of §4.A.
+    pub last_progress_event_ns: Option<u64>,
     /// The readiness level this service last published with `LEVEL=`, for
     /// dependents declaring `Requires = ["<service>:<level>"]`.
     ///
@@ -253,6 +273,9 @@ impl ServiceRuntimeSnapshot {
             consecutive_restart_failures: 0,
             restart_backoff_until_ns: None,
             status_text: None,
+            progress: None,
+            progress_unit: None,
+            last_progress_event_ns: None,
             level: None,
             stopping_acknowledged: false,
             stopping_timeout: None,

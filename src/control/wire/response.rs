@@ -8,6 +8,7 @@ use crate::control::reload_config::ReloadConfigOutcome;
 use crate::control::service_security::ServiceAccess;
 use crate::ids::OperationId;
 use crate::service::runtime::{ServiceState, TransitionCause};
+use crate::submitted::JobProgressUnit;
 
 use super::model::{ControlErrorCode, ControlResponseStatus};
 use labels::{
@@ -57,6 +58,13 @@ pub fn control_status_response_line(
         "state": service_state_wire(view.state),
         "cause": view.cause.map(transition_cause_wire),
         "status_text": view.status_text.as_deref(),
+        // The job view's form (§7.7); null until the service sends one.
+        "progress": view.progress.map(|progress| json!({
+            "current": progress.current,
+            "total": progress.total,
+            "bounded": progress.bounded,
+            "unit": view.progress_unit.map(JobProgressUnit::wire),
+        })),
         "current_job": view.current_job.as_ref().map(|job| {
             json!({
                 "id": job.id.to_canonical_string(),

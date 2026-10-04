@@ -74,6 +74,8 @@ fn status_from_entry(
         cause: entry.runtime.cause,
         generation: entry.runtime.generation,
         status_text: entry.runtime.status_text.clone(),
+        progress: entry.runtime.progress,
+        progress_unit: entry.runtime.progress_unit,
         health: entry
             .definition
             .health_check

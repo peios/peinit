@@ -3,7 +3,10 @@ use crate::notify::NotifyMessage;
 
 use super::auth::authenticate_notify_sender;
 use super::field::{NotifyFieldContext, apply_notify_field};
-use super::model::{NotifyApplyContext, NotifyApplyDispatch, NotifyApplyError, NotifyApplyRequest};
+use super::model::{
+    NotifyAppliedField, NotifyApplyContext, NotifyApplyDispatch, NotifyApplyError,
+    NotifyApplyRequest,
+};
 
 pub fn apply_notify_message<P>(
     context: NotifyApplyContext<'_, P>,
@@ -33,6 +36,7 @@ where
         service_transitions: Vec::new(),
         graph_events: Vec::new(),
         post_start_hook: None,
+        progress_event: None,
     };
 
     for field in &message.fields {
@@ -49,6 +53,20 @@ where
             dispatch: &mut dispatch,
         };
         apply_notify_field(&mut field_context, field)?;
+    }
+
+    // Progress becomes an event once per datagram that changed it, and no
+    // more than once a second however often it changes (PSPU §4.19, §4.A).
+    let progress_changed = dispatch.applied_fields.iter().any(|field| {
+        matches!(
+            field,
+            NotifyAppliedField::Progress { .. } | NotifyAppliedField::ProgressUnit { .. }
+        )
+    });
+    if progress_changed {
+        dispatch.progress_event = next_services
+            .take_progress_event(&sender.service, request.observed_at_ns)
+            .map_err(NotifyApplyError::ServiceTable)?;
     }
 
     *context.services = next_services;

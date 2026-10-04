@@ -7,7 +7,7 @@ use crate::ids::{JobId, JobIdAllocator, OperationId};
 use crate::job::{JobState, JobStore};
 use crate::operation::OperationType;
 use crate::operation::store::{OperationEvent, OperationStore, OperationStoreError};
-use crate::service::runtime::ServiceState;
+use crate::service::runtime::{ServiceProgressReport, ServiceState};
 use crate::service::{ServiceTable, ServiceTableError, ServiceTableTransition};
 
 pub struct NotifyApplyContext<'a, P>
@@ -48,6 +48,10 @@ pub struct NotifyApplyDispatch {
     pub service_transitions: Vec<ServiceTableTransition>,
     pub graph_events: Vec<GraphExecutionEvent>,
     pub post_start_hook: Option<crate::job::JobEvent>,
+    /// The service's progress after this datagram, when the datagram
+    /// changed it and the once-a-second bound (PSPU §4.A) lets that become
+    /// a `notify.progress` event.
+    pub progress_event: Option<ServiceProgressReport>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

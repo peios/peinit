@@ -7,6 +7,7 @@ use crate::notify::NotifyField;
 use crate::operation::store::OperationStore;
 use crate::service::ServiceTable;
 use crate::service::runtime::ServiceState;
+use crate::submitted::{parse_progress, parse_progress_unit};
 
 use super::error::unknown_service;
 use super::model::{
@@ -59,6 +60,18 @@ pub(super) fn apply_notify_field(
             context.sender,
             &mut *context.dispatch,
         )?,
+        NotifyField::Progress(value) => apply_progress(
+            &mut *context.services,
+            context.sender,
+            value,
+            &mut *context.dispatch,
+        )?,
+        NotifyField::ProgressUnit(value) => apply_progress_unit(
+            &mut *context.services,
+            context.sender,
+            value,
+            &mut *context.dispatch,
+        )?,
         other => record_advisory_field(other, &mut *context.dispatch),
     }
     Ok(())
@@ -96,6 +109,50 @@ fn apply_status(
     dispatch.applied_fields.push(NotifyAppliedField::Status {
         text: text.to_string(),
     });
+    Ok(())
+}
+
+/// Retain a `PROGRESS=` value, exposed as `progress` in the status shape
+/// (PSPU §4.19). A value outside the three forms, a `T` of zero or an `N`
+/// above `T` is an unexpected value under §4.17: the line is ignored —
+/// neither retained nor recorded — and never clamped or repaired.
+fn apply_progress(
+    services: &mut ServiceTable,
+    sender: &AuthenticatedNotifySender,
+    value: &str,
+    dispatch: &mut NotifyApplyDispatch,
+) -> Result<(), NotifyApplyError> {
+    let Ok(progress) = parse_progress(value) else {
+        return Ok(());
+    };
+    services
+        .update_progress(&sender.service, progress)
+        .map_err(NotifyApplyError::ServiceTable)?;
+    dispatch.applied_fields.push(NotifyAppliedField::Progress {
+        value: value.to_string(),
+    });
+    Ok(())
+}
+
+/// Retain a `PROGRESS_UNIT=` value; one outside `bytes`, `items` and
+/// `percent` is an unexpected value and is ignored (PSPU §4.19).
+fn apply_progress_unit(
+    services: &mut ServiceTable,
+    sender: &AuthenticatedNotifySender,
+    value: &str,
+    dispatch: &mut NotifyApplyDispatch,
+) -> Result<(), NotifyApplyError> {
+    let Some(unit) = parse_progress_unit(value) else {
+        return Ok(());
+    };
+    services
+        .update_progress_unit(&sender.service, unit)
+        .map_err(NotifyApplyError::ServiceTable)?;
+    dispatch
+        .applied_fields
+        .push(NotifyAppliedField::ProgressUnit {
+            value: value.to_string(),
+        });
     Ok(())
 }
 
@@ -140,18 +197,6 @@ fn record_advisory_field(field: &NotifyField, dispatch: &mut NotifyApplyDispatch
         NotifyField::Level(value) => dispatch.applied_fields.push(NotifyAppliedField::Level {
             value: value.clone(),
         }),
-        NotifyField::Progress(value) => {
-            dispatch.applied_fields.push(NotifyAppliedField::Progress {
-                value: value.clone(),
-            });
-        }
-        NotifyField::ProgressUnit(value) => {
-            dispatch
-                .applied_fields
-                .push(NotifyAppliedField::ProgressUnit {
-                    value: value.clone(),
-                });
-        }
         NotifyField::Errno(value) => dispatch.applied_fields.push(NotifyAppliedField::Errno {
             value: value.clone(),
         }),
@@ -192,7 +237,9 @@ fn record_advisory_field(field: &NotifyField, dispatch: &mut NotifyApplyDispatch
         NotifyField::Ready
         | NotifyField::Reloading
         | NotifyField::Stopping
-        | NotifyField::Status(_) => {}
+        | NotifyField::Status(_)
+        | NotifyField::Progress(_)
+        | NotifyField::ProgressUnit(_) => {}
     }
 }
 

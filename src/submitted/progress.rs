@@ -2,6 +2,10 @@
 
 use super::model::{JobProgress, JobProgressUnit};
 
+/// The bound on how often a sender's progress may become an event: at most
+/// once a second (PSPU §4.A). A service's and a submitted job's alike.
+pub const PROGRESS_EVENT_INTERVAL_NS: u64 = 1_000_000_000;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProgressParseError {
     /// Not one of the three forms, or a number that does not parse.

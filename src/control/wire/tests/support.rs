@@ -15,6 +15,7 @@ pub(super) use crate::service::runtime::{ServiceHealthStatus, ServiceState, Tran
 pub(super) use crate::service::{ServiceGraphWarning, ServiceReloadSummary};
 pub(super) use crate::shutdown::ShutdownKind;
 pub(super) use crate::shutdown::ShutdownSettings;
+pub(super) use crate::submitted::{JobProgress, JobProgressUnit};
 
 pub(super) use super::super::{
     ControlCommand, ControlErrorCode, ControlFrameDecision, ControlFrameRejectReason,
