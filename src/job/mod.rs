@@ -14,8 +14,8 @@ pub use builder::{
     service_main_job_from_phase2_start,
 };
 pub use cgroup::{
-    ServiceCgroupKind, encode_service_cgroup_id, service_cgroup_root_path, service_job_cgroup_path,
-    submitted_job_cgroup_path,
+    CgroupMember, ServiceCgroupKind, ServicePart, cgroup_member, encode_service_cgroup_id,
+    service_cgroup_root_path, service_job_cgroup_path, submitted_job_cgroup_path,
 };
 pub use event::{JobEvent, JobEventDetail};
 pub use hook_builder::{ServiceHealthCheckJobSpec, ServiceHookJobBuildError, ServiceHookJobSpec};
