@@ -1,4 +1,5 @@
 use crate::control::lifecycle::LifecycleCommandOutcome;
+use crate::operation::OperationState;
 
 use super::super::control_boundary::{PendingControlOperation, queue_control_boundary};
 use super::super::dispatch::SupervisorLifecycleDispatch;
@@ -44,6 +45,7 @@ pub(in crate::supervisor::lifecycle) fn finish_lifecycle_outcome(
             })
         }
         LifecycleCommandOutcome::OperationAccepted(operation) => {
+            drop_superseded_readiness_deadlines(&mut work, &operation.events);
             let pending_control_operation = queue_control_boundary(
                 &mut work.pending_control_operations,
                 &work.operations,
@@ -66,6 +68,29 @@ pub(in crate::supervisor::lifecycle) fn finish_lifecycle_outcome(
         }
         LifecycleCommandOutcome::Already(_) | LifecycleCommandOutcome::Noop(_) => {
             Ok(empty_lifecycle_dispatch(outcome, None))
+        }
+    }
+}
+
+/// A start this command superseded is no longer waiting for READY=1.
+///
+/// A `stop` of a Starting service aborts the start it lands on (§8.3), but
+/// the readiness deadline the start armed is keyed by that operation and was
+/// left in place. It came due later against an operation that was no longer
+/// Running, raised, and — the operation being unreachable through the active
+/// records — was never cleared: it failed whatever start of the service ran
+/// next and then fired on every timer turn (PEI-1267). The main process is
+/// the stop's to end; nothing is left for the deadline to time out.
+fn drop_superseded_readiness_deadlines(
+    work: &mut SupervisorWork,
+    events: &[crate::operation::store::OperationEvent],
+) {
+    for event in events {
+        if matches!(
+            event.state,
+            OperationState::Aborted | OperationState::Cancelled
+        ) {
+            work.start.remove_readiness_deadline(event.operation_id);
         }
     }
 }

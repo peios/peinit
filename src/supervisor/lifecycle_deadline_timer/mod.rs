@@ -5,5 +5,8 @@ mod process;
 mod timer;
 
 pub use dispatch::SupervisorLifecycleDeadlineDispatch;
-pub use model::{SupervisorLifecycleDeadline, SupervisorLifecycleDeadlineKind};
+pub use model::{
+    SupervisorLifecycleDeadline, SupervisorLifecycleDeadlineHoldoff,
+    SupervisorLifecycleDeadlineKind,
+};
 pub use timer::SupervisorLifecycleDeadlineTimerTurn;
