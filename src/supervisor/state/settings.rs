@@ -10,6 +10,10 @@ pub struct SupervisorSettings {
     /// is entered with a supervisor and nothing else.
     pub quiet: crate::init::QuietLevel,
     pub shutdown: ShutdownSettings,
+    /// The boot attempt counter and threshold Phase 1 checked, for `boot` to
+    /// report. Carried here for the same reason as `quiet`: Phase 1 reads
+    /// them, and the runtime has only the supervisor.
+    pub boot_attempts: crate::boot::BootAttempts,
 }
 
 impl SupervisorSettings {
@@ -21,6 +25,7 @@ impl SupervisorSettings {
             notify_socket_path: Self::DEFAULT_NOTIFY_SOCKET_PATH.to_string(),
             quiet: crate::init::QuietLevel::default(),
             shutdown: ShutdownSettings::default(),
+            boot_attempts: crate::boot::BootAttempts::default(),
         }
     }
 }
@@ -35,6 +40,7 @@ impl Default for SupervisorSettings {
             notify_socket_path: Self::DEFAULT_NOTIFY_SOCKET_PATH.to_string(),
             quiet: crate::init::QuietLevel::default(),
             shutdown: ShutdownSettings::default(),
+            boot_attempts: crate::boot::BootAttempts::default(),
         }
     }
 }

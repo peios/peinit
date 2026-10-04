@@ -84,6 +84,32 @@ fn requires_service_for_service_commands() {
     );
 }
 
+/// `boot` takes nothing, does not wait, and ignores what it does not use
+/// rather than refusing it (PSPU §4.8).
+#[test]
+fn parses_boot_with_no_arguments() {
+    let request = parse_control_request(br#"{"command":"boot"}"#).expect("boot request");
+
+    assert_eq!(
+        request,
+        ParsedControlRequest {
+            job_id: None,
+            job_filter: None,
+            command: ControlCommand::Boot,
+            service: None,
+            wait: false,
+            shutdown_kind: None,
+            operation_id: None,
+        },
+    );
+    assert_eq!(
+        parse_control_request(br#"{"command":"boot","service":"app","wait":true}"#)
+            .expect("boot with unused fields")
+            .command,
+        ControlCommand::Boot,
+    );
+}
+
 #[test]
 fn requires_operation_id_for_operation_status() {
     assert_eq!(

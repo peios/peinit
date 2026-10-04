@@ -207,6 +207,7 @@ fn send_control(client: &mut ControlClient, command: &Command) -> Result<CliResp
         Command::OperationStatus { operation_id } => client.operation_status(operation_id),
         Command::ReloadConfig => client.reload_config(),
         Command::Shutdown { kind } => client.system_shutdown(*kind),
+        Command::Boot => client.boot_status(),
         Command::JobList { filter } => client.request(job_list_request(filter)),
         Command::JobStatus { job_id } => {
             client.request(json!({"command": "job-status", "job_id": job_id}))

@@ -920,12 +920,12 @@ security-critical and should be tighter — see its page.
 --- machine\system\init controlsecurity
 canonical: Machine\System\Init ControlSecurity
 type: REG_BINARY
-default: SYSTEM full; Administrators shutdown and reload-config
+default: SYSTEM and Administrators full; Authenticated Users query status
 valid: a self-relative Peios security descriptor
 applies: live
 
 Who may perform system-level control operations — shutdown, reboot,
-`reload-config`.
+`reload-config` — and who may ask how the machine booted (`boot`).
 
 This is the machine-wide door. Who may manage one particular service is
 that service's `ServiceSecurity`, a separate descriptor with a separate

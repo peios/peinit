@@ -19,10 +19,10 @@ pub(crate) use response::{
     operation_state_from_wire, service_health_from_wire, service_state_from_wire,
 };
 pub use response::{
-    ControlResponseTimeProjection, control_client_error_message, control_error_response_line,
-    control_lifecycle_ack_response_line, control_lifecycle_ack_response_line_with_mode,
-    control_list_response_line, control_operation_status_response_line,
-    control_reload_config_response_line, control_status_response_line,
-    control_system_ok_response_line, response_line_from_value,
+    ControlResponseTimeProjection, control_boot_response_line, control_client_error_message,
+    control_error_response_line, control_lifecycle_ack_response_line,
+    control_lifecycle_ack_response_line_with_mode, control_list_response_line,
+    control_operation_status_response_line, control_reload_config_response_line,
+    control_status_response_line, control_system_ok_response_line, response_line_from_value,
 };
 pub use write_buffer::{ControlWriteBuffer, ControlWriteBufferError};

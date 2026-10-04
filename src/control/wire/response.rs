@@ -1,7 +1,7 @@
 use serde_json::json;
 
 use crate::control::query::{
-    OperationStatusView, ServiceListItem, ServiceStatusView, ServiceStatusWarning,
+    BootStatusView, OperationStatusView, ServiceListItem, ServiceStatusView, ServiceStatusWarning,
     ServiceStatusWarningType, ServiceTimerArming, ServiceTimerView,
 };
 use crate::control::reload_config::ReloadConfigOutcome;
@@ -176,6 +176,29 @@ pub fn control_operation_status_response_line(
             "requested_at": time.realtime_timestamp(view.created_at_ns),
             "started_at": view.started_at_ns.map(|started_at_ns| time.realtime_timestamp(started_at_ns)),
             "completed_at": view.completed_at_ns.map(|completed_at_ns| time.realtime_timestamp(completed_at_ns)),
+        }
+    });
+    response_line(&response)
+}
+
+/// The `boot` shape (PSPU §4.15): how this boot went.
+pub fn control_boot_response_line(
+    view: &BootStatusView,
+    time: ControlResponseTimeProjection,
+) -> Result<Vec<u8>, serde_json::Error> {
+    let response = json!({
+        "status": ControlResponseStatus::Ok.as_str(),
+        "boot": {
+            "mode": view.mode.wire(),
+            "reason": view.reason.wire(),
+            "downgrade": &view.downgrade,
+            "attempts": view.attempts,
+            "max_attempts": view.max_attempts,
+            "confirmed": view.confirmed,
+            "grace_seconds": view.grace_seconds,
+            "waiting_on": &view.waiting_on,
+            "confirms_at": view.confirms_at_ns.map(|due_at_ns| time.realtime_timestamp(due_at_ns)),
+            "confirm_error": view.confirm_error.as_deref(),
         }
     });
     response_line(&response)

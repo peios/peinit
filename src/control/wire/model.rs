@@ -28,6 +28,9 @@ pub enum ControlCommand {
     JobList,
     JobStatus,
     JobStop,
+    /// How this boot went: its mode, why, and whether it has counted as a
+    /// success yet (PSPU §4.15).
+    Boot,
 }
 
 impl ControlCommand {
@@ -46,6 +49,7 @@ impl ControlCommand {
             "job-list" => Some(Self::JobList),
             "job-status" => Some(Self::JobStatus),
             "job-stop" => Some(Self::JobStop),
+            "boot" => Some(Self::Boot),
             _ => None,
         }
     }
@@ -65,6 +69,7 @@ impl ControlCommand {
             Self::JobList => "job-list",
             Self::JobStatus => "job-status",
             Self::JobStop => "job-stop",
+            Self::Boot => "boot",
         }
     }
 

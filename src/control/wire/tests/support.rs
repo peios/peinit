@@ -1,6 +1,8 @@
+pub(super) use crate::boot::{BootMode, BootModeReason};
 pub(super) use crate::control::query::{
-    CurrentJobView, CurrentOperationView, OperationStatusView, ServiceListItem, ServiceStatusView,
-    ServiceStatusWarning, ServiceStatusWarningType, ServiceTimerArming, ServiceTimerView,
+    BootStatusView, CurrentJobView, CurrentOperationView, OperationStatusView, ServiceListItem,
+    ServiceStatusView, ServiceStatusWarning, ServiceStatusWarningType, ServiceTimerArming,
+    ServiceTimerView,
 };
 pub(super) use crate::control::reload_config::ReloadConfigOutcome;
 pub(super) use crate::control::service_security::ServiceAccess;
@@ -20,10 +22,11 @@ pub(super) use crate::submitted::{JobProgress, JobProgressUnit};
 pub(super) use super::super::{
     ControlCommand, ControlErrorCode, ControlFrameDecision, ControlFrameRejectReason,
     ControlRequestParseError, ControlResponseStatus, ControlResponseTimeProjection,
-    ParsedControlRequest, control_error_response_line, control_frame_decision,
-    control_lifecycle_ack_response_line_with_mode, control_list_response_line,
-    control_operation_status_response_line, control_reload_config_response_line,
-    control_status_response_line, control_system_ok_response_line, parse_control_request,
+    ParsedControlRequest, control_boot_response_line, control_error_response_line,
+    control_frame_decision, control_lifecycle_ack_response_line_with_mode,
+    control_list_response_line, control_operation_status_response_line,
+    control_reload_config_response_line, control_status_response_line,
+    control_system_ok_response_line, parse_control_request,
 };
 
 pub(super) fn shutdown_kind(body: &[u8]) -> ShutdownKind {

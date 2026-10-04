@@ -63,6 +63,7 @@ fn system_access_label(bits: u32) -> &'static str {
     match bits {
         0x0001 => "SYSTEM_SHUTDOWN",
         0x0002 => "SYSTEM_RELOAD_CONFIG",
+        0x0004 => "SYSTEM_QUERY_STATUS",
         _ => "SYSTEM_ACCESS",
     }
 }

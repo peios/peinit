@@ -1,3 +1,4 @@
+use crate::boot::{BootMode, BootModeReason};
 use crate::ids::{JobId, OperationId};
 use crate::job::JobType;
 use crate::operation::{OperationSource, OperationState, OperationType};
@@ -120,6 +121,33 @@ pub struct OperationStatusView {
     pub result: Option<String>,
     pub error: Option<String>,
     pub merged_into: Option<OperationId>,
+}
+
+/// How this boot went, as `boot` reports it (PSPU §4.15).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BootStatusView {
+    /// The mode Phase 2 booted in, after any downgrade.
+    pub mode: BootMode,
+    pub reason: BootModeReason,
+    /// Every finding that forced a downgrade to Safe, in words; empty
+    /// unless `reason` is a downgrade.
+    pub downgrade: Vec<String>,
+    /// The boot attempt counter as the recovery threshold was checked
+    /// against it at this boot.
+    pub attempts: u32,
+    /// The recovery threshold; 0 when the check is disabled.
+    pub max_attempts: u32,
+    /// The boot has counted as a success, and the counter was reset.
+    pub confirmed: bool,
+    /// `BootSuccessGrace`: how long the Critical services must hold.
+    pub grace_seconds: u32,
+    /// Critical services not yet holding a dependent-satisfying state.
+    pub waiting_on: Vec<String>,
+    /// When the boot will count as a success if nothing changes, on the
+    /// monotonic clock: known once every Critical service is holding.
+    pub confirms_at_ns: Option<u64>,
+    /// Why the counter could not be reset when the grace elapsed.
+    pub confirm_error: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

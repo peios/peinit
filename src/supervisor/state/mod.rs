@@ -27,7 +27,7 @@ use crate::shutdown::{ShutdownRuntime, ShutdownSignalTracker};
 use crate::submitted::SubmittedJobStore;
 
 use super::boot_settle::BootSettleTracker;
-use super::boot_success::BootSuccessTracker;
+use super::boot_success::{BootModeRecord, BootSuccessTracker};
 use super::cgroup_cleanup::CgroupCleanupStore;
 use super::control_boundary::PendingControlOperation;
 use super::health::HealthCheckStore;
@@ -93,6 +93,9 @@ pub struct Supervisor {
     pub(super) retained_service_launches: Vec<LaunchCreatedJobDispatch>,
     pub(super) boot_settle: BootSettleTracker,
     pub(super) boot_success: BootSuccessTracker,
+    /// The mode Phase 2 booted in and why, for `boot`. None until Phase 2
+    /// has run, when the mode is the one asked for.
+    pub(super) boot_mode: Option<BootModeRecord>,
     pub(super) shutdown: Option<ShutdownRuntime>,
     pub(super) shutdown_signals: ShutdownSignalTracker,
     /// A Critical reboot observed by a path that was asked not to finalise
@@ -159,6 +162,7 @@ impl Supervisor {
             retained_service_launches: Vec::new(),
             boot_settle: BootSettleTracker::default(),
             boot_success: BootSuccessTracker::default(),
+            boot_mode: None,
             shutdown: None,
             shutdown_signals: ShutdownSignalTracker::default(),
             deferred_critical_reboot: None,

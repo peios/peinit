@@ -97,7 +97,7 @@ fn control_security_generic_mapping() -> peios::security::GenericMapping {
     use super::model::SystemAccess;
 
     peios::security::GenericMapping::new(
-        0,
+        SystemAccess::QUERY_STATUS.bits(),
         SystemAccess::RELOAD_CONFIG.bits(),
         SystemAccess::SHUTDOWN.bits(),
         SystemAccess::ALL.bits(),
@@ -112,9 +112,18 @@ fn default_control_security_descriptor() -> peios::Result<peios::security::Secur
 
     let system = Sid::well_known(WellKnown::System);
     let administrators = Sid::well_known(WellKnown::Administrators);
+    let authenticated = Sid::well_known(WellKnown::AuthenticatedUsers);
+    // How the machine booted is machine status, like /proc, not a secret:
+    // everyone who can reach the socket may read it, as everyone may query
+    // a service under the default service descriptor.
     let dacl = AclBuilder::new()
         .allow(&system, SystemAccess::ALL.bits(), AceFlags::empty())
         .allow(&administrators, SystemAccess::ALL.bits(), AceFlags::empty())
+        .allow(
+            &authenticated,
+            SystemAccess::QUERY_STATUS.bits(),
+            AceFlags::empty(),
+        )
         .build()?;
     SdBuilder::new()
         .owner(&system)
