@@ -5,6 +5,7 @@ use crate::control::query::{
     ServiceStatusWarningType, ServiceTimerArming, ServiceTimerView,
 };
 use crate::control::reload_config::ReloadConfigOutcome;
+use crate::control::service_security::ServiceAccess;
 use crate::ids::OperationId;
 use crate::service::runtime::{ServiceState, TransitionCause};
 
@@ -39,8 +40,12 @@ pub fn control_system_ok_response_line() -> Result<Vec<u8>, serde_json::Error> {
     response_line(&response)
 }
 
+/// The status shape (PSPU §4.14). `granted` is what the caller may do to the
+/// service, as an AccessCheck asking for every right found it; it is the
+/// caller's, not the service's, so the view does not carry it.
 pub fn control_status_response_line(
     view: &ServiceStatusView,
+    granted: ServiceAccess,
     time: ControlResponseTimeProjection,
 ) -> Result<Vec<u8>, serde_json::Error> {
     let started_at_ns = view.current_job.as_ref().and_then(|job| job.started_at_ns);
@@ -73,6 +78,7 @@ pub fn control_status_response_line(
         "definition_removed": view.definition_removed,
         "warnings": view.warnings.iter().map(|warning| status_warning_json(warning, time)).collect::<Vec<_>>(),
         "timers": view.timers.iter().map(status_timer_json).collect::<Vec<_>>(),
+        "granted": granted.wire_names(),
     });
     response_line(&response)
 }

@@ -140,6 +140,14 @@ impl JobAccessChecker for TestJobSecurity {
     ) -> Result<JobAccessDecision, JobAccessCheckError> {
         self.checks
             .push((request.desired_access, request.descriptor.bytes.clone()));
+        // A MAXIMUM_ALLOWED check reports the whole allow list, and is
+        // allowed when that holds anything, as AccessCheck answers it.
+        if request.desired_access == JobAccess::MAXIMUM_ALLOWED {
+            return Ok(JobAccessDecision {
+                allowed: self.allowed.bits() != 0,
+                granted_access_bits: self.allowed.bits(),
+            });
+        }
         let allowed =
             self.allowed.bits() & request.desired_access.bits() == request.desired_access.bits();
         Ok(JobAccessDecision {

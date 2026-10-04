@@ -31,8 +31,9 @@ impl Supervisor {
         let view = self
             .service_status(service)
             .map_err(SupervisorControlCommandBodyError::Query)?;
+        let granted = self.service_granted_access(peer, access_checker, service)?;
         Ok(SupervisorControlCommandBodyResponse::accepted_response(
-            control_status_response_line(&view, response_time_projection(clock)?)
+            control_status_response_line(&view, granted, response_time_projection(clock)?)
                 .map_err(SupervisorControlCommandBodyError::serialize)?,
         ))
     }

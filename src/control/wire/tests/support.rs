@@ -3,6 +3,7 @@ pub(super) use crate::control::query::{
     ServiceStatusWarning, ServiceStatusWarningType, ServiceTimerArming, ServiceTimerView,
 };
 pub(super) use crate::control::reload_config::ReloadConfigOutcome;
+pub(super) use crate::control::service_security::ServiceAccess;
 pub(super) use crate::control::socket::ControlSocketLimits;
 pub(super) use crate::control::system::ControlSecurityDescriptor;
 pub(super) use crate::ids::{JobId, JobIdAllocator, OperationId, OperationIdAllocator};

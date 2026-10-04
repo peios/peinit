@@ -12,6 +12,18 @@ impl ServiceAccess {
     pub const INTERROGATE: Self = Self(0x0008);
     pub const ALL: Self =
         Self(Self::QUERY_STATUS.0 | Self::START.0 | Self::STOP.0 | Self::INTERROGATE.0);
+    /// Not a right: asks AccessCheck for every right the caller holds, which
+    /// is how `status` learns what to report as `granted` (§4.14).
+    pub const MAXIMUM_ALLOWED: Self = Self(0x0200_0000);
+
+    /// Each service right with its name on the wire, in the order `granted`
+    /// lists them (§4.14): §4.7's name, lowercased, without `SERVICE_`.
+    pub const WIRE_NAMES: [(Self, &'static str); 4] = [
+        (Self::QUERY_STATUS, "query_status"),
+        (Self::START, "start"),
+        (Self::STOP, "stop"),
+        (Self::INTERROGATE, "interrogate"),
+    ];
 
     pub const fn bits(self) -> u32 {
         self.0
@@ -19,6 +31,25 @@ impl ServiceAccess {
 
     pub const fn union(self, other: Self) -> Self {
         Self(self.0 | other.0)
+    }
+
+    /// The service rights among the bits an AccessCheck granted; anything
+    /// else it granted (standard rights, say) is not the service's to report.
+    pub const fn from_granted_bits(bits: u32) -> Self {
+        Self(bits & Self::ALL.0)
+    }
+
+    pub const fn contains(self, other: Self) -> bool {
+        self.0 & other.0 == other.0
+    }
+
+    /// The wire names of the rights held, in [`Self::WIRE_NAMES`] order.
+    pub fn wire_names(self) -> Vec<&'static str> {
+        Self::WIRE_NAMES
+            .iter()
+            .filter(|(right, _)| self.contains(*right))
+            .map(|(_, name)| *name)
+            .collect()
     }
 
     /// The right a lifecycle command needs (§4.6). Restart asks for start and
