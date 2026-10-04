@@ -51,9 +51,16 @@ impl crate::submitted::JobAccessChecker for AllowAccessChecker {
         &mut self,
         request: crate::submitted::JobAccessCheckRequest<'_>,
     ) -> Result<crate::submitted::JobAccessDecision, crate::submitted::JobAccessCheckError> {
+        // Every job right is held: a MAXIMUM_ALLOWED check reports all of
+        // them, a named right gets itself.
+        let granted = if request.desired_access == crate::submitted::JobAccess::MAXIMUM_ALLOWED {
+            crate::submitted::JobAccess::ALL
+        } else {
+            request.desired_access
+        };
         Ok(crate::submitted::JobAccessDecision {
             allowed: true,
-            granted_access_bits: request.desired_access.bits(),
+            granted_access_bits: granted.bits(),
         })
     }
 }

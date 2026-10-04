@@ -158,6 +158,31 @@ impl Supervisor {
         Ok((services, denied))
     }
 
+    /// Every service right the caller holds on `service` (PSPU §4.14's
+    /// `granted`): the same AccessCheck a command gets, against the same
+    /// descriptor, asking for `MAXIMUM_ALLOWED`. It is a question, not a
+    /// command, so a caller holding nothing is not a denial and is not
+    /// audited as one; only the boundary failing is an error.
+    pub(super) fn service_granted_access<A>(
+        &self,
+        peer: &ControlPeer,
+        access_checker: &mut A,
+        service: &str,
+    ) -> Result<ServiceAccess, SupervisorControlCommandBodyError>
+    where
+        A: ServiceAccessChecker + ?Sized,
+    {
+        let decision = self.service_access_decision(
+            peer,
+            access_checker,
+            service,
+            ServiceAccess::MAXIMUM_ALLOWED,
+        )?;
+        Ok(ServiceAccess::from_granted_bits(
+            decision.granted_access_bits,
+        ))
+    }
+
     fn definition_removed_is_unknown_for_command(
         &self,
         service: &str,

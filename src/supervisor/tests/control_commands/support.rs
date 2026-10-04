@@ -78,38 +78,49 @@ pub(super) struct TestAccessChecker {
     /// order — so a test can prove *which* descriptor a query was checked
     /// against, not only whether it passed.
     pub(super) observed_descriptors: Vec<crate::service::ServiceSecurityDescriptor>,
+    /// Every right a service check asked for, in order.
+    pub(super) observed_desired: Vec<ServiceAccess>,
+    /// The rights an allowed service grants: all of them unless a test
+    /// says otherwise with [`Self::granting`].
+    granted: ServiceAccess,
 }
 
 impl TestAccessChecker {
-    pub(super) fn allow_all() -> Self {
+    fn with(allowed_services: Option<BTreeSet<String>>, system_allowed: bool) -> Self {
         Self {
-            allowed_services: None,
-            system_allowed: true,
+            allowed_services,
+            system_allowed,
             observed_descriptors: Vec::new(),
+            observed_desired: Vec::new(),
+            granted: ServiceAccess::ALL,
         }
+    }
+
+    pub(super) fn allow_all() -> Self {
+        Self::with(None, true)
     }
 
     pub(super) fn deny_all_services() -> Self {
-        Self {
-            allowed_services: Some(BTreeSet::new()),
-            system_allowed: true,
-            observed_descriptors: Vec::new(),
-        }
+        Self::with(Some(BTreeSet::new()), true)
     }
 
     pub(super) fn allow_only_services<const N: usize>(services: [&str; N]) -> Self {
-        Self {
-            allowed_services: Some(services.into_iter().map(ToString::to_string).collect()),
-            system_allowed: true,
-            observed_descriptors: Vec::new(),
-        }
+        Self::with(
+            Some(services.into_iter().map(ToString::to_string).collect()),
+            true,
+        )
     }
 
     pub(super) fn deny_system() -> Self {
+        Self::with(None, false)
+    }
+
+    /// Every service grants only `granted`: a check for more is denied,
+    /// and a `MAXIMUM_ALLOWED` check answers with exactly it.
+    pub(super) fn granting(granted: ServiceAccess) -> Self {
         Self {
-            allowed_services: None,
-            system_allowed: false,
-            observed_descriptors: Vec::new(),
+            granted,
+            ..Self::allow_all()
         }
     }
 }
@@ -136,17 +147,31 @@ impl ServiceAccessChecker for TestAccessChecker {
         request: ServiceAccessCheckRequest<'_>,
     ) -> Result<ServiceAccessDecision, ServiceAccessCheckError> {
         self.observed_descriptors.push(request.descriptor.clone());
-        let allowed = self
+        self.observed_desired.push(request.desired_access);
+        let granted = if self
             .allowed_services
             .as_ref()
-            .is_none_or(|services| services.contains(request.service));
+            .is_none_or(|services| services.contains(request.service))
+        {
+            self.granted
+        } else {
+            ServiceAccess::from_granted_bits(0)
+        };
+        // As AccessCheck answers: MAXIMUM_ALLOWED is allowed when anything
+        // is granted, and reports all of it; a named right is allowed when
+        // every bit of it is granted.
+        let (allowed, granted_access_bits) =
+            if request.desired_access == ServiceAccess::MAXIMUM_ALLOWED {
+                (granted.bits() != 0, granted.bits())
+            } else {
+                (
+                    granted.contains(request.desired_access),
+                    granted.bits() & request.desired_access.bits(),
+                )
+            };
         Ok(ServiceAccessDecision {
             allowed,
-            granted_access_bits: if allowed {
-                ServiceAccess::ALL.bits()
-            } else {
-                0
-            },
+            granted_access_bits,
         })
     }
 }
@@ -198,9 +223,16 @@ impl crate::submitted::JobAccessChecker for TestAccessChecker {
         &mut self,
         request: crate::submitted::JobAccessCheckRequest<'_>,
     ) -> Result<crate::submitted::JobAccessDecision, crate::submitted::JobAccessCheckError> {
+        // Every job right is held: a MAXIMUM_ALLOWED check reports all of
+        // them, a named right gets itself.
+        let granted = if request.desired_access == crate::submitted::JobAccess::MAXIMUM_ALLOWED {
+            crate::submitted::JobAccess::ALL
+        } else {
+            request.desired_access
+        };
         Ok(crate::submitted::JobAccessDecision {
             allowed: true,
-            granted_access_bits: request.desired_access.bits(),
+            granted_access_bits: granted.bits(),
         })
     }
 }

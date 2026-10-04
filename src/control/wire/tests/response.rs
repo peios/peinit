@@ -73,7 +73,14 @@ fn serializes_status_response_shape_with_structured_warnings_and_timestamps() {
         ],
     };
 
-    let line = control_status_response_line(&view, response_time()).expect("status response");
+    // Given out of order and with a bit that is no service right, as an
+    // AccessCheck's granted mask may be: `granted` names only the service
+    // rights, in §4.7's order.
+    let granted = ServiceAccess::from_granted_bits(
+        ServiceAccess::INTERROGATE.bits() | ServiceAccess::QUERY_STATUS.bits() | 0x0002_0000,
+    );
+    let line =
+        control_status_response_line(&view, granted, response_time()).expect("status response");
     let response = response_json(&line);
 
     assert_eq!(
@@ -85,6 +92,7 @@ fn serializes_status_response_shape_with_structured_warnings_and_timestamps() {
             "definition_removed",
             "description",
             "display_name",
+            "granted",
             "health",
             "service",
             "state",
@@ -138,6 +146,25 @@ fn serializes_status_response_shape_with_structured_warnings_and_timestamps() {
     assert_eq!(
         response["warnings"][0]["detected_at"],
         "2024-05-31T16:08:37.123456789Z",
+    );
+    assert_eq!(
+        response["granted"],
+        serde_json::json!(["query_status", "interrogate"])
+    );
+}
+
+/// A caller holding every service right is told all four, in §4.7's
+/// order, and one holding none gets an empty array rather than null.
+#[test]
+fn status_granted_lists_every_right_held_in_order_and_is_never_null() {
+    assert_eq!(
+        ServiceAccess::ALL.wire_names(),
+        ["query_status", "start", "stop", "interrogate"]
+    );
+    assert!(
+        ServiceAccess::from_granted_bits(0x0002_0000)
+            .wire_names()
+            .is_empty()
     );
 }
 

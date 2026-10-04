@@ -12,7 +12,14 @@ pub struct ControlOperationWait {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ControlPendingWait {
     Operation(ControlOperationWait),
-    Job { job_id: crate::ids::JobId },
+    Job {
+        job_id: crate::ids::JobId,
+        /// The caller's rights on the job, for the terminal view's
+        /// `granted` (PSPU §4.14). Found when the command was taken, since
+        /// the answer is written with no caller to hand; a job's descriptor
+        /// is fixed at submission, so it cannot have changed since.
+        granted: crate::submitted::JobAccess,
+    },
 }
 
 impl ControlPendingWait {

@@ -47,13 +47,14 @@ impl Supervisor {
                         SupervisorControlWaitCompletion::Operation(wait.operation_id),
                     )
                 }
-                ControlPendingWait::Job { job_id } => {
+                ControlPendingWait::Job { job_id, granted } => {
                     if !self.submitted_job_terminal(job_id) {
                         continue;
                     }
                     let line = self
                         .control_job_view_line(
                             job_id,
+                            granted,
                             ControlResponseTimeProjection::new(observed_at_ns, realtime_now_ns),
                         )
                         .map_err(|error| {

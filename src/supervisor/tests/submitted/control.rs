@@ -58,9 +58,69 @@ fn job_status_returns_the_view_to_a_caller_with_job_query() {
     assert_eq!(json["job"]["pid"], 9000);
     assert_eq!(json["job"]["submitter"], SUBMITTER);
     assert_eq!(
-        boundaries.security.checks,
-        vec![(JobAccess::QUERY, SUBMITTER.as_bytes().to_vec())]
+        json["job"]["granted"],
+        serde_json::json!(["query", "stop", "signal"])
     );
+    // The query is checked, then the caller's rights asked for, both
+    // against the job's own descriptor.
+    assert_eq!(
+        boundaries.security.checks,
+        vec![
+            (JobAccess::QUERY, SUBMITTER.as_bytes().to_vec()),
+            (JobAccess::MAXIMUM_ALLOWED, SUBMITTER.as_bytes().to_vec()),
+        ]
+    );
+}
+
+/// PSPU §4.14: on the control channel each job view in a `job-list` says
+/// what the caller may do to that job, as a MAXIMUM_ALLOWED check against
+/// its descriptor found it.
+#[test]
+fn job_list_entries_carry_the_rights_the_caller_holds() {
+    let mut supervisor = submitted_supervisor();
+    let mut boundaries = Boundaries::at([SUBMIT_NS]);
+    let job_id = running_job(&mut supervisor, &mut boundaries, 9000, 90);
+    let mut security = TestJobSecurity::allowing(JobAccess::QUERY.union(JobAccess::SIGNAL));
+    let mut clock = ScriptedClock::new([CONTROL_NS]);
+
+    let json = accepted_line(
+        supervisor
+            .run_control_job_list(
+                &parse_control_request(br#"{"command":"job-list"}"#).expect("parsed"),
+                &admin(),
+                &mut security,
+                &mut clock,
+            )
+            .expect("list"),
+    );
+
+    assert_eq!(json["jobs"][0]["id"], job_id.to_canonical_string());
+    assert_eq!(
+        json["jobs"][0]["granted"],
+        serde_json::json!(["query", "signal"])
+    );
+    assert_eq!(
+        security.checks,
+        vec![
+            (JobAccess::QUERY, SUBMITTER.as_bytes().to_vec()),
+            (JobAccess::MAXIMUM_ALLOWED, SUBMITTER.as_bytes().to_vec()),
+        ]
+    );
+}
+
+/// The jobs socket's own view has no `granted`: it is the control
+/// channel's alone.
+#[test]
+fn the_jobs_socket_view_has_no_granted() {
+    let mut supervisor = submitted_supervisor();
+    let mut boundaries = Boundaries::at([SUBMIT_NS]);
+    let job_id = running_job(&mut supervisor, &mut boundaries, 9000, 90);
+    let view = supervisor.submitted_job_view(job_id).expect("view");
+    let json = crate::submitted::job_view_json(
+        &view,
+        crate::control::wire::ControlResponseTimeProjection::new(CONTROL_NS, CONTROL_NS),
+    );
+    assert!(json.get("granted").is_none());
 }
 
 #[test]
@@ -245,6 +305,10 @@ fn job_stop_signals_the_job_and_answers_with_the_view() {
     let json = accepted_line(response);
     assert_eq!(json["status"], "ok");
     assert_eq!(json["job"]["state"], "running");
+    assert_eq!(
+        json["job"]["granted"],
+        serde_json::json!(["query", "stop", "signal"])
+    );
     assert_eq!(boundaries.controller.signals.len(), 1);
     assert_eq!(
         boundaries.controller.signals[0].signal,
@@ -252,7 +316,10 @@ fn job_stop_signals_the_job_and_answers_with_the_view() {
     );
     assert_eq!(
         boundaries.security.checks,
-        vec![(JobAccess::STOP, SUBMITTER.as_bytes().to_vec())]
+        vec![
+            (JobAccess::STOP, SUBMITTER.as_bytes().to_vec()),
+            (JobAccess::MAXIMUM_ALLOWED, SUBMITTER.as_bytes().to_vec()),
+        ]
     );
     reap(
         &mut supervisor,
@@ -293,11 +360,44 @@ fn job_stop_with_wait_registers_a_job_wait() {
 
     let SupervisorControlCommandBodyResponse::Accepted {
         response_line: None,
-        wait: Some(crate::control::connection::ControlPendingWait::Job { job_id: waited }),
+        wait:
+            Some(crate::control::connection::ControlPendingWait::Job {
+                job_id: waited,
+                granted,
+            }),
         ..
     } = response
     else {
         panic!("expected a registered job wait, got {response:?}");
     };
     assert_eq!(waited, job_id);
+    // The caller's rights are found now, for the view the wait answers
+    // with, since nothing holds the caller's token when it is written.
+    assert_eq!(granted, JobAccess::ALL);
+
+    // And the view the wait answers with carries what was found.
+    reap(
+        &mut supervisor,
+        &mut boundaries.controller,
+        9000,
+        ChildExitStatus::Signaled {
+            signal: libc::SIGTERM,
+            core_dumped: false,
+        },
+        CONTROL_NS + 2,
+    );
+    let line = supervisor
+        .control_job_view_line(
+            job_id,
+            JobAccess::QUERY.union(JobAccess::STOP),
+            crate::control::wire::ControlResponseTimeProjection::new(
+                CONTROL_NS + 3,
+                CONTROL_NS + 3,
+            ),
+        )
+        .expect("serialize")
+        .expect("a line");
+    let json: serde_json::Value = serde_json::from_slice(&line[..line.len() - 1]).expect("json");
+    assert_eq!(json["job"]["state"], "failed");
+    assert_eq!(json["job"]["granted"], serde_json::json!(["query", "stop"]));
 }

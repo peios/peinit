@@ -12,6 +12,18 @@ impl JobAccess {
     pub const STOP: Self = Self(0x0002);
     pub const SIGNAL: Self = Self(0x0004);
     pub const ALL: Self = Self(Self::QUERY.0 | Self::STOP.0 | Self::SIGNAL.0);
+    /// Not a right: asks AccessCheck for every right the caller holds, which
+    /// is how the control channel learns what to report as a job view's
+    /// `granted` (PSPU §4.14).
+    pub const MAXIMUM_ALLOWED: Self = Self(0x0200_0000);
+
+    /// Each job right with its name on the wire, in the order `granted`
+    /// lists them: §7.8's name, lowercased, without `JOB_`.
+    pub const WIRE_NAMES: [(Self, &'static str); 3] = [
+        (Self::QUERY, "query"),
+        (Self::STOP, "stop"),
+        (Self::SIGNAL, "signal"),
+    ];
 
     pub const fn bits(self) -> u32 {
         self.0
@@ -21,12 +33,31 @@ impl JobAccess {
         Self(self.0 | other.0)
     }
 
+    /// The job rights among the bits an AccessCheck granted.
+    pub const fn from_granted_bits(bits: u32) -> Self {
+        Self(bits & Self::ALL.0)
+    }
+
+    pub const fn contains(self, other: Self) -> bool {
+        self.0 & other.0 == other.0
+    }
+
+    /// The wire names of the rights held, in [`Self::WIRE_NAMES`] order.
+    pub fn wire_names(self) -> Vec<&'static str> {
+        Self::WIRE_NAMES
+            .iter()
+            .filter(|(right, _)| self.contains(*right))
+            .map(|(_, name)| *name)
+            .collect()
+    }
+
     pub fn label(self) -> &'static str {
         match self.0 {
             0x0001 => "JOB_QUERY",
             0x0002 => "JOB_STOP",
             0x0004 => "JOB_SIGNAL",
             0x0007 => "JOB_ALL_ACCESS",
+            0x0200_0000 => "MAXIMUM_ALLOWED",
             _ => "JOB_ACCESS",
         }
     }

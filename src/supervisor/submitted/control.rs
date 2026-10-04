@@ -33,13 +33,14 @@ impl Supervisor {
     {
         let job_id = parse_control_job_id(parsed)?;
         self.check_control_job_access(peer, access_checker, job_id, JobAccess::QUERY)?;
+        let granted = self.control_job_granted_access(peer, access_checker, job_id)?;
         let time = control_time_projection(clock)?;
         let view = self
             .submitted_job_view(job_id)
             .ok_or(SupervisorControlCommandBodyError::UnknownJob { job_id })?;
         let line = crate::control::wire::response_line_from_value(json!({
             "status": ControlResponseStatus::Ok.as_str(),
-            "job": job_view_json(&view, time),
+            "job": control_job_view_json(&view, granted, time),
         }))
         .map_err(SupervisorControlCommandBodyError::serialize)?;
         Ok(SupervisorControlCommandBodyResponse::accepted_response(
@@ -74,7 +75,9 @@ impl Supervisor {
             )? {
                 Ok(()) => {
                     if let Some(view) = self.submitted_job_view(job_id) {
-                        jobs.push(job_view_json(&view, time));
+                        let granted =
+                            self.control_job_granted_access(peer, access_checker, job_id)?;
+                        jobs.push(control_job_view_json(&view, granted, time));
                     }
                 }
                 Err(denied) => denials.push(denied),
@@ -109,6 +112,10 @@ impl Supervisor {
     {
         let job_id = parse_control_job_id(parsed)?;
         self.check_control_job_access(peer, access_checker, job_id, JobAccess::STOP)?;
+        // Found now, before the stop, and carried through a wait: the record
+        // may be purged by the time the answer is written, and nothing
+        // there holds the caller's token.
+        let granted = self.control_job_granted_access(peer, access_checker, job_id)?;
         let now_ns = clock.monotonic_ns().map_err(|error| {
             SupervisorControlCommandBodyError::supervisor(
                 crate::supervisor::SupervisorError::Clock(error),
@@ -126,14 +133,14 @@ impl Supervisor {
             return Ok(SupervisorControlCommandBodyResponse::Accepted {
                 response_line: None,
                 dispatch,
-                wait: Some(crate::control::connection::ControlPendingWait::Job { job_id }),
+                wait: Some(crate::control::connection::ControlPendingWait::Job { job_id, granted }),
                 access_denials: Vec::new(),
                 job_access_denials: Vec::new(),
             });
         }
         let time = control_time_projection(clock)?;
         let line = self
-            .control_job_view_line(job_id, time)
+            .control_job_view_line(job_id, granted, time)
             .map_err(SupervisorControlCommandBodyError::serialize)?;
         Ok(SupervisorControlCommandBodyResponse::Accepted {
             response_line: line,
@@ -149,12 +156,13 @@ impl Supervisor {
     pub(in crate::supervisor) fn control_job_view_line(
         &self,
         job_id: JobId,
+        granted: JobAccess,
         time: ControlResponseTimeProjection,
     ) -> Result<Option<Vec<u8>>, serde_json::Error> {
         match self.submitted_job_view(job_id) {
             Some(view) => crate::control::wire::response_line_from_value(json!({
                 "status": ControlResponseStatus::Ok.as_str(),
-                "job": job_view_json(&view, time),
+                "job": control_job_view_json(&view, granted, time),
             }))
             .map(Some),
             None => crate::control::wire::control_error_response_line(
@@ -163,6 +171,33 @@ impl Supervisor {
             )
             .map(Some),
         }
+    }
+
+    /// Every job right the caller holds on `job_id`: the check a job command
+    /// gets, against the job's descriptor, asking for `MAXIMUM_ALLOWED`. A
+    /// question rather than a command, so holding nothing is no denial and
+    /// is not audited as one.
+    fn control_job_granted_access<A>(
+        &self,
+        peer: &ControlPeer,
+        access_checker: &mut A,
+        job_id: JobId,
+    ) -> Result<JobAccess, SupervisorControlCommandBodyError>
+    where
+        A: JobAccessChecker + ?Sized,
+    {
+        let entry = self
+            .submitted
+            .get(job_id)
+            .ok_or(SupervisorControlCommandBodyError::UnknownJob { job_id })?;
+        let decision = access_checker
+            .check_job_access(JobAccessCheckRequest {
+                token_fd: peer.token_fd(),
+                descriptor: &entry.security_descriptor,
+                desired_access: JobAccess::MAXIMUM_ALLOWED,
+            })
+            .map_err(SupervisorControlCommandBodyError::JobAuthorization)?;
+        Ok(JobAccess::from_granted_bits(decision.granted_access_bits))
     }
 
     fn check_control_job_access<A>(
@@ -215,6 +250,19 @@ impl Supervisor {
             }))
         }
     }
+}
+
+/// The job view as the control channel gives it: §7.7's, plus `granted`,
+/// the caller's job rights (PSPU §4.14). The jobs socket's view has no
+/// `granted`, so it is added here rather than in `job_view_json`.
+fn control_job_view_json(
+    view: &crate::submitted::JobView,
+    granted: JobAccess,
+    time: ControlResponseTimeProjection,
+) -> serde_json::Value {
+    let mut job = job_view_json(view, time);
+    job["granted"] = json!(granted.wire_names());
+    job
 }
 
 fn parse_control_job_id(

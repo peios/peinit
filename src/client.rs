@@ -75,6 +75,14 @@ pub struct Status {
     pub warnings: Vec<Warning>,
     /// Its calendar timers, in the order of their schedules.
     pub timers: Vec<Timer>,
+    /// What the caller may do to it: the service rights it holds, by their
+    /// wire names (`query_status`, `start`, `stop`, `interrogate`), in that
+    /// order. peinit finds them with the AccessCheck it runs for a command,
+    /// so a command needing only rights listed here will not be denied —
+    /// [`ServiceAccess::for_command`] says which a command needs, and
+    /// [`ServiceAccess::WIRE_NAMES`] names each. Empty from a peinit that
+    /// does not report it.
+    pub granted: Vec<String>,
 }
 
 /// One calendar timer trigger of a service, as peinit has it armed (§9).
@@ -190,6 +198,10 @@ pub struct SubmittedJob {
     pub created_at: Option<String>,
     pub started_at: Option<String>,
     pub ended_at: Option<String>,
+    /// What the caller may do to it: the job rights it holds, by their wire
+    /// names (`query`, `stop`, `signal`), in that order. Only the control
+    /// socket says; empty from a peinit that does not.
+    pub granted: Vec<String>,
 }
 
 /// How far a job says it has got (`PROGRESS=`).
@@ -295,6 +307,7 @@ impl ControlClient {
                         .collect()
                 })
                 .unwrap_or_default(),
+            granted: strings(&answer["granted"]),
         };
         // As `list` would have it. peinit's times are all one width, in UTC,
         // so the soonest is the least.
@@ -329,6 +342,20 @@ impl ControlClient {
             .iter()
             .map(submitted_job)
             .collect()
+    }
+
+    /// Stops a submitted job (`job-stop`), which needs `JOB_STOP` on it,
+    /// and does not wait for it to end: the answer is the job as it stands
+    /// once the stop has begun, normally still `running`. Follow it to its
+    /// end with [`ControlClient::jobs`]. A job already over comes back as
+    /// it ended. A job peinit no longer holds is `UNKNOWN_JOB`.
+    pub fn job_stop(&mut self, id: &str) -> Result<SubmittedJob, Failure> {
+        let answer = answered(self.request(serde_json::json!({
+            "command": "job-stop",
+            "job_id": id,
+            "wait": false,
+        }))?)?;
+        submitted_job(&answer["job"])
     }
 
     pub fn operation(&mut self, id: &str) -> Result<Operation, Failure> {
@@ -439,6 +466,7 @@ fn submitted_job(value: &Value) -> Result<SubmittedJob, Failure> {
         created_at: text(value, "created_at"),
         started_at: text(value, "started_at"),
         ended_at: text(value, "ended_at"),
+        granted: strings(&value["granted"]),
     })
 }
 
@@ -458,6 +486,15 @@ mod tests {
 
     /// A control socket that answers each request with the next line given.
     fn answering(name: &str, lines: Vec<Vec<u8>>) -> ControlClient {
+        answering_recording(name, lines).0
+    }
+
+    /// As [`answering`], also handing back each request as it arrived.
+    fn answering_recording(
+        name: &str,
+        lines: Vec<Vec<u8>>,
+    ) -> (ControlClient, std::sync::mpsc::Receiver<Value>) {
+        let (sent, requests) = std::sync::mpsc::channel();
         let path =
             std::env::temp_dir().join(format!("peinit-client-{name}-{}.sock", std::process::id()));
         let _ = std::fs::remove_file(&path);
@@ -469,12 +506,13 @@ mod tests {
             for line in lines {
                 let mut request = String::new();
                 reader.read_line(&mut request).expect("read request");
+                let _ = sent.send(serde_json::from_str(&request).unwrap_or(Value::Null));
                 stream.write_all(&line).expect("answer");
             }
         });
         let client = ControlClient::connect_path(&path).expect("connect");
         let _ = std::fs::remove_file(&path);
-        client
+        (client, requests)
     }
 
     /// A job list in PSPU §7.7's shape is read back whole.
@@ -497,6 +535,48 @@ mod tests {
             Some(Progress { current: 3, total: Some(10), bounded: true, unit: Some("items".into()) })
         );
         assert_eq!(job.ended_at, None);
+        // This peinit said nothing of the caller's rights.
+        assert!(job.granted.is_empty());
+    }
+
+    /// The control socket's job view carries the caller's rights on it,
+    /// and `job_stop` reads back the view it answers with.
+    #[test]
+    fn a_job_says_what_the_caller_may_do_and_a_stop_answers_with_the_job() {
+        let listed = br#"{"status":"ok","jobs":[{"id":"4f7a1c2e-9b3d-4e5f-8a6b-0c1d2e3f4a5b","type":"submitted","state":"running","submitter":"S-1-5-18","identity":"S-1-5-21-1-2-3-1000","pid":2611,"granted":["query","stop"]}]}
+"#;
+        let stopped = br#"{"status":"ok","job":{"id":"4f7a1c2e-9b3d-4e5f-8a6b-0c1d2e3f4a5b","type":"submitted","state":"running","submitter":"S-1-5-18","identity":"S-1-5-21-1-2-3-1000","pid":2611,"granted":["query","stop","signal"]}}
+"#;
+        let (mut client, requests) = answering_recording(
+            "job-stop",
+            vec![
+                listed.to_vec(),
+                stopped.to_vec(),
+                control_error_response_line(ControlErrorCode::UnknownJob, "unknown job").unwrap(),
+            ],
+        );
+        assert_eq!(client.jobs().unwrap()[0].granted, ["query", "stop"]);
+        let job = client
+            .job_stop("4f7a1c2e-9b3d-4e5f-8a6b-0c1d2e3f4a5b")
+            .unwrap();
+        let _ = requests.recv().unwrap();
+        assert_eq!(
+            requests.recv().unwrap(),
+            serde_json::json!({
+                "command": "job-stop",
+                "job_id": "4f7a1c2e-9b3d-4e5f-8a6b-0c1d2e3f4a5b",
+                "wait": false,
+            })
+        );
+        assert_eq!(job.state, "running");
+        assert_eq!(job.granted, ["query", "stop", "signal"]);
+        assert_eq!(
+            client.job_stop("4f7a1c2e-9b3d-4e5f-8a6b-0c1d2e3f4a5b"),
+            Err(Failure::Refused {
+                code: "UNKNOWN_JOB".into(),
+                message: "unknown job".into()
+            })
+        );
     }
 
     /// What peinit writes for `list` is read back as it was meant.
@@ -581,9 +661,14 @@ mod tests {
                 },
             ],
         };
-        let line =
-            control_status_response_line(&view, ControlResponseTimeProjection::new(0, 0)).unwrap();
+        let line = control_status_response_line(
+            &view,
+            ServiceAccess::QUERY_STATUS.union(ServiceAccess::STOP),
+            ControlResponseTimeProjection::new(0, 0),
+        )
+        .unwrap();
         let status = answering("status", vec![line]).status_of("backup").unwrap();
+        assert_eq!(status.granted, ["query_status", "stop"]);
         assert_eq!(status.timers.len(), 3);
         assert_eq!(status.timers[0].schedule, "*-*-* 03:00:00");
         assert_eq!(
