@@ -1,10 +1,11 @@
 use crate::boundary::ProcessController;
+use crate::job::JobState;
 use crate::service::runtime::LeakedCgroupKind;
 
 use super::stop_main::{apply_stop_main_abandoned, apply_stop_main_empty};
 use super::{
     CgroupCleanupDeadline, CgroupCleanupKind, SupervisorLeakedCgroupDispatch,
-    cleanup_service_cgroup_tree,
+    cleanup_service_cgroup_tree, parent_cgroup_path,
 };
 use crate::supervisor::state::{Supervisor, SupervisorError};
 use crate::supervisor::work::SupervisorWork;
@@ -41,6 +42,9 @@ impl Supervisor {
                 continue;
             };
             processed = true;
+            if service_tree_back_in_use(&work, &deadline) {
+                continue;
+            }
             let populated = controller
                 .cgroup_populated(&deadline.cgroup_id)
                 .map_err(SupervisorError::ProcessControl)?;
@@ -68,6 +72,36 @@ impl Supervisor {
         work.commit(self);
         Ok(processed.then_some(leaks))
     }
+}
+
+/// Whether the tree a `ServiceTree` cleanup was scheduled for has been taken
+/// up again by the service's next instance.
+///
+/// The cleanup is scheduled when an instance's tree is killed — a readiness
+/// timeout, a health or watchdog escalation — and comes due a
+/// `PostKillTimeout` later. A restart that lands first (the default
+/// `RestartDelay` is one second, the default `PostKillTimeout` five) relaunches
+/// into the same tree, since nothing has leaked yet to move the generation on.
+/// The cleanup then found the tree populated by the live instance, recorded it
+/// as a leak, advanced the generation, and the service reported a leaked tree
+/// that nothing had leaked (PEI-1267). A tree in use is not the cleanup's to
+/// reclaim, so the deadline is dropped. The cost: a remnant of the killed
+/// instance that is still in the tree goes unreported until that tree is next
+/// killed and cleaned — the relaunch never waited on the cleanup in any case.
+fn service_tree_back_in_use(work: &SupervisorWork, deadline: &CgroupCleanupDeadline) -> bool {
+    if deadline.kind != CgroupCleanupKind::ServiceTree {
+        return false;
+    }
+    let Some(job) = work
+        .jobs
+        .current_service_main_job(&deadline.service)
+        .and_then(|job_id| work.jobs.get(job_id))
+    else {
+        return false;
+    };
+    matches!(job.state, JobState::Created | JobState::Running)
+        && (job.cgroup_id == deadline.cgroup_id
+            || parent_cgroup_path(&job.cgroup_id).as_deref() == Some(deadline.cgroup_id.as_str()))
 }
 
 fn process_populated_cgroup_cleanup(
