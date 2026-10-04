@@ -76,3 +76,78 @@ fn is_cgroup_safe(byte: u8) -> bool {
 }
 
 const HEX_DIGITS: &[u8; 16] = b"0123456789ABCDEF";
+
+/// Which of a service's processes a cgroup holds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ServicePart {
+    /// The service's own process and everything it starts.
+    Main,
+    /// Its pre-exec, post-exec and reload hooks.
+    Hooks,
+    /// Its health checks.
+    Health,
+    /// Its pre-start checks.
+    Checks,
+}
+
+/// What a process belongs to, by peinit's account, read back from the
+/// cgroup peinit put it in.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CgroupMember {
+    /// One of a service's processes. `part` is `None` for a cgroup directly
+    /// under the service's root, which peinit does not make.
+    Service {
+        service: String,
+        part: Option<ServicePart>,
+    },
+    /// A submitted job's process, by the job's id as peinit prints it.
+    Job(String),
+}
+
+/// What the contents of `/proc/<pid>/cgroup` say the process belongs to:
+/// the inverse of [`service_job_cgroup_path`] and
+/// [`submitted_job_cgroup_path`]. `None` for a process outside peinit's tree,
+/// such as peinit itself or a kernel thread.
+pub fn cgroup_member(proc_cgroup: &str) -> Option<CgroupMember> {
+    let path = proc_cgroup.lines().find_map(|line| line.strip_prefix("0::"))?;
+    let mut parts = path.strip_prefix("/peinit/")?.split('/');
+    let first = parts.next()?;
+    let second = parts.next();
+    let part = |name: Option<&str>| match name {
+        Some("main") => Some(ServicePart::Main),
+        Some("hooks") => Some(ServicePart::Hooks),
+        Some("health") => Some(ServicePart::Health),
+        Some("checks") => Some(ServicePart::Checks),
+        _ => None,
+    };
+    // `jobs/<id>`; a service named `jobs` has `main` and the like below it.
+    if first == "jobs"
+        && let Some(id) = second
+        && part(Some(id)).is_none()
+    {
+        return Some(CgroupMember::Job(id.to_string()));
+    }
+    let encoded = first.split(GENERATION_SEPARATOR).next()?;
+    Some(CgroupMember::Service {
+        service: decode_service_cgroup_id(encoded)?,
+        part: part(second),
+    })
+}
+
+/// The inverse of [`encode_service_cgroup_id`].
+fn decode_service_cgroup_id(encoded: &str) -> Option<String> {
+    let bytes = encoded.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' {
+            let hex = encoded.get(i + 1..i + 3)?;
+            out.push(u8::from_str_radix(hex, 16).ok()?);
+            i += 3;
+        } else {
+            out.push(bytes[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8(out).ok()
+}

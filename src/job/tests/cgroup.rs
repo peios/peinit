@@ -1,5 +1,6 @@
 use crate::job::{
-    ServiceCgroupKind, encode_service_cgroup_id, service_cgroup_root_path, service_job_cgroup_path,
+    CgroupMember, ServiceCgroupKind, ServicePart, cgroup_member, encode_service_cgroup_id,
+    service_cgroup_root_path, service_job_cgroup_path,
 };
 
 #[test]
@@ -44,4 +45,50 @@ fn a_generational_path_cannot_collide_with_a_service_named_like_one() {
         service_cgroup_root_path("app%gen1", 0),
         service_cgroup_root_path("app", 1),
     );
+}
+
+/// `/proc/<pid>/cgroup` for a process in the cgroup at `path`, which peinit
+/// names under `/sys/fs/cgroup`.
+fn proc_cgroup(path: &str) -> String {
+    format!("0::{}\n", path.strip_prefix("/sys/fs/cgroup").unwrap())
+}
+
+#[test]
+fn a_process_s_cgroup_names_its_service_and_part_whatever_the_name_or_generation() {
+    for name in ["sshd", "a/b %", "app.gen1", "app%gen1", "jobs"] {
+        for generation in [0, 3] {
+            for (kind, part) in [
+                (ServiceCgroupKind::Main, ServicePart::Main),
+                (ServiceCgroupKind::Hooks, ServicePart::Hooks),
+                (ServiceCgroupKind::Health, ServicePart::Health),
+            ] {
+                let path = service_job_cgroup_path(name, generation, kind);
+                assert_eq!(
+                    cgroup_member(&proc_cgroup(&path)),
+                    Some(CgroupMember::Service { service: name.to_string(), part: Some(part) }),
+                    "{path}",
+                );
+            }
+        }
+    }
+    let checks = format!("{}/checks", service_cgroup_root_path("sshd", 0));
+    assert_eq!(
+        cgroup_member(&proc_cgroup(&checks)),
+        Some(CgroupMember::Service { service: "sshd".into(), part: Some(ServicePart::Checks) }),
+    );
+}
+
+#[test]
+fn a_submitted_job_s_process_names_its_job_and_others_name_nothing() {
+    let id = "4f7a1c2e-9b3d-4e5f-8a6b-0c1d2e3f4a5b";
+    assert_eq!(
+        cgroup_member(&format!("0::/peinit/jobs/{id}\n")),
+        Some(CgroupMember::Job(id.to_string())),
+    );
+    // peinit itself, and a kernel thread.
+    assert_eq!(cgroup_member("0::/\n"), None);
+    assert_eq!(cgroup_member("0::/init.scope\n"), None);
+    assert_eq!(cgroup_member(""), None);
+    // A broken escape is no service.
+    assert_eq!(cgroup_member("0::/peinit/a%2/main\n"), None);
 }

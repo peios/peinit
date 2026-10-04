@@ -4,9 +4,10 @@
 //! It covers what to ask the control socket and how to read the answers
 //! (PSPU §4), which right each command needs, what the generic rights mean on
 //! a service, the descriptor a service has when none is given (§4.6), what a
-//! command would come to against a service in each state (§10.3), and a
+//! command would come to against a service in each state (§10.3), a
 //! service's definition: its fields, and whether peinit would take it
-//! (`Definition`).
+//! (`Definition`), and which service or submitted job a running process
+//! belongs to, read from the cgroup peinit put it in (`cgroup_member`).
 //!
 //! Everything here is what peinit itself uses, re-exported or read with
 //! peinit's own labels, never a copy, so a client cannot drift from the
@@ -32,6 +33,7 @@ pub use crate::control::service_security::{
     DEFAULT_SERVICE_SECURITY_SDDL, SERVICE_GENERIC_MAPPING, ServiceAccess, ServiceGenericMapping,
 };
 pub use crate::control::socket::CONTROL_SOCKET_PATH;
+pub use crate::job::{CgroupMember, ServicePart, cgroup_member};
 pub use crate::operation::OperationState;
 pub use crate::registry::SERVICES_ROOT_KEY;
 pub use crate::service::runtime::{ServiceHealthStatus as Health, ServiceState as State};
@@ -161,6 +163,46 @@ impl Operation {
     }
 }
 
+/// A submitted job, as its job view gives it (PSPU §7.7): a supervised
+/// process someone submitted on the jobs socket, such as a person's desktop
+/// session. Times are RFC 3339, in UTC.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SubmittedJob {
+    pub id: String,
+    /// `created`, `running`, `completed`, `failed` or `abandoned`.
+    pub state: String,
+    pub cause: Option<String>,
+    /// Who submitted it, as a SID string.
+    pub submitter: String,
+    /// Who it runs as, as a SID string.
+    pub identity: String,
+    /// The logon session it runs in.
+    pub logon_session: Option<u64>,
+    pub description: String,
+    pub image_path: String,
+    pub pid: Option<u32>,
+    pub ready: bool,
+    pub exit_code: Option<i64>,
+    pub exit_signal: Option<i64>,
+    /// What it last said of itself (`STATUS=`).
+    pub status_text: Option<String>,
+    pub progress: Option<Progress>,
+    pub created_at: Option<String>,
+    pub started_at: Option<String>,
+    pub ended_at: Option<String>,
+}
+
+/// How far a job says it has got (`PROGRESS=`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Progress {
+    pub current: u64,
+    /// What it is counting to, when it knows.
+    pub total: Option<u64>,
+    pub bounded: bool,
+    /// What it counts (`bytes`, `items`…), when it says.
+    pub unit: Option<String>,
+}
+
 /// Why a request came to nothing.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Failure {
@@ -276,6 +318,19 @@ impl ControlClient {
         })
     }
 
+    /// Every submitted job the caller may query. The rest are left out
+    /// without a word, as `list` leaves out services (§4.7): by default a
+    /// person may query only the jobs they submitted.
+    pub fn jobs(&mut self) -> Result<Vec<SubmittedJob>, Failure> {
+        let answer = answered(self.request(serde_json::json!({"command": "job-list"}))?)?;
+        answer["jobs"]
+            .as_array()
+            .ok_or_else(|| garbled("a job list with no jobs"))?
+            .iter()
+            .map(submitted_job)
+            .collect()
+    }
+
     pub fn operation(&mut self, id: &str) -> Result<Operation, Failure> {
         let answer = answered(self.operation_status(id)?)?;
         let operation = &answer["operation"];
@@ -357,6 +412,36 @@ fn garbled(what: &str) -> Failure {
     Failure::Unreachable(format!("peinit answered with {what}"))
 }
 
+fn submitted_job(value: &Value) -> Result<SubmittedJob, Failure> {
+    Ok(SubmittedJob {
+        id: text(value, "id").ok_or_else(|| garbled("a job with no id"))?,
+        state: text(value, "state").ok_or_else(|| garbled("a job in no state"))?,
+        cause: text(value, "cause"),
+        submitter: text(value, "submitter").unwrap_or_default(),
+        identity: text(value, "identity").unwrap_or_default(),
+        logon_session: value["logon_session"].as_u64(),
+        description: text(value, "description").unwrap_or_default(),
+        image_path: text(value, "image_path").unwrap_or_default(),
+        pid: value["pid"].as_u64().and_then(|pid| u32::try_from(pid).ok()),
+        ready: value["ready"].as_bool().unwrap_or(false),
+        exit_code: value["exit_code"].as_i64(),
+        exit_signal: value["exit_signal"].as_i64(),
+        status_text: text(value, "status_text"),
+        progress: match &value["progress"] {
+            Value::Null => None,
+            progress => Some(Progress {
+                current: progress["current"].as_u64().unwrap_or(0),
+                total: progress["total"].as_u64(),
+                bounded: progress["bounded"].as_bool().unwrap_or(false),
+                unit: text(progress, "unit"),
+            }),
+        },
+        created_at: text(value, "created_at"),
+        started_at: text(value, "started_at"),
+        ended_at: text(value, "ended_at"),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use std::io::{BufRead, BufReader, Write};
@@ -390,6 +475,28 @@ mod tests {
         let client = ControlClient::connect_path(&path).expect("connect");
         let _ = std::fs::remove_file(&path);
         client
+    }
+
+    /// A job list in PSPU §7.7's shape is read back whole.
+    #[test]
+    fn a_job_list_is_read_as_the_job_view_has_it() {
+        let line = br#"{"status":"ok","jobs":[{"id":"4f7a1c2e-9b3d-4e5f-8a6b-0c1d2e3f4a5b","type":"submitted","state":"running","cause":null,"submitter":"S-1-5-18","identity":"S-1-5-21-1-2-3-1000","logon_session":1007,"description":"GXWI session for S-1-5-21-1-2-3-1000","image_path":"/usr/bin/gexora","pid":2611,"ready":true,"exit_code":null,"exit_signal":null,"status_text":"ready","progress":{"current":3,"total":10,"bounded":true,"unit":"items"},"created_at":"2026-10-04T10:02:41.000000000Z","started_at":"2026-10-04T10:02:41.100000000Z","ended_at":null}]}
+"#;
+        let mut client = answering("jobs", vec![line.to_vec()]);
+        let jobs = client.jobs().unwrap();
+        assert_eq!(jobs.len(), 1);
+        let job = &jobs[0];
+        assert_eq!(job.state, "running");
+        assert_eq!(job.identity, "S-1-5-21-1-2-3-1000");
+        assert_eq!(job.logon_session, Some(1007));
+        assert_eq!(job.pid, Some(2611));
+        assert!(job.ready);
+        assert_eq!(job.exit_code, None);
+        assert_eq!(
+            job.progress,
+            Some(Progress { current: 3, total: Some(10), bounded: true, unit: Some("items".into()) })
+        );
+        assert_eq!(job.ended_at, None);
     }
 
     /// What peinit writes for `list` is read back as it was meant.
