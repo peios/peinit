@@ -91,10 +91,12 @@ pub const SERVICE_GENERIC_MAPPING: ServiceGenericMapping = ServiceGenericMapping
 
 /// The descriptor a service takes when neither its definition nor the
 /// Services key carries one (§4.6), in SDDL: SYSTEM and Administrators may
-/// do everything, and everyone authenticated may see its state. The boundary
-/// builds the same descriptor, and a test holds the two to the same bytes.
+/// do everything, and everyone authenticated may see its state. Its SACL
+/// audits every refusal, for everyone, so that KACS records each denial
+/// (PEI-1279). The boundary builds the same descriptor, and a test holds the
+/// two to the same bytes.
 pub const DEFAULT_SERVICE_SECURITY_SDDL: &str =
-    "O:SYG:BAD:(A;;0xf;;;SY)(A;;0xf;;;BA)(A;;0x1;;;AU)";
+    "O:SYG:BAD:(A;;0xf;;;SY)(A;;0xf;;;BA)(A;;0x1;;;AU)S:(AU;FA;0xf;;;WD)";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ServiceAccessCheckRequest<'a> {

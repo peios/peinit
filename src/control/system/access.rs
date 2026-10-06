@@ -57,7 +57,7 @@ fn peios_check_system_access(
 ) -> Result<SystemAccessDecision, SystemAccessCheckError> {
     use std::os::fd::BorrowedFd;
 
-    use peios::access::AccessCheck;
+    use peios::access::{AccessCheck, AuditContext};
     use peios::security::{AccessMask, SecurityDescriptor};
 
     use super::model::ControlSecurityDescriptor;
@@ -76,6 +76,10 @@ fn peios_check_system_access(
         }
     }
     .map_err(|error| SystemAccessCheckError::Boundary(error.to_string()))?;
+    // The machine-wide door is a singleton, so its kind alone names it
+    // (PGSS §6.7, PEI-1279).
+    let context = AuditContext::new(SYSTEM_AUDIT_KIND, &[])
+        .map_err(|error| SystemAccessCheckError::Boundary(error.to_string()))?;
     let token = unsafe { BorrowedFd::borrow_raw(request.token_fd) };
     let decision = AccessCheck::new(
         &descriptor,
@@ -83,6 +87,7 @@ fn peios_check_system_access(
         control_security_generic_mapping(),
     )
     .token(token)
+    .audit_context(&context)
     .check()
     .map_err(|error| SystemAccessCheckError::Boundary(error.to_string()))?;
 
@@ -91,6 +96,12 @@ fn peios_check_system_access(
         granted_access_bits: decision.granted.bits(),
     })
 }
+
+/// The `object.kind` of peinit's system-level control operations in the
+/// record of an access check: peinit's own word, as eventd's is
+/// `eventd-admin`, because a bare `system` would be every daemon's.
+#[cfg(feature = "peios-boundary")]
+const SYSTEM_AUDIT_KIND: &str = "peinit-system";
 
 #[cfg(feature = "peios-boundary")]
 fn control_security_generic_mapping() -> peios::security::GenericMapping {
@@ -129,5 +140,8 @@ fn default_control_security_descriptor() -> peios::Result<peios::security::Secur
         .owner(&system)
         .group(&administrators)
         .dacl(&dacl)
+        .sacl(&crate::control::service_security::failure_audit_sacl(
+            SystemAccess::ALL.bits(),
+        )?)
         .build()
 }

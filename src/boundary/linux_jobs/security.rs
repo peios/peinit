@@ -1,7 +1,7 @@
 use std::os::fd::BorrowedFd;
 use std::str::FromStr;
 
-use peios::access::AccessCheck;
+use peios::access::{AccessCheck, AuditContext, AuditValue};
 use peios::security::{
     AccessMask, AceFlags, AclBuilder, GenericMapping, SdBuilder, SecurityDescriptor, Sid,
     WellKnown, sddl,
@@ -16,7 +16,9 @@ use crate::submitted::{
 impl JobDescriptorFactory for PeiosSystemAccessChecker {
     /// The default of PSPU §7.8: owner and group the submitter, full control
     /// to the submitter, SYSTEM and Administrators, nothing to anyone else —
-    /// the job identity included.
+    /// the job identity included. Its SACL audits every refusal, for
+    /// everyone, so KACS records each denial (PEI-1279). A descriptor the
+    /// submitter supplies is used as given, SACL or none.
     fn default_job_descriptor(
         &mut self,
         submitter_sid: &str,
@@ -32,10 +34,13 @@ impl JobDescriptorFactory for PeiosSystemAccessChecker {
             .allow(&administrators, JobAccess::ALL.bits(), AceFlags::empty())
             .build()
             .map_err(|error| JobDescriptorError::Boundary(error.to_string()))?;
+        let sacl = crate::control::service_security::failure_audit_sacl(JobAccess::ALL.bits())
+            .map_err(|error| JobDescriptorError::Boundary(error.to_string()))?;
         let descriptor = SdBuilder::new()
             .owner(&submitter)
             .group(&submitter)
             .dacl(&dacl)
+            .sacl(&sacl)
             .build()
             .map_err(|error| JobDescriptorError::Boundary(error.to_string()))?;
         Ok(JobSecurityDescriptor {
@@ -83,6 +88,11 @@ impl JobAccessChecker for PeiosSystemAccessChecker {
         }
         let descriptor = SecurityDescriptor::from_validated_bytes(request.descriptor.bytes.clone())
             .map_err(|error| JobAccessCheckError::Boundary(error.to_string()))?;
+        // Names the job to KACS by its GUID, so that the record a SACL asks
+        // for says which job was decided on (PGSS §6.7, PEI-1279).
+        let guid = request.job_id.as_bytes();
+        let context = AuditContext::new("job", &[("guid", AuditValue::Bin(&guid))])
+            .map_err(|error| JobAccessCheckError::Boundary(error.to_string()))?;
         let token = unsafe { BorrowedFd::borrow_raw(request.token_fd) };
         let decision = AccessCheck::new(
             &descriptor,
@@ -90,6 +100,7 @@ impl JobAccessChecker for PeiosSystemAccessChecker {
             job_generic_mapping(),
         )
         .token(token)
+        .audit_context(&context)
         .check()
         .map_err(|error| JobAccessCheckError::Boundary(error.to_string()))?;
         Ok(JobAccessDecision {

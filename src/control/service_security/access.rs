@@ -23,7 +23,7 @@ fn peios_check_service_access(
 ) -> Result<ServiceAccessDecision, ServiceAccessCheckError> {
     use std::os::fd::BorrowedFd;
 
-    use peios::access::AccessCheck;
+    use peios::access::{AccessCheck, AuditContext, AuditValue};
     use peios::security::{AccessMask, SecurityDescriptor};
 
     use crate::service::ServiceSecurityDescriptor;
@@ -42,6 +42,11 @@ fn peios_check_service_access(
         }
     }
     .map_err(|error| ServiceAccessCheckError::Boundary(error.to_string()))?;
+    // Names the service to KACS, so that the record a SACL asks for
+    // (`kacs.audit.access.checked`) says which service was decided on
+    // (PGSS §6.7, PEI-1279).
+    let context = AuditContext::new("service", &[("name", AuditValue::Str(request.service))])
+        .map_err(|error| ServiceAccessCheckError::Boundary(error.to_string()))?;
     let token = unsafe { BorrowedFd::borrow_raw(request.token_fd) };
     let decision = AccessCheck::new(
         &descriptor,
@@ -49,6 +54,7 @@ fn peios_check_service_access(
         service_security_generic_mapping(),
     )
     .token(token)
+    .audit_context(&context)
     .check()
     .map_err(|error| ServiceAccessCheckError::Boundary(error.to_string()))?;
 
@@ -91,6 +97,24 @@ fn default_service_security_descriptor() -> peios::Result<peios::security::Secur
         .owner(&system)
         .group(&administrators)
         .dacl(&dacl)
+        .sacl(&failure_audit_sacl(ServiceAccess::ALL.bits())?)
+        .build()
+}
+
+/// A SACL auditing every refused right, for everyone: the default that has
+/// KACS record each denial on a peinit-guarded object as
+/// `kacs.audit.access.checked`, in place of the event peinit used to write
+/// itself (PEI-1279). An object's own descriptor may drop or narrow it.
+#[cfg(feature = "peios-boundary")]
+pub(crate) fn failure_audit_sacl(all_rights: u32) -> peios::Result<peios::security::Acl> {
+    use peios::security::{AceFlags, AclBuilder, Sid, WellKnown};
+
+    AclBuilder::new()
+        .audit(
+            &Sid::well_known(WellKnown::Everyone),
+            all_rights,
+            AceFlags::FAILED_ACCESS,
+        )
         .build()
 }
 

@@ -95,6 +95,9 @@ pub trait JobDescriptorFactory {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct JobAccessCheckRequest<'a> {
     pub token_fd: i32,
+    /// The job checked, named to KACS in the check's audit context so that
+    /// the decision's record says which job it was (PEI-1279).
+    pub job_id: crate::ids::JobId,
     pub descriptor: &'a JobSecurityDescriptor,
     pub desired_access: JobAccess,
 }
