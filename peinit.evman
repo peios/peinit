@@ -595,10 +595,19 @@ field: object.operation.guid                optional
   The operation the job serves. Absent when none asked for it, as for a
   submitted job.
 field: object.job.executable                required
-field: object.job.token.sid                 required
-field: object.job.token.groups              required
-field: object.job.token.privileges          required
-field: object.job.token.privileges-enabled  required
+field: object.job.token.sid                 optional
+  A service's token is minted when its process is set up, after this
+  record, so here it is the user the job is to run as when peinit knows
+  that SID in advance — a well-known identity such as `SYSTEM` — and
+  absent for an identity peinit has only by name. A submitted job's
+  token exists from the start.
+field: object.job.token.groups              optional
+  Present once peinit holds the job's token: a submitted job's at once, a
+  service job's from `peinit.job.started`.
+field: object.job.token.privileges          optional
+  Present exactly when `object.job.token.groups` is.
+field: object.job.token.privileges-enabled  optional
+  Present exactly when `object.job.token.groups` is.
 
 --- event peinit.job.started
 tier: standard
@@ -661,10 +670,17 @@ field: object.job.started-time              optional
 field: object.job.duration                  required
 field: object.cgroup.path                   required
 field: object.cgroup.generation             required
-field: object.job.token.sid                 required
-field: object.job.token.groups              required
-field: object.job.token.privileges          required
-field: object.job.token.privileges-enabled  required
+field: object.job.token.sid                 optional
+  As on `peinit.job.started`, for a job whose process started. A
+  service's job that ended without starting had no token yet, and is as
+  on `peinit.job.created`.
+field: object.job.token.groups              optional
+  Present exactly when the job's process started, or it is a submitted
+  job.
+field: object.job.token.privileges          optional
+  Present exactly when `object.job.token.groups` is.
+field: object.job.token.privileges-enabled  optional
+  Present exactly when `object.job.token.groups` is.
 
 --- event peinit.job.status.reported
 tier: verbose
