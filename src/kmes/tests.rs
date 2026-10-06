@@ -81,12 +81,12 @@ fn a_job_ended_is_the_whole_job_record_nested_under_its_catalogue_paths() {
     let p = &encoded.payload;
 
     assert_eq!(encoded.event_type, "peinit.job.ended");
-    assert_eq!(read_bin(p, "object.job.guid"), job_id.as_bytes());
+    assert_eq!(read_bin(p, "object.job.guid"), job_id.as_guid_bytes());
     assert_eq!(read_str(p, "object.job.type"), "service-main");
     assert_eq!(read_str(p, "object.job.state"), "failed");
     assert_eq!(read_str(p, "object.service.name"), "app");
     assert_eq!(read_uint(p, "object.job.activation-generation"), 3);
-    assert_eq!(read_bin(p, "object.operation.guid"), operation_id.as_bytes());
+    assert_eq!(read_bin(p, "object.operation.guid"), operation_id.as_guid_bytes());
     assert!(!read_bool(p, "outcome.success"));
     assert_eq!(read_str(p, "outcome.detail"), "exit-code");
     assert_eq!(read_uint(p, "object.process.pid"), 123);
@@ -208,7 +208,7 @@ fn every_way_an_operation_ends_is_one_type_told_apart_by_its_state() {
     .expect("encoded");
     let p = &completed.payload;
     assert_eq!(completed.event_type, "peinit.operation.ended");
-    assert_eq!(read_bin(p, "object.operation.guid"), operation_id.as_bytes());
+    assert_eq!(read_bin(p, "object.operation.guid"), operation_id.as_guid_bytes());
     assert_eq!(read_str(p, "object.operation.type"), "start");
     assert_eq!(read_str(p, "object.operation.source"), "dependency-propagation");
     assert_eq!(read_str(p, "object.operation.state"), "completed");
@@ -272,7 +272,7 @@ fn a_graph_member_reaching_its_outcome_is_a_graph_operation_ended() {
     assert_eq!(event.event_type, "peinit.graph.operation.ended");
     assert_eq!(read_uint(&event.payload, "graph.context"), 4);
     assert_eq!(read_str(&event.payload, "object.service.name"), "db");
-    assert_eq!(read_bin(&event.payload, "object.operation.guid"), operation_id.as_bytes());
+    assert_eq!(read_bin(&event.payload, "object.operation.guid"), operation_id.as_guid_bytes());
     assert!(read_bool(&event.payload, "outcome.success"));
 }
 
@@ -311,11 +311,11 @@ fn notify_fields_are_recorded_with_their_sender_and_their_value_typed() {
     );
     let status = &events[0].payload;
     assert_eq!(read_str(status, "subject.service.name"), "app");
-    assert_eq!(read_bin(status, "subject.job.guid"), sender.job_id.as_bytes());
+    assert_eq!(read_bin(status, "subject.job.guid"), sender.job_id.as_guid_bytes());
     assert_eq!(read_uint(status, "subject.job.activation-generation"), 3);
     assert_eq!(
         read_bin(status, "subject.operation.guid"),
-        sender.operation_id.expect("operation").as_bytes()
+        sender.operation_id.expect("operation").as_guid_bytes()
     );
     assert_eq!(read_str(status, "notify.status"), "warming cache");
     // ERRNO= is sent positive and carried negated, as every errno is.
@@ -446,7 +446,7 @@ fn a_submitted_jobs_status_names_its_submitter_by_sid() {
     .expect("status event");
     let p = &event.payload;
     assert_eq!(event.event_type, "peinit.job.status.reported");
-    assert_eq!(read_bin(p, "object.job.guid"), job_id.as_bytes());
+    assert_eq!(read_bin(p, "object.job.guid"), job_id.as_guid_bytes());
     assert_eq!(read_bin(p, "object.job.submitter.sid"), sid("S-1-5-21-1-2-3-1001"));
     assert_eq!(read_str(p, "notify.status"), "copying");
     assert_eq!(read_uint(p, "notify.progress.total"), 4);
@@ -488,7 +488,7 @@ fn a_notify_rejection_names_its_reason_and_whoever_peinit_could_attribute() {
     assert_eq!(read_str(p, "outcome.reason"), "generation-mismatch");
     assert_eq!(read_uint(p, "subject.process.pid"), 55);
     assert_eq!(read_str(p, "subject.service.name"), "app");
-    assert_eq!(read_bin(p, "subject.job.guid"), sender.job_id.as_bytes());
+    assert_eq!(read_bin(p, "subject.job.guid"), sender.job_id.as_guid_bytes());
     assert_absent(p, "outcome.success");
 
     let anonymous = encode_notify_rejection_event(None, NotifyRejectionReason::Truncated, None)
@@ -819,7 +819,7 @@ fn a_reload_left_unconfirmed_and_a_leaked_job_cgroup_name_what_they_are_about() 
         encode_leaked_job_cgroup_event(job_id, "/sys/fs/cgroup/peinit/jobs/x").expect("leak");
     assert_eq!(leaked.event_type, "peinit.cgroup.leaked");
     // A submitted job's cgroup belongs to the job, not to a service.
-    assert_eq!(read_bin(&leaked.payload, "object.job.guid"), job_id.as_bytes());
+    assert_eq!(read_bin(&leaked.payload, "object.job.guid"), job_id.as_guid_bytes());
     assert_absent(&leaked.payload, "object.service");
     assert_eq!(read_str(&leaked.payload, "object.cgroup.type"), "service-tree");
 }
@@ -907,7 +907,7 @@ fn encodes_internal_error_and_dropped_event_payloads() {
     assert_eq!(read_str(p, "operation.stage"), "process-setup");
     assert_eq!(read_str(p, "object.service.name"), "app");
     assert!(!read_bool(p, "object.service.failed"));
-    assert_eq!(read_bin(p, "object.job.guid"), job_id.as_bytes());
+    assert_eq!(read_bin(p, "object.job.guid"), job_id.as_guid_bytes());
     // The error is Rust Debug text, which an event never carries.
     assert_absent(p, "outcome");
     for gone in ["observed_at_ns", "message", "error", "step"] {
@@ -916,7 +916,7 @@ fn encodes_internal_error_and_dropped_event_payloads() {
 
     let subject = KmesEventSubject {
         service: None,
-        job_guid: Some(job_id.as_bytes()),
+        job_guid: Some(job_id.as_guid_bytes()),
     };
     let dropped = DroppedEvent {
         event_type: "peinit.job.ended",
@@ -930,7 +930,7 @@ fn encodes_internal_error_and_dropped_event_payloads() {
     assert_eq!(read_str(p, "emission.type"), "peinit.job.ended");
     assert_eq!(read_uint(p, "emission.payload-length"), 66_000);
     assert_absent(p, "object.service");
-    assert_eq!(read_bin(p, "object.job.guid"), job_id.as_bytes());
+    assert_eq!(read_bin(p, "object.job.guid"), job_id.as_guid_bytes());
     assert_eq!(read_int(p, "outcome.errno"), -28);
     for gone in ["action", "limit_bytes", "dropped_total", "message"] {
         assert_absent(p, gone);
@@ -968,7 +968,7 @@ fn the_subject_of_any_event_is_found_in_its_nested_payload() {
         kmes_event_subject(&ended.payload),
         KmesEventSubject {
             service: Some("app".to_string()),
-            job_guid: Some(job_id.as_bytes()),
+            job_guid: Some(job_id.as_guid_bytes()),
         }
     );
 
@@ -984,7 +984,7 @@ fn the_subject_of_any_event_is_found_in_its_nested_payload() {
         kmes_event_subject(&status.payload),
         KmesEventSubject {
             service: Some("app".to_string()),
-            job_guid: Some(sender.job_id.as_bytes()),
+            job_guid: Some(sender.job_id.as_guid_bytes()),
         }
     );
 

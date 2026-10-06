@@ -88,9 +88,10 @@ impl JobAccessChecker for PeiosSystemAccessChecker {
         }
         let descriptor = SecurityDescriptor::from_validated_bytes(request.descriptor.bytes.clone())
             .map_err(|error| JobAccessCheckError::Boundary(error.to_string()))?;
-        // Names the job to KACS by its GUID, so that the record a SACL asks
-        // for says which job was decided on (PGSS §6.7, PEI-1279).
-        let guid = request.job_id.as_bytes();
+        // Names the job to KACS by its GUID, in the PCDS binary form a
+        // `bin.guid` field carries, so that the record a SACL asks for says
+        // which job was decided on (PGSS §6.7, PEI-1279).
+        let guid = request.job_id.as_guid_bytes();
         let context = AuditContext::new("job", &[("guid", AuditValue::Bin(&guid))])
             .map_err(|error| JobAccessCheckError::Boundary(error.to_string()))?;
         let token = unsafe { BorrowedFd::borrow_raw(request.token_fd) };

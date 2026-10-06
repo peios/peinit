@@ -81,16 +81,17 @@ impl From<&[String]> for Value {
 }
 
 impl From<JobId> for Value {
-    /// `bin.guid`: the job's sixteen UUID bytes.
+    /// `bin.guid`: the job as a PCDS binary GUID, which reads back as the
+    /// same text `svctl` shows.
     fn from(value: JobId) -> Self {
-        Self::Bin(value.as_bytes().to_vec())
+        Self::Bin(value.as_guid_bytes().to_vec())
     }
 }
 
 impl From<OperationId> for Value {
-    /// `bin.guid`: the operation's sixteen UUID bytes.
+    /// `bin.guid`: the operation as a PCDS binary GUID.
     fn from(value: OperationId) -> Self {
-        Self::Bin(value.as_bytes().to_vec())
+        Self::Bin(value.as_guid_bytes().to_vec())
     }
 }
 
