@@ -740,6 +740,15 @@ service to a team without handing over service control generally.
 Note what it does not govern: editing the definition. That is a registry
 write, gated by this key's own descriptor.
 
+**Its SACL is the service's audit policy.** A refused command is recorded
+by the kernel, as `kacs.audit.access.checked`, only when this descriptor's
+SACL asks; the compiled default audits every refusal, for everyone. The
+value is written whole, so whoever may write it may drop the SACL without
+holding `SeSecurityPrivilege`: keep this key writable only by those
+trusted to change audit policy (SYSTEM and Administrators, as inherited),
+delegate a service through this descriptor's DACL rather than through the
+key's, and keep the SACL when rewriting only the DACL.
+
 --- machine\system\services\<name> displayname
 canonical: Machine\System\Services\<name> DisplayName
 type: REG_SZ
@@ -920,7 +929,7 @@ security-critical and should be tighter — see its page.
 --- machine\system\init controlsecurity
 canonical: Machine\System\Init ControlSecurity
 type: REG_BINARY
-default: SYSTEM and Administrators full; Authenticated Users query status
+default: SYSTEM and Administrators full; Authenticated Users query status; every refusal audited, for everyone
 valid: a self-relative Peios security descriptor
 applies: live
 
@@ -930,6 +939,12 @@ Who may perform system-level control operations — shutdown, reboot,
 This is the machine-wide door. Who may manage one particular service is
 that service's `ServiceSecurity`, a separate descriptor with a separate
 answer. Absent or malformed, the compiled default above applies.
+
+Its SACL decides which refusals the kernel records, as
+`kacs.audit.access.checked` with `object.kind` `peinit-system`. As with
+`ServiceSecurity`, the value is written whole, so whoever may write it
+may drop the SACL: keep `Init` writable only by those trusted to change
+audit policy.
 
 --- machine\system\init maxcontrolconnections
 canonical: Machine\System\Init MaxControlConnections
