@@ -193,6 +193,7 @@ impl Supervisor {
         let decision = access_checker
             .check_job_access(JobAccessCheckRequest {
                 token_fd: peer.token_fd(),
+                job_id,
                 descriptor: &entry.security_descriptor,
                 desired_access: JobAccess::MAXIMUM_ALLOWED,
             })
@@ -235,6 +236,7 @@ impl Supervisor {
         let decision = access_checker
             .check_job_access(JobAccessCheckRequest {
                 token_fd: peer.token_fd(),
+                job_id,
                 descriptor: &entry.security_descriptor,
                 desired_access,
             })

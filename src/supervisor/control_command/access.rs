@@ -162,7 +162,8 @@ impl Supervisor {
     /// `granted`): the same AccessCheck a command gets, against the same
     /// descriptor, asking for `MAXIMUM_ALLOWED`. It is a question, not a
     /// command, so a caller holding nothing is not a denial and is not
-    /// audited as one; only the boundary failing is an error.
+    /// refused; only the boundary failing is an error. (The descriptor's
+    /// SACL decides whether KACS records the check, as for any other.)
     pub(super) fn service_granted_access<A>(
         &self,
         peer: &ControlPeer,

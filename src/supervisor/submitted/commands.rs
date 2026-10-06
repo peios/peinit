@@ -262,6 +262,7 @@ impl Supervisor {
         let decision = checker
             .check_job_access(JobAccessCheckRequest {
                 token_fd: peer.control.token_fd(),
+                job_id,
                 descriptor: &entry.security_descriptor,
                 desired_access,
             })
