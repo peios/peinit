@@ -50,7 +50,7 @@ pub struct NotifyApplyDispatch {
     pub post_start_hook: Option<crate::job::JobEvent>,
     /// The service's progress after this datagram, when the datagram
     /// changed it and the once-a-second bound (PSPU §4.A) lets that become
-    /// a `notify.progress` event.
+    /// a `peinit.notify.progress.reported` event.
     pub progress_event: Option<ServiceProgressReport>,
 }
 

@@ -1,4 +1,3 @@
-mod access;
 mod cgroup;
 mod graph;
 mod internal_error;
@@ -7,21 +6,20 @@ mod recovery;
 mod reload;
 mod shutdown;
 
-pub use access::{encode_service_access_denied_event, encode_system_access_denied_event};
-pub use cgroup::encode_leaked_cgroup_event;
+pub use cgroup::{encode_leaked_cgroup_event, encode_leaked_job_cgroup_event};
 pub use graph::{
-    encode_boot_blocked_service_event, encode_graph_validation_error_event,
+    GraphPhase, encode_boot_blocked_service_event, encode_graph_validation_error_event,
     encode_graph_validation_warning_event, encode_reload_undecodable_service_event,
     encode_safe_mode_downgrade_event,
 };
 pub use internal_error::{
-    OversizedEvent, OversizedEventAction, encode_event_oversized_event,
-    encode_service_internal_error_event, kmes_event_subject, oversized_event_message,
+    DroppedEvent, KmesEventSubject, dropped_event_message, encode_event_dropped_event,
+    encode_service_internal_error_event, kmes_event_subject,
 };
 pub use on_failure::encode_on_failure_loop_suppressed_event;
-pub use recovery::encode_init_recovery_events;
+pub use recovery::collect_init_recovery_events;
 pub use reload::{
-    encode_registry_reload_coalesced_event, encode_registry_reload_deferred_event,
+    encode_config_reload_applied_event, encode_registry_reload_deferred_event,
     encode_reload_unconfirmed_event,
 };
 pub use shutdown::{encode_critical_failure_event, encode_shutdown_abandoned_event};

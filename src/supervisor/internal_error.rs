@@ -101,8 +101,9 @@ impl SupervisorInternalErrorDispatch {
             && self.start_dispatches.is_empty()
     }
 
-    /// The one sentence the console prints and the audit event carries for
-    /// this failure, so the two records read alike.
+    /// The one sentence the console prints for this failure. The
+    /// `peinit.internal-error.contained` event carries the step, the service
+    /// and the job as fields, not this text.
     pub fn message(&self) -> String {
         let subject = match (self.service(), self.subject.job_id) {
             (Some(service), _) => format!("service {service}"),

@@ -23,6 +23,16 @@ fn an_unowned_console_carries_everything_below_blackout() {
     }
 }
 
+/// A debugging line, such as a refused command's, is written only when the
+/// machine is being debugged (`peios.quiet=0`), never at the default: an
+/// unprivileged client can cause as many as it likes (PEI-1279).
+#[test]
+fn a_debug_line_is_written_only_at_the_verbose_level() {
+    assert!(policy(QuietLevel::Verbose, false).allows(ConsoleSeverity::Debug));
+    assert!(!policy(QuietLevel::Standard, false).allows(ConsoleSeverity::Debug));
+    assert!(!policy(QuietLevel::Blackout, false).allows(ConsoleSeverity::Debug));
+}
+
 /// Blackout silences the narrative, not the news.
 #[test]
 fn blackout_drops_status_and_keeps_errors() {

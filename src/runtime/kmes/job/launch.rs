@@ -1,4 +1,5 @@
-use crate::boundary::{BoundaryError, KmesEvent};
+use crate::boundary::BoundaryError;
+use crate::kmes::EventCollector;
 use crate::execution::control::ControlExecutionDetail;
 use crate::execution::launch::LaunchCreatedJobDispatch;
 use crate::supervisor::{
@@ -18,7 +19,7 @@ use super::terminal::collect_health_check_terminal;
 
 pub(in crate::runtime::kmes) fn collect_control_dispatch(
     dispatch: &SupervisorControlDispatch,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     let execution = &dispatch.execution;
     push_operation(out, &execution.operation_event)?;
@@ -33,7 +34,7 @@ pub(in crate::runtime::kmes) fn collect_control_dispatch(
 
 pub(in crate::runtime::kmes) fn collect_service_launch(
     dispatch: &SupervisorLaunchDispatch,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     collect_launch(&dispatch.launch, out)?;
     collect_service_main_started(&dispatch.started, out)?;
@@ -42,7 +43,7 @@ pub(in crate::runtime::kmes) fn collect_service_launch(
 
 pub(in crate::runtime::kmes) fn collect_service_launch_failure(
     dispatch: &SupervisorLaunchFailureDispatch,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     push_job(out, &dispatch.job_event)?;
     collect_start_failure(&dispatch.failure, out)?;
@@ -51,14 +52,14 @@ pub(in crate::runtime::kmes) fn collect_service_launch_failure(
 
 pub(in crate::runtime::kmes) fn collect_start_hook_launch(
     dispatch: &SupervisorStartHookLaunchDispatch,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     collect_launch(&dispatch.launch, out)
 }
 
 pub(in crate::runtime::kmes) fn collect_start_hook_launch_failure(
     dispatch: &SupervisorStartHookLaunchFailureDispatch,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     push_job(out, &dispatch.job_event)?;
     collect_start_failure(&dispatch.failure, out)?;
@@ -67,14 +68,14 @@ pub(in crate::runtime::kmes) fn collect_start_hook_launch_failure(
 
 pub(in crate::runtime::kmes) fn collect_post_start_hook_launch(
     dispatch: &SupervisorPostStartHookLaunchDispatch,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     collect_launch(&dispatch.launch, out)
 }
 
 pub(in crate::runtime::kmes) fn collect_post_start_hook_launch_failure(
     dispatch: &SupervisorPostStartHookLaunchFailureDispatch,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     collect_post_start_hook_terminal(&dispatch.terminal, out)?;
     collect_start_dispatches(&dispatch.start_dispatches, out)
@@ -82,28 +83,28 @@ pub(in crate::runtime::kmes) fn collect_post_start_hook_launch_failure(
 
 pub(in crate::runtime::kmes) fn collect_health_check_launch(
     dispatch: &SupervisorHealthCheckLaunchDispatch,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     collect_launch(&dispatch.launch, out)
 }
 
 pub(in crate::runtime::kmes) fn collect_health_check_launch_failure(
     dispatch: &SupervisorHealthCheckLaunchFailureDispatch,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     collect_health_check_terminal(&dispatch.terminal, out)
 }
 
 pub(in crate::runtime::kmes) fn collect_health_check_launch_cancellation(
     dispatch: &SupervisorHealthCheckLaunchCancelledDispatch,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     push_job(out, &dispatch.job_event)
 }
 
 pub(in crate::runtime::kmes) fn collect_launch(
     dispatch: &LaunchCreatedJobDispatch,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     push_job(out, &dispatch.job_event)
 }

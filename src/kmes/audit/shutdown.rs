@@ -1,76 +1,59 @@
-use peios::msgpack::Writer;
-
 use crate::boundary::{BoundaryError, KmesEvent};
 use crate::shutdown::ShutdownFinalizationState;
 use crate::supervisor::{
-    SupervisorShutdownAbandonedDispatch, SupervisorShutdownFinalizationDispatch,
+    CriticalRebootTrigger, SupervisorShutdownAbandonedDispatch,
+    SupervisorShutdownFinalizationDispatch,
 };
 
 use crate::kmes::labels::{service_state_label, transition_cause_label};
-use crate::kmes::payload::{
-    finish_event, write_optional_str_field, write_optional_u64_field, write_str_field,
-    write_uint_field,
-};
+use crate::kmes::payload::Payload;
+use crate::kmes::types::{CRITICAL_SERVICE_FAILED, SERVICE_ABANDONED};
 
+/// `peinit.critical-service.failed`: a Critical service failed and peinit
+/// took the machine to its reboot final action.
 pub fn encode_critical_failure_event(
     service: &str,
-    trigger: &str,
-    observed_at_ns: Option<u64>,
+    trigger: CriticalRebootTrigger,
     finalization: &SupervisorShutdownFinalizationDispatch,
 ) -> Result<KmesEvent, BoundaryError> {
-    let mut writer = Writer::new();
-    writer.write_map(6);
-    write_str_field(&mut writer, "service", service);
-    write_str_field(&mut writer, "trigger", trigger);
-    write_optional_u64_field(&mut writer, "observed_at_ns", observed_at_ns);
-    write_str_field(&mut writer, "final_action", "reboot");
-    write_str_field(
-        &mut writer,
-        "finalization_state",
+    let mut payload = Payload::new();
+    payload.set("object.service.name", service);
+    payload.set("outcome.reason", trigger.kmes_id());
+    payload.set(
+        "shutdown.finalization-state",
         finalization_state_label(&finalization.finalization),
     );
-    match &finalization.finalization {
-        ShutdownFinalizationState::Failed { message, .. } => {
-            write_str_field(&mut writer, "finalization_detail", message);
-        }
-        _ => {
-            write_optional_str_field(&mut writer, "finalization_detail", None);
-        }
+    if let ShutdownFinalizationState::Failed { message, .. } = &finalization.finalization {
+        payload.set("outcome.detail", message.as_str());
     }
-    finish_event("critical.failure", writer)
+    payload.finish(CRITICAL_SERVICE_FAILED)
 }
 
+/// `peinit.service.abandoned`: a service's cgroup was still populated after
+/// SIGKILL and the post-kill timeout, so peinit gave up on it.
 pub fn encode_shutdown_abandoned_event(
     abandoned: &SupervisorShutdownAbandonedDispatch,
 ) -> Result<KmesEvent, BoundaryError> {
     let transition = &abandoned.service_transition.event;
-    let mut writer = Writer::new();
-    writer.write_map(7);
-    write_str_field(&mut writer, "service", &abandoned.service);
-    write_str_field(&mut writer, "cgroup_id", &abandoned.cgroup_id);
-    write_str_field(
-        &mut writer,
-        "from_state",
+    let mut payload = Payload::new();
+    payload.set("object.service.name", abandoned.service.as_str());
+    payload.set("object.cgroup.path", abandoned.cgroup_id.as_str());
+    payload.set(
+        "object.service.state-previous",
         service_state_label(transition.from),
     );
-    write_str_field(&mut writer, "to_state", service_state_label(transition.to));
-    write_str_field(
-        &mut writer,
-        "cause",
+    payload.set("object.service.state", service_state_label(transition.to));
+    payload.set(
+        "object.service.transition-cause",
         transition_cause_label(transition.cause),
     );
-    write_uint_field(&mut writer, "generation", transition.generation);
-    write_str_field(
-        &mut writer,
-        "message",
-        "service cgroup remained populated after SIGKILL and post-kill timeout",
-    );
-    finish_event("shutdown.abandoned", writer)
+    payload.set("object.service.generation", transition.generation);
+    payload.finish(SERVICE_ABANDONED)
 }
 
 fn finalization_state_label(state: &ShutdownFinalizationState) -> &'static str {
     match state {
-        ShutdownFinalizationState::WaitingForServices => "waiting_for_services",
+        ShutdownFinalizationState::WaitingForServices => "waiting-for-services",
         ShutdownFinalizationState::Ready => "ready",
         ShutdownFinalizationState::Failed { .. } => "failed",
         ShutdownFinalizationState::Completed => "completed",

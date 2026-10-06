@@ -185,7 +185,7 @@ fn post_kill_stop_cleanup_populated_cgroup_marks_abandoned_and_fails_stop() {
 
 // PEI-818. Giving a service up is also a leak of its tree, and TRM §5.7 wants
 // a leak both queryable and pushed. The Abandoned path recorded it on the
-// runtime alone -- `status.warnings` showed it, but no `cgroup.leaked` event
+// runtime alone -- `status.warnings` showed it, but no `peinit.cgroup.leaked` event
 // and no console line were ever produced, because it never built the dispatch
 // every other leak path builds.
 #[test]

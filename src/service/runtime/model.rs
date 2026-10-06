@@ -244,8 +244,9 @@ pub struct ServiceRuntimeSnapshot {
     /// generation (§4.14).
     pub progress: Option<JobProgress>,
     pub progress_unit: Option<JobProgressUnit>,
-    /// When this incarnation's progress last became a `notify.progress`
-    /// event, for the once-a-second bound of §4.A.
+    /// When this incarnation's progress last became a
+    /// `peinit.notify.progress.reported` event, for the once-a-second bound
+    /// of §4.A.
     pub last_progress_event_ns: Option<u64>,
     /// The readiness level this service last published with `LEVEL=`, for
     /// dependents declaring `Requires = ["<service>:<level>"]`.

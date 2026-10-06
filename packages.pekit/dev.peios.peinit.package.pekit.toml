@@ -38,3 +38,7 @@ path = "/usr/sbin/registryd"
 # definitions, Boot, and Init. Hand-written beside the recipe rather than
 # generated, so it is taken from source with no build target involved.
 "@source:peinit.regman" = "usr/share/regman/peinit.regman"
+# evman documentation for every event peinit writes and every field it
+# defines (PGSS §6.10). Hand-written beside the recipe, like the regman file,
+# and held to the code by a unit test (kmes::tests).
+"@source:peinit.evman" = "usr/share/evman/peinit.evman"

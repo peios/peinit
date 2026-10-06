@@ -2,8 +2,9 @@ use crate::control::lifecycle::LifecycleCommandOutcome;
 use crate::runtime::console::ConsoleMessage;
 use crate::runtime::{RuntimeCalendarTimerTurn, RuntimeFilesystemCheckHelperTurn};
 use crate::supervisor::{
-    SupervisorControlCommandDispatch, SupervisorControlConnectionTableTurn,
-    SupervisorControlFrameTurn, SupervisorLifecycleDispatch, SupervisorNotifyDispatch,
+    SupervisorControlCommandBodyError, SupervisorControlCommandDispatch,
+    SupervisorControlConnectionTableTurn, SupervisorControlFrameTurn, SupervisorLifecycleDispatch,
+    SupervisorNotifyDispatch, SupervisorSystemShutdownControlBodyError,
     SupervisorSystemShutdownDispatch, SupervisorTimerAction, SupervisorTimerDispatch,
 };
 
@@ -69,15 +70,85 @@ fn collect_control_frame_turn_console_messages(
             collect_system_shutdown_dispatch_console_messages(dispatch, out);
         }
         SupervisorControlFrameTurn::CommandAccepted {
-            dispatch: Some(dispatch),
+            access_denials,
+            job_access_denials,
+            dispatch,
             ..
-        } => collect_control_command_dispatch_console_messages(dispatch, out),
+        } => {
+            for denied in access_denials {
+                push_service_denial(denied, out);
+            }
+            for denied in job_access_denials {
+                push_job_denial(denied, out);
+            }
+            if let Some(dispatch) = dispatch {
+                collect_control_command_dispatch_console_messages(dispatch, out);
+            }
+        }
+        SupervisorControlFrameTurn::ShutdownRejected { error, .. } => {
+            if let SupervisorSystemShutdownControlBodyError::AccessDenied(denied) = error {
+                push_system_denial(denied, out);
+            }
+        }
+        SupervisorControlFrameTurn::CommandRejected { error, .. } => match error {
+            SupervisorControlCommandBodyError::SystemAccessDenied(denied) => {
+                push_system_denial(denied, out);
+            }
+            SupervisorControlCommandBodyError::ServiceAccessDenied(denied) => {
+                push_service_denial(denied, out);
+            }
+            SupervisorControlCommandBodyError::JobAccessDenied(denied) => {
+                push_job_denial(denied, out);
+            }
+            _ => {}
+        },
         SupervisorControlFrameTurn::Incomplete { .. }
-        | SupervisorControlFrameTurn::RejectedFrame { .. }
-        | SupervisorControlFrameTurn::ShutdownRejected { .. }
-        | SupervisorControlFrameTurn::CommandAccepted { dispatch: None, .. }
-        | SupervisorControlFrameTurn::CommandRejected { .. } => {}
+        | SupervisorControlFrameTurn::RejectedFrame { .. } => {}
     }
+}
+
+// A refusal by a descriptor is recorded by KACS, as
+// `kacs.audit.access.checked`, when the descriptor's SACL asks for it
+// (PEI-1279). peinit writes no event of its own; these lines are for
+// whoever is debugging the machine, and only at `peios.quiet=0`, because an
+// unprivileged client can cause as many as it likes.
+
+fn push_service_denial(
+    denied: &crate::control::service_security::ServiceAccessDenied,
+    out: &mut Vec<ConsoleMessage>,
+) {
+    out.push(ConsoleMessage::debug(format!(
+        "peinit: access denied: {} asked for {:#x} on service {} (granted {:#x})\n",
+        denied.caller.caller_sid(),
+        denied.desired_access.bits(),
+        denied.service,
+        denied.granted_access_bits,
+    )));
+}
+
+fn push_system_denial(
+    denied: &crate::control::system::SystemAccessDenied,
+    out: &mut Vec<ConsoleMessage>,
+) {
+    out.push(ConsoleMessage::debug(format!(
+        "peinit: access denied: {} asked for {:#x} on the system (granted {:#x})\n",
+        denied.caller.caller_sid(),
+        denied.desired_access.bits(),
+        denied.granted_access_bits,
+    )));
+}
+
+pub(super) fn push_job_denial(
+    denied: &crate::submitted::JobAccessDenied,
+    out: &mut Vec<ConsoleMessage>,
+) {
+    out.push(ConsoleMessage::debug(format!(
+        "peinit: access denied: {} asked for {} on job {} (granted {:#x})\n",
+        denied.caller.caller_sid(),
+        denied.desired_access.label(),
+        denied.job_id,
+        denied.granted_access_bits,
+    )));
 }
 
 fn collect_control_command_dispatch_console_messages(

@@ -1020,7 +1020,7 @@ fn phase2_graph_failure_emits_recovery_and_graph_audit_events() {
             .iter()
             .map(|event| event.event_type.as_str())
             .collect::<Vec<_>>(),
-        vec!["recovery.entered", "graph.validation_error"],
+        vec!["peinit.recovery.entered", "peinit.graph.validation.failed"],
     );
 }
 

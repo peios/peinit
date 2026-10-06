@@ -37,8 +37,8 @@ pub struct LinuxShutdownRuntime {
     calendar_timers: calendar_timer::LinuxCalendarTimerTable,
     kmes_sink: LinuxKmesEventSink,
     /// Events the ring refused since boot, dropped rather than fatal
-    /// (PEI-1082). Carried in every `event.oversized` so the trail says how
-    /// many gaps it has.
+    /// (PEI-1082). Said on the console beside each drop; in the trail, the
+    /// count is the number of `peinit.event.dropped` records.
     dropped_kmes_events: u64,
     console_sink: LinuxConsoleSink,
     /// `peios.quiet`, from the kernel command line.

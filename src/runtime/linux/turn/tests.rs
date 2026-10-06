@@ -1,4 +1,4 @@
-use crate::boundary::{BoundaryError, KmesEvent, KmesEventSink};
+use crate::boundary::{BoundaryError, EventTier, KmesEvent, KmesEventSink};
 use crate::operation::store::OperationEvent;
 use crate::operation::{OperationRecord, OperationSource, OperationState, OperationType};
 use crate::runtime::RuntimeWorkPumpTurn;
@@ -30,15 +30,47 @@ fn runtime_loop_kmes_emission_sends_collected_events_to_sink() {
     )
     .expect("emit KMES events");
 
-    assert_eq!(sink.event_types(), vec!["operation.completed"]);
+    assert_eq!(sink.event_types(), vec!["peinit.operation.ended"]);
     assert!(dropped.is_empty());
     assert_eq!(dropped_events, 0);
 }
 
+/// The sink's emission policy is asked about each type before it is built,
+/// and a type it switches off is never sent (PGSS §6.9).
+#[test]
+fn runtime_loop_kmes_emission_asks_the_sinks_policy() {
+    let maintenance = SupervisorOperationMaintenanceTurn {
+        operation_timeouts: vec![operation_completed("app")],
+        ..SupervisorOperationMaintenanceTurn::default()
+    };
+    let mut sink = RecordingKmesSink {
+        switched_off: Some("peinit.operation.ended".to_string()),
+        ..RecordingKmesSink::default()
+    };
+    let mut dropped_events = 0;
+
+    emit_runtime_loop_kmes_events(
+        RuntimeKmesEmitter {
+            sink: &mut sink,
+            dropped_events: &mut dropped_events,
+        },
+        &RuntimeWorkPumpTurn::default(),
+        &maintenance,
+        &[],
+        &RuntimeWorkPumpTurn::default(),
+        &SupervisorOperationMaintenanceTurn::default(),
+        &[],
+    )
+    .expect("emit KMES events");
+
+    assert!(sink.emitted.is_empty());
+}
+
 /// PEI-1082, PEI-1125 (the event-emit class): an event the ring refuses is
 /// about that event — most likely one too large for `MaxEventSize` — and
-/// not about the ring. It is dropped, counted, replaced in the trail by an
-/// `event.oversized` naming it and its service, and the loop carries on.
+/// not about the ring. It is dropped, counted, replaced in the trail by a
+/// `peinit.event.dropped` naming it and its service, and the loop carries
+/// on.
 /// Until this it was a fatal loop error, and PID 1 entered recovery over an
 /// audit record it could not write.
 #[test]
@@ -47,7 +79,11 @@ fn runtime_loop_kmes_emission_drops_a_refused_event_and_records_the_gap() {
         operation_timeouts: vec![operation_completed("app"), operation_completed("db")],
         ..SupervisorOperationMaintenanceTurn::default()
     };
-    let mut sink = RecordingKmesSink::refusing_service("app", "No space left on device");
+    // Switching the gap record off changes nothing: it is essential.
+    let mut sink = RecordingKmesSink {
+        switched_off: Some("peinit.event.dropped".to_string()),
+        ..RecordingKmesSink::refusing_service("app", "No space left on device")
+    };
     let mut dropped_events = 0;
 
     let dropped = emit_runtime_loop_kmes_events(
@@ -68,17 +104,18 @@ fn runtime_loop_kmes_emission_drops_a_refused_event_and_records_the_gap() {
     // still emitted.
     assert_eq!(
         sink.event_types(),
-        vec!["event.oversized", "operation.completed"]
+        vec!["peinit.event.dropped", "peinit.operation.ended"]
     );
     assert_eq!(dropped_events, 1);
     assert_eq!(dropped.len(), 1);
-    assert_eq!(dropped[0].event_type, "operation.completed");
-    assert_eq!(dropped[0].service.as_deref(), Some("app"));
+    assert_eq!(dropped[0].event_type, "peinit.operation.ended");
+    assert_eq!(dropped[0].subject.service.as_deref(), Some("app"));
     assert_eq!(dropped[0].dropped_total, 1);
+    assert_eq!(dropped[0].errno, Some(28));
     assert!(dropped[0].error.contains("No space left on device"));
     assert_eq!(
         crate::kmes::kmes_event_subject(&sink.emitted[0].payload)
-            .0
+            .service
             .as_deref(),
         Some("app"),
         "the gap record names the service the dropped event was about",
@@ -86,7 +123,7 @@ fn runtime_loop_kmes_emission_drops_a_refused_event_and_records_the_gap() {
     assert!(
         dropped[0]
             .console_message()
-            .contains("event operation.completed for service app"),
+            .contains("event peinit.operation.ended for service app"),
         "{}",
         dropped[0].console_message(),
     );
@@ -135,22 +172,22 @@ struct RecordingKmesSink {
     error: Option<BoundaryError>,
     /// Refuse events naming this service, with this error.
     refuse_service: Option<(String, String)>,
+    /// The one type the emission policy has switched off.
+    switched_off: Option<String>,
 }
 
 impl RecordingKmesSink {
     fn refusing_everything(error: BoundaryError) -> Self {
         Self {
-            emitted: Vec::new(),
             error: Some(error),
-            refuse_service: None,
+            ..Self::default()
         }
     }
 
     fn refusing_service(service: &str, error: &str) -> Self {
         Self {
-            emitted: Vec::new(),
-            error: None,
             refuse_service: Some((service.to_string(), error.to_string())),
+            ..Self::default()
         }
     }
 
@@ -168,13 +205,20 @@ impl KmesEventSink for RecordingKmesSink {
             return Err(error.clone());
         }
         if let Some((service, error)) = &self.refuse_service
-            && event.event_type != "event.oversized"
-            && crate::kmes::kmes_event_subject(&event.payload).0.as_deref() == Some(service)
+            && event.event_type != "peinit.event.dropped"
+            && crate::kmes::kmes_event_subject(&event.payload).service.as_deref() == Some(service)
         {
-            return Err(BoundaryError::Kmes(error.clone()));
+            return Err(BoundaryError::KmesRefused {
+                errno: 28,
+                message: error.clone(),
+            });
         }
         self.emitted.push(event.clone());
         Ok(())
+    }
+
+    fn kmes_event_enabled(&self, event_type: &str, _tier: EventTier) -> bool {
+        self.switched_off.as_deref() != Some(event_type)
     }
 }
 

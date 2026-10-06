@@ -36,7 +36,7 @@ pub(super) fn apply_stop_main_abandoned(
         .get(operation_id)
         .is_some_and(explicit_stop_record_clears_fd_store);
     // Through the same helper as every other leak path, so the tree given up
-    // here is pushed -- a `cgroup.leaked` event and a console line -- and not
+    // here is pushed -- a `peinit.cgroup.leaked` event and a console line -- and not
     // only queryable through `status`. It used to be recorded on the runtime
     // alone, so the one leak that also abandons the service was the one nobody
     // was told about (TRM §5.7, PEI-818).

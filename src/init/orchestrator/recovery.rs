@@ -153,8 +153,14 @@ fn emit_recovery_audit_events<P>(platform: &mut P, reason: &InitRecoveryReason)
 where
     P: InitPlatform + ?Sized,
 {
-    let Ok(events) = crate::kmes::encode_init_recovery_events(reason) else {
-        return;
+    let events = {
+        let gate: &P = &*platform;
+        let enabled = |event_type: &str, tier| gate.kmes_event_enabled(event_type, tier);
+        let mut out = crate::kmes::EventCollector::new(&enabled, Default::default());
+        if crate::kmes::collect_init_recovery_events(reason, &mut out).is_err() {
+            return;
+        }
+        out.into_events()
     };
     for event in events {
         let _ = platform.emit_kmes_event(&event);

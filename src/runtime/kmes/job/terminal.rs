@@ -1,4 +1,6 @@
-use crate::boundary::{BoundaryError, KmesEvent};
+use crate::boundary::BoundaryError;
+use crate::kmes::EventCollector;
+use crate::supervisor::CriticalRebootTrigger;
 use crate::execution::control::ReloadCommandTerminalDispatch;
 use crate::execution::job_terminal::ServiceMainJobTerminalDispatch;
 use crate::execution::start::RestartStartExecutionDispatch;
@@ -11,7 +13,7 @@ use super::start::collect_start_dispatches;
 
 pub(in crate::runtime::kmes) fn collect_terminal_dispatch(
     dispatch: &SupervisorTerminalDispatch,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     collect_service_main_terminal(&dispatch.terminal, out)?;
     for event in &dispatch.cleanup_job_events {
@@ -25,8 +27,7 @@ pub(in crate::runtime::kmes) fn collect_terminal_dispatch(
         push_critical_failure(
             out,
             service,
-            "service_main_terminal",
-            dispatch.terminal.job_event.ended_at_ns,
+            CriticalRebootTrigger::ServiceMainTerminal,
             finalization,
         )?;
     }
@@ -35,7 +36,7 @@ pub(in crate::runtime::kmes) fn collect_terminal_dispatch(
 
 pub(in crate::runtime::kmes) fn collect_health_check_terminal(
     dispatch: &SupervisorHealthCheckTerminalDispatch,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     push_job(out, &dispatch.job_event)?;
     if let Some(job_event) = &dispatch.service_job_event {
@@ -47,8 +48,7 @@ pub(in crate::runtime::kmes) fn collect_health_check_terminal(
         push_critical_failure(
             out,
             service,
-            "health_check_failure",
-            dispatch.job_event.ended_at_ns,
+            CriticalRebootTrigger::HealthCheckFailure,
             finalization,
         )?;
     }
@@ -57,7 +57,7 @@ pub(in crate::runtime::kmes) fn collect_health_check_terminal(
 
 pub(in crate::runtime::kmes) fn collect_reload_command_terminal(
     dispatch: &ReloadCommandTerminalDispatch,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     push_job(out, &dispatch.job_event)?;
     push_operation(out, &dispatch.operation_event)
@@ -65,7 +65,7 @@ pub(in crate::runtime::kmes) fn collect_reload_command_terminal(
 
 fn collect_service_main_terminal(
     dispatch: &ServiceMainJobTerminalDispatch,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     push_job(out, &dispatch.job_event)?;
     push_operations(out, &dispatch.operation_events)?;
@@ -78,7 +78,7 @@ fn collect_service_main_terminal(
 
 fn collect_restart_start_dispatches(
     dispatches: &[RestartStartExecutionDispatch],
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     for dispatch in dispatches {
         push_job(out, &dispatch.job_event)?;

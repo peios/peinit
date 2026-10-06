@@ -1,3 +1,9 @@
+//! The kebab-case values peinit's enumerated event fields take (PGSS §6.5).
+//!
+//! The same vocabularies the control channel spells in snake_case (PSPU
+//! §4.B); an event writes each word with hyphens, as every event field's
+//! value is written.
+
 use crate::fd_store::StoreFdOutcome;
 use crate::job::{JobState, JobType};
 use crate::operation::{OperationSource, OperationState, OperationType};
@@ -6,11 +12,11 @@ use crate::service::runtime::{ServiceState, TransitionCause};
 
 pub(super) fn job_type_label(value: JobType) -> &'static str {
     match value {
-        JobType::ServiceMain => "service_main",
-        JobType::PreExecHook => "pre_exec_hook",
-        JobType::PostExecHook => "post_exec_hook",
-        JobType::ReloadHook => "reload_hook",
-        JobType::HealthCheck => "health_check",
+        JobType::ServiceMain => "service-main",
+        JobType::PreExecHook => "pre-exec-hook",
+        JobType::PostExecHook => "post-exec-hook",
+        JobType::ReloadHook => "reload-hook",
+        JobType::HealthCheck => "health-check",
         JobType::Submitted => "submitted",
     }
 }
@@ -40,14 +46,14 @@ pub(super) fn operation_source_label(value: OperationSource) -> &'static str {
         OperationSource::Admin => "admin",
         OperationSource::Boot => "boot",
         OperationSource::Shutdown => "shutdown",
-        OperationSource::DependencyPropagation => "dependency_propagation",
-        OperationSource::RestartPolicy => "restart_policy",
+        OperationSource::DependencyPropagation => "dependency-propagation",
+        OperationSource::RestartPolicy => "restart-policy",
         OperationSource::Timer => "timer",
-        OperationSource::BindsToRecovery => "binds_to_recovery",
-        OperationSource::BindsToPropagation => "binds_to_propagation",
-        OperationSource::ConflictResolution => "conflict_resolution",
-        OperationSource::OnFailure => "on_failure",
-        OperationSource::TtyRelease => "tty_release",
+        OperationSource::BindsToRecovery => "binds-to-recovery",
+        OperationSource::BindsToPropagation => "binds-to-propagation",
+        OperationSource::ConflictResolution => "conflict-resolution",
+        OperationSource::OnFailure => "on-failure",
+        OperationSource::TtyRelease => "tty-release",
     }
 }
 
@@ -75,7 +81,7 @@ pub(super) fn service_dependency_kind_label(value: ServiceDependencyKind) -> &'s
     match value {
         ServiceDependencyKind::Requires => "requires",
         ServiceDependencyKind::Wants => "wants",
-        ServiceDependencyKind::BindsTo => "binds_to",
+        ServiceDependencyKind::BindsTo => "binds-to",
     }
 }
 
@@ -96,35 +102,35 @@ pub(super) fn service_state_label(value: ServiceState) -> &'static str {
 
 pub(super) fn transition_cause_label(value: TransitionCause) -> &'static str {
     match value {
-        TransitionCause::ExplicitStart => "explicit_start",
-        TransitionCause::DependencyStart => "dependency_start",
-        TransitionCause::RestartPolicy => "restart_policy",
-        TransitionCause::BindsToRecovery => "binds_to_recovery",
-        TransitionCause::ExplicitStop => "explicit_stop",
-        TransitionCause::ExplicitReload => "explicit_reload",
-        TransitionCause::ExplicitReset => "explicit_reset",
-        TransitionCause::ConflictEviction => "conflict_eviction",
-        TransitionCause::BindsToPropagation => "binds_to_propagation",
+        TransitionCause::ExplicitStart => "explicit-start",
+        TransitionCause::DependencyStart => "dependency-start",
+        TransitionCause::RestartPolicy => "restart-policy",
+        TransitionCause::BindsToRecovery => "binds-to-recovery",
+        TransitionCause::ExplicitStop => "explicit-stop",
+        TransitionCause::ExplicitReload => "explicit-reload",
+        TransitionCause::ExplicitReset => "explicit-reset",
+        TransitionCause::ConflictEviction => "conflict-eviction",
+        TransitionCause::BindsToPropagation => "binds-to-propagation",
         TransitionCause::Timer => "timer",
-        TransitionCause::ShutdownWave => "shutdown_wave",
-        TransitionCause::ProcessCrash => "process_crash",
-        TransitionCause::CleanExit => "clean_exit",
-        TransitionCause::CleanExitRestart => "clean_exit_restart",
-        TransitionCause::ReadinessTimeout => "readiness_timeout",
-        TransitionCause::WatchdogTimeout => "watchdog_timeout",
-        TransitionCause::HealthCheckFailure => "health_check_failure",
-        TransitionCause::PreHookFailure => "pre_hook_failure",
-        TransitionCause::ParentSetupFailure => "parent_setup_failure",
-        TransitionCause::PreExecFailure => "pre_exec_failure",
-        TransitionCause::DependencyFailure => "dependency_failure",
-        TransitionCause::RestartBudgetExhausted => "restart_budget_exhausted",
-        TransitionCause::CycleDetected => "cycle_detected",
-        TransitionCause::ValidationError => "validation_error",
-        TransitionCause::AssertionError => "assertion_error",
-        TransitionCause::ConditionSkipped => "condition_skipped",
-        TransitionCause::TtyUnavailable => "tty_unavailable",
-        TransitionCause::ProcessUnkillable => "process_unkillable",
-        TransitionCause::InternalError => "internal_error",
+        TransitionCause::ShutdownWave => "shutdown-wave",
+        TransitionCause::ProcessCrash => "process-crash",
+        TransitionCause::CleanExit => "clean-exit",
+        TransitionCause::CleanExitRestart => "clean-exit-restart",
+        TransitionCause::ReadinessTimeout => "readiness-timeout",
+        TransitionCause::WatchdogTimeout => "watchdog-timeout",
+        TransitionCause::HealthCheckFailure => "health-check-failure",
+        TransitionCause::PreHookFailure => "pre-hook-failure",
+        TransitionCause::ParentSetupFailure => "parent-setup-failure",
+        TransitionCause::PreExecFailure => "pre-exec-failure",
+        TransitionCause::DependencyFailure => "dependency-failure",
+        TransitionCause::RestartBudgetExhausted => "restart-budget-exhausted",
+        TransitionCause::CycleDetected => "cycle-detected",
+        TransitionCause::ValidationError => "validation-error",
+        TransitionCause::AssertionError => "assertion-error",
+        TransitionCause::ConditionSkipped => "condition-skipped",
+        TransitionCause::TtyUnavailable => "tty-unavailable",
+        TransitionCause::ProcessUnkillable => "process-unkillable",
+        TransitionCause::InternalError => "internal-error",
     }
 }
 

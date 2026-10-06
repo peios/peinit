@@ -1,4 +1,5 @@
-use crate::boundary::{KmesEvent, LinuxTimerFdRead};
+use crate::boundary::LinuxTimerFdRead;
+use crate::kmes::EventCollector;
 use crate::control::connection::{ControlConnectionReadTurn, ControlConnectionWriteTurn};
 use crate::control::lifecycle::{OnDemandStartDispatch, OnDemandStartPlan};
 use crate::control::service_security::{ServiceAccess, ServiceAccessDenied};
@@ -42,7 +43,7 @@ fn runtime_loop_collector_pushes_a_leaked_cgroup_as_an_audit_event() {
         deadline_timer: crate::supervisor::SupervisorLifecycleDeadlineTimerTurn::Disarmed,
     };
 
-    let mut events = Vec::new();
+    let mut out = EventCollector::everything(Default::default());
     collect_runtime_loop_kmes_events(
         &RuntimeWorkPumpTurn::default(),
         &SupervisorOperationMaintenanceTurn::default(),
@@ -50,16 +51,17 @@ fn runtime_loop_collector_pushes_a_leaked_cgroup_as_an_audit_event() {
         &RuntimeWorkPumpTurn::default(),
         &SupervisorOperationMaintenanceTurn::default(),
         &[],
-        &mut events,
+        &mut out,
     )
     .expect("collected KMES events");
+    let events = out.into_events();
 
     assert_eq!(
         events
             .iter()
             .map(|event| event.event_type.as_str())
             .collect::<Vec<_>>(),
-        vec!["cgroup.leaked"],
+        vec!["peinit.cgroup.leaked"],
     );
 }
 
@@ -107,7 +109,7 @@ fn runtime_loop_collector_preserves_phase_order_for_maintenance_events_and_calen
         next_scheduled_ns: None,
     };
 
-    let mut events = Vec::<KmesEvent>::new();
+    let mut out = EventCollector::everything(Default::default());
     collect_runtime_loop_kmes_events(
         &RuntimeWorkPumpTurn::default(),
         &maintenance_before_wait,
@@ -115,9 +117,10 @@ fn runtime_loop_collector_preserves_phase_order_for_maintenance_events_and_calen
         &RuntimeWorkPumpTurn::default(),
         &maintenance_after_sources,
         &[(17, calendar_turn)],
-        &mut events,
+        &mut out,
     )
     .expect("collected KMES events");
+    let events = out.into_events();
 
     assert_eq!(
         events
@@ -125,17 +128,59 @@ fn runtime_loop_collector_preserves_phase_order_for_maintenance_events_and_calen
             .map(|event| event.event_type.as_str())
             .collect::<Vec<_>>(),
         vec![
-            "operation.completed",
-            "shutdown.abandoned",
-            "operation.completed",
-            "on_failure.loop_suppressed",
-            "operation.requested",
+            "peinit.operation.ended",
+            "peinit.service.abandoned",
+            "peinit.operation.ended",
+            "peinit.on-failure.suppressed",
+            "peinit.operation.requested",
         ],
     );
 }
 
+/// The emission policy decides per type, before the payload is built: with
+/// `peinit.operation.ended` switched off, the turn's other events are
+/// written in their order and that type is not.
 #[test]
-fn runtime_loop_collector_emits_access_denial_audit_events() {
+fn runtime_loop_collector_leaves_out_a_type_the_policy_switches_off() {
+    let maintenance = SupervisorOperationMaintenanceTurn {
+        operation_timeouts: vec![completed_operation(operation_id(1), "a")],
+        relationship_audit_events: vec![SupervisorOnFailureLoopSuppressedDispatch {
+            failed_service: "a".to_string(),
+            attempted_handler: "b".to_string(),
+            chain: vec!["b".to_string()],
+            reason: SupervisorOnFailureLoopSuppressionReason::Cycle,
+        }],
+        ..SupervisorOperationMaintenanceTurn::default()
+    };
+    let policy = |event_type: &str, _: crate::boundary::EventTier| {
+        event_type != "peinit.operation.ended"
+    };
+    let mut out = EventCollector::new(&policy, Default::default());
+    collect_runtime_loop_kmes_events(
+        &RuntimeWorkPumpTurn::default(),
+        &maintenance,
+        &[],
+        &RuntimeWorkPumpTurn::default(),
+        &SupervisorOperationMaintenanceTurn::default(),
+        &[],
+        &mut out,
+    )
+    .expect("collected KMES events");
+
+    assert_eq!(
+        out.events()
+            .iter()
+            .map(|event| event.event_type.as_str())
+            .collect::<Vec<_>>(),
+        vec!["peinit.on-failure.suppressed"],
+    );
+}
+
+/// PEI-1279: a command refused by a descriptor writes no event of peinit's.
+/// KACS records the decision, as `kacs.audit.access.checked`, under the
+/// descriptor's SACL.
+#[test]
+fn runtime_loop_collector_writes_no_event_for_an_access_denial() {
     let command_error =
         SupervisorControlCommandBodyError::ServiceAccessDenied(Box::new(ServiceAccessDenied {
             caller: TokenSummary::requested_identity("S-1-5-21-client"),
@@ -170,7 +215,7 @@ fn runtime_loop_collector_emits_access_denial_audit_events() {
         deadline_timer: None,
     };
 
-    let mut events = Vec::<KmesEvent>::new();
+    let mut out = EventCollector::everything(Default::default());
     collect_runtime_loop_kmes_events(
         &RuntimeWorkPumpTurn::default(),
         &SupervisorOperationMaintenanceTurn::default(),
@@ -178,12 +223,12 @@ fn runtime_loop_collector_emits_access_denial_audit_events() {
         &RuntimeWorkPumpTurn::default(),
         &SupervisorOperationMaintenanceTurn::default(),
         &[],
-        &mut events,
+        &mut out,
     )
     .expect("collected KMES events");
+    let events = out.into_events();
 
-    assert_eq!(events.len(), 1);
-    assert_eq!(events[0].event_type, "access.denied");
+    assert!(events.is_empty(), "{events:?}");
 }
 
 fn completed_operation(id: crate::ids::OperationId, service: &str) -> OperationEvent {
@@ -280,8 +325,9 @@ fn operation_id(sequence: u64) -> crate::ids::OperationId {
 }
 
 /// PEI-1125: a contained internal error leaves a complete trail — the job it
-/// retired, the operation it failed, and a `service.internal_error` saying
-/// what peinit could not do — so the failure does not read as the service's.
+/// retired, the operation it failed, and a `peinit.internal-error.contained`
+/// saying what peinit could not do — so the failure does not read as the
+/// service's.
 #[test]
 fn runtime_loop_collector_records_a_contained_internal_error() {
     let dispatch = crate::supervisor::SupervisorInternalErrorDispatch {
@@ -319,7 +365,7 @@ fn runtime_loop_collector_records_a_contained_internal_error() {
         deadline_timer: crate::supervisor::SupervisorLifecycleDeadlineTimerTurn::Disarmed,
     };
 
-    let mut events = Vec::new();
+    let mut out = EventCollector::everything(Default::default());
     collect_runtime_loop_kmes_events(
         &RuntimeWorkPumpTurn::default(),
         &SupervisorOperationMaintenanceTurn::default(),
@@ -327,29 +373,30 @@ fn runtime_loop_collector_records_a_contained_internal_error() {
         &RuntimeWorkPumpTurn::default(),
         &SupervisorOperationMaintenanceTurn::default(),
         &[],
-        &mut events,
+        &mut out,
     )
     .expect("collected KMES events");
+    let events = out.into_events();
 
     assert_eq!(
         events
             .iter()
             .map(|event| event.event_type.as_str())
             .collect::<Vec<_>>(),
-        vec!["operation.completed", "service.internal_error"],
+        vec!["peinit.operation.ended", "peinit.internal-error.contained"],
     );
     assert_eq!(
         crate::kmes::kmes_event_subject(&events[1].payload)
-            .0
+            .service
             .as_deref(),
         Some("app")
     );
 }
 
-/// PEI-1082: a `job.ended` whose arguments were cut is followed by an
-/// `event.oversized` saying so, so the audit trail records the gap.
+/// PEI-1082: a `peinit.job.ended` whose arguments were cut says so itself;
+/// the `truncated` notice that used to follow it is withdrawn.
 #[test]
-fn a_cut_job_ended_is_followed_by_an_event_oversized_naming_the_cut() {
+fn a_cut_job_ended_says_it_was_cut_and_needs_no_notice() {
     let job_id = crate::ids::JobIdAllocator::new()
         .allocate_batch(1, 1_717_171_717_123_456_789)
         .expect("job id")[0];
@@ -408,7 +455,7 @@ fn a_cut_job_ended_is_followed_by_an_event_oversized_naming_the_cut() {
         ended_at_ns: 30,
     };
 
-    let mut events = Vec::new();
+    let mut out = EventCollector::everything(Default::default());
     collect_runtime_loop_kmes_events(
         &RuntimeWorkPumpTurn::default(),
         &SupervisorOperationMaintenanceTurn::default(),
@@ -416,35 +463,41 @@ fn a_cut_job_ended_is_followed_by_an_event_oversized_naming_the_cut() {
         &RuntimeWorkPumpTurn::default(),
         &SupervisorOperationMaintenanceTurn::default(),
         &[],
-        &mut events,
+        &mut out,
     )
     .expect("collected KMES events");
+    let events = out.into_events();
 
     assert_eq!(
         events
             .iter()
             .map(|event| event.event_type.as_str())
             .collect::<Vec<_>>(),
-        vec!["job.ended", "event.oversized", "service.internal_error"],
+        vec!["peinit.job.ended", "peinit.internal-error.contained"],
     );
     assert!(events[0].payload.len() < 65_536);
     assert_eq!(
-        crate::kmes::kmes_event_subject(&events[1].payload),
-        (Some("app".to_string()), Some(job_id.to_string())),
+        crate::kmes::kmes_event_subject(&events[0].payload),
+        crate::kmes::KmesEventSubject {
+            service: Some("app".to_string()),
+            job_guid: Some(job_id.as_bytes()),
+        },
     );
-    assert_eq!(read_str(&events[1].payload, "action"), "truncated");
-    assert_eq!(read_str(&events[1].payload, "event"), "job.ended");
+    assert!(read_bool(&events[0].payload, &["object", "job", "arguments-truncated"]));
 }
 
-fn read_str(payload: &[u8], field: &str) -> String {
+fn read_bool(payload: &[u8], path: &[&str]) -> bool {
     let mut reader = peios::msgpack::Reader::new(payload);
-    let count = reader.read_map().expect("payload map");
-    for _ in 0..count {
-        let key = reader.read_str().expect("field key");
-        if key == field {
-            return reader.read_str().expect("field value").to_string();
+    'segments: for segment in path {
+        let count = reader.read_map().expect("payload map");
+        for _ in 0..count {
+            let key = reader.read_str().expect("field key");
+            if key == *segment {
+                continue 'segments;
+            }
+            reader.skip().expect("skip value");
         }
-        reader.skip().expect("skip value");
+        panic!("missing field {segment}");
     }
-    panic!("missing field {field}");
+    reader.read_bool().expect("field value")
 }

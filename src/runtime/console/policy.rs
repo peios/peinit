@@ -35,6 +35,11 @@ impl QuietPolicy {
     }
 
     pub fn allows(self, severity: ConsoleSeverity) -> bool {
+        // A debugging line is for a machine someone is debugging, which is
+        // what `peios.quiet=0` says.
+        if severity == ConsoleSeverity::Debug && self.level != QuietLevel::Verbose {
+            return false;
+        }
         // Ownership first, and it is the stricter of the two: an error is news
         // worth overriding a preference for, but it is not worth writing into
         // the middle of someone's login prompt. Only losing the machine is.

@@ -239,6 +239,11 @@ pub trait InitPlatform {
     ) -> Result<(), BoundaryError> {
         Ok(())
     }
+    /// Whether the emission policy has `event_type` switched on, asked
+    /// before a non-essential event is built (PGSS §6.9).
+    fn kmes_event_enabled(&self, _event_type: &str, _tier: crate::boundary::EventTier) -> bool {
+        true
+    }
     fn run_recovery_forever(&mut self, reason: &InitRecoveryReason) -> Result<(), BoundaryError>;
 }
 

@@ -145,7 +145,7 @@ pub struct SubmittedJobEntry {
     pub status_text: Option<String>,
     pub progress: Option<JobProgress>,
     pub progress_unit: Option<JobProgressUnit>,
-    /// When the last `job.status` event was emitted for this job, for the
+    /// When the last `peinit.job.status.reported` was emitted for this job, for the
     /// per-job rate bound.
     pub last_status_event_ns: Option<u64>,
     /// The job sent `STOPPING=1`: a stop sends no termination signal.
@@ -162,7 +162,7 @@ pub struct SubmittedJobEntry {
     /// A cgroup that could not be removed after the job ended is retried
     /// once at this deadline, then reported as leaked.
     pub cgroup_cleanup_due_at_ns: Option<u64>,
-    /// Whether an `output.dropped` event has already been emitted.
+    /// Whether a `peinit.job.output.dropped` event has already been emitted.
     pub output_drop_reported: bool,
 }
 

@@ -343,7 +343,7 @@ impl LinuxShutdownRuntime {
             &mut console_messages,
         );
         // An event the ring refused is gone from the trail; the operator is
-        // told here and the trail itself carries an `event.oversized` in
+        // told here and the trail itself carries a `peinit.event.dropped` in
         // its place (PEI-1082).
         for dropped in &dropped_events {
             crate::runtime::console::push_warn(&mut console_messages, dropped.console_message());

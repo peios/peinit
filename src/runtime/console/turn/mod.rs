@@ -77,6 +77,14 @@ pub(super) fn collect_runtime_shutdown_turn_console_messages(
         RuntimeShutdownEventTurn::DeferredRegistryReload { turn } => {
             control::collect_deferred_registry_reload_console_messages(turn, out);
         }
+        RuntimeShutdownEventTurn::JobsConnection {
+            turn: crate::runtime::RuntimeJobsConnectionTurn::Processed { supervisor, .. },
+            ..
+        } => {
+            if let Some(denied) = &supervisor.access_denial {
+                control::push_job_denial(denied, out);
+            }
+        }
         RuntimeShutdownEventTurn::ControlListener { .. }
         | RuntimeShutdownEventTurn::IdleControlConnectionsClosed { .. }
         | RuntimeShutdownEventTurn::StaleControlConnection { .. }
