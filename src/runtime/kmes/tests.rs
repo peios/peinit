@@ -480,7 +480,7 @@ fn a_cut_job_ended_says_it_was_cut_and_needs_no_notice() {
         crate::kmes::kmes_event_subject(&events[0].payload),
         crate::kmes::KmesEventSubject {
             service: Some("app".to_string()),
-            job_guid: Some(job_id.as_bytes()),
+            job_guid: Some(job_id.as_guid_bytes()),
         },
     );
     assert!(read_bool(&events[0].payload, &["object", "job", "arguments-truncated"]));

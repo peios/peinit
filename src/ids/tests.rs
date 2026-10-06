@@ -14,6 +14,28 @@ fn operation_allocator_allocates_distinct_uuidv7_ids() {
     assert_eq!(ids[0].as_bytes()[8] & 0b1100_0000, 0b1000_0000);
 }
 
+/// A `bin.guid` field carries a GUID in its PCDS binary form, whose first
+/// three fields are little-endian; read back that way, it is the same
+/// canonical text the control channel shows.
+#[test]
+fn the_pcds_form_reads_back_as_the_canonical_text() {
+    let id = JobIdAllocator::new()
+        .allocate_batch(1, OBSERVED_AT_NS)
+        .expect("ids")[0];
+    let b = id.as_guid_bytes();
+    let read_back = format!(
+        "{:08x}-{:04x}-{:04x}-{:02x}{:02x}-{}",
+        u32::from_le_bytes([b[0], b[1], b[2], b[3]]),
+        u16::from_le_bytes([b[4], b[5]]),
+        u16::from_le_bytes([b[6], b[7]]),
+        b[8],
+        b[9],
+        b[10..].iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
+    );
+    assert_eq!(read_back, id.to_string());
+    assert_eq!(b[8..], id.as_bytes()[8..], "the last eight bytes are as they are");
+}
+
 #[test]
 fn job_allocator_is_independent_from_operation_allocator() {
     let mut operations = OperationIdAllocator::new();

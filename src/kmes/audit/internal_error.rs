@@ -82,17 +82,23 @@ pub struct KmesEventSubject {
 }
 
 impl KmesEventSubject {
-    /// The job's GUID as UUID text, for a person.
+    /// The job's GUID as its canonical text, for a person: the PCDS binary
+    /// form read back, first three fields little-endian (PCDS §2.2).
     pub fn job_text(&self) -> Option<String> {
-        self.job_guid.map(|guid| {
-            let hex: String = guid.iter().map(|byte| format!("{byte:02x}")).collect();
+        self.job_guid.map(|b| {
             format!(
-                "{}-{}-{}-{}-{}",
-                &hex[0..8],
-                &hex[8..12],
-                &hex[12..16],
-                &hex[16..20],
-                &hex[20..32]
+                "{:08x}-{:04x}-{:04x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
+                u32::from_le_bytes([b[0], b[1], b[2], b[3]]),
+                u16::from_le_bytes([b[4], b[5]]),
+                u16::from_le_bytes([b[6], b[7]]),
+                b[8],
+                b[9],
+                b[10],
+                b[11],
+                b[12],
+                b[13],
+                b[14],
+                b[15]
             )
         })
     }
