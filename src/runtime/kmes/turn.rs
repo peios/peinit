@@ -1,9 +1,15 @@
-use crate::boundary::{BoundaryError, KmesEvent};
-use crate::kmes::{
-    encode_fd_store_rejection_event, encode_notify_applied_field_events,
-    encode_notify_progress_event, encode_notify_rejection_event,
-    encode_on_failure_loop_suppressed_event,
+use crate::boundary::BoundaryError;
+use crate::execution::notify::NotifyApplyError;
+use crate::kmes::types::{
+    CONFIG_RELOAD_APPLIED, FD_STORE_REJECTED, NOTIFY_PROGRESS_REPORTED, NOTIFY_REJECTED,
+    ON_FAILURE_SUPPRESSED,
 };
+use crate::kmes::{
+    EventCollector, NotifyRejectionReason, encode_fd_store_rejection_event,
+    encode_notify_field_event, encode_notify_progress_event, encode_notify_rejection_event,
+    encode_on_failure_loop_suppressed_event, notify_field_event_type,
+};
+use crate::notify::NotifyParseError;
 use crate::supervisor::{SupervisorFilesystemCheckCompletionDispatch, SupervisorNotifyDispatch};
 
 use super::event::{push_graphs, push_job, push_operations};
@@ -33,7 +39,7 @@ pub(crate) fn collect_runtime_loop_kmes_events(
     post_work: &RuntimeWorkPumpTurn,
     maintenance_after_sources: &crate::supervisor::SupervisorOperationMaintenanceTurn,
     calendar_turns: &[(i32, RuntimeCalendarTimerTurn)],
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     super::work::collect_runtime_work_pump_kmes_events(pre_work, out)?;
     collect_operation_maintenance_turn_kmes_events(maintenance_before_wait, out)?;
@@ -48,20 +54,19 @@ pub(crate) fn collect_runtime_loop_kmes_events(
     Ok(())
 }
 
-/// The audit record of a final action that returned: the `critical.failure`
-/// for a Critical service's reboot, with the trigger the path that observed
-/// it recorded. A shutdown's own final action has no event, as on the
-/// drive paths.
+/// The audit record of a final action that returned: the
+/// `peinit.critical-service.failed` for a Critical service's reboot, with the
+/// trigger the path that observed it recorded. A shutdown's own final action
+/// has no event, as on the drive paths.
 pub(crate) fn collect_runtime_shutdown_finalization_kmes_events(
     finalization: &crate::runtime::RuntimeShutdownFinalizationTurn,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     if let Some(reboot) = &finalization.critical_budget_reboot {
         super::event::push_critical_failure(
             out,
             &reboot.service,
-            reboot.trigger.kmes_id(),
-            reboot.observed_at_ns,
+            reboot.trigger,
             &reboot.finalization,
         )?;
     }
@@ -70,7 +75,7 @@ pub(crate) fn collect_runtime_shutdown_finalization_kmes_events(
 
 pub(crate) fn collect_runtime_shutdown_turn_kmes_events(
     turn: &RuntimeShutdownEventTurn,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     match turn {
         RuntimeShutdownEventTurn::Pid1Signal {
@@ -148,10 +153,12 @@ pub(crate) fn collect_runtime_shutdown_turn_kmes_events(
             }
         }
         RuntimeShutdownEventTurn::DeferredRegistryReload { turn } => {
-            out.push(crate::kmes::encode_registry_reload_coalesced_event(
-                &turn.deferred,
-                &turn.outcome,
-            )?);
+            out.push(CONFIG_RELOAD_APPLIED, |_| {
+                crate::kmes::encode_config_reload_applied_event(
+                    Some(turn.deferred.services.as_slice()),
+                    turn.outcome.as_ref().as_ref(),
+                )
+            })?;
             if let Ok(outcome) = turn.outcome.as_ref() {
                 super::system::collect_reload_config_warnings(outcome, out)?;
             }
@@ -168,7 +175,7 @@ pub(crate) fn collect_runtime_shutdown_turn_kmes_events(
 
 fn collect_power_button_turn(
     turn: &RuntimePowerButtonTurn,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     let RuntimePowerButtonTurn::Shutdown { supervisor, .. } = turn else {
         return Ok(());
@@ -178,7 +185,7 @@ fn collect_power_button_turn(
 
 fn collect_process_setup_turn(
     turn: &RuntimeProcessSetupTurn,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     let supervisor = match turn {
         RuntimeProcessSetupTurn::Completed { supervisor, .. } => supervisor,
@@ -231,7 +238,7 @@ fn collect_process_setup_turn(
 
 pub(crate) fn collect_runtime_calendar_timer_kmes_events(
     turn: &RuntimeCalendarTimerTurn,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     if let RuntimeCalendarTimerTurn::Read {
         supervisor: Some(dispatch),
@@ -245,7 +252,7 @@ pub(crate) fn collect_runtime_calendar_timer_kmes_events(
 
 pub(crate) fn collect_operation_maintenance_turn_kmes_events(
     turn: &crate::supervisor::SupervisorOperationMaintenanceTurn,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     push_operations(out, &turn.operation_timeouts)?;
     for timeout in &turn.service_main_start_timeouts {
@@ -253,7 +260,9 @@ pub(crate) fn collect_operation_maintenance_turn_kmes_events(
     }
     push_graphs(out, &turn.graph_events)?;
     for event in &turn.relationship_audit_events {
-        out.push(encode_on_failure_loop_suppressed_event(event)?);
+        out.push(ON_FAILURE_SUPPRESSED, |_| {
+            encode_on_failure_loop_suppressed_event(event)
+        })?;
     }
     collect_start_dispatches(&turn.start_dispatches, out)
 }
@@ -261,7 +270,7 @@ pub(crate) fn collect_operation_maintenance_turn_kmes_events(
 fn collect_notify_supervisor_turn(
     read: &RuntimeNotifyRead,
     turn: &RuntimeNotifySupervisorTurn,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     match turn {
         RuntimeNotifySupervisorTurn::Applied(dispatch) => collect_notify_dispatch(dispatch, out),
@@ -274,29 +283,31 @@ fn collect_notify_supervisor_turn(
         RuntimeNotifySupervisorTurn::Rejected(rejection) => {
             let sender_pid = notify_sender_pid(read);
             let attribution = notify_rejection_attribution(rejection);
-            out.push(encode_notify_rejection_event(
-                sender_pid,
-                &notify_rejection_reason(rejection),
-                attribution,
-            )?);
-            Ok(())
+            out.push(NOTIFY_REJECTED, |_| {
+                encode_notify_rejection_event(
+                    sender_pid,
+                    notify_rejection_reason(rejection),
+                    attribution,
+                )
+            })
         }
     }
 }
 
 fn collect_notify_dispatch(
     dispatch: &SupervisorNotifyDispatch,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
-    out.extend(encode_notify_applied_field_events(
-        &dispatch.notify.sender,
-        &dispatch.notify.applied_fields,
-    )?);
+    let sender = &dispatch.notify.sender;
+    for field in &dispatch.notify.applied_fields {
+        if let Some(event_type) = notify_field_event_type(field) {
+            out.push(event_type, |_| encode_notify_field_event(sender, field))?;
+        }
+    }
     if let Some(report) = &dispatch.notify.progress_event {
-        out.push(encode_notify_progress_event(
-            &dispatch.notify.sender,
-            report,
-        )?);
+        out.push(NOTIFY_PROGRESS_REPORTED, |_| {
+            encode_notify_progress_event(sender, report)
+        })?;
     }
     push_operations(out, &dispatch.notify.operation_events)?;
     push_graphs(out, &dispatch.notify.graph_events)?;
@@ -304,14 +315,16 @@ fn collect_notify_dispatch(
         push_job(out, job_event)?;
     }
     for rejection in &dispatch.fd_store_rejections {
-        out.push(encode_fd_store_rejection_event(rejection)?);
+        out.push(FD_STORE_REJECTED, |_| {
+            encode_fd_store_rejection_event(rejection)
+        })?;
     }
     collect_start_dispatches(&dispatch.start_dispatches, out)
 }
 
 fn collect_filesystem_check_helper_turn(
     turn: &RuntimeFilesystemCheckHelperTurn,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     match turn {
         RuntimeFilesystemCheckHelperTurn::Completed { completion }
@@ -326,7 +339,7 @@ fn collect_filesystem_check_helper_turn(
 
 fn collect_filesystem_check_completion(
     dispatch: &SupervisorFilesystemCheckCompletionDispatch,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     collect_pre_start_check_completion(&dispatch.completion, out)?;
     collect_start_dispatches(&dispatch.start_dispatches, out)
@@ -349,13 +362,46 @@ fn notify_rejection_attribution(
     }
 }
 
-fn notify_rejection_reason(rejection: &RuntimeNotifyRejection) -> String {
+/// Why a datagram was refused, as `peinit.notify.rejected` names it. The
+/// errors of peinit's own tables are one reason, `internal-error`: they say
+/// peinit could not act, not what was wrong with the datagram.
+fn notify_rejection_reason(rejection: &RuntimeNotifyRejection) -> NotifyRejectionReason {
     match rejection {
-        RuntimeNotifyRejection::Parse { error, .. } => format!("parse: {error:?}"),
-        RuntimeNotifyRejection::Apply { error, .. } => format!("apply: {error:?}"),
-        RuntimeNotifyRejection::Shutdown(error) => format!("shutdown: {error:?}"),
-        RuntimeNotifyRejection::Truncated { payload, control } => {
-            format!("truncated: payload={payload} control={control}")
-        }
+        RuntimeNotifyRejection::Parse { error, .. } => match error {
+            NotifyParseError::InvalidUtf8 => NotifyRejectionReason::InvalidUtf8,
+            NotifyParseError::MalformedLine { .. } => NotifyRejectionReason::MalformedLine,
+        },
+        RuntimeNotifyRejection::Apply { error, .. } => match error {
+            NotifyApplyError::UnauthenticatedSender { .. } => {
+                NotifyRejectionReason::UnauthenticatedSender
+            }
+            NotifyApplyError::MissingService { .. } => NotifyRejectionReason::MissingService,
+            NotifyApplyError::JobNotRunning { .. } => NotifyRejectionReason::JobNotRunning,
+            NotifyApplyError::MissingProcess { .. } => NotifyRejectionReason::MissingProcess,
+            NotifyApplyError::PidfdMismatch { .. } => NotifyRejectionReason::PidfdMismatch,
+            NotifyApplyError::ProcessVerification { .. } => {
+                NotifyRejectionReason::ProcessVerificationFailed
+            }
+            NotifyApplyError::GenerationMismatch { .. } => {
+                NotifyRejectionReason::GenerationMismatch
+            }
+            NotifyApplyError::MissingStartOperation { .. } => {
+                NotifyRejectionReason::MissingStartOperation
+            }
+            NotifyApplyError::MissingReloadOperation { .. } => {
+                NotifyRejectionReason::MissingReloadOperation
+            }
+            NotifyApplyError::UnsupportedReloadOperation { .. } => {
+                NotifyRejectionReason::UnsupportedReloadOperation
+            }
+            NotifyApplyError::UnsupportedReadyState { .. } => {
+                NotifyRejectionReason::UnsupportedReadyState
+            }
+            NotifyApplyError::ServiceTable(_)
+            | NotifyApplyError::OperationStore(_)
+            | NotifyApplyError::Start(_) => NotifyRejectionReason::InternalError,
+        },
+        RuntimeNotifyRejection::Shutdown(_) => NotifyRejectionReason::ShutdownRefused,
+        RuntimeNotifyRejection::Truncated { .. } => NotifyRejectionReason::Truncated,
     }
 }

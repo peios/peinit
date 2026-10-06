@@ -1,0 +1,1224 @@
+--- field object.service.name
+type: str
+asserted: true
+
+The name of the service the event is about, as its definition names it.
+The same value peinit passes as the object name in the KACS audit context
+when it checks a caller's access to a service, so a peinit record and the
+access-check record for the same command join on it.
+
+On a `kacs.audit.access.checked` record the value is peinit's claim, copied
+by the kernel from the check's audit context `{kind: "service", service:
+{name}}`, so that record also carries `fields.attestation.userspace`.
+
+A name, not a durable identity: a service removed and later redefined
+under the same name is a different service with the same
+`object.service.name`. Read `object.service.generation` beside it to tell
+one activation from the next.
+
+--- field object.service.type
+type: str.enum
+values: simple | oneshot
+closed: false
+
+How the service's main process is supervised. A `simple` service is up
+while its process runs; a `oneshot` service runs to completion and is
+then `completed`. Health checks are scheduled for `simple` services only,
+which is why a validation finding names the type.
+
+--- field object.service.state
+type: str.enum
+values: inactive | starting | active | reloading | stopping | completed | backoff | failed | abandoned | skipped
+closed: true
+
+The service's state after the event, in the vocabulary of the control
+channel (PSPU §4.B). Exactly four states satisfy dependents: `active`,
+`reloading`, `completed` and `skipped`. Use that set and no other when
+asking whether something depending on this service could be running.
+
+`abandoned` means a process survived SIGKILL and is still there,
+unkillably. It is not a stopped service.
+
+--- field object.service.state-previous
+type: str.enum
+values: inactive | starting | active | reloading | stopping | completed | backoff | failed | abandoned | skipped
+closed: true
+
+The service's state before the event, with the same values as
+`object.service.state`. The two together are the transition; a record
+carrying only one of them says where the service is, not how it got
+there.
+
+--- field object.service.transition-cause
+type: str.enum
+values: explicit-start | dependency-start | restart-policy | binds-to-recovery | timer | explicit-stop | explicit-reload | explicit-reset | conflict-eviction | binds-to-propagation | shutdown-wave | process-crash | clean-exit | clean-exit-restart | readiness-timeout | watchdog-timeout | health-check-failure | pre-hook-failure | parent-setup-failure | pre-exec-failure | dependency-failure | restart-budget-exhausted | cycle-detected | validation-error | assertion-error | condition-skipped | tty-unavailable | process-unkillable | internal-error
+closed: false
+
+Why the service's state changed. The causes beginning `explicit-` follow
+an operator's command; the rest are peinit's own reasons, and an operator
+reading one has learned what the manager did, not what anyone asked for.
+
+**`internal-error` is a fault in peinit, not in the service.** The
+service was failed because peinit could not carry out a step on its
+behalf; the service itself may have been healthy.
+
+--- field object.service.generation
+type: uint
+
+The service's activation generation: a counter peinit advances each time
+the service enters `starting`, so that every incarnation of a service has
+its own number. Records with the same `object.service.name` and the same
+generation describe one run of the service.
+
+The same counter as `object.job.activation-generation`, seen from the
+service rather than from one of its jobs. It is held in memory and starts
+again when peinit does, so it orders runs within one boot only.
+
+--- field object.service.dependents
+type: str[]
+
+The services that hard-depend on this one, by name. Hard dependencies are
+`requires` and `binds-to`; a `wants` dependent is not listed, because it
+starts whether or not this service does.
+
+--- field object.service.dependency.name
+type: str
+
+The name of the dependency a graph finding is about: the service this
+one requires and cannot have, or the one whose block has blocked it.
+Read `object.service.dependency.kind` for how this service depends on it.
+
+The name is as the definition wrote it. A missing-dependency finding
+names a service that does not exist, so do not expect to find any other
+record about it.
+
+--- field object.service.dependency.kind
+type: str.enum
+values: requires | wants | binds-to
+closed: false
+
+How the service depends on `object.service.dependency.name`. `requires`
+and `binds-to` are hard: the service cannot start without the dependency.
+`binds-to` is also tied to it afterwards, and stops and recovers with it.
+
+--- field object.service.conflict.name
+type: str
+
+The name of the service this one conflicts with, on a finding that two
+services both triggered at boot declare a conflict and so cannot both
+start. Which of the pair is `object.service.name` and which is this field
+carries no meaning: the conflict is mutual.
+
+--- field object.service.on-failure.name
+type: str
+
+The OnFailure handler peinit declined to start, because starting it would
+have looped or gone too deep. The failure the handler was meant to handle
+went unhandled, so look for it here when a handler did not run.
+
+--- field object.service.on-failure-chain
+type: str[]
+
+The OnFailure handlers already started in the chain that peinit cut
+short, in the order they were started. A chain is cut when the next
+handler is already in it, which is a loop, or when it has reached sixteen
+handlers.
+
+--- field object.service.failed
+type: bool
+
+Whether an internal error in peinit failed the service it occurred on.
+False means peinit contained the error without changing the service's
+state. Either way the fault was peinit's, not the service's.
+
+--- field object.service.health-check.interval
+type: uint.duration
+
+The configured interval between health checks, in nanoseconds. Configured
+in whole seconds, so it is always a whole number of seconds.
+
+--- field object.service.health-check.retries
+type: uint
+
+The configured number of consecutive health-check failures at which
+peinit stops reporting the service unhealthy and acts on it. Failures
+short of this count change nothing but the service's health.
+
+--- field object.service.health-check.restart-window
+type: uint.duration
+
+The configured restart window of a health check, in nanoseconds.
+Configured in whole seconds, so it is always a whole number of seconds.
+A validation finding carries it beside `object.service.health-check.interval`
+and `object.service.health-check.retries`, because it is their
+combination that a definition gets wrong.
+
+--- field object.service.timer.schedule
+type: str
+
+The service's timer schedule, exactly as its definition wrote it. On a
+finding that the schedule does not parse, this is the text that failed,
+so it may not be a valid schedule at all.
+
+--- field object.job.guid
+type: bin.guid
+asserted: true
+
+The job the event is about. A job is one process peinit runs: a service's
+main process, one of its hooks or health checks, or a job a client
+submitted. The GUID is a UUIDv7, so it also orders jobs by when they were
+created.
+
+On a `kacs.audit.access.checked` record the value is peinit's claim, copied
+by the kernel from the check's audit context `{kind: "job", job: {guid}}`,
+so that record also carries `fields.attestation.userspace`.
+
+--- field object.job.type
+type: str.enum
+values: service-main | pre-exec-hook | post-exec-hook | reload-hook | health-check | submitted
+closed: true
+
+What the job is for. Every type except `submitted` belongs to a service,
+named in `object.service.name`; a `submitted` job belongs to the client
+that submitted it, named in `object.job.submitter.sid`, and has no
+service.
+
+--- field object.job.state
+type: str.enum
+values: created | running | completed | failed | abandoned
+closed: true
+
+The job's state after the event. `completed`, `failed` and `abandoned`
+are terminal. `abandoned` means its process survived SIGKILL: the job is
+over but the process is still there.
+
+--- field object.job.activation-generation
+type: uint
+
+The activation generation of the service the job belongs to, at the time
+the job was created. The same counter as `object.service.generation`, so
+it tells which run of a service a job served. Absent for a `submitted`
+job, which belongs to no service.
+
+--- field object.job.executable
+type: str.path
+
+The path of the executable the job runs.
+
+--- field object.job.arguments
+type: str[]
+
+The job's argument vector, including `argv[0]`. Kept whole up to 32 KiB
+of encoded arguments; past that, the arguments are cut at the last whole
+argument that fits, never inside one, and `object.job.arguments-truncated`
+is true. A cut argument vector is a prefix of the real one, so do not
+read its last element as the last argument the job was given.
+
+--- field object.job.arguments-count
+type: uint
+
+How many arguments the job was given, before any were cut. Equal to the
+length of `object.job.arguments` unless that was cut.
+
+--- field object.job.arguments-truncated
+type: bool
+
+Whether `object.job.arguments` was cut to fit the record. When true,
+`object.job.arguments-count` says how many arguments there really were.
+
+--- field object.job.created-time
+type: uint.time
+
+When peinit created the job, in nanoseconds since the Unix epoch.
+Creation is when peinit decided to run it, before its process exists.
+
+peinit times a job on the monotonic clock, and writes the instant as the
+wall-clock time it was when it builds the record. If the wall clock was
+stepped between the job's creation and its end, the time is reported on
+the clock as it stood at the end.
+
+--- field object.job.started-time
+type: uint.time
+
+When the job's process started, in nanoseconds since the Unix epoch.
+Absent if the job never started, which is how a job that failed before
+its process existed shows itself. Projected from the monotonic clock as
+`object.job.created-time` is.
+
+--- field object.job.duration
+type: uint.duration
+
+How long the job lasted, in nanoseconds, from its creation to its end.
+**Measured from creation, not from start**, so it includes any time spent
+waiting to start; subtract `object.job.created-time` from
+`object.job.started-time` to find that part.
+
+--- field object.job.submitter.sid
+type: bin.sid
+
+The user SID of the client that submitted the job. Present only on a
+`submitted` job.
+
+--- field object.job.token.sid
+type: bin.sid
+
+The user SID of the token the job's process runs as.
+
+--- field object.job.token.groups
+type: bin.sid[]
+
+The group SIDs of the token the job's process runs as, in the token's
+order.
+
+--- field object.job.token.privileges
+type: uint.flags
+values: 0x4 KACS_SE_CREATE_TOKEN_PRIVILEGE | 0x8 KACS_SE_ASSIGN_PRIMARY_TOKEN_PRIVILEGE | 0x10 KACS_SE_LOCK_MEMORY_PRIVILEGE | 0x20 KACS_SE_INCREASE_QUOTA_PRIVILEGE | 0x80 KACS_SE_TCB_PRIVILEGE | 0x100 KACS_SE_SECURITY_PRIVILEGE | 0x200 KACS_SE_TAKE_OWNERSHIP_PRIVILEGE | 0x400 KACS_SE_LOAD_DRIVER_PRIVILEGE | 0x800 KACS_SE_SYSTEM_PROFILE_PRIVILEGE | 0x1000 KACS_SE_SYSTEMTIME_PRIVILEGE | 0x2000 KACS_SE_PROFILE_SINGLE_PROCESS_PRIVILEGE | 0x4000 KACS_SE_INCREASE_BASE_PRIORITY_PRIVILEGE | 0x20000 KACS_SE_BACKUP_PRIVILEGE | 0x40000 KACS_SE_RESTORE_PRIVILEGE | 0x80000 KACS_SE_SHUTDOWN_PRIVILEGE | 0x100000 KACS_SE_DEBUG_PRIVILEGE | 0x200000 KACS_SE_AUDIT_PRIVILEGE | 0x800000 KACS_SE_CHANGE_NOTIFY_PRIVILEGE | 0x1000000 KACS_SE_REMOTE_SHUTDOWN_PRIVILEGE | 0x10000000 KACS_SE_MANAGE_VOLUME_PRIVILEGE | 0x20000000 KACS_SE_IMPERSONATE_PRIVILEGE | 0x100000000 KACS_SE_RELABEL_PRIVILEGE | 0x800000000 KACS_SE_CREATE_SYMBOLIC_LINK_PRIVILEGE
+
+The privileges present on the token the job's process runs as, as the
+flags of the 64-bit privilege word of `uapi/pkm/token.h`, one
+`KACS_SE_*_PRIVILEGE` bit each. Present is not enabled: read
+`object.job.token.privileges-enabled` for which ones the process can use
+without enabling them first.
+
+Flags, as the kernel's `subject.token.privileges` are, not an access mask:
+a `uint.mask` is decoded against `object.kind` (PGSS §6.5), which means
+nothing on a job event.
+
+--- field object.job.token.privileges-enabled
+type: uint.flags
+values: 0x4 KACS_SE_CREATE_TOKEN_PRIVILEGE | 0x8 KACS_SE_ASSIGN_PRIMARY_TOKEN_PRIVILEGE | 0x10 KACS_SE_LOCK_MEMORY_PRIVILEGE | 0x20 KACS_SE_INCREASE_QUOTA_PRIVILEGE | 0x80 KACS_SE_TCB_PRIVILEGE | 0x100 KACS_SE_SECURITY_PRIVILEGE | 0x200 KACS_SE_TAKE_OWNERSHIP_PRIVILEGE | 0x400 KACS_SE_LOAD_DRIVER_PRIVILEGE | 0x800 KACS_SE_SYSTEM_PROFILE_PRIVILEGE | 0x1000 KACS_SE_SYSTEMTIME_PRIVILEGE | 0x2000 KACS_SE_PROFILE_SINGLE_PROCESS_PRIVILEGE | 0x4000 KACS_SE_INCREASE_BASE_PRIORITY_PRIVILEGE | 0x20000 KACS_SE_BACKUP_PRIVILEGE | 0x40000 KACS_SE_RESTORE_PRIVILEGE | 0x80000 KACS_SE_SHUTDOWN_PRIVILEGE | 0x100000 KACS_SE_DEBUG_PRIVILEGE | 0x200000 KACS_SE_AUDIT_PRIVILEGE | 0x800000 KACS_SE_CHANGE_NOTIFY_PRIVILEGE | 0x1000000 KACS_SE_REMOTE_SHUTDOWN_PRIVILEGE | 0x10000000 KACS_SE_MANAGE_VOLUME_PRIVILEGE | 0x20000000 KACS_SE_IMPERSONATE_PRIVILEGE | 0x100000000 KACS_SE_RELABEL_PRIVILEGE | 0x800000000 KACS_SE_CREATE_SYMBOLIC_LINK_PRIVILEGE
+
+Which of the privileges in `object.job.token.privileges` are enabled, as
+flags in the same 64-bit word. Always a subset of it.
+
+--- field object.cgroup.path
+type: str.path
+
+The cgroup the event is about, as its full path under
+`/sys/fs/cgroup/peinit`. A service's cgroup is named for the service,
+with any byte outside letters, digits, `.`, `_` and `-` written as `%`
+and two hexadecimal digits, so the path can differ from the service name.
+Once a service's tree has leaked, later trees carry a `%gen` suffix and
+the cgroup generation, so that a new run never shares a tree with an
+unkillable process. A submitted job's cgroup is under `jobs/`, named by
+the job's GUID.
+
+--- field object.cgroup.type
+type: str.enum
+values: service-tree | health | hooks | helper
+closed: false
+
+Which part of a service's process containment the cgroup is.
+`service-tree` is the whole of it and the most serious to lose; `health`
+and `hooks` hold its health checks and hooks; `helper` is a pre-start
+check helper's cgroup.
+
+--- field object.cgroup.generation
+type: uint
+
+The cgroup generation of the service the cgroup belongs to. peinit
+advances it when a service's tree is leaked, so that the next run gets a
+fresh tree; it is the number in a path's `%gen` suffix. Not the same
+counter as `object.service.generation`, which advances on every start.
+
+--- field object.operation.guid
+type: bin.guid
+
+The peinit operation the event is about: a start, stop, restart, reload
+or reset of one service, from the moment it is requested to the moment
+it ends. The GUID is a UUIDv7.
+
+**Not the generic `operation` domain.** `operation.name` and its
+siblings describe what any event attempted; `object.operation` is a
+thing peinit manages, and a search for one does not find the other.
+
+--- field object.operation.type
+type: str.enum
+values: start | stop | restart | reload | reset
+closed: true
+
+What the operation does to its service.
+
+--- field object.operation.state
+type: str.enum
+values: pending | running | completed | failed | merged | cancelled | aborted
+closed: true
+
+The operation's state after the event. `completed`, `failed`, `merged`,
+`cancelled` and `aborted` are terminal. `cancelled` means it ended while
+still pending and never ran; `aborted` means it ended while running;
+`merged` means another operation absorbed it, named in
+`object.operation.merged-into.guid`.
+
+--- field object.operation.source
+type: str.enum
+values: admin | boot | shutdown | dependency-propagation | restart-policy | timer | binds-to-recovery | binds-to-propagation | conflict-resolution | on-failure | tty-release
+closed: false
+
+Who or what asked for the operation. `admin` is the only source a
+client's command produces; every other source is peinit acting for its
+own reasons. An `admin` operation is the one to tie to a person, through
+the access check that admitted the command.
+
+--- field object.operation.duration
+type: uint.duration
+
+How long the operation lasted, in nanoseconds, from when it was requested
+to when it ended. **Measured from the request, not from when it started
+running**, so it includes any time it spent pending behind other work.
+
+--- field object.operation.merged-into.guid
+type: bin.guid
+
+The operation that absorbed this one. A merged operation's work is done,
+or not, by the operation named here, so follow it to learn the outcome.
+
+--- field subject.service.name
+type: str
+
+The service whose job sent a notification message. The sender is
+authenticated by its process, so this is the service peinit established,
+not one the message claimed.
+
+--- field subject.job.guid
+type: bin.guid
+
+The job whose process sent a notification message: the service's main
+process, or a submitted job.
+
+--- field subject.job.activation-generation
+type: uint
+
+The activation generation of the service whose job sent a notification
+message, as `object.job.activation-generation` describes it. A message
+from an earlier run of a service carries an older generation.
+
+--- field subject.operation.guid
+type: bin.guid
+
+The peinit operation the sending job was serving when it sent a
+notification message, such as the start that a readiness message
+completes. Absent when the job serves none.
+
+--- field notify.status
+type: str
+
+The text a service sent as `STATUS=`: free text describing what it is
+doing. The service's own words, unvalidated; never read it as a
+statement by peinit.
+
+--- field notify.errno
+type: int.errno
+
+The error number a service sent as `ERRNO=`, as a negative errno. Services
+send it positive, by convention; this field holds it negated.
+
+The field is the service's claim about itself, informational only; peinit
+neither acts on nor retains it. The protocol does not require the text to
+be a number: text that is not a positive number has no errno to carry, and
+the record is written without this field.
+
+--- field notify.exit-status
+type: int
+
+The exit status a service sent as `EXIT_STATUS=`, informationally. Not
+the exit code of any process: a service may send it while still running,
+and its real exit appears in `object.process.exit-code`. Text that is not
+an integer is not carried, and the record is written without this field.
+
+--- field notify.progress.current
+type: uint
+
+How far a service or submitted job has got, as it reported with
+`PROGRESS=`: the count before any `/`. Its unit is
+`notify.progress.unit`. It may fall from one record to the next; do not
+read motion from the difference between two.
+
+--- field notify.progress.total
+type: uint
+
+The end `notify.progress.current` is counting towards, as reported after
+the `/` of `PROGRESS=`. At least 1, and never less than the current
+value. The total may change between records, because a job that
+rescans has learned something.
+
+Absent when the service gave no total, and **absence alone does not say
+whether one is coming**. `PROGRESS=N` counts with no end, while
+`PROGRESS=N/` counts towards an end not yet known, and both leave this
+field absent; `notify.progress.bounded` is what tells them apart.
+
+--- field notify.progress.bounded
+type: bool
+
+Whether the progress a service or submitted job reported declares an end:
+true for `PROGRESS=N/` and `PROGRESS=N/M`, false for a bare `PROGRESS=N`,
+which counts with no end (PSPU §4.19). It is what tells a viewer to draw a
+bar or to expect one rather than show a rising count.
+
+True with `notify.progress.total` absent means the end is declared but not
+yet known. Absent when no progress figure has been reported, as when a
+service has sent only `PROGRESS_UNIT=`.
+
+Not implied by `notify.progress.total`: `PROGRESS=N` and `PROGRESS=N/` both
+leave the total absent, and PSPU §4.19 has a viewer draw them differently.
+
+--- field notify.progress.unit
+type: str.enum
+values: bytes | items | percent
+closed: true
+
+What `notify.progress.current` and `notify.progress.total` count, as
+reported with `PROGRESS_UNIT=`. Absent when the service gave no unit.
+
+--- field graph.context
+type: uint
+
+The graph execution context an event belongs to: one boot's start of its
+service set, or one on-demand start of a service and everything it needs.
+Records with the same context belong to one attempt to bring a set of
+services up.
+
+Numbered from 0 in the order peinit creates contexts. Not durable: the
+numbering starts again when peinit does.
+
+--- field graph.phase
+type: str.enum
+values: boot | reload-config | phase2-boot
+closed: false
+
+When the service graph was validated. The phase changes what a finding
+did: at `boot`, the services it names are marked and the boot continues;
+at `reload-config`, the whole reload is rejected and nothing is applied;
+at `phase2-boot`, the boot plan itself could not be built.
+
+--- field graph.services
+type: str[]
+
+The services a graph finding involves. For a dependency cycle, the
+services in the cycle, in the order the cycle runs; for an unfilled role, the
+services that need the role and cannot start; for a reload during the
+boot window, the services whose definitions were deferred.
+
+--- field graph.role
+type: str
+
+The role no service fills. A role is a virtual name a service declares it
+provides, such as `authn`, and other services depend on the role rather
+than on a service name. The services that need it are in
+`graph.services`.
+
+--- field graph.counts.added
+type: uint
+
+How many service definitions a configuration reload added: names that
+had no definition before.
+
+Written only when the reload succeeded. A failed reload changed nothing,
+and carries no counts.
+
+--- field graph.counts.updated
+type: uint
+
+How many existing service definitions a configuration reload changed.
+Written only when the reload succeeded, as `graph.counts.added` is.
+
+--- field graph.counts.restored
+type: uint
+
+How many definitions a configuration reload brought back after an
+earlier reload had removed them while their services were still
+running. Written only when the reload succeeded, as
+`graph.counts.added` is.
+
+--- field graph.counts.marked-removed
+type: uint
+
+How many definitions a configuration reload withdrew from services that
+were still running. Such a service is left running, cannot be started
+again, and is discarded once it stops. Written only when the reload
+succeeded, as `graph.counts.added` is.
+
+--- field graph.counts.discarded
+type: uint
+
+How many definitions a configuration reload withdrew and dropped at
+once, because their services were not running. Written only when the
+reload succeeded, as `graph.counts.added` is.
+
+--- field graph.counts.undecodable
+type: uint
+
+How many definitions a configuration reload found in the registry but
+could not decode. Each such service is failed, or, if it was running,
+left running with its definition marked removed. Not counted under
+`graph.counts.marked-removed` or `graph.counts.discarded`, because the
+key is still there. Written only when the reload succeeded, as
+`graph.counts.added` is.
+
+--- field object.fd-store.name
+type: str
+
+The name a service gave a file descriptor it asked peinit to keep, with
+`FDNAME=`. A descriptor sent without a name is stored as `stored`.
+Names are not unique: a service may store several descriptors under one
+name, and two services may use the same one, so a name identifies
+nothing on its own without `object.service.name`.
+
+--- field shutdown.finalization-state
+type: str.enum
+values: waiting-for-services | ready | failed | completed
+closed: false
+
+How far the system shutdown had got when the event was written.
+`waiting-for-services` means services were still being stopped; `ready`
+means they had stopped and the final action had not yet run; `failed`
+means finalisation itself went wrong; `completed` means it finished.
+
+--- event peinit.job.created
+tier: verbose
+gating: none — every job peinit creates is recorded
+
+A job exists: peinit has decided to run a process and recorded it, before
+the process exists. The gap to `peinit.job.started` is time spent queued,
+and `peinit.job.ended` repeats everything here, which is why this one is
+verbose.
+
+Formerly `job.created`.
+
+field: object.job.guid                      required
+field: object.job.type                      required
+field: object.job.state                     required
+  Always `created`.
+field: object.service.name                  when object.job.type != submitted
+field: object.job.activation-generation     when object.job.type != submitted
+field: object.operation.guid                optional
+  The operation the job serves. Absent when none asked for it, as for a
+  submitted job.
+field: object.job.executable                required
+field: object.job.token.sid                 required
+field: object.job.token.groups              required
+field: object.job.token.privileges          required
+field: object.job.token.privileges-enabled  required
+
+--- event peinit.job.started
+tier: standard
+gating: none — every job whose process starts is recorded
+
+A job's process exists and has been executed: the moment a process is
+running as `object.job.token.sid` on peinit's behalf.
+
+Formerly `job.started`.
+
+field: object.job.guid                      required
+field: object.job.type                      required
+field: object.job.state                     required
+  Always `running`.
+field: object.service.name                  when object.job.type != submitted
+field: object.job.activation-generation     when object.job.type != submitted
+field: object.operation.guid                optional
+field: object.process.pid                   required
+  The job's process.
+field: object.cgroup.path                   required
+  The cgroup the job's process runs in.
+field: object.job.token.sid                 required
+field: object.job.token.groups              required
+field: object.job.token.privileges          required
+field: object.job.token.privileges-enabled  required
+
+--- event peinit.job.ended
+tier: standard
+gating: none — every job that ends is recorded
+
+A job is over: its process exited or was killed, or the job ended without
+its process ever starting. It carries the whole job record, so it is the
+one job event to read when only one is kept.
+
+Formerly `job.ended`.
+
+field: object.job.guid                      required
+field: object.job.type                      required
+field: object.job.state                     required
+  The terminal state: `completed`, `failed` or `abandoned`.
+field: outcome.success                      required
+  True exactly when `object.job.state` is `completed`.
+field: outcome.detail                       optional
+  Why the job did not complete, in peinit's words, such as
+  `ProcessCrash: signal 9`. Present only when `outcome.success` is false
+  and peinit recorded a cause. Free text until it is given an enumeration.
+field: object.service.name                  when object.job.type != submitted
+field: object.job.activation-generation     when object.job.type != submitted
+field: object.operation.guid                optional
+field: object.process.pid                   optional
+  Absent when the process never started.
+field: object.process.exit-code             optional
+field: object.process.exit-signal           optional
+field: object.job.executable                required
+field: object.job.arguments                 required
+field: object.job.arguments-truncated       required
+field: object.job.arguments-count           required
+field: object.job.created-time              required
+field: object.job.started-time              optional
+field: object.job.duration                  required
+field: object.cgroup.path                   required
+field: object.cgroup.generation             required
+field: object.job.token.sid                 required
+field: object.job.token.groups              required
+field: object.job.token.privileges          required
+field: object.job.token.privileges-enabled  required
+
+--- event peinit.job.status.reported
+tier: verbose
+gating: none — every change a submitted job reports is recorded, within the rate bound
+cardinality: at most one per job per second; a report inside the window updates the job view and writes nothing
+
+A submitted job reported `STATUS=` or `PROGRESS=` on the notification
+channel, and this is what peinit retained after it.
+
+Formerly `job.status`.
+
+field: object.job.guid                      required
+field: object.job.submitter.sid             required
+field: notify.status                        optional
+field: notify.progress.current              optional
+field: notify.progress.total                optional
+field: notify.progress.bounded              optional
+field: notify.progress.unit                 optional
+
+--- event peinit.job.output.dropped
+tier: standard
+gating: none
+cardinality: once per job, on the first line dropped
+
+A submitted job's submitter stopped draining its output, and peinit began
+dropping the submitter's copy of the job's lines. The copy sent to the log
+store is unaffected.
+
+Formerly `output.dropped`.
+
+field: object.job.guid                      required
+
+--- event peinit.operation.requested
+tier: standard
+gating: none — every operation is recorded
+
+An operation on a service — a start, stop, restart, reload or reset — was
+created. A client's command creates one with `object.operation.source`
+`admin`; every other source is peinit acting for its own reasons. Every
+operation in a graph context is requested when the context is built.
+
+Formerly `operation.requested`.
+
+field: object.operation.guid                required
+field: object.operation.type                required
+field: object.operation.source              required
+field: object.operation.state               required
+  Always `pending`.
+field: object.service.name                  required
+field: subject.token.sid                    optional
+  The client whose command created the operation. Absent for an operation
+  peinit created itself.
+field: subject.token.groups                 optional
+  Written only when peinit holds the client's whole token. For a
+  control-channel caller it holds the user SID alone, so today an
+  operation's subject is `subject.token.sid` and nothing more.
+field: subject.token.privileges             optional
+  Present exactly when `subject.token.groups` is.
+field: subject.token.privileges-enabled     optional
+  Present exactly when `subject.token.groups` is.
+
+--- event peinit.operation.started
+tier: verbose
+gating: none — every operation that begins to run is recorded
+
+An operation left the queue and began to run.
+
+Formerly `operation.started`.
+
+field: object.operation.guid                required
+field: object.operation.type                required
+field: object.operation.source              required
+field: object.operation.state               required
+  Always `running`.
+field: object.service.name                  required
+field: subject.token.sid                    optional
+field: subject.token.groups                 optional
+field: subject.token.privileges             optional
+field: subject.token.privileges-enabled     optional
+
+--- event peinit.operation.ended
+tier: standard
+gating: none — every operation that ends, other than by merging, is recorded
+
+An operation reached a terminal state other than `merged`: it completed,
+failed, was cancelled while still pending, or was aborted while running.
+One type for the four, because they are outcomes of one action (PGSS
+§6.6); `object.operation.state` says which.
+
+Formerly `operation.completed`, `operation.failed`, `operation.cancelled`
+and `operation.aborted`.
+
+field: object.operation.guid                required
+field: object.operation.type                required
+field: object.operation.source              required
+field: object.operation.state               required
+  `completed`, `failed`, `cancelled` or `aborted`.
+field: outcome.success                      required
+  True exactly when `object.operation.state` is `completed`.
+field: outcome.detail                       optional
+  The operation's result as peinit words it for a client, such as
+  `inactive` or `startup killed by shutdown`. Free text until it is given
+  an enumeration.
+field: object.operation.duration            optional
+  From the request, not from the start. Absent on a cancelled operation,
+  which never ran.
+field: object.service.name                  required
+field: subject.token.sid                    optional
+field: subject.token.groups                 optional
+field: subject.token.privileges             optional
+field: subject.token.privileges-enabled     optional
+
+--- event peinit.operation.merged
+tier: verbose
+gating: none — every merge is recorded
+
+An operation was absorbed into another before it ran, and has no outcome
+of its own: follow `object.operation.merged-into.guid` to the operation
+whose `peinit.operation.ended` decides it.
+
+Formerly `operation.merged`.
+
+field: object.operation.guid                required
+field: object.operation.type                required
+field: object.operation.source              required
+field: object.operation.state               required
+  Always `merged`.
+field: object.operation.merged-into.guid    required
+field: object.service.name                  required
+field: subject.token.sid                    optional
+field: subject.token.groups                 optional
+field: subject.token.privileges             optional
+field: subject.token.privileges-enabled     optional
+
+--- event peinit.graph.operation.ended
+tier: verbose
+gating: none — every member of a graph context is recorded
+
+An operation that is a member of a graph execution context reached its
+terminal outcome as the graph sees it: satisfied, so that what depends on
+it may proceed, or failed. The operation's own `peinit.operation.ended`
+records the same end from the operation's side.
+
+Formerly `graph.operation_terminal`.
+
+field: graph.context                        required
+field: object.operation.guid                required
+field: object.service.name                  required
+field: outcome.success                      required
+  True when the graph counts the member satisfied, false when it failed.
+
+--- event peinit.graph.validation.failed
+tier: standard
+gating: none — every finding is recorded
+cardinality: one per finding; a validation with several findings writes several
+
+The service graph failed validation for the reason in `outcome.reason`. At
+`boot` the services named are marked and the boot continues; at
+`reload-config` the whole reload is rejected; at `phase2-boot` the boot
+plan could not be built.
+
+Formerly `graph.validation_error`.
+
+field: graph.phase                          required
+field: outcome.reason                       required
+  values: invalid-service-name | duplicate-service | missing-service-definition | missing-hard-dependency | hard-dependency-blocked | cycle | conflicting-boot-services | invalid-health-check-restart-window | unschedulable-health-check | invalid-timer-schedule | validation-error
+  closed: false
+  The finding.
+field: object.service.name                  optional
+  The service the finding is about. Absent on `cycle`, which names several.
+field: graph.services                       when outcome.reason == cycle
+field: object.service.dependency.name       optional
+  On `missing-hard-dependency` and `hard-dependency-blocked`.
+field: object.service.dependency.kind       optional
+  Present exactly when `object.service.dependency.name` is.
+field: object.service.conflict.name         when outcome.reason == conflicting-boot-services
+field: object.service.health-check.interval when outcome.reason == invalid-health-check-restart-window
+field: object.service.health-check.retries  when outcome.reason == invalid-health-check-restart-window
+field: object.service.health-check.restart-window when outcome.reason == invalid-health-check-restart-window
+field: object.service.type                  when outcome.reason == unschedulable-health-check
+field: object.service.timer.schedule        when outcome.reason == invalid-timer-schedule
+field: outcome.detail                       optional
+  On `invalid-timer-schedule`, the parser's message; on `validation-error`,
+  why the definition was refused.
+
+--- event peinit.graph.validation.warned
+tier: standard
+gating: none — every warning is recorded
+cardinality: one per warning
+
+The service graph passed validation with a warning: nothing was refused,
+but something will not behave as its author probably expects.
+
+Formerly `graph.validation_warning`.
+
+field: graph.phase                          required
+field: outcome.reason                       required
+  values: alive-readiness-with-hard-dependents | unfilled-role
+  closed: false
+  The warning.
+field: object.service.name                  when outcome.reason == alive-readiness-with-hard-dependents
+field: object.service.dependents            when outcome.reason == alive-readiness-with-hard-dependents
+field: graph.role                           when outcome.reason == unfilled-role
+field: graph.services                       when outcome.reason == unfilled-role
+
+--- event peinit.boot.downgraded
+tier: essential
+gating: none
+cardinality: one per finding that forced the downgrade, at most once a boot in all
+
+A full boot was downgraded to safe mode: the machine is running a reduced
+service set. The services named are not marked failed, because safe mode
+never meant to start them, so this record is the only one that names them
+as the cause. Essential because it is rare and changes what the whole
+machine is running.
+
+Formerly `boot.safe_mode_downgrade`.
+
+field: outcome.reason                       required
+  values: critical-cycle | critical-boot-conflict
+  closed: false
+  The finding that forced the downgrade.
+field: graph.services                       when outcome.reason == critical-cycle
+field: object.service.name                  when outcome.reason == critical-boot-conflict
+field: object.service.conflict.name         when outcome.reason == critical-boot-conflict
+
+--- event peinit.recovery.entered
+tier: essential
+gating: none
+cardinality: once, when peinit gives up on the boot and starts the recovery shell
+
+peinit dropped the machine to a recovery shell, for the reason in
+`outcome.reason`. Written before the registry or eventd may exist, into the
+ring, which is where the record of a boot that failed this early survives.
+Essential because it is rare and means the machine did not boot.
+
+Formerly `recovery.entered`.
+
+field: outcome.reason                       required
+  values: kernel-command-line | privileges | boot-attempt-counter | forced-by-kernel-command-line | boot-attempt-threshold-reached | root-writable | virtual-filesystems | machine-id | rtc-clock | registryd | provisioning | infrastructure | phase2 | runtime
+  closed: false
+field: outcome.detail                       optional
+  What went wrong, in the error's own words, such as `peinit is missing
+  required privilege(s): SeAuditPrivilege`. Absent for
+  `forced-by-kernel-command-line`, which has nothing to add, and for
+  `phase2`, whose findings are their own `peinit.graph.validation.failed`
+  records.
+
+--- event peinit.critical-service.failed
+tier: essential
+gating: none
+cardinality: once per Critical failure that drives the machine to reboot
+
+A service marked Critical failed, and peinit took the machine to its
+reboot final action. Essential because it is rare and reboots the machine.
+
+Formerly `critical.failure`.
+
+field: object.service.name                  required
+field: outcome.reason                       required
+  values: service-main-terminal | health-check-failure | watchdog-timeout | restart-budget-exhausted
+  closed: false
+  How the Critical service failed.
+field: shutdown.finalization-state          required
+field: outcome.detail                       when shutdown.finalization-state == failed
+  Why finalisation failed.
+
+--- event peinit.service.abandoned
+tier: standard
+gating: none
+cardinality: once per service abandoned
+
+A service's processes survived SIGKILL and its post-kill timeout, so peinit
+gave up on them and moved the service to `abandoned`: its cgroup is still
+populated, unkillably. Written only on the shutdown path so far; the
+name also covers an abandonment anywhere else.
+
+Formerly `shutdown.abandoned`.
+
+field: object.service.name                  required
+field: object.cgroup.path                   required
+field: object.service.state-previous        required
+field: object.service.state                 required
+  Always `abandoned`.
+field: object.service.transition-cause      required
+field: object.service.generation            required
+
+--- event peinit.cgroup.leaked
+tier: standard
+gating: none
+cardinality: once per cgroup, the first time it is found still populated after its post-kill deadline
+
+A cgroup could not be reclaimed: its processes do not respond to the
+kernel, and the cgroup is leaked. It is one of a service's sub-cgroups, or
+the whole cgroup of a submitted job.
+
+Formerly `cgroup.leaked`.
+
+field: object.service.name                  optional
+  The service whose cgroup leaked. Absent for a submitted job's cgroup,
+  which belongs to no service.
+field: object.job.guid                      optional
+  The submitted job whose cgroup leaked. Exactly one of
+  `object.service.name` and this field is present.
+field: object.cgroup.path                   required
+field: object.cgroup.type                   required
+  `service-tree` for a submitted job's cgroup, which is the whole of its
+  containment.
+
+--- event peinit.on-failure.suppressed
+tier: standard
+gating: none — every suppressed handler is recorded
+
+peinit declined to start an OnFailure handler, because starting it would
+have looped or gone too deep, so the failure it was meant to handle went
+unhandled.
+
+Formerly `on_failure.loop_suppressed`.
+
+field: object.service.name                  required
+  The service whose failure the chain was handling.
+field: object.service.on-failure.name       required
+field: object.service.on-failure-chain      required
+field: outcome.reason                       required
+  values: cycle | max-depth
+  closed: true
+
+--- event peinit.service.reload.timed-out
+tier: standard
+gating: none — every reload left unconfirmed past its deadline is recorded
+
+A service announced `RELOADING=1` and never confirmed the reload by its
+deadline: it wedged mid-reload, or lost its handler. Recorded because the
+default `reload` does not wait, so nothing else would say so.
+
+Formerly `service.reload_unconfirmed`.
+
+field: object.service.name                  required
+
+--- event peinit.internal-error.contained
+tier: standard
+gating: none — every contained internal error is recorded
+
+peinit could not carry out a step on a service's behalf, and contained the
+fault to that service. The fault is peinit's, not the service's; the job,
+operation and state change it caused have their own events.
+
+The error itself is not carried: every path that contains one has it only
+as Rust Debug output, which no event field admits. peinit's console line
+and the failed operation's result keep it.
+
+Formerly `service.internal_error`.
+
+field: operation.stage                      required
+  values: job-terminal | process-setup | lifecycle-deadline | notify
+  closed: false
+  The step peinit could not carry out.
+field: object.service.name                  optional
+field: object.job.guid                      optional
+field: object.service.failed                optional
+  Present exactly when `object.service.name` is.
+
+--- event peinit.event.dropped
+tier: essential
+gating: none
+cardinality: once per event the ring refused
+
+The ring refused one of peinit's events, and it is gone. Written so that
+the trail records the gap rather than, for example, a job with a
+`peinit.job.started` and no `peinit.job.ended`. Small by construction, and
+if the ring refuses this one too peinit treats it as fatal. Essential
+because it is the record of a hole in the audit trail.
+
+There is no count of drops on the record: count the records. The
+`truncated` notice that used to follow a cut `job.ended` is gone, because
+`peinit.job.ended` says itself when its arguments were cut.
+
+Formerly `event.oversized`, with action `dropped`.
+
+field: emission.type                        required
+field: emission.payload-length              required
+field: object.service.name                  optional
+  The service the refused event was about, or whose job sent it.
+field: object.job.guid                      optional
+  The job the refused event was about, or whose process sent it.
+field: outcome.errno                        optional
+  The error the emit returned, where it gave a number.
+
+--- event peinit.config.reload.deferred
+tier: verbose
+gating: none
+cardinality: once per reload during the boot window that left definitions pending
+
+A configuration reload during the boot window changed definitions of
+services the boot plan had not yet launched. The boot runs against its
+snapshot, so those services start from the plan, and the change waits for
+`peinit.config.reload.applied`.
+
+Formerly `config.reload_deferred`.
+
+field: graph.services                       required
+  The services whose definitions were deferred.
+
+--- event peinit.config.reload.applied
+tier: standard
+gating: none
+cardinality: once per explicit `reload-config`, and once a boot at most when the boot window closes with reloads deferred
+
+A configuration reload ran: from now on the registry as it then stood is
+the running configuration, or, if it failed, nothing changed. Written for
+an explicit `reload-config`, and for the one reload that applies what the
+boot window deferred. A reload a registry watch starts writes none.
+
+A failed validation also writes one `peinit.graph.validation.failed` per
+finding, under the `reload-config` phase.
+
+Formerly `config.reload_coalesced`, which an explicit reload did not write.
+
+field: outcome.success                      required
+field: outcome.detail                       optional
+  Why the reload failed, for a person. Present only when
+  `outcome.success` is false.
+field: graph.services                       optional
+  The services whose definitions the boot window had deferred. Present
+  exactly on the reload that applies them, which is how it is told from an
+  explicit `reload-config`.
+field: graph.counts.added                   when outcome.success == true
+field: graph.counts.updated                 when outcome.success == true
+field: graph.counts.restored                when outcome.success == true
+field: graph.counts.marked-removed          when outcome.success == true
+field: graph.counts.discarded               when outcome.success == true
+field: graph.counts.undecodable             when outcome.success == true
+
+--- event peinit.notify.status.reported
+tier: verbose
+gating: none — every authenticated `STATUS=` is recorded
+
+A service's job sent `STATUS=` on the notification channel. The text is the
+service's own words, not peinit's. Not rate-bounded: a service decides how
+often it sends one.
+
+Formerly `notify.status`.
+
+field: subject.service.name                 required
+field: subject.job.guid                     required
+field: subject.job.activation-generation    required
+field: subject.operation.guid               optional
+field: notify.status                        required
+
+--- event peinit.notify.errno.reported
+tier: standard
+gating: none — every authenticated `ERRNO=` is recorded
+
+A service's job sent `ERRNO=`: its own claim about an error, which peinit
+neither acts on nor retains.
+
+Formerly `notify.errno`.
+
+field: subject.service.name                 required
+field: subject.job.guid                     required
+field: subject.job.activation-generation    required
+field: subject.operation.guid               optional
+field: notify.errno                         optional
+  Absent when the text sent was not a positive number.
+
+--- event peinit.notify.exit-status.reported
+tier: standard
+gating: none — every authenticated `EXIT_STATUS=` is recorded
+
+A service's job sent `EXIT_STATUS=`, informationally; it is not the exit
+of any process.
+
+Formerly `notify.exit_status`.
+
+field: subject.service.name                 required
+field: subject.job.guid                     required
+field: subject.job.activation-generation    required
+field: subject.operation.guid               optional
+field: notify.exit-status                   optional
+  Absent when the text sent was not a number.
+
+--- event peinit.notify.stopping.reported
+tier: standard
+gating: none — every authenticated `STOPPING=1` is recorded
+
+A service's job sent `STOPPING=1`, so peinit will not send it SIGTERM. The
+record exists because the effect is an absence: without it, a service that
+rightly got no SIGTERM looks the same afterwards as one that wrongly did
+not.
+
+Formerly `notify.stopping`.
+
+field: subject.service.name                 required
+field: subject.job.guid                     required
+field: subject.job.activation-generation    required
+field: subject.operation.guid               optional
+
+--- event peinit.notify.progress.reported
+tier: verbose
+gating: none — every change of progress is recorded, within the rate bound
+cardinality: at most one per service activation per second
+
+A service's job sent `PROGRESS=` or `PROGRESS_UNIT=`, and this is the
+progress peinit retained after it.
+
+Formerly `notify.progress`.
+
+field: subject.service.name                 required
+field: subject.job.guid                     required
+field: subject.job.activation-generation    required
+field: subject.operation.guid               optional
+field: notify.progress.current              optional
+field: notify.progress.total                optional
+field: notify.progress.bounded              optional
+field: notify.progress.unit                 optional
+
+--- event peinit.notify.rejected
+tier: standard
+gating: none — every refused notification datagram is recorded
+
+peinit refused a datagram on the notification channel and applied none of
+it: the sender could not be authenticated, the message did not parse, or
+it made no sense for the job's state. A stream of these from one process
+is worth reading.
+
+Formerly `notify.rejected`.
+
+field: outcome.reason                       required
+  values: invalid-utf8 | malformed-line | truncated | unauthenticated-sender | missing-service | job-not-running | missing-process | pidfd-mismatch | process-verification-failed | generation-mismatch | missing-start-operation | missing-reload-operation | unsupported-reload-operation | unsupported-ready-state | shutdown-refused | internal-error
+  closed: false
+  Why the datagram was refused. `internal-error` is peinit unable to act on
+  it, not anything wrong with the datagram; `shutdown-refused` is a
+  timeout extension (`EXTEND_TIMEOUT_USEC=`) the shutdown in progress
+  would not grant.
+field: subject.process.pid                  optional
+  The sending process, when the kernel gave its credentials.
+field: subject.service.name                 optional
+  The sender's service, when peinit could attribute it.
+field: subject.job.guid                     optional
+field: subject.job.activation-generation    optional
+field: subject.operation.guid               optional
+
+--- event peinit.fd-store.rejected
+tier: standard
+gating: none — every refused descriptor is recorded
+
+peinit refused a file descriptor a service asked it to keep.
+
+Formerly `fd_store.rejected`.
+
+field: object.service.name                  required
+field: object.fd-store.name                 required
+field: outcome.reason                       required
+  values: disabled | full
+  closed: false
+  `disabled` when the service's definition does not enable an fd store;
+  `full` when it is at its limit.

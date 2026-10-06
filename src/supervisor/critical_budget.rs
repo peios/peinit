@@ -67,7 +67,7 @@ pub struct SupervisorCriticalBudgetRebootDispatch {
 /// The paths that watch a running service — its main job ending, a health
 /// check failing or timing out, the watchdog expiring — used to finalise the
 /// reboot inline, and named themselves in the console line and the
-/// `critical.failure` audit event. The runtime now leaves every reboot to the
+/// `peinit.critical-service.failed` event. The runtime now leaves every reboot to the
 /// end of its turn, so that the turn's console output is written before the
 /// action that does not return (PEI-827); the trigger travels with it so the
 /// operator and the audit log still learn what happened, not just that the
@@ -83,13 +83,13 @@ pub enum CriticalRebootTrigger {
 }
 
 impl CriticalRebootTrigger {
-    /// The `trigger` field of the `critical.failure` audit event.
+    /// The `outcome.reason` of the `peinit.critical-service.failed` event.
     pub fn kmes_id(self) -> &'static str {
         match self {
-            Self::ServiceMainTerminal => "service_main_terminal",
-            Self::HealthCheckFailure => "health_check_failure",
-            Self::WatchdogTimeout => "watchdog_timeout",
-            Self::RestartBudgetExhausted => "restart_budget_exhausted",
+            Self::ServiceMainTerminal => "service-main-terminal",
+            Self::HealthCheckFailure => "health-check-failure",
+            Self::WatchdogTimeout => "watchdog-timeout",
+            Self::RestartBudgetExhausted => "restart-budget-exhausted",
         }
     }
 

@@ -78,7 +78,7 @@ pub struct SupervisorSubmittedNotifyDispatch {
     pub job_id: JobId,
     pub submitter_sid: String,
     pub applied: Vec<SubmittedNotifyField>,
-    /// Whether this datagram is due a `job.status` event under the
+    /// Whether this datagram is due a `peinit.job.status.reported` under the
     /// per-job rate bound (PSPU §4.19).
     pub status_event_due: bool,
     /// The job's retained values after this datagram, for the event.

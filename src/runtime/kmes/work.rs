@@ -1,4 +1,5 @@
-use crate::boundary::{BoundaryError, KmesEvent};
+use crate::boundary::BoundaryError;
+use crate::kmes::EventCollector;
 use crate::runtime::RuntimeWorkPumpTurn;
 
 use super::job::{
@@ -10,7 +11,7 @@ use super::job::{
 
 pub(crate) fn collect_runtime_work_pump_kmes_events(
     turn: &RuntimeWorkPumpTurn,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     for dispatch in &turn.promoted_operations {
         for event in &dispatch.operation_events {

@@ -1,4 +1,5 @@
 use crate::boundary::{KmesEvent, KmesEventSink, ProcessController};
+use crate::kmes::EventCollector;
 use crate::control::connection::{
     ControlConnectionIo, ControlConnectionRecord, ControlConnectionTable,
 };
@@ -135,32 +136,31 @@ pub(in crate::runtime::linux::turn) fn append_idle_closure_turn(
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct DroppedKmesEvent {
     pub event_type: String,
-    pub service: Option<String>,
-    pub job_id: Option<String>,
+    pub subject: crate::kmes::KmesEventSubject,
     pub size_bytes: usize,
+    /// The error number the ring refused it with, when it gave one.
+    pub errno: Option<i32>,
     pub error: String,
-    /// How many events this boot has dropped, this one included.
+    /// How many events this boot has dropped, this one included. The
+    /// console says it; the event does not, because counting the
+    /// `peinit.event.dropped` records gives it.
     pub dropped_total: u64,
 }
 
 impl DroppedKmesEvent {
-    fn oversized(&self) -> crate::kmes::OversizedEvent<'_> {
-        crate::kmes::OversizedEvent {
+    fn record(&self) -> crate::kmes::DroppedEvent<'_> {
+        crate::kmes::DroppedEvent {
             event_type: &self.event_type,
-            action: crate::kmes::OversizedEventAction::Dropped,
-            service: self.service.as_deref(),
-            job_id: self.job_id.as_deref(),
-            size_bytes: self.size_bytes as u64,
-            limit_bytes: None,
-            dropped_total: Some(self.dropped_total),
-            error: Some(&self.error),
+            subject: &self.subject,
+            payload_length: self.size_bytes as u64,
+            errno: self.errno,
         }
     }
 
     pub(crate) fn console_message(&self) -> String {
         format!(
             "peinit warning: {}\n",
-            crate::kmes::oversized_event_message(&self.oversized())
+            crate::kmes::dropped_event_message(&self.record(), &self.error)
         )
     }
 }
@@ -180,18 +180,33 @@ pub(in crate::runtime::linux::turn) fn emit_runtime_loop_kmes_events(
     maintenance_after_sources: &SupervisorOperationMaintenanceTurn,
     calendar_turns: &[(i32, RuntimeCalendarTimerTurn)],
 ) -> Result<Vec<DroppedKmesEvent>, RuntimeShutdownLoopError> {
-    let mut events = Vec::new();
-    collect_runtime_loop_kmes_events(
-        pre_work,
-        maintenance_before_wait,
-        event_turns,
-        post_work,
-        maintenance_after_sources,
-        calendar_turns,
-        &mut events,
-    )
-    .map_err(RuntimeShutdownLoopError::Kmes)?;
+    let events = collect_with_policy(&mut *emitter.sink, |out| {
+        collect_runtime_loop_kmes_events(
+            pre_work,
+            maintenance_before_wait,
+            event_turns,
+            post_work,
+            maintenance_after_sources,
+            calendar_turns,
+            out,
+        )
+    })?;
     emit_kmes_events_contained(emitter, &events)
+}
+
+/// Collect a turn's events through the sink's emission policy and clocks:
+/// every non-essential type is asked about before its payload is built
+/// (PGSS §6.9), and monotonic instants are written as wall-clock times.
+fn collect_with_policy(
+    sink: &mut dyn KmesEventSink,
+    collect: impl FnOnce(&mut EventCollector<'_>) -> Result<(), crate::boundary::BoundaryError>,
+) -> Result<Vec<KmesEvent>, RuntimeShutdownLoopError> {
+    let time = sink.kmes_time_projection();
+    let sink: &dyn KmesEventSink = sink;
+    let enabled = |event_type: &str, tier| sink.kmes_event_enabled(event_type, tier);
+    let mut out = EventCollector::new(&enabled, time);
+    collect(&mut out).map_err(RuntimeShutdownLoopError::Kmes)?;
+    Ok(out.into_events())
 }
 
 /// The audit record of a final action that returned.
@@ -199,9 +214,9 @@ pub(in crate::runtime::linux::turn) fn emit_runtime_shutdown_finalization_kmes_e
     emitter: RuntimeKmesEmitter<'_>,
     finalization: &RuntimeShutdownFinalizationTurn,
 ) -> Result<Vec<DroppedKmesEvent>, RuntimeShutdownLoopError> {
-    let mut events = Vec::new();
-    collect_runtime_shutdown_finalization_kmes_events(finalization, &mut events)
-        .map_err(RuntimeShutdownLoopError::Kmes)?;
+    let events = collect_with_policy(&mut *emitter.sink, |out| {
+        collect_runtime_shutdown_finalization_kmes_events(finalization, out)
+    })?;
     emit_kmes_events_contained(emitter, &events)
 }
 
@@ -212,7 +227,7 @@ pub(in crate::runtime::linux::turn) fn emit_runtime_shutdown_finalization_kmes_e
 /// from any authenticated principal (PEI-1082). Until PEI-1125 it was
 /// treated as the ring being unusable, and PID 1 entered recovery over an
 /// audit record it could not write. Now the event is dropped, counted, and
-/// replaced in the trail by a small `event.oversized` naming it. That small
+/// replaced in the trail by a small `peinit.event.dropped` naming it. That small
 /// event fits by construction, so if the ring refuses *it* too the ring
 /// really is unusable, and that is still the loop's error.
 ///
@@ -233,16 +248,20 @@ fn emit_kmes_events_contained(
             continue;
         };
         *dropped_events += 1;
-        let (service, job_id) = crate::kmes::kmes_event_subject(&event.payload);
         let record = DroppedKmesEvent {
             event_type: event.event_type.clone(),
-            service,
-            job_id,
+            subject: crate::kmes::kmes_event_subject(&event.payload),
             size_bytes: event.payload.len(),
-            error: format!("{error:?}"),
+            errno: error.kmes_errno(),
+            error: error
+                .text()
+                .map(str::to_string)
+                .unwrap_or_else(|| format!("{error:?}")),
             dropped_total: *dropped_events,
         };
-        let notice = crate::kmes::encode_event_oversized_event(&record.oversized())
+        // Essential: written whatever the policy says, because it is the
+        // record of a hole in the trail.
+        let notice = crate::kmes::encode_event_dropped_event(&record.record())
             .map_err(RuntimeShutdownLoopError::Kmes)?;
         sink.emit_kmes_event(&notice)
             .map_err(RuntimeShutdownLoopError::Kmes)?;

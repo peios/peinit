@@ -163,6 +163,10 @@ impl InitPlatform for LinuxInitPlatform {
         LinuxKmesEventSink::new().emit_kmes_event(event)
     }
 
+    fn kmes_event_enabled(&self, event_type: &str, tier: crate::boundary::EventTier) -> bool {
+        LinuxKmesEventSink::new().kmes_event_enabled(event_type, tier)
+    }
+
     fn run_recovery_forever(&mut self, reason: &InitRecoveryReason) -> Result<(), BoundaryError> {
         let mut console = LinuxRecoveryConsoleBoundary;
         run_recovery_console_forever(&mut console, reason)

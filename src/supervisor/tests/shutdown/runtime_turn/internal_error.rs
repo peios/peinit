@@ -123,10 +123,10 @@ fn an_internal_error_on_a_job_terminal_fails_the_service_and_the_loop_turn_retur
     {
         let types = kmes_event_types(&turn);
         assert!(
-            types.contains(&"service.internal_error".to_string()),
+            types.contains(&"peinit.internal-error.contained".to_string()),
             "{types:?}"
         );
-        assert!(types.contains(&"job.ended".to_string()), "{types:?}");
+        assert!(types.contains(&"peinit.job.ended".to_string()), "{types:?}");
     }
 }
 
@@ -595,7 +595,7 @@ fn console_lines(turn: &RuntimeShutdownLoopTurn) -> Vec<String> {
 /// What the turn would put in the event ring.
 #[cfg(feature = "peios-boundary")]
 fn kmes_event_types(turn: &RuntimeShutdownLoopTurn) -> Vec<String> {
-    let mut events = Vec::new();
+    let mut events = crate::kmes::EventCollector::everything(Default::default());
     crate::runtime::collect_runtime_loop_kmes_events(
         &turn.pre_work,
         &crate::supervisor::SupervisorOperationMaintenanceTurn::default(),
@@ -606,7 +606,11 @@ fn kmes_event_types(turn: &RuntimeShutdownLoopTurn) -> Vec<String> {
         &mut events,
     )
     .expect("collect events");
-    events.into_iter().map(|event| event.event_type).collect()
+    events
+        .into_events()
+        .into_iter()
+        .map(|event| event.event_type)
+        .collect()
 }
 
 #[derive(Debug)]

@@ -12,7 +12,7 @@ const THREE_OF_TEN: JobProgress = JobProgress {
 
 /// PSPU §4.19: a service's `PROGRESS` and `PROGRESS_UNIT` are retained and
 /// exposed as `progress` in its status, and a change of progress becomes a
-/// `notify.progress` event no more than once a second.
+/// `peinit.notify.progress.reported` event no more than once a second.
 #[test]
 fn a_services_progress_is_retained_exposed_and_bounded_as_an_event() {
     let mut supervisor = notify_app_supervisor();

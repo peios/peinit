@@ -1,4 +1,5 @@
-use crate::boundary::{BoundaryError, KmesEvent};
+use crate::boundary::BoundaryError;
+use crate::kmes::EventCollector;
 use crate::supervisor::{
     SupervisorPowerButtonAction, SupervisorPowerButtonDispatch, SupervisorShutdownDispatch,
     SupervisorShutdownDriveDispatch, SupervisorShutdownSignalAction,
@@ -10,7 +11,7 @@ use super::super::event::{push_job, push_operations, push_shutdown_abandoned};
 
 pub(in crate::runtime::kmes) fn collect_pid1_signal_turn(
     turn: &crate::supervisor::SupervisorPid1SignalFdTurn,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     let crate::supervisor::SupervisorPid1SignalFdTurn::Shutdown(dispatch) = turn else {
         return Ok(());
@@ -20,7 +21,7 @@ pub(in crate::runtime::kmes) fn collect_pid1_signal_turn(
 
 pub(in crate::runtime::kmes) fn collect_power_button_dispatch(
     dispatch: &SupervisorPowerButtonDispatch,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     match &dispatch.action {
         SupervisorPowerButtonAction::Graceful(shutdown) => {
@@ -33,7 +34,7 @@ pub(in crate::runtime::kmes) fn collect_power_button_dispatch(
 
 pub(in crate::runtime::kmes) fn collect_shutdown_drive_dispatch(
     dispatch: &SupervisorShutdownDriveDispatch,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     if let Some(timeout) = &dispatch.timeout {
         for job_event in &timeout.job_events {
@@ -51,21 +52,21 @@ pub(in crate::runtime::kmes) fn collect_shutdown_drive_dispatch(
 
 pub(in crate::runtime::kmes::system) fn collect_system_shutdown_dispatch(
     dispatch: &SupervisorSystemShutdownDispatch,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     collect_shutdown_dispatch(&dispatch.shutdown, out)
 }
 
 pub(in crate::runtime::kmes::system) fn collect_shutdown_terminal_dispatch(
     dispatch: &SupervisorShutdownTerminalDispatch,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     push_job(out, &dispatch.job_event)
 }
 
 fn collect_shutdown_signal_dispatch(
     dispatch: &SupervisorShutdownSignalDispatch,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     match &dispatch.action {
         SupervisorShutdownSignalAction::Graceful(shutdown) => {
@@ -79,7 +80,7 @@ fn collect_shutdown_signal_dispatch(
 
 fn collect_shutdown_dispatch(
     dispatch: &SupervisorShutdownDispatch,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     push_operations(out, &dispatch.startup_operation_events)?;
     for job_event in &dispatch.startup_job_events {

@@ -13,7 +13,8 @@ use crate::supervisor::dispatch::{SupervisorNotifyDispatch, SupervisorSubmittedN
 use crate::supervisor::state::{Supervisor, SupervisorError};
 use crate::supervisor::work::SupervisorWork;
 
-/// The minimum spacing between `job.status` events for one job (PSPU §4.A).
+/// The minimum spacing between `peinit.job.status.reported` events for one
+/// job (PSPU §4.A).
 pub const JOB_STATUS_EVENT_INTERVAL_NS: u64 = crate::submitted::PROGRESS_EVENT_INTERVAL_NS;
 
 /// What a notification datagram did: a service's, or a submitted job's.

@@ -282,6 +282,69 @@ fn control_dispatch_turn(
     }
 }
 
+/// PEI-1279: a refused command writes no event of peinit's, only a
+/// debugging line, which the quiet policy keeps off the console unless the
+/// machine is being debugged.
+#[test]
+fn a_refused_command_leaves_a_debug_line() {
+    let turn = RuntimeShutdownEventTurn::ControlConnection {
+        fd: 44,
+        supervisor: Box::new(crate::supervisor::SupervisorControlConnectionTableTurn {
+            fd: 44,
+            turn: crate::supervisor::SupervisorControlConnectionTurn {
+                read: crate::control::connection::ControlConnectionReadTurn::WouldBlock {
+                    buffered_bytes: 0,
+                },
+                frames: vec![crate::supervisor::SupervisorControlConnectionFrameTurn {
+                    frame: crate::supervisor::SupervisorControlFrameTurn::CommandRejected {
+                        response_line: b"{\"status\":\"error\",\"code\":\"ACCESS_DENIED\"}\n"
+                            .to_vec(),
+                        error: crate::supervisor::SupervisorControlCommandBodyError::ServiceAccessDenied(
+                            Box::new(crate::control::service_security::ServiceAccessDenied {
+                                caller: TokenSummary::requested_identity("S-1-5-21-1-2-3-1001"),
+                                service: "secret".to_string(),
+                                desired_access:
+                                    crate::control::service_security::ServiceAccess::START,
+                                granted_access_bits: 1,
+                            }),
+                        ),
+                        remaining_bytes: 0,
+                    },
+                    pending_write_bytes: 0,
+                    close_after_write: false,
+                }],
+                write: crate::control::connection::ControlConnectionWriteTurn::Idle {
+                    close_after_write: false,
+                },
+                close_connection: false,
+            },
+            removed: false,
+            active_connections: 1,
+        }),
+        deadline_timer: None,
+    };
+
+    let mut messages = Vec::new();
+    collect_runtime_loop_console_messages(
+        &RuntimeWorkPumpTurn::default(),
+        &[turn],
+        &RuntimeWorkPumpTurn::default(),
+        &[],
+        &mut messages,
+    );
+
+    assert_eq!(
+        messages
+            .iter()
+            .map(|message| (message.text.as_str(), message.severity))
+            .collect::<Vec<_>>(),
+        vec![(
+            "peinit: access denied: S-1-5-21-1-2-3-1001 asked for 0x2 on service secret (granted 0x1)\n",
+            super::ConsoleSeverity::Debug,
+        )],
+    );
+}
+
 // PEI-359. §5.3 asks for a warning when a service announces RELOADING=1 and
 // never completes the reload. That string existed only as an *operation
 // result*, returned to a `wait=true` caller — and `reload` defaults to

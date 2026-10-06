@@ -42,6 +42,10 @@ pub(crate) fn collect_runtime_loop_console_messages(
 /// sink from its text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum ConsoleSeverity {
+    /// For whoever is debugging the machine: written only at `peios.quiet=0`,
+    /// never at the default. A line an unprivileged client can cause, such
+    /// as a refused command, is one of these, so it cannot fill the console.
+    Debug,
     /// Ordinary progress. The first thing either gate suppresses.
     Status,
     /// Something went wrong. Loud enough to override a requested blackout —
@@ -73,6 +77,15 @@ impl ConsoleMessage {
         Self {
             text: text.into(),
             severity: ConsoleSeverity::Status,
+            tag: ConsoleTag::None,
+        }
+    }
+
+    /// A debugging line, written only at `peios.quiet=0`.
+    pub fn debug(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            severity: ConsoleSeverity::Debug,
             tag: ConsoleTag::None,
         }
     }

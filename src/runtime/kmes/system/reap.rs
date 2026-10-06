@@ -1,4 +1,5 @@
-use crate::boundary::{BoundaryError, KmesEvent};
+use crate::boundary::BoundaryError;
+use crate::kmes::EventCollector;
 use crate::supervisor::{SupervisorChildReapDispatch, SupervisorChildReapTurn};
 
 use super::super::job::{
@@ -10,7 +11,7 @@ use super::shutdown::collect_shutdown_terminal_dispatch;
 
 pub(in crate::runtime::kmes) fn collect_child_reap_turn(
     turn: &SupervisorChildReapTurn,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     let dispatch = match turn {
         SupervisorChildReapTurn::Tracked { dispatch, .. } => dispatch,

@@ -418,7 +418,7 @@ where
     }
 }
 
-/// Emit one `graph.validation_error` KMES event per boot validation finding.
+/// Emit one `peinit.graph.validation.failed` per boot validation finding.
 ///
 /// The console lines written by `log_phase2_boot_progress` are for whoever is
 /// watching the boot; these are for whoever is reading the event stream
@@ -439,32 +439,46 @@ fn emit_phase2_boot_audit_events<P>(platform: &mut P, dispatch: &SupervisorBootD
 where
     P: InitPlatform + ?Sized,
 {
+    use crate::kmes::types::{GRAPH_VALIDATION_FAILED, GRAPH_VALIDATION_WARNED};
+
+    // Essential: the record of why the machine runs a reduced set.
     for downgrade in &dispatch.plan.safe_mode_downgrade {
         let Ok(event) = crate::kmes::encode_safe_mode_downgrade_event(downgrade) else {
             continue;
         };
         let _ = platform.emit_kmes_event(&event);
     }
-    for blocked in &dispatch.plan.blocked {
-        for reason in std::iter::once(&blocked.reason).chain(&blocked.additional_reasons) {
-            let Ok(event) =
-                crate::kmes::encode_boot_blocked_service_event(&blocked.service, reason)
-            else {
-                continue;
-            };
-            let _ = platform.emit_kmes_event(&event);
+    // The findings are standard, so the emission policy is asked before
+    // each is built (PGSS §6.9).
+    if platform.kmes_event_enabled(GRAPH_VALIDATION_FAILED, crate::boundary::EventTier::Standard)
+    {
+        for blocked in &dispatch.plan.blocked {
+            for reason in std::iter::once(&blocked.reason).chain(&blocked.additional_reasons) {
+                let Ok(event) =
+                    crate::kmes::encode_boot_blocked_service_event(&blocked.service, reason)
+                else {
+                    continue;
+                };
+                let _ = platform.emit_kmes_event(&event);
+            }
         }
     }
     // Warnings are not blocking, so nothing above carries them, and the
     // boot is where they matter most: an `Alive` service with hard
     // dependents is about to release them before it is usable. Tagged
-    // `boot` rather than `reload_config`, which was the only phase these
+    // `boot` rather than `reload-config`, which was the only phase these
     // were ever emitted under.
-    for warning in &dispatch.plan.warnings {
-        let Ok(event) = crate::kmes::encode_graph_validation_warning_event("boot", warning) else {
-            continue;
-        };
-        let _ = platform.emit_kmes_event(&event);
+    if platform.kmes_event_enabled(GRAPH_VALIDATION_WARNED, crate::boundary::EventTier::Standard)
+    {
+        for warning in &dispatch.plan.warnings {
+            let Ok(event) = crate::kmes::encode_graph_validation_warning_event(
+                crate::kmes::GraphPhase::Boot,
+                warning,
+            ) else {
+                continue;
+            };
+            let _ = platform.emit_kmes_event(&event);
+        }
     }
 }
 
@@ -499,7 +513,8 @@ where
     // Graph validation warnings: the boot goes on regardless, and the
     // operator is the only one who can act on them, so §2.5's "logged" has
     // to mean the console as well as the audit event (PEI-1124). Same words
-    // as the `graph.validation_warning` event carries.
+    // as the reload's answer uses for the warning that
+    // `peinit.graph.validation.warned` records.
     for warning in &dispatch.plan.warnings {
         log_console_warn(
             platform,

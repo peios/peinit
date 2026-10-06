@@ -1,66 +1,51 @@
-use crate::boundary::{BoundaryError, KmesEvent};
+use crate::boundary::BoundaryError;
 use crate::control::lifecycle::OnDemandStartDispatch;
 use crate::execution::graph::GraphExecutionEvent;
+use crate::kmes::types::{
+    CRITICAL_SERVICE_FAILED, GRAPH_OPERATION_ENDED, INTERNAL_ERROR_CONTAINED, SERVICE_ABANDONED,
+};
 use crate::kmes::{
-    encode_critical_failure_event, encode_graph_event, encode_job_event_bounded,
-    encode_operation_event, encode_shutdown_abandoned_event,
+    EventCollector, encode_critical_failure_event, encode_graph_event, encode_job_event,
+    encode_operation_event, encode_shutdown_abandoned_event, job_event_type, operation_event_type,
 };
 use crate::operation::store::{OperationEvent, OperationRequestOutcome};
 use crate::supervisor::{
-    SupervisorShutdownAbandonedDispatch, SupervisorShutdownFinalizationDispatch,
+    CriticalRebootTrigger, SupervisorShutdownAbandonedDispatch,
+    SupervisorShutdownFinalizationDispatch,
 };
 
 pub(super) fn collect_operation_request_outcome(
     outcome: &OperationRequestOutcome,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     push_operations(out, &outcome.events)
 }
 
 pub(super) fn collect_on_demand_start(
     dispatch: &OnDemandStartDispatch,
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     push_operations(out, &dispatch.events)
 }
 
-/// A job event, and — when a `job.ended` had its arguments cut to fit the
-/// ring — the `event.oversized` that records the cut beside it (PEI-1082).
+/// A job event. A `peinit.job.ended` whose arguments had to be cut to fit
+/// the ring says so itself, in `object.job.arguments-truncated` (PEI-1082).
 pub(super) fn push_job(
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
     event: &crate::job::JobEvent,
 ) -> Result<(), BoundaryError> {
-    let (encoded, truncation) = encode_job_event_bounded(event)?;
-    let event_type = encoded.event_type.clone();
-    out.push(encoded);
-    if let Some(truncation) = truncation {
-        let job_id = event.job_id.to_string();
-        out.push(crate::kmes::encode_event_oversized_event(
-            &crate::kmes::OversizedEvent {
-                event_type: &event_type,
-                action: crate::kmes::OversizedEventAction::Truncated,
-                service: event.service.as_deref(),
-                job_id: Some(&job_id),
-                size_bytes: truncation.arguments_bytes,
-                limit_bytes: Some(truncation.limit_bytes),
-                dropped_total: None,
-                error: None,
-            },
-        )?);
-    }
-    Ok(())
+    out.push(job_event_type(event), |time| encode_job_event(event, time))
 }
 
 pub(super) fn push_operation(
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
     event: &OperationEvent,
 ) -> Result<(), BoundaryError> {
-    out.push(encode_operation_event(event)?);
-    Ok(())
+    out.push(operation_event_type(event), |_| encode_operation_event(event))
 }
 
 pub(super) fn push_operations(
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
     events: &[OperationEvent],
 ) -> Result<(), BoundaryError> {
     for event in events {
@@ -70,15 +55,14 @@ pub(super) fn push_operations(
 }
 
 pub(super) fn push_graph(
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
     event: &GraphExecutionEvent,
 ) -> Result<(), BoundaryError> {
-    out.push(encode_graph_event(event)?);
-    Ok(())
+    out.push(GRAPH_OPERATION_ENDED, |_| encode_graph_event(event))
 }
 
 pub(super) fn push_graphs(
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
     events: &[GraphExecutionEvent],
 ) -> Result<(), BoundaryError> {
     for event in events {
@@ -88,26 +72,22 @@ pub(super) fn push_graphs(
 }
 
 pub(super) fn push_critical_failure(
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
     service: &str,
-    trigger: &str,
-    observed_at_ns: Option<u64>,
+    trigger: CriticalRebootTrigger,
     finalization: &SupervisorShutdownFinalizationDispatch,
 ) -> Result<(), BoundaryError> {
-    out.push(encode_critical_failure_event(
-        service,
-        trigger,
-        observed_at_ns,
-        finalization,
-    )?);
-    Ok(())
+    out.push(CRITICAL_SERVICE_FAILED, |_| {
+        encode_critical_failure_event(service, trigger, finalization)
+    })
 }
 
 /// The audit record of a contained internal error: the job it retired, the
 /// operation it failed, the starts its reactions released, and the
-/// `service.internal_error` that says what peinit could not do (PEI-1125).
+/// `peinit.internal-error.contained` that says what peinit could not do
+/// (PEI-1125).
 pub(super) fn push_internal_error(
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
     dispatch: &crate::supervisor::SupervisorInternalErrorDispatch,
 ) -> Result<(), BoundaryError> {
     if let Some(job_event) = &dispatch.job_event {
@@ -119,14 +99,15 @@ pub(super) fn push_internal_error(
     if let Some(operation_event) = &dispatch.operation_event {
         push_operation(out, operation_event)?;
     }
-    out.push(crate::kmes::encode_service_internal_error_event(dispatch)?);
+    out.push(INTERNAL_ERROR_CONTAINED, |_| {
+        crate::kmes::encode_service_internal_error_event(dispatch)
+    })?;
     super::job::collect_start_dispatches(&dispatch.start_dispatches, out)
 }
 
 pub(super) fn push_shutdown_abandoned(
-    out: &mut Vec<KmesEvent>,
+    out: &mut EventCollector<'_>,
     abandoned: &SupervisorShutdownAbandonedDispatch,
 ) -> Result<(), BoundaryError> {
-    out.push(encode_shutdown_abandoned_event(abandoned)?);
-    Ok(())
+    out.push(SERVICE_ABANDONED, |_| encode_shutdown_abandoned_event(abandoned))
 }

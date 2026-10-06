@@ -136,7 +136,8 @@ fn a_turn_with_nothing_due_leaves_the_finalizer_and_deadline_timer_alone() {
 // service's failure, and the "critical service X failed" line naming it —
 // was assembled after reboot(2) had already not returned. The reap now
 // notes what it saw and leaves the reboot to the end of the turn, which can
-// be announced first; and the audit event still names the trigger.
+// be announced first; and `peinit.critical-service.failed` still names the
+// trigger.
 #[test]
 fn a_critical_crash_reaped_without_a_finalizer_is_announced_and_rebooted_at_the_end_of_the_turn() {
     let mut app = alive_service("app");
@@ -213,7 +214,7 @@ fn a_critical_crash_reaped_without_a_finalizer_is_announced_and_rebooted_at_the_
     assert_eq!(
         reboot.observed_at_ns,
         Some(APP_CRASH_NS),
-        "the audit event carries when the crash was seen, not when the reboot ran",
+        "the reboot keeps when the crash was seen, not when the reboot ran",
     );
     assert_eq!(finalizer.reboots, 1);
     assert!(

@@ -77,9 +77,9 @@ pub enum ServiceGraphWarning {
 }
 
 impl ServiceGraphWarning {
-    /// The one-line wording of the warning, shared by the console line and
-    /// the `graph.validation_warning` event's `message`, so an operator who
-    /// saw one can find the other with the same words.
+    /// The one-line wording of the warning, for the console line and the
+    /// reload's answer. The `peinit.graph.validation.warned` event carries
+    /// the same warning as fields, not as this text.
     pub fn message(&self) -> String {
         match self {
             Self::AliveReadinessWithHardDependents { service, .. } => format!(

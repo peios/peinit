@@ -1,23 +1,19 @@
-use peios::msgpack::Writer;
-
 use crate::boundary::{BoundaryError, KmesEvent};
 use crate::execution::graph::{GraphExecutionEvent, GraphTerminalOutcome};
 
-use super::super::payload::{finish_event, write_str_field, write_uint_field};
+use super::super::payload::Payload;
+use super::super::types::GRAPH_OPERATION_ENDED;
 
+/// `peinit.graph.operation.ended`: a member of a graph execution context
+/// reached the outcome the graph counts.
 pub fn encode_graph_event(event: &GraphExecutionEvent) -> Result<KmesEvent, BoundaryError> {
-    let mut writer = Writer::new();
-    writer.write_map(4);
-    write_uint_field(&mut writer, "context_id", event.context_id.as_u64());
-    write_str_field(&mut writer, "service", &event.service);
-    write_str_field(&mut writer, "operation_id", &event.operation_id.to_string());
-    write_str_field(
-        &mut writer,
-        "outcome",
-        match event.outcome {
-            GraphTerminalOutcome::Satisfied => "satisfied",
-            GraphTerminalOutcome::Failed => "failed",
-        },
+    let mut payload = Payload::new();
+    payload.set("graph.context", event.context_id.as_u64());
+    payload.set("object.operation.guid", event.operation_id);
+    payload.set("object.service.name", event.service.as_str());
+    payload.set(
+        "outcome.success",
+        matches!(event.outcome, GraphTerminalOutcome::Satisfied),
     );
-    finish_event("graph.operation_terminal", writer)
+    payload.finish(GRAPH_OPERATION_ENDED)
 }

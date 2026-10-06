@@ -14,7 +14,7 @@ pub use boot::BootAttemptCounter;
 pub use console::ConsoleSink;
 pub use error::BoundaryError;
 pub use jobs::{JobIdentityError, JobIdentityProvider, JobIdentitySource, PreparedJobIdentity};
-pub use kmes::{KmesEvent, KmesEventSink};
+pub use kmes::{EventTier, EventTimeProjection, KmesEvent, KmesEventSink};
 pub use pre_start_check::{
     FilesystemCheckHelperLauncher, FilesystemCheckHelperReader, FilesystemCheckHelperRequest,
     FilesystemCheckReport, FilesystemCheckResult, LaunchedFilesystemCheckHelper,

@@ -1,39 +1,33 @@
-use peios::msgpack::Writer;
-
 use crate::boundary::{BoundaryError, KmesEvent};
 use crate::supervisor::{
     SupervisorOnFailureLoopSuppressedDispatch, SupervisorOnFailureLoopSuppressionReason,
 };
 
-use crate::kmes::payload::{finish_event, write_str_field, write_string_array_field};
+use crate::kmes::payload::Payload;
+use crate::kmes::types::ON_FAILURE_SUPPRESSED;
 
+/// `peinit.on-failure.suppressed`: an OnFailure handler peinit declined to
+/// start, because starting it would have looped or gone too deep.
 pub fn encode_on_failure_loop_suppressed_event(
     event: &SupervisorOnFailureLoopSuppressedDispatch,
 ) -> Result<KmesEvent, BoundaryError> {
-    let mut writer = Writer::new();
-    writer.write_map(5);
-    write_str_field(&mut writer, "failed_service", &event.failed_service);
-    write_str_field(&mut writer, "attempted_handler", &event.attempted_handler);
-    write_string_array_field(&mut writer, "chain", &event.chain);
-    write_str_field(
-        &mut writer,
-        "reason",
+    let mut payload = Payload::new();
+    payload.set("object.service.name", event.failed_service.as_str());
+    payload.set(
+        "object.service.on-failure.name",
+        event.attempted_handler.as_str(),
+    );
+    payload.set("object.service.on-failure-chain", event.chain.as_slice());
+    payload.set(
+        "outcome.reason",
         on_failure_suppression_reason(event.reason),
     );
-    write_str_field(
-        &mut writer,
-        "message",
-        &format!(
-            "OnFailure loop suppressed after {} attempted {}",
-            event.failed_service, event.attempted_handler
-        ),
-    );
-    finish_event("on_failure.loop_suppressed", writer)
+    payload.finish(ON_FAILURE_SUPPRESSED)
 }
 
 fn on_failure_suppression_reason(reason: SupervisorOnFailureLoopSuppressionReason) -> &'static str {
     match reason {
         SupervisorOnFailureLoopSuppressionReason::Cycle => "cycle",
-        SupervisorOnFailureLoopSuppressionReason::MaxDepth { .. } => "max_depth",
+        SupervisorOnFailureLoopSuppressionReason::MaxDepth { .. } => "max-depth",
     }
 }
