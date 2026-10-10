@@ -77,7 +77,8 @@ fn write_record(out: &mut Vec<u8>, record: &ServiceLogRecord) {
     write_u64(out, record.timestamp_ns);
     if let Some(job_id) = record.job_id {
         write_str(out, JOB_ID);
-        write_bin(out, &job_id.as_bytes());
+        // PSPU §3.7 carries this GUID in PCDS's mixed-endian binary layout.
+        write_bin(out, &job_id.as_guid_bytes());
     }
 }
 
