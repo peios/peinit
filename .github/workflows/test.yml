@@ -1,0 +1,24 @@
+name: Test pull requests
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install Rust
+        run: rustup toolchain install 1.99.0 --profile minimal
+      # The default feature set is the host-runnable unit-test rung. The
+      # Peios boundary requires its SDK and a booted Peios system (pekit.toml).
+      - name: Test default library
+        run: cargo +1.99.0 test --release --lib --locked
+      - name: Build default targets
+        run: cargo +1.99.0 build --release --locked
