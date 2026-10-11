@@ -7,6 +7,68 @@ use crate::service::{RestartPolicy, ServiceType};
 
 const FAILED_AT_NS: u64 = 1_000_003_000;
 
+#[test]
+fn start_failure_commits_every_dependent_in_an_overlapping_graph() {
+    let mut registry = service("registry", ServiceType::Simple);
+    registry.restart_policy = RestartPolicy::Never;
+    let mut api = service("api", ServiceType::Simple);
+    api.requires.push("registry".to_string());
+    let mut ui = service("ui", ServiceType::Simple);
+    ui.requires = vec!["registry".to_string(), "api".to_string()];
+    let mut tail = service("ztail", ServiceType::Simple);
+    tail.requires.push("registry".to_string());
+    let definitions = vec![registry, api, ui, tail];
+    crate::service::validate_service_graph(&definitions).expect("accepted graph");
+    let mut fixture = StartedBootGraph::new(definitions, "registry");
+    let operation_id = fixture.started_operation_id;
+
+    let dispatch = apply_start_failure(
+        &mut fixture.services,
+        &mut fixture.operations,
+        &mut fixture.graph,
+        failure_request("registry", operation_id, TransitionCause::ReadinessTimeout),
+    )
+    .expect("the failure transaction commits despite overlapping paths");
+
+    assert_runtime(
+        &fixture,
+        "registry",
+        ServiceState::Failed,
+        TransitionCause::ReadinessTimeout,
+    );
+    for dependent in ["api", "ui", "ztail"] {
+        assert_runtime(
+            &fixture,
+            dependent,
+            ServiceState::Failed,
+            TransitionCause::DependencyFailure,
+        );
+    }
+    assert_eq!(dispatch.graph_events.len(), 4);
+    assert_eq!(dispatch.operation_events.len(), 4);
+    assert_eq!(dispatch.service_transitions.len(), 4);
+    for event in &dispatch.graph_events {
+        assert_eq!(event.outcome, GraphTerminalOutcome::Failed);
+        assert_eq!(
+            fixture
+                .operations
+                .get(event.operation_id)
+                .expect("operation")
+                .state,
+            OperationState::Failed,
+        );
+        assert_eq!(
+            fixture
+                .graph
+                .context(fixture.context_id)
+                .expect("context")
+                .members[&event.service]
+                .status,
+            GraphMemberStatus::Failed,
+        );
+    }
+}
+
 /// The PEI-821 bug: the graph member was failed before the restart policy
 /// was consulted, so a hard dependent got DependencyFailure on the way to a
 /// Backoff the target then came back from. A service in Backoff is going to
