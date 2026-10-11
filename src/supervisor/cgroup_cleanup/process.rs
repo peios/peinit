@@ -1,6 +1,7 @@
 use crate::boundary::ProcessController;
 use crate::job::JobState;
 use crate::service::runtime::LeakedCgroupKind;
+use crate::service::runtime::ServiceState;
 
 use super::stop_main::{apply_stop_main_abandoned, apply_stop_main_empty};
 use super::{
@@ -42,6 +43,20 @@ impl Supervisor {
                 continue;
             };
             processed = true;
+            if let CgroupCleanupKind::StopMain { operation_id, .. } = deadline.kind {
+                // The path may already belong to another instance. Check
+                // ownership before probing or removing anything beneath it.
+                let current = work.operations.current_for_service(&deadline.service);
+                if !current.is_some_and(|operation| {
+                    operation.id == operation_id && !operation.state.is_terminal()
+                }) || !work
+                    .services
+                    .runtime(&deadline.service)
+                    .is_some_and(|runtime| runtime.state == ServiceState::Stopping)
+                {
+                    continue;
+                }
+            }
             if service_tree_back_in_use(&work, &deadline) {
                 continue;
             }
