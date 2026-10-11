@@ -17,6 +17,8 @@
 //! held only on such edges is itself such a fact to whatever waits on it.
 //! Everything else keeps its lifetime, queue time included (PEI-830).
 
+use std::collections::BTreeSet;
+
 use crate::ids::OperationId;
 
 use super::model::{GraphDependency, GraphExecutionContext, GraphMemberStatus};
@@ -143,6 +145,35 @@ impl GraphExecutionContext {
 }
 
 impl GraphExecutionStore {
+    /// Previously observed holds, before a release pass overwrites the waiting
+    /// members' flags. A hold can already have ended through a terminal graph
+    /// event, so querying only the current classification would lose that exit.
+    pub(crate) fn recorded_held_operations(&self) -> BTreeSet<OperationId> {
+        self.contexts
+            .values()
+            .flat_map(|context| context.members.values())
+            .filter(|member| {
+                member.status == GraphMemberStatus::WaitingForDependencies
+                    && member.held_without_clock
+            })
+            .map(|member| member.operation_id)
+            .collect()
+    }
+
+    /// Consume one aggregate hold exit. Another context or release pass must
+    /// not restart the same operation's lifetime again from old evidence.
+    pub(crate) fn clear_recorded_operation_hold(&mut self, operation_id: OperationId) {
+        for context_id in self.associated_contexts(operation_id) {
+            if let Some(context) = self.contexts.get_mut(&context_id) {
+                for member in context.members.values_mut() {
+                    if member.operation_id == operation_id {
+                        member.held_without_clock = false;
+                    }
+                }
+            }
+        }
+    }
+
     /// Whether `operation_id` is a start held on facts with no clock of
     /// their own, in some live context — the one case in which its
     /// lifetime does not run.

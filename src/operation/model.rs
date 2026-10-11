@@ -62,7 +62,10 @@ pub struct OperationRecord {
     /// was held, so the clock starts again when the hold ends: a start
     /// released after a long hold gets its `StartTimeout` from the
     /// release, not a deadline that expired while it was not allowed to
-    /// run (PEI-821). `created_at_ns` stays what it was: when the operator
+    /// run (PEI-821). A transitive hold can end while the operation is still
+    /// Pending on a now-starting dependency; that clocked wait consumes the
+    /// new lifetime before its own dispatch (PEI-1380).
+    /// `created_at_ns` stays what it was: when the operator
     /// asked.
     pub lifetime_from_ns: u64,
     pub started_at_ns: Option<u64>,
