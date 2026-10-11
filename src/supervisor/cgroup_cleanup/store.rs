@@ -1,3 +1,4 @@
+use crate::ids::OperationId;
 use std::collections::BTreeMap;
 
 use super::model::{CgroupCleanupDeadline, CgroupCleanupKind};
@@ -16,6 +17,15 @@ impl CgroupCleanupStore {
 
     pub fn record(&mut self, deadline: CgroupCleanupDeadline) {
         match self.deadlines.get_mut(&deadline.cgroup_id) {
+            // A new stop owns a fresh grace period on a reused path.
+            Some(existing)
+                if matches!((&existing.kind, &deadline.kind),
+                    (CgroupCleanupKind::StopMain { operation_id: old, .. },
+                     CgroupCleanupKind::StopMain { operation_id: new, .. }) if old != new) =>
+            {
+                *existing = deadline;
+            }
+            // Re-recording the same cleanup never extends its grace period.
             Some(existing) if existing.due_at_ns <= deadline.due_at_ns => {}
             Some(existing) => *existing = deadline,
             None => {
@@ -41,6 +51,14 @@ impl CgroupCleanupStore {
 
     pub fn remove(&mut self, cgroup_id: &str) -> Option<CgroupCleanupDeadline> {
         self.deadlines.remove(cgroup_id)
+    }
+
+    pub fn remove_stop_main(&mut self, operation_id: OperationId) {
+        self.deadlines.retain(|_, deadline| {
+            !matches!(deadline.kind, CgroupCleanupKind::StopMain {
+                operation_id: owner, ..
+            } if owner == operation_id)
+        });
     }
 }
 
