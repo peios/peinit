@@ -1,6 +1,104 @@
 use super::*;
 
 #[test]
+fn hard_dependency_failure_visits_each_member_once_and_reaches_later_dependents() {
+    // All are accepted acyclic definitions. The diamond revisits ui after
+    // recursion through api; the other cases revisit api through distinct
+    // hard edges. ztail must still be processed after either overlap.
+    for shape in ["diamond", "requires-and-binds-to", "readiness-levels"] {
+        let db = service("db");
+        let mut api = service("api");
+        api.requires.push("db".to_string());
+        let mut ui = service("ui");
+        ui.requires.push("api".to_string());
+        let mut tail = service("ztail");
+        tail.requires.push("db".to_string());
+        match shape {
+            "diamond" => ui.requires.push("db".to_string()),
+            "requires-and-binds-to" => api.binds_to.push("db".to_string()),
+            "readiness-levels" => {
+                api.requires = vec!["db:ready".to_string(), "db:serving".to_string()];
+            }
+            _ => unreachable!(),
+        }
+        let definitions = [db, api, ui, tail];
+        crate::service::validate_service_graph(&definitions).expect("accepted graph shape");
+        let ids = operation_ids(definitions.len());
+        let jobs = job_ids(definitions.len());
+        let plan = boot_plan(
+            definitions
+                .iter()
+                .enumerate()
+                .map(|(index, definition)| {
+                    prepared_start(
+                        &definition.name,
+                        ids[index],
+                        jobs[index],
+                        StartCause::ExplicitStart,
+                    )
+                })
+                .collect(),
+        );
+        let mut store = GraphExecutionStore::new();
+        let context_id = store
+            .create_boot_context(&plan, &definitions)
+            .expect("boot context");
+        // Run only the in-memory graph's precheck transitions. No job is
+        // launched; db is the sole member whose start can be released.
+        loop {
+            let ready = store
+                .release_ready(context_id, 10, &no_levels)
+                .expect("release");
+            assert!(!ready.is_empty(), "graph must reach db: {shape}");
+            if ready[0].action == ReadyGraphOperationAction::Start {
+                assert_eq!(ready.len(), 1);
+                assert_eq!(ready[0].service, "db");
+                break;
+            }
+            for operation in ready {
+                assert_eq!(operation.action, ReadyGraphOperationAction::PreStartCheck);
+                store
+                    .apply_pre_start_check_passed(operation.operation_id)
+                    .expect("precheck passed");
+            }
+        }
+
+        let events = store.apply_operation_failed(ids[0]).expect(shape);
+        assert_eq!(
+            events
+                .iter()
+                .map(|event| (event.service.as_str(), event.outcome))
+                .collect::<Vec<_>>(),
+            vec![
+                ("db", GraphTerminalOutcome::Failed),
+                ("api", GraphTerminalOutcome::Failed),
+                ("ui", GraphTerminalOutcome::Failed),
+                ("ztail", GraphTerminalOutcome::Failed),
+            ],
+            "{shape}",
+        );
+        let context = store.context(context_id).expect("context");
+        assert!(context.is_drained(), "{shape}");
+        assert!(
+            context
+                .members
+                .values()
+                .all(|member| member.status == GraphMemberStatus::Failed)
+        );
+        // Only propagation tolerates a revisit. An explicit duplicate
+        // terminal operation is still an error, as it was before.
+        assert_eq!(
+            store.apply_operation_failed(ids[0]),
+            Err(GraphExecutionError::MemberAlreadyTerminal {
+                context_id,
+                service: "db".to_string(),
+                status: GraphMemberStatus::Failed,
+            }),
+        );
+    }
+}
+
+#[test]
 fn required_dependency_failure_propagates_but_wants_do_not() {
     let ids = operation_ids(3);
     let jobs = job_ids(3);

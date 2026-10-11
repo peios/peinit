@@ -227,14 +227,25 @@ fn propagate_hard_dependency_failure(
     let dependents = hard_dependents(context, failed_service);
     let mut events = Vec::new();
     for dependent in dependents {
-        let operation_id = context
-            .members
-            .get(&dependent)
-            .ok_or_else(|| GraphExecutionError::MissingMember {
-                context_id: context.id,
-                service: dependent.clone(),
-            })?
-            .operation_id;
+        let member =
+            context
+                .members
+                .get(&dependent)
+                .ok_or_else(|| GraphExecutionError::MissingMember {
+                    context_id: context.id,
+                    service: dependent.clone(),
+                })?;
+        // The snapshot can name the same dependent through several hard
+        // edges, or recursion through an earlier dependent can already have
+        // failed it. Recheck eligibility now, not only when collecting the
+        // snapshot, so each member fails once and later dependents are reached.
+        if !matches!(
+            member.status,
+            GraphMemberStatus::WaitingForDependencies | GraphMemberStatus::Running
+        ) {
+            continue;
+        }
+        let operation_id = member.operation_id;
         mark_terminal(context, &dependent, GraphTerminalOutcome::Failed)?;
         events.push(GraphExecutionEvent {
             context_id: context.id,
