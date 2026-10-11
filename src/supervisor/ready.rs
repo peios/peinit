@@ -8,6 +8,7 @@ use crate::execution::start::{
     GraphPreStartCheckOutcome, PrecheckedReadyStartOutcome, StartExecutionDispatch,
     StartExecutionRequest, begin_graph_pre_start_check, begin_prechecked_ready_start,
 };
+use crate::operation::OperationState;
 use crate::security::TokenSummary;
 
 use super::state::SupervisorError;
@@ -24,13 +25,19 @@ impl SupervisorWork {
         let mut dispatches = Vec::new();
 
         while let Some(context_id) = context_ids.pop_front() {
+            // PEI-1380: a transitive hold can end while its operation remains
+            // Pending on a newly clocked dependency. Capture the old hold before
+            // release_ready refreshes it, not only the starts ready to dispatch.
+            let held = self.graph.recorded_held_operations();
             let services = &self.services;
-            let ready = self
+            let mut ready = self
                 .graph
                 .release_ready(context_id, max_parallel_starts, &|target, level| {
                     probe_level(services, target, level)
                 })
                 .map_err(SupervisorError::Graph)?;
+
+            self.restart_exited_hold_lifetimes(held, &mut ready, observed_at_ns)?;
 
             for ready in ready {
                 match ready.action {
@@ -81,6 +88,45 @@ impl SupervisorWork {
         }
 
         Ok(dispatches)
+    }
+
+    /// Reconcile operation-level hold exits before dispatch. Kept separate
+    /// from release_ready because the graph owns neither clocks nor operations.
+    fn restart_exited_hold_lifetimes(
+        &mut self,
+        held: BTreeSet<crate::ids::OperationId>,
+        ready: &mut [ReadyGraphOperation],
+        observed_at_ns: u64,
+    ) -> Result<(), SupervisorError> {
+        for operation_id in held {
+            // A shared operation stays exempt while any context holds it.
+            for operation in ready.iter_mut() {
+                if operation.operation_id == operation_id {
+                    // This coordinator uses aggregate holds, not the ready
+                    // member's per-context history. Standalone callers keep
+                    // the original low-level reset semantics.
+                    operation.released_from_hold = false;
+                }
+            }
+            if self.graph.is_operation_held(operation_id) {
+                continue;
+            }
+            if self
+                .operations
+                .get(operation_id)
+                .is_some_and(|operation| operation.state == OperationState::Pending)
+            {
+                self.operations
+                    .restart_lifetime_clock(operation_id, observed_at_ns)
+                    .map_err(|error| {
+                        SupervisorError::Start(
+                            crate::execution::start::StartExecutionError::OperationStore(error),
+                        )
+                    })?;
+            }
+            self.graph.clear_recorded_operation_hold(operation_id);
+        }
+        Ok(())
     }
 
     fn start_request(
