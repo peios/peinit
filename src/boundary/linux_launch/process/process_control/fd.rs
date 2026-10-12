@@ -1,4 +1,4 @@
-use std::os::fd::{FromRawFd, OwnedFd};
+use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
 use std::path::Path;
 
 use peios::file::{FileAccess, OpenOptions};
@@ -25,7 +25,10 @@ pub(in crate::boundary::linux_launch::process) fn open_dev_null() -> Result<Owne
         .desired_access(FileAccess::READ_DATA | FileAccess::WRITE_DATA)
         .open(None, Path::new("/dev/null"))
         .map_err(|error| BoundaryError::Process(format!("open /dev/null failed: {error}")))?;
-    Ok(file.into())
+    let fd: OwnedFd = file.into();
+    crate::boundary::set_cloexec(fd.as_raw_fd())
+        .map_err(|error| BoundaryError::Process(format!("cloexec /dev/null failed: {error}")))?;
+    Ok(fd)
 }
 
 /// Open a service's terminal read/write, from its `TTYPath`. The child dups
@@ -51,5 +54,8 @@ pub(in crate::boundary::linux_launch::process) fn open_console(
         )
         .open(None, Path::new(path))
         .map_err(|error| BoundaryError::Process(format!("open {path} failed: {error}")))?;
-    Ok(file.into())
+    let fd: OwnedFd = file.into();
+    crate::boundary::set_cloexec(fd.as_raw_fd())
+        .map_err(|error| BoundaryError::Process(format!("cloexec {path} failed: {error}")))?;
+    Ok(fd)
 }
