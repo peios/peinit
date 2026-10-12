@@ -1,4 +1,5 @@
 use crate::boundary::FilesystemCheckResult;
+use crate::service::registry_check::{CachedRegistryKey, cached_registry_key};
 use crate::service::runtime::TransitionCause;
 use crate::service::tty::tty_holder;
 use crate::service::{ServiceCheck, ServiceCheckKind, ServiceDefinition, ServiceTable};
@@ -235,20 +236,11 @@ fn filesystem_check_satisfied(check: &ServiceCheck, results: &[FilesystemCheckRe
 }
 
 fn cached_registry_key_exists(services: &ServiceTable, key: &str) -> bool {
-    const SERVICES_ROOT: &str = "Machine\\System\\Services";
-    const INIT_ROOT: &str = "Machine\\System\\Init";
-
-    if key == SERVICES_ROOT || key == INIT_ROOT {
-        return true;
+    match cached_registry_key(key) {
+        Some(CachedRegistryKey::Root) => true,
+        Some(CachedRegistryKey::Service(name)) => services.definition(name).is_some(),
+        None => false,
     }
-
-    let Some(service) = key.strip_prefix("Machine\\System\\Services\\") else {
-        return false;
-    };
-    if service.is_empty() || service.contains('\\') {
-        return false;
-    }
-    services.definition(service).is_some()
 }
 
 pub(super) fn format_check(check: &ServiceCheck) -> String {
