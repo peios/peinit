@@ -4,7 +4,7 @@ use super::model::LevelProbe;
 
 /// Answer a level edge's question from the live service table.
 ///
-/// Exact match on the level, deliberately: peinit has no ordering over
+/// Exact membership in the published set: peinit has no ordering over
 /// another daemon's vocabulary — see `ServiceEntry::satisfies` for the
 /// full argument.
 pub fn probe_level(services: &ServiceTable, target: &str, level: &str) -> LevelProbe {
@@ -14,7 +14,7 @@ pub fn probe_level(services: &ServiceTable, target: &str, level: &str) -> LevelP
     if !entry.runtime.state.satisfies_dependents() {
         return LevelProbe::Absent;
     }
-    if entry.runtime.level.as_deref() == Some(level) {
+    if entry.runtime.levels.contains(level) {
         LevelProbe::Satisfied
     } else {
         LevelProbe::NotYetPublished

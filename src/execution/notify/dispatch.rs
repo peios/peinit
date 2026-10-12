@@ -1,5 +1,5 @@
 use crate::boundary::ProcessController;
-use crate::notify::NotifyMessage;
+use crate::notify::{NotifyField, NotifyMessage};
 
 use super::auth::authenticate_notify_sender;
 use super::field::{NotifyFieldContext, apply_notify_field};
@@ -38,6 +38,26 @@ where
         post_start_hook: None,
         progress_event: None,
     };
+
+    // A datagram publishes one complete set. Install it before applying
+    // READY so dependency evaluation never observes an intermediate member
+    // or a stale set, regardless of field order. Work remains on the cloned
+    // table until the whole datagram has applied successfully.
+    if message
+        .fields
+        .iter()
+        .any(|field| matches!(field, NotifyField::Level(_)))
+    {
+        next_services
+            .update_levels(
+                &sender.service,
+                message.fields.iter().filter_map(|field| match field {
+                    NotifyField::Level(value) => Some(value.clone()),
+                    _ => None,
+                }),
+            )
+            .map_err(NotifyApplyError::ServiceTable)?;
+    }
 
     for field in &message.fields {
         let mut field_context = NotifyFieldContext {
