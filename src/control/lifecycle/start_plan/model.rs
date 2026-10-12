@@ -49,9 +49,18 @@ pub enum DependencyAvailability {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OnDemandStartPlanError {
-    UnknownService { service: String },
-    DefinitionRemoved { service: String },
-    Cycle { services: Vec<String> },
+    UnknownService {
+        service: String,
+    },
+    DefinitionRemoved {
+        service: String,
+    },
+    Cycle {
+        services: Vec<String>,
+    },
+    Validation {
+        findings: Vec<crate::service::ServiceGraphFinding>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
