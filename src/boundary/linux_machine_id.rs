@@ -36,9 +36,7 @@ pub enum LinuxMachineIdStatus {
 
 #[derive(Debug)]
 pub enum LinuxMachineIdError {
-    Read { path: PathBuf, source: io::Error },
     Generate { source: io::Error },
-    Write { path: PathBuf, source: io::Error },
 }
 
 pub fn ensure_linux_machine_id() -> Result<LinuxMachineIdStatus, LinuxMachineIdError> {
