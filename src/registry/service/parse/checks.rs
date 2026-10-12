@@ -1,3 +1,4 @@
+use crate::service::registry_check::cached_registry_key;
 use crate::service::{ServiceCheck, ServiceCheckKind};
 
 use crate::registry::fields::Field;
@@ -54,11 +55,7 @@ fn validate_cached_registry_check(
     field: Field,
     key: &str,
 ) -> Result<(), ServiceRegistryDecodeError> {
-    if key == "Machine\\System\\Services"
-        || key.starts_with("Machine\\System\\Services\\")
-        || key == "Machine\\System\\Init"
-        || key.starts_with("Machine\\System\\Init\\")
-    {
+    if cached_registry_key(key).is_some() {
         Ok(())
     } else {
         Err(ServiceRegistryDecodeError::NonCachedRegistryCheck {
