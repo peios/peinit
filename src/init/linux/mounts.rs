@@ -16,7 +16,8 @@ pub(super) const DEFAULT_MOUNTINFO_PATH: &str = "/proc/self/mountinfo";
 /// token to replace the MISSING SD — held by the boot SYSTEM token.
 ///
 /// Allow SYSTEM GenericAll and Allow BUILTIN\Administrators GenericAll, both
-/// OI|CI, plus Allow Everyone read+execute, CI only. Because everything created
+/// OI|CI, plus Allow Everyone read+execute, CI only, and Allow CREATOR OWNER
+/// GenericAll, OI|CI|IO (inherit-only). Because everything created
 /// beneath these roots inherits from this one descriptor, it is the access
 /// policy of `/run`, `/dev/shm` and the cgroup tree in their entirety; an ACE
 /// missing here is missing from every per-service directory under
