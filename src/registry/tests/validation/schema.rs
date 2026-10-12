@@ -317,3 +317,50 @@ fn required_privileges_reject_empty_entries() {
         }
     );
 }
+
+#[test]
+fn registry_checks_accept_only_paths_the_cached_evaluator_can_resolve() {
+    for field in ["Conditions", "Asserts"] {
+        for key in [
+            r"Machine\System\Services",
+            r"Machine\System\Init",
+            r"Machine\System\Services\app",
+            r"Machine\System\Services\missing",
+        ] {
+            build_service_definition_from_registry_values(
+                "app",
+                &[
+                    sz("ImagePath", "/bin/app"),
+                    multi_sz(field, &[&format!("registry:{key}")]),
+                ],
+            )
+            .unwrap_or_else(|error| panic!("{field} {key}: {error:?}"));
+        }
+        for key in [
+            r"Machine\System\Init\EnvVars",
+            r"Machine\System\Init\ProvisionedPaths",
+            r"Machine\System\Init\Anything",
+            "Machine\\System\\Init\\",
+            "Machine\\System\\Services\\",
+            r"Machine\System\Services\app\EnvVars",
+            "Machine\\System\\Services\\app\\",
+            r"Machine\System\ServicesOther",
+        ] {
+            assert_eq!(
+                build_service_definition_from_registry_values(
+                    "app",
+                    &[
+                        sz("ImagePath", "/bin/app"),
+                        multi_sz(field, &[&format!("registry:{key}")])
+                    ],
+                )
+                .unwrap_err(),
+                ServiceRegistryDecodeError::NonCachedRegistryCheck {
+                    field,
+                    key: key.into()
+                },
+                "{field} {key}",
+            );
+        }
+    }
+}

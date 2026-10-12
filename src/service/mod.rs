@@ -1,6 +1,7 @@
 mod definition;
 mod dependency;
 pub mod graph;
+pub(crate) mod registry_check;
 mod restart;
 pub(crate) mod role;
 pub mod table;
