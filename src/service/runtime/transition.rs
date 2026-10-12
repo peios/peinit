@@ -64,7 +64,7 @@ impl ServiceRuntimeSnapshot {
             // it. Keeping one across a stop would hold a dependent open on
             // a promise nobody is keeping — the exact failure the whole
             // level mechanism exists to avoid.
-            self.level = None;
+            self.levels.clear();
         }
 
         Ok(ServiceTransitionEvent {

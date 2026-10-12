@@ -62,24 +62,29 @@ impl ServiceTable {
         }))
     }
 
-    /// Record the level a service published, or clear it on an empty value.
-    ///
-    /// Returns whether it changed, so the caller only does the work of
-    /// re-evaluating dependents when something actually moved — a daemon
-    /// that republishes its level on a timer is a reasonable thing to
-    /// write and must not cost a graph walk each time.
-    pub fn update_level(&mut self, service: &str, level: &str) -> Result<bool, ServiceTableError> {
+    /// Replace the complete published readiness set. Empty names are not
+    /// members; duplicate names have no effect. Returns whether it changed.
+    pub fn update_levels(
+        &mut self,
+        service: &str,
+        levels: impl IntoIterator<Item = String>,
+    ) -> Result<bool, ServiceTableError> {
         let entry = self.require_entry_mut(service)?;
-        let next = (!level.is_empty()).then(|| level.to_string());
-        let changed = entry.runtime.level != next;
-        entry.runtime.level = next;
+        let next = levels
+            .into_iter()
+            .filter(|level| !level.is_empty())
+            .collect();
+        let changed = entry.runtime.levels != next;
+        entry.runtime.levels = next;
         Ok(changed)
     }
 
-    /// Forget a service's level, because it is no longer running.
+    /// Forget a service's levels, because it is no longer running.
     pub fn clear_level(&mut self, service: &str) -> Result<bool, ServiceTableError> {
         let entry = self.require_entry_mut(service)?;
-        Ok(entry.runtime.level.take().is_some())
+        let changed = !entry.runtime.levels.is_empty();
+        entry.runtime.levels.clear();
+        Ok(changed)
     }
 
     pub fn acknowledge_stopping(&mut self, service: &str) -> Result<(), ServiceTableError> {

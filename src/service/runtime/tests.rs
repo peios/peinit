@@ -103,7 +103,7 @@ fn valid_transition_updates_state_cause_and_generation() {
 }
 
 #[test]
-fn dependent_satisfaction_timestamp_is_cleared_when_state_no_longer_satisfies() {
+fn dependent_satisfaction_and_all_levels_are_cleared_when_state_no_longer_satisfies() {
     let mut snapshot = ServiceRuntimeSnapshot::inactive("svc");
     snapshot
         .transition(ServiceTransition {
@@ -118,6 +118,11 @@ fn dependent_satisfaction_timestamp_is_cleared_when_state_no_longer_satisfies() 
         })
         .expect("active");
     snapshot.mark_dependent_satisfied_since(55);
+    snapshot.levels.extend([
+        "link".to_string(),
+        "addressed".to_string(),
+        "routed".to_string(),
+    ]);
     assert_eq!(snapshot.dependent_satisfied_since_ns, Some(55));
 
     snapshot
@@ -128,14 +133,18 @@ fn dependent_satisfaction_timestamp_is_cleared_when_state_no_longer_satisfies() 
         .expect("stop");
 
     assert_eq!(snapshot.dependent_satisfied_since_ns, None);
+    assert!(
+        snapshot.levels.is_empty(),
+        "a stop clears every published condition"
+    );
 }
 
 /// §6.1: Reloading satisfies dependents, so a reload is not an outage. The
-/// RestartWindow stamp and a published level survive it in both directions.
+/// RestartWindow stamp and the published level set survive it in both directions.
 /// PEI-1079: clearing the stamp here lost the budget reset for the rest of
 /// the activation.
 #[test]
-fn a_reload_keeps_the_satisfaction_stamp_and_the_published_level() {
+fn a_reload_keeps_the_satisfaction_stamp_and_the_published_level_set() {
     let mut snapshot = ServiceRuntimeSnapshot::inactive("svc");
     for (to, cause) in [
         (ServiceState::Starting, TransitionCause::ExplicitStart),
@@ -146,7 +155,9 @@ fn a_reload_keeps_the_satisfaction_stamp_and_the_published_level() {
             .expect("start");
     }
     snapshot.mark_dependent_satisfied_since(55);
-    snapshot.level = Some("ready".to_string());
+    snapshot
+        .levels
+        .extend(["ready".to_string(), "sessions".to_string()]);
 
     for to in [ServiceState::Reloading, ServiceState::Active] {
         snapshot
@@ -161,9 +172,13 @@ fn a_reload_keeps_the_satisfaction_stamp_and_the_published_level() {
             "the stamp survives the move to {to:?}",
         );
         assert_eq!(
-            snapshot.level.as_deref(),
-            Some("ready"),
-            "and so does the level"
+            snapshot
+                .levels
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            ["ready", "sessions"],
+            "and so does the readiness set"
         );
     }
 }
