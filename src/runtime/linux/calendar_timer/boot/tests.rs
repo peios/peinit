@@ -130,8 +130,7 @@ fn a_persistent_timers_last_firing_is_seeded_at_boot_from_its_record() {
     assert_eq!(last_fired(&table), Some(now_ns));
 }
 
-/// A reload re-arms from now and reads no history (§9.3), but a trigger it
-/// keeps keeps when it last fired.
+/// A reload reads no history (§9.3); a retained trigger keeps its last firing.
 #[test]
 fn a_reload_keeps_when_a_kept_trigger_last_fired() {
     let now_ns = ns_utc(2024, 5, 3, 12, 0, 0);
