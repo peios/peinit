@@ -1,10 +1,10 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::boundary::write_linux_console_message;
 use crate::boundary::{Clock, RealtimeClock};
 use crate::runtime::{RuntimeEventRegistrar, RuntimeEventSource};
 use crate::supervisor::Supervisor;
-use crate::timer::boot::plan_timer_reload;
+use crate::timer::boot::plan_timer_reload_where;
 
 use super::entry::LinuxCalendarTimerEntry;
 use super::error::LinuxCalendarTimerError;
@@ -26,8 +26,31 @@ impl LinuxCalendarTimerTable {
         let realtime_now_ns = clock
             .realtime_ns()
             .map_err(LinuxCalendarTimerError::Clock)?;
-        let plan = plan_timer_reload(&definitions, realtime_now_ns)
-            .map_err(LinuxCalendarTimerError::BootPlan)?;
+        let mut retained = BTreeSet::new();
+        let plan = plan_timer_reload_where(
+            &definitions,
+            realtime_now_ns,
+            |service, schedule, storage| {
+                // Match each existing fd at most once, including duplicate
+                // schedules. Bookkeeping writes and unrelated service edits
+                // must not redraw jitter or postpone an already-armed firing.
+                let existing = self.entries.iter().find(|(fd, entry)| {
+                    !retained.contains(*fd)
+                        && entry.service == service.name
+                        && entry.schedule == schedule
+                        && entry.storage == storage
+                        && entry.persistent == service.timer_persistent
+                        && entry.jitter_secs == service.timer_jitter_secs
+                });
+                if let Some((&fd, _)) = existing {
+                    retained.insert(fd);
+                    false
+                } else {
+                    true
+                }
+            },
+        )
+        .map_err(LinuxCalendarTimerError::BootPlan)?;
         // A bad schedule introduced by an edit used to come out of the run
         // loop and end PID 1's event loop -- and any drained registry watch
         // event triggers a reload, so writing the schedule was enough, without
@@ -39,9 +62,8 @@ impl LinuxCalendarTimerTable {
         }
         let mut replacement = BTreeMap::new();
         let mut sources = Vec::new();
-        // A reload re-arms from now and reads no history (§9.3), but when a
-        // timer last fired is still so: a trigger kept across the reload keeps
-        // it.
+        // Changed settings re-arm from now without reading history, but the
+        // last firing still belongs to the same service and schedule.
         let fired = self
             .entries
             .values()
@@ -70,12 +92,19 @@ impl LinuxCalendarTimerTable {
 
         let old_fds = self.entries.keys().copied().collect::<Vec<_>>();
         for fd in old_fds {
+            if retained.contains(&fd) {
+                continue;
+            }
             if let Err(error) = registrar.unregister_source(fd) {
                 unregister_replacement_sources(&replacement, registrar);
                 return Err(LinuxCalendarTimerError::Register(error));
             }
         }
 
+        for fd in retained {
+            sources.push(RuntimeEventSource::CalendarTimer { fd });
+            replacement.insert(fd, self.entries.remove(&fd).expect("retained timer"));
+        }
         self.entries = replacement;
         self.rejected = plan.rejected.iter().map(rejected_trigger).collect();
         Ok(sources)
@@ -92,3 +121,6 @@ fn unregister_replacement_sources<E>(
         let _ = registrar.unregister_source(fd);
     }
 }
+
+#[cfg(test)]
+mod tests;

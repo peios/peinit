@@ -307,7 +307,7 @@ impl LinuxShutdownRuntime {
                     CalendarTimerMaintenanceStep::ProcessReadyTimers => {
                         // Calendar fds returned by the current wait belong to
                         // the timer table that existed at wait time. Consume
-                        // them before reload-config destroys and recreates it.
+                        // them before reload-config replaces changed timers.
                         calendar_turns =
                             self.process_calendar_timer_sources(supervisor, &calendar_sources)?;
                     }

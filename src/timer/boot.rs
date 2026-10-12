@@ -95,6 +95,16 @@ pub fn plan_timer_reload(
     services: &[ServiceDefinition],
     now_realtime_ns: u64,
 ) -> Result<TimerBootPlan, TimerBootPlanError> {
+    plan_timer_reload_where(services, now_realtime_ns, |_, _, _| true)
+}
+
+/// Decide which triggers need arming before computing their next occurrence.
+/// An unchanged, already-armed trigger may have no *future* occurrence left.
+pub(crate) fn plan_timer_reload_where(
+    services: &[ServiceDefinition],
+    now_realtime_ns: u64,
+    mut needs_arming: impl FnMut(&ServiceDefinition, &str, TimerLastRunStorage) -> bool,
+) -> Result<TimerBootPlan, TimerBootPlanError> {
     let mut registrations = Vec::new();
     let mut rejected = Vec::new();
     for service in services.iter().filter(|service| !service.disabled) {
@@ -106,6 +116,9 @@ pub fn plan_timer_reload(
         };
 
         for schedule in schedules {
+            if !needs_arming(service, schedule, storage) {
+                continue;
+            }
             match plan_reload_trigger(service, schedule, storage, now_realtime_ns) {
                 Ok(registration) => registrations.push(registration),
                 Err(error) => rejected.push(error),
