@@ -74,6 +74,7 @@ pub(super) fn remove_satisfied_stop_deadlines(
 ) {
     for event in &dispatch.operation_events {
         work.control.remove_stop_timeout(event.operation_id);
+        work.cgroup_cleanup.remove_stop_main(event.operation_id);
     }
 }
 

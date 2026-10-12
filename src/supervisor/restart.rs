@@ -156,6 +156,7 @@ pub(super) fn begin_restart_start_after_stop(
         return Ok(Vec::new());
     }
     work.control.remove_stop_timeout(operation.id);
+    work.cgroup_cleanup.remove_stop_main(operation.id);
 
     // §8.1: the definition went away while the stop leg was draining. The stop
     // still drained the instance -- that is what the transition above just

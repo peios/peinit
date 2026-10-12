@@ -474,3 +474,146 @@ fn a_cgroup_that_is_unpopulated_but_busy_still_leaks_and_advances_the_generation
         1,
     );
 }
+
+// PEI-1322: the post-kill timer belongs to a stop operation, not to the
+// reusable cgroup pathname. Exercise both populated and empty later instances.
+fn old_stop_cleanup_does_not_own_next_instance(restart: bool, populated: bool) {
+    let mut supervisor = active_app_supervisor();
+    let mut command_clock = ScriptedClock::new([LIFECYCLE_COMMAND_NS]);
+    if restart {
+        supervisor
+            .restart_service("app", None, &mut command_clock)
+            .unwrap();
+    } else {
+        stop_app(&mut supervisor);
+    }
+    let mut controller = TestProcessController::default();
+    supervisor
+        .execute_next_pending_control_operation(
+            &mut controller,
+            &mut ScriptedClock::new([CONTROL_NS]),
+        )
+        .unwrap()
+        .unwrap();
+    let kill_at = supervisor.next_stop_timeout_deadline().unwrap().due_at_ns;
+    supervisor
+        .process_next_due_stop_timeout(&mut controller, kill_at)
+        .unwrap()
+        .unwrap();
+    let old_deadline = supervisor.next_cgroup_cleanup_deadline().unwrap();
+    supervisor
+        .complete_job(current_app_job(&supervisor), kill_at + 1, 0)
+        .unwrap();
+    if !restart {
+        supervisor
+            .start_service("app", None, &mut ScriptedClock::new([kill_at + 2]))
+            .unwrap();
+    }
+    supervisor
+        .launch_next_pending_job(
+            &mut TestTokenProvider::default(),
+            &mut TestProcessLauncher::new(vec![process(9000, 60)]),
+            &mut ScriptedClock::new([kill_at + 3]),
+        )
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        supervisor.service_status("app").unwrap().state,
+        ServiceState::Active
+    );
+    let accepted = supervisor
+        .stop_service("app", None, &mut ScriptedClock::new([kill_at + 4]))
+        .unwrap();
+    let LifecycleCommandOutcome::OperationAccepted(operation) = accepted.outcome else {
+        panic!("expected second stop");
+    };
+    let second_stop = operation.returned_operation_id;
+    supervisor
+        .execute_next_pending_control_operation(
+            &mut controller,
+            &mut ScriptedClock::new([kill_at + 5]),
+        )
+        .unwrap()
+        .unwrap();
+    controller.set_cgroup_populated(&old_deadline.cgroup_id, populated);
+    controller.cgroup_populated_checks.clear();
+    supervisor
+        .process_due_cgroup_cleanups(&mut controller, old_deadline.due_at_ns)
+        .unwrap();
+    assert_eq!(
+        supervisor.service_status("app").unwrap().state,
+        ServiceState::Stopping
+    );
+    assert_eq!(
+        supervisor.operation_status(second_stop).unwrap().state,
+        OperationState::Running
+    );
+    assert!(
+        controller.cgroup_populated_checks.is_empty(),
+        "obsolete cleanup must not probe a reused path"
+    );
+    assert!(controller.cgroup_removes.is_empty());
+
+    // Even a retained stale record must be harmless: ownership is checked
+    // before either the populated or empty cleanup branch can act.
+    supervisor.cgroup_cleanup.record(old_deadline.clone());
+    supervisor
+        .process_due_cgroup_cleanups(&mut controller, old_deadline.due_at_ns)
+        .unwrap();
+    assert_eq!(
+        supervisor.service_status("app").unwrap().state,
+        ServiceState::Stopping
+    );
+    assert!(controller.cgroup_populated_checks.is_empty());
+    assert!(controller.cgroup_removes.is_empty());
+    // A second SIGKILL gets its own full grace even if an old record survives.
+    supervisor.cgroup_cleanup.record(old_deadline.clone());
+    let second_kill = supervisor.next_stop_timeout_deadline().unwrap().due_at_ns;
+    supervisor
+        .process_next_due_stop_timeout(&mut controller, second_kill)
+        .unwrap()
+        .unwrap();
+    let new_deadline = supervisor.next_cgroup_cleanup_deadline().unwrap();
+    assert_eq!(new_deadline.due_at_ns, second_kill + 5_000_000_000);
+    let mut duplicate_deadline = new_deadline.clone();
+    duplicate_deadline.due_at_ns += 1_000_000_000;
+    supervisor.cgroup_cleanup.record(duplicate_deadline);
+    assert_eq!(
+        supervisor.next_cgroup_cleanup_deadline().unwrap(),
+        new_deadline
+    );
+
+    assert!(
+        supervisor
+            .process_due_cgroup_cleanups(&mut controller, old_deadline.due_at_ns)
+            .unwrap()
+            .is_none()
+    );
+    supervisor
+        .process_due_cgroup_cleanups(&mut controller, new_deadline.due_at_ns)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        supervisor.service_status("app").unwrap().state,
+        if populated {
+            ServiceState::Abandoned
+        } else {
+            ServiceState::Inactive
+        }
+    );
+}
+
+#[test]
+fn completed_stop_cleanup_cannot_abandon_a_later_stopping_instance() {
+    old_stop_cleanup_does_not_own_next_instance(false, true);
+}
+
+#[test]
+fn completed_restart_stop_cleanup_cannot_abandon_a_later_stopping_instance() {
+    old_stop_cleanup_does_not_own_next_instance(true, true);
+}
+
+#[test]
+fn obsolete_stop_cleanup_cannot_remove_the_next_instances_empty_tree() {
+    old_stop_cleanup_does_not_own_next_instance(false, false);
+}
