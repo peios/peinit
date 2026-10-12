@@ -29,6 +29,7 @@ struct FakeMountSyscalls {
     mount_failures: BTreeMap<String, i32>,
     seed_failures: BTreeMap<String, i32>,
     policy_failures: BTreeMap<String, i32>,
+    directory_failures: BTreeMap<String, i32>,
 }
 
 impl FakeMountSyscalls {
@@ -41,6 +42,7 @@ impl FakeMountSyscalls {
             mount_failures: BTreeMap::new(),
             seed_failures: BTreeMap::new(),
             policy_failures: BTreeMap::new(),
+            directory_failures: BTreeMap::new(),
         }
     }
 
@@ -77,6 +79,9 @@ impl Phase1MountSyscalls for FakeMountSyscalls {
     fn create_dir_all(&mut self, mount_point: &str) -> std::io::Result<()> {
         self.calls
             .push(MountCall::CreateDir(mount_point.to_string()));
+        if let Some(errno) = self.directory_failures.get(mount_point) {
+            return Err(std::io::Error::from_raw_os_error(*errno));
+        }
         Ok(())
     }
 
@@ -131,7 +136,10 @@ fn skips_mounts_already_present_in_mountinfo() {
 
     mount_phase1_virtual_filesystems(Path::new("/mountinfo"), &mut syscalls).expect("mount setup");
 
-    assert!(syscalls.calls.is_empty());
+    assert_eq!(
+        syscalls.calls,
+        vec![MountCall::CreateDir("/run/lock".into())]
+    );
 }
 
 #[test]
@@ -143,6 +151,7 @@ fn mounts_absent_filesystems_in_spec_order_with_exact_flags() {
     let expected: Vec<MountCall> = PHASE1_VIRTUAL_MOUNTS
         .iter()
         .flat_map(expected_calls_for_spec)
+        .chain(std::iter::once(MountCall::CreateDir("/run/lock".into())))
         .collect();
     assert_eq!(syscalls.calls, expected);
 }
@@ -159,6 +168,7 @@ fn mounts_proc_before_reading_default_mountinfo_when_proc_is_absent() {
     let expected: Vec<MountCall> = std::iter::once(&PHASE1_VIRTUAL_MOUNTS[0])
         .chain(PHASE1_VIRTUAL_MOUNTS[1..].iter())
         .flat_map(expected_calls_for_spec)
+        .chain(std::iter::once(MountCall::CreateDir("/run/lock".into())))
         .collect();
     assert_eq!(syscalls.calls, expected);
 }
@@ -400,4 +410,38 @@ fn surfaces_seed_failure_as_recovery_error() {
         .expect_err("seed failure");
 
     assert!(format!("{error:?}").contains("seed SD on /run failed"));
+}
+
+#[test]
+fn recreates_runtime_lock_directory_after_mounting_and_seeding_run() {
+    let mut syscalls = FakeMountSyscalls::with_mountinfo("");
+    mount_phase1_virtual_filesystems(Path::new("/mountinfo"), &mut syscalls).expect("mount setup");
+    let seeded = syscalls
+        .calls
+        .iter()
+        .position(|call| *call == MountCall::Seed("/run".into()))
+        .unwrap();
+    let created = syscalls
+        .calls
+        .iter()
+        .position(|call| *call == MountCall::CreateDir("/run/lock".into()))
+        .expect("runtime skeleton restored");
+    assert!(seeded < created, "create in the mounted, seeded filesystem");
+}
+
+#[test]
+fn runtime_lock_directory_creation_failure_enters_recovery() {
+    for errno in [libc::EACCES, libc::ENOTDIR, libc::EEXIST] {
+        let mut syscalls = FakeMountSyscalls::with_mountinfo("");
+        syscalls
+            .directory_failures
+            .insert("/run/lock".into(), errno);
+        let error = mount_phase1_virtual_filesystems(Path::new("/mountinfo"), &mut syscalls)
+            .expect_err("a missing runtime skeleton is a boot error");
+        assert!(
+            matches!(error, crate::boundary::BoundaryError::Recovery(ref message)
+            if message.contains("create runtime directory /run/lock failed")),
+            "{error:?}"
+        );
+    }
 }

@@ -237,6 +237,15 @@ where
         }
     }
 
+    // The /run tmpfs hides fsbase's packaged skeleton. Recreate its shared
+    // lock directory after mount setup so it inherits from the live root.
+    // create_dir_all also preserves a directory supplied by an earlier init.
+    syscalls.create_dir_all("/run/lock").map_err(|error| {
+        BoundaryError::Recovery(format!(
+            "create runtime directory /run/lock failed: {error}"
+        ))
+    })?;
+
     Ok(())
 }
 
