@@ -70,6 +70,143 @@ fn hard_dependent() -> ServiceDefinition {
     dependent
 }
 
+#[test]
+fn on_demand_dependent_waits_for_an_existing_backoff() {
+    for soft in [false, true] {
+        let mut dependent = hard_dependent();
+        dependent.triggers.clear();
+        if soft {
+            dependent.requires.clear();
+            dependent.wants.push("target".to_string());
+        }
+        let mut clock = ScriptedClock::new([BOOT_NS, APP_LAUNCH_NS]);
+        let target = ServiceDefinition::simple_system_boot("target", "/sbin/target");
+        let mut supervisor = boot_and_crash_target(target, dependent, &mut clock);
+        let mut clock = ScriptedClock::new([CRASH_NS + 1]);
+        supervisor
+            .start_service("dependent", None, &mut clock)
+            .expect("on-demand dependent accepted while target is in Backoff");
+        let operation = assert_held(&supervisor, "dependent");
+        assert!(!supervisor.operation_timeout_expired(operation, PAST_LIFETIME_NS));
+        assert!(
+            supervisor
+                .process_due_operation_maintenance(PAST_LIFETIME_NS)
+                .expect("held maintenance")
+                .operation_timeouts
+                .is_empty()
+        );
+        assert_eq!(assert_held(&supervisor, "dependent"), operation);
+        let deferred = supervisor
+            .operations()
+            .current_for_service("target")
+            .expect("deferred dependency operation")
+            .id;
+        assert!(!supervisor.operation_timeout_expired(deferred, PAST_LIFETIME_NS));
+        let mut clock = ScriptedClock::new([PAST_LIFETIME_NS + 1]);
+        supervisor
+            .start_service("dependent", None, &mut clock)
+            .expect("repeated dependent start merges");
+        assert_eq!(assert_held(&supervisor, "dependent"), operation);
+        assert_eq!(
+            supervisor
+                .operations()
+                .current_for_service("target")
+                .unwrap()
+                .id,
+            deferred
+        );
+
+        assert_eq!(
+            supervisor
+                .process_due_restart_backoffs(RELAUNCH_NS)
+                .expect("backoff deadline releases target")
+                .len(),
+            1
+        );
+        assert!(!supervisor.graph().is_operation_held(deferred));
+        let mut tokens = TestTokenProvider::default();
+        let mut launcher = TestProcessLauncher::new(vec![process(4243, 10)]);
+        let mut clock = ScriptedClock::new([RELAUNCH_NS]);
+        supervisor
+            .launch_next_pending_job(&mut tokens, &mut launcher, &mut clock)
+            .expect("relaunch target")
+            .expect("target dispatch");
+        let mut controller = TestProcessController::default();
+        supervisor
+            .apply_notify_datagram(
+                datagram(4243, b"READY=1"),
+                RELAUNCH_READY_NS,
+                &mut controller,
+            )
+            .expect("target ready");
+        assert_eq!(
+            supervisor.service_status("dependent").unwrap().state,
+            ServiceState::Starting
+        );
+        assert_eq!(
+            supervisor.operations().get(operation).unwrap().state,
+            OperationState::Running
+        );
+        assert_eq!(
+            supervisor.operations().get(deferred).unwrap().state,
+            OperationState::Completed
+        );
+        assert_eq!(
+            supervisor
+                .operations()
+                .get(deferred)
+                .unwrap()
+                .lifetime_from_ns,
+            RELAUNCH_NS
+        );
+    }
+}
+
+#[test]
+fn stopping_backoff_target_settles_on_demand_hard_and_soft_waiters() {
+    for soft in [false, true] {
+        let mut dependent = hard_dependent();
+        dependent.triggers.clear();
+        if soft {
+            dependent.requires.clear();
+            dependent.wants.push("target".to_string());
+        }
+        let mut clock = ScriptedClock::new([BOOT_NS, APP_LAUNCH_NS]);
+        let target = ServiceDefinition::simple_system_boot("target", "/sbin/target");
+        let mut supervisor = boot_and_crash_target(target, dependent, &mut clock);
+        let mut clock = ScriptedClock::new([CRASH_NS + 1, CRASH_NS + 2]);
+        supervisor
+            .start_service("dependent", None, &mut clock)
+            .expect("start held");
+        let operation = assert_held(&supervisor, "dependent");
+        let deferred = supervisor
+            .operations()
+            .current_for_service("target")
+            .unwrap()
+            .id;
+        supervisor
+            .stop_service("target", None, &mut clock)
+            .expect("stop backoff target");
+        assert!(
+            supervisor
+                .operations()
+                .get(deferred)
+                .unwrap()
+                .state
+                .is_terminal()
+        );
+        assert_eq!(
+            supervisor.operations().get(operation).unwrap().state,
+            if soft {
+                OperationState::Running
+            } else {
+                OperationState::Failed
+            }
+        );
+        assert!(!supervisor.graph().is_operation_held(operation));
+    }
+}
+
 /// §6.1: a service in Backoff is going to start again, and its dependents
 /// wait rather than failing. The dependent looks exactly like a start held
 /// on a readiness level, survives the operation lifetime, and starts when

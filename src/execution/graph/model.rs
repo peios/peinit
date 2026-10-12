@@ -65,7 +65,9 @@ pub struct GraphMember {
     /// Whether the last look at this member, while it waited, found it
     /// held only on facts with no clock (§7.5, `waits_without_clock`).
     /// Read when it is released: such a start's lifetime runs from the
-    /// release, since it had none while held (PEI-821).
+    /// release, since it had none while held (PEI-821). Also set for a newly
+    /// queued dependency operation waiting for an existing Backoff; an
+    /// already-ended operation awaiting a later restart keeps this false.
     pub held_without_clock: bool,
 }
 
