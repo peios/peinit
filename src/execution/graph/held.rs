@@ -178,13 +178,26 @@ impl GraphExecutionStore {
     /// their own, in some live context — the one case in which its
     /// lifetime does not run.
     pub fn is_operation_held(&self, operation_id: OperationId) -> bool {
-        self.associated_contexts(operation_id)
+        let members = self
+            .associated_contexts(operation_id)
             .into_iter()
             .filter_map(|context_id| self.contexts.get(&context_id))
-            .any(|context| {
+            .filter_map(|context| {
                 context
                     .member_for_operation(operation_id)
-                    .is_some_and(|member| context.waits_without_clock(&member.service))
+                    .map(|member| (context, member))
             })
+            .collect::<Vec<_>>();
+        // A deferred dependency operation may also be the operation the
+        // restart deadline subsequently runs in a new context. Its execution
+        // clock then applies even while old contexts await its outcome.
+        members
+            .iter()
+            .any(|(context, member)| context.waits_without_clock(&member.service))
+            || (members.iter().any(|(_, member)| {
+                member.status == GraphMemberStatus::AwaitingRestart && member.held_without_clock
+            }) && !members
+                .iter()
+                .any(|(_, member)| member.status == GraphMemberStatus::Running))
     }
 }

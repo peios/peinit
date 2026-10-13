@@ -62,6 +62,13 @@ impl<'a> StartClosureCollector<'a> {
         if !self.included.insert(service.to_string()) {
             return;
         }
+        if mode == IncludeMode::Dependency
+            && entry.runtime.state == crate::service::runtime::ServiceState::Backoff
+        {
+            // Keep a graph waiter, but let the restart deadline plan this
+            // service's activation and its own dependencies when it is due.
+            return;
+        }
 
         for dependency in hard_dependencies(&entry.definition) {
             self.include_hard_dependency(
