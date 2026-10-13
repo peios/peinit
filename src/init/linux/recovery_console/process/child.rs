@@ -1,7 +1,7 @@
 use std::ffi::c_char;
 
 use super::report::{ChildFailureStep, write_child_failure};
-use super::sys::{close_raw_fd, last_errno};
+use super::sys::{close_raw_fd, dup_inheritable, last_errno};
 
 pub(super) fn child_exec_recovery_shell(
     console_fd: i32,
@@ -13,7 +13,7 @@ pub(super) fn child_exec_recovery_shell(
 ) -> ! {
     close_raw_fd(error_read_fd);
     for target_fd in [libc::STDIN_FILENO, libc::STDOUT_FILENO, libc::STDERR_FILENO] {
-        if unsafe { libc::dup2(console_fd, target_fd) } < 0 {
+        if !dup_inheritable(console_fd, target_fd) {
             write_child_failure(error_write_fd, ChildFailureStep::DupConsole, last_errno());
         }
     }
