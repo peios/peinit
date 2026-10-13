@@ -67,8 +67,8 @@ fn supported_field(key: &str, value: &str) -> Option<NotifyField> {
         "RELOADING" if value == "1" => Some(NotifyField::Reloading),
         "STOPPING" if value == "1" => Some(NotifyField::Stopping),
         "STATUS" => Some(NotifyField::Status(value.to_string())),
-        // An empty level is "I have no level", which is how a daemon
-        // retracts one without exiting.
+        // Repeated LEVEL lines in one datagram publish a complete set.
+        // LEVEL= alone clears it; names remain opaque strings.
         "LEVEL" => Some(NotifyField::Level(value.to_string())),
         "PROGRESS" => Some(NotifyField::Progress(value.to_string())),
         "PROGRESS_UNIT" => Some(NotifyField::ProgressUnit(value.to_string())),
