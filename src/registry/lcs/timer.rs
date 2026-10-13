@@ -200,6 +200,10 @@ pub(super) fn queue_timer_last_run_write(
             source: io::Error::last_os_error(),
         }),
         0 => {
+            if !close_timer_writer_inherited_fds() {
+                // The parent reports this through the normal failed-write reap.
+                unsafe { libc::_exit(1) }
+            }
             let exit_code = if write_timer_last_run(
                 &service,
                 &schedule,
@@ -216,6 +220,14 @@ pub(super) fn queue_timer_last_run_write(
         }
         pid => Ok(pid as u32),
     }
+}
+
+fn close_timer_writer_inherited_fds() -> bool {
+    // PID 1's supervision handles are unused here. Both storage variants open
+    // a fresh absolute registry key after this call; the SDK caches no client
+    // descriptor. Keep standard streams and avoid allocation in the cleanup.
+    // The caller must _exit, never drop inherited OwnedFd wrappers after reuse.
+    unsafe { libc::syscall(libc::SYS_close_range, 3_u32, u32::MAX, 0_u32) == 0 }
 }
 
 fn timer_last_run_location(
@@ -248,6 +260,52 @@ fn decode_timer_value_name(value_name: Vec<u8>) -> String {
 mod tests {
     use super::*;
     use crate::timer::state::TimerLastRunStorage;
+
+    #[test]
+    fn timer_writer_closes_inherited_fds_without_changing_parent_or_stdio() {
+        use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
+
+        let source = std::fs::File::open("/dev/null").expect("sentinel source");
+        let raw = unsafe { libc::fcntl(source.as_raw_fd(), libc::F_DUPFD_CLOEXEC, 64) };
+        assert!(raw >= 64, "allocate a high inherited descriptor");
+        let sentinel = unsafe { OwnedFd::from_raw_fd(raw) };
+        let pid = unsafe { libc::fork() };
+        assert!(pid >= 0, "fork the descriptor cleanup probe");
+        if pid == 0 {
+            // Only syscalls and stack values after fork: the test harness may
+            // have other threads. Communicate through exit status, not a pipe
+            // which is itself supposed to be closed by the cleanup.
+            let before = unsafe {
+                [
+                    libc::fcntl(0, libc::F_GETFD),
+                    libc::fcntl(1, libc::F_GETFD),
+                    libc::fcntl(2, libc::F_GETFD),
+                ]
+            };
+            let cleaned = close_timer_writer_inherited_fds();
+            let closed = unsafe {
+                libc::fcntl(raw, libc::F_GETFD) == -1 && *libc::__errno_location() == libc::EBADF
+            };
+            let unchanged =
+                (0..3).all(|fd| unsafe { libc::fcntl(fd, libc::F_GETFD) == before[fd as usize] });
+            unsafe { libc::_exit(if cleaned && closed && unchanged { 0 } else { 1 }) }
+        }
+        let mut status = 0;
+        loop {
+            let reaped = unsafe { libc::waitpid(pid, &mut status, 0) };
+            if reaped == pid {
+                break;
+            }
+            assert_eq!(io::Error::last_os_error().raw_os_error(), Some(libc::EINTR));
+        }
+        assert!(libc::WIFEXITED(status), "probe exited normally");
+        assert_eq!(
+            libc::WEXITSTATUS(status),
+            0,
+            "child descriptors were isolated"
+        );
+        assert!(unsafe { libc::fcntl(sentinel.as_raw_fd(), libc::F_GETFD) } >= 0);
+    }
 
     /// §9.2: the write is performed in a forked child, so the event loop never
     /// waits on the registry.
