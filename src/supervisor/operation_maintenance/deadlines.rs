@@ -203,6 +203,17 @@ impl Supervisor {
     /// reload. A restart passes through its stop deadline and then its
     /// readiness deadline; the later phase wins when both are recorded.
     fn operation_phase_deadline_ns(&self, operation: &OperationRecord) -> Option<u64> {
+        if operation.source == crate::operation::OperationSource::Shutdown
+            && operation.state == OperationState::Running
+        {
+            return self.shutdown.as_ref().and_then(|shutdown| {
+                shutdown
+                    .stop_deadlines
+                    .iter()
+                    .find(|deadline| deadline.service == operation.service)
+                    .map(|deadline| deadline.due_at_ns)
+            });
+        }
         let operation_id = operation.id;
         match operation.operation_type {
             OperationType::Start | OperationType::Restart => self

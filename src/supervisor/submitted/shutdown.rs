@@ -43,17 +43,21 @@ impl crate::supervisor::state::Supervisor {
         &mut self,
         controller: &mut P,
         now_ns: u64,
-    ) -> Result<(), SupervisorError>
+    ) -> Result<Vec<crate::operation::store::OperationEvent>, SupervisorError>
     where
         P: ProcessController + ?Sized,
     {
         let mut work = SupervisorWork::from_supervisor(self);
+        let mut operation_events = Vec::new();
         crate::supervisor::shutdown_progress::advance_shutdown_progress(
-            &mut work, controller, now_ns,
+            &mut work,
+            controller,
+            now_ns,
+            &mut operation_events,
         )
         .map_err(SupervisorError::Shutdown)?;
         work.commit(self);
-        Ok(())
+        Ok(operation_events)
     }
 }
 

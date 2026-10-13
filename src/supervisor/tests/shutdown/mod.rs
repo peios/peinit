@@ -7,6 +7,7 @@ mod finalize;
 mod fixture;
 mod immediate;
 mod progress;
+mod operations;
 mod response;
 mod retained_evidence;
 mod runtime_turn;

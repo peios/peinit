@@ -37,7 +37,8 @@ pub(super) fn collect_submitted_terminal(
     dispatch: &SupervisedSubmittedTerminalDispatch,
     out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
-    push_job(out, &dispatch.job_event)
+    push_job(out, &dispatch.job_event)?;
+    super::event::push_operations(out, &dispatch.shutdown_operation_events)
 }
 
 pub(super) fn collect_jobs_command_dispatch(
