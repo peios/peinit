@@ -151,6 +151,148 @@ fn a_restart_queued_behind_a_stop_becomes_a_start_once_the_stop_completes() {
     );
 }
 
+#[test]
+fn invalid_promoted_start_fails_its_operation_without_stopping_the_supervisor() {
+    promoted_invalid_definition(crate::operation::OperationSource::Admin);
+}
+
+#[test]
+fn invalid_internal_queued_start_keeps_its_source_and_existing_behavior() {
+    promoted_invalid_definition(crate::operation::OperationSource::OnFailure);
+}
+
+fn promoted_invalid_definition(source: crate::operation::OperationSource) {
+    let (mut supervisor, _tokens, _launcher) = booted_active_app(alive_service("app"));
+    let main_job = supervisor
+        .service_status("app")
+        .expect("app")
+        .current_job
+        .expect("main job")
+        .id;
+    let mut controller = TestProcessController::default();
+    let mut clock = ScriptedClock::new([
+        LIFECYCLE_COMMAND_NS,
+        LIFECYCLE_COMMAND_NS + 1,
+        LIFECYCLE_COMMAND_NS + 2,
+        LIFECYCLE_COMMAND_NS + 3,
+    ]);
+
+    let (stop_id, stop_decision) = accepted(
+        supervisor
+            .stop_service("app", None, &mut clock)
+            .expect("stop app"),
+    );
+    assert_eq!(stop_decision, OperationConflictDecision::CreateNew);
+    supervisor
+        .execute_next_pending_control_operation(&mut controller, &mut clock)
+        .expect("execute stop")
+        .expect("stop execution");
+    assert_eq!(
+        supervisor.service_status("app").expect("app").state,
+        ServiceState::Stopping
+    );
+
+    let restart_id = supervisor
+        .operation_ids
+        .allocate_batch(1, LIFECYCLE_COMMAND_NS + 3)
+        .unwrap()[0];
+    let queued = supervisor
+        .operations
+        .request_operation(crate::operation::store::OperationRequest {
+            id: restart_id,
+            operation_type: crate::operation::OperationType::Start,
+            service: "app".into(),
+            source,
+            caller: None,
+            created_at_ns: LIFECYCLE_COMMAND_NS + 3,
+        })
+        .unwrap();
+    assert_eq!(queued.decision, OperationConflictDecision::QueueNew);
+    // Queued means not on the control boundary.
+    assert!(supervisor.pending_control_operations().is_empty());
+    assert!(!supervisor.has_ready_queued_operations());
+    assert_eq!(
+        supervisor
+            .operation_status(restart_id)
+            .expect("restart")
+            .state,
+        OperationState::Pending
+    );
+
+    // The stop completes: the service is Inactive and the restart is ready.
+    supervisor
+        .complete_job(main_job, LIFECYCLE_COMMAND_NS + 10, 0)
+        .expect("main exits");
+    assert_eq!(
+        supervisor.service_status("app").expect("app").state,
+        ServiceState::Inactive
+    );
+    assert_eq!(
+        supervisor.operation_status(stop_id).expect("stop").state,
+        OperationState::Completed
+    );
+    assert!(supervisor.has_ready_queued_operations());
+
+    // Model an invalid nonboot definition retained by an internal start.
+    // Promotion must contain its refusal even when admission was queued.
+    let mut bad = alive_service("app");
+    bad.health_check = Some("/bin/true".into());
+    bad.health_check_retries = 3;
+    bad.health_check_interval_secs = 10;
+    bad.restart_window_secs = 30;
+    supervisor
+        .services
+        .apply_definition_snapshot(vec![bad])
+        .unwrap();
+
+    let promoted = supervisor
+        .promote_queued_operations(LIFECYCLE_COMMAND_NS + 11)
+        .expect("promote");
+    assert_eq!(promoted.len(), 1);
+    assert_eq!(promoted[0].operation_id, restart_id);
+    assert_eq!(
+        supervisor.operation_status(restart_id).unwrap().source,
+        source
+    );
+    if source == crate::operation::OperationSource::Admin {
+        assert_eq!(promoted[0].outcome, PromotedOperationOutcome::Failed);
+        assert!(promoted[0].start_dispatches.is_empty());
+        assert_eq!(promoted[0].operation_events.len(), 1);
+        assert!(supervisor.pending_launch_jobs().is_empty());
+        assert_eq!(
+            supervisor.service_status("app").unwrap().state,
+            ServiceState::Inactive
+        );
+        assert_eq!(
+            supervisor.operation_status(restart_id).unwrap().state,
+            OperationState::Failed
+        );
+    } else {
+        assert_eq!(promoted[0].outcome, PromotedOperationOutcome::StartPlan);
+        assert_eq!(promoted[0].start_dispatches.len(), 1);
+        assert_eq!(supervisor.pending_launch_jobs().len(), 1);
+        assert_eq!(
+            supervisor.service_status("app").unwrap().state,
+            ServiceState::Starting
+        );
+        assert_eq!(
+            supervisor.operation_status(restart_id).unwrap().state,
+            OperationState::Running
+        );
+    }
+    assert!(!supervisor.has_ready_queued_operations());
+    assert_eq!(
+        supervisor.operation_status(stop_id).unwrap().state,
+        OperationState::Completed
+    );
+    assert!(
+        supervisor
+            .promote_queued_operations(LIFECYCLE_COMMAND_NS + 12)
+            .unwrap()
+            .is_empty()
+    );
+}
+
 /// §8.3, `Restart (Running)` + `Stop`: abort the restart, create the stop.
 /// The stop adopts the stop leg the restart already started; the main
 /// process's exit completes the stop, and no start leg follows.
