@@ -280,6 +280,56 @@ fn on_failure_starts_fallback_when_service_enters_failed() {
 }
 
 #[test]
+fn invalid_nonboot_fallback_does_not_roll_back_the_failed_service() {
+    let mut app = alive_service("app");
+    app.on_failure = Some("fallback".to_string());
+    app.restart_policy = RestartPolicy::Never;
+    let mut fallback = alive_service("fallback");
+    fallback.triggers.clear();
+    fallback.health_check = Some("/bin/true".into());
+    fallback.health_check_retries = 3;
+    fallback.health_check_interval_secs = 10;
+    fallback.restart_window_secs = 30;
+    let mut supervisor = boot_and_launch(vec![app, fallback], [BOOT_NS, APP_LAUNCH_NS]);
+    let app_job = current_job(&supervisor, "app");
+
+    let terminal = supervisor
+        .complete_job(app_job, APP_CRASH_NS, 1)
+        .expect("app failed");
+
+    assert_eq!(
+        terminal
+            .start_dispatches
+            .iter()
+            .map(|dispatch| dispatch.ready.service.as_str())
+            .collect::<Vec<_>>(),
+        vec!["fallback"],
+    );
+    let fallback_operation = supervisor
+        .service_status("fallback")
+        .expect("fallback")
+        .current_operation
+        .expect("fallback operation")
+        .id;
+    assert_eq!(
+        supervisor
+            .operation_status(fallback_operation)
+            .expect("fallback operation")
+            .source,
+        OperationSource::OnFailure,
+    );
+    assert_eq!(supervisor.pending_launch_jobs().len(), 1);
+    assert_eq!(
+        supervisor.service_status("app").unwrap().state,
+        ServiceState::Failed
+    );
+    assert_eq!(
+        supervisor.service_status("fallback").unwrap().state,
+        ServiceState::Starting
+    );
+}
+
+#[test]
 fn on_failure_self_reference_is_suppressed_at_runtime() {
     let mut app = alive_service("app");
     app.on_failure = Some("app".to_string());

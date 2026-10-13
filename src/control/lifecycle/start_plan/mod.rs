@@ -4,8 +4,8 @@ mod model;
 mod order;
 
 use crate::operation::OperationSource;
-use crate::service::ServiceTable;
 use crate::service::runtime::TransitionCause;
+use crate::service::{ServiceGraphFinding, ServiceTable, validate_service_graph};
 
 use closure::collect_start_closure;
 use order::dependency_order;
@@ -20,12 +20,17 @@ pub fn plan_on_demand_start(
     services: &ServiceTable,
     service: &str,
 ) -> Result<OnDemandStartPlan, OnDemandStartPlanError> {
-    plan_start(
-        services,
-        service,
-        OperationSource::Admin,
-        TransitionCause::ExplicitStart,
-    )
+    plan_queued_start(services, service, OperationSource::Admin)
+}
+
+/// A promoted operation retains its source. Only administrator requests gain
+/// the definition-validation refusal; internal work keeps its existing checks.
+pub(crate) fn plan_queued_start(
+    services: &ServiceTable,
+    service: &str,
+    source: OperationSource,
+) -> Result<OnDemandStartPlan, OnDemandStartPlanError> {
+    plan_start(services, service, source, TransitionCause::ExplicitStart)
 }
 
 pub fn plan_restart_policy_start(
@@ -118,6 +123,36 @@ fn plan_start(
         Vec::new()
     } else {
         let startable = closure.startable_services();
+        // Internal recovery must not roll back a source service's terminal
+        // transition because its target has an invalid definition.
+        if requested_operation_source == OperationSource::Admin {
+            // Validate exactly the definitions this plan would activate. An
+            // already-satisfied dependency and an unrelated invalid definition
+            // must not reject an otherwise valid start. Missing/disabled hard
+            // dependencies and cycles retain the closure/order handling below;
+            // conflicting boot triggers are not a constraint on an explicit start.
+            let definitions = startable
+                .iter()
+                .filter_map(|name| services.definition(name).cloned())
+                .collect::<Vec<_>>();
+            if let Err(failure) = validate_service_graph(&definitions) {
+                let findings = failure
+                    .findings
+                    .into_iter()
+                    .filter(|finding| {
+                        matches!(
+                            finding,
+                            ServiceGraphFinding::InvalidHealthCheckRestartWindow { .. }
+                                | ServiceGraphFinding::UnschedulableHealthCheck { .. }
+                                | ServiceGraphFinding::InvalidTimerSchedule { .. }
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                if !findings.is_empty() {
+                    return Err(OnDemandStartPlanError::Validation { findings });
+                }
+            }
+        }
         dependency_order(&startable, services)?
             .into_iter()
             .map(|planned| {

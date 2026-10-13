@@ -14,7 +14,8 @@
 use std::collections::BTreeSet;
 
 use crate::control::lifecycle::{
-    LifecycleCommandError, dispatch_existing_requested_start_plan, plan_on_demand_start,
+    LifecycleCommandError, OnDemandStartPlanError, dispatch_existing_requested_start_plan,
+    plan_queued_start,
 };
 use crate::execution::graph::GraphContextId;
 use crate::execution::start::StartExecutionDispatch;
@@ -139,10 +140,27 @@ fn promote_one(
             // §8.1: a restart of a service with no process skips the stop
             // phase; the operation keeps its type. The existing record is the
             // requested start of the plan, as a deferred backoff start is.
-            let plan =
-                plan_on_demand_start(&work.services, &operation.service).map_err(|error| {
-                    SupervisorError::Lifecycle(LifecycleCommandError::StartPlan(error))
-                })?;
+            let plan = match plan_queued_start(&work.services, &operation.service, operation.source)
+            {
+                Ok(plan) => plan,
+                Err(OnDemandStartPlanError::Validation { findings }) => {
+                    // There is no request to reject now: report the refusal
+                    // on the queued operation and continue promoting others.
+                    dispatch.operation_events.push(fail(
+                        work,
+                        operation.id,
+                        now_ns,
+                        format!("invalid_state: start definition validation failed: {findings:?}"),
+                    )?);
+                    dispatch.outcome = PromotedOperationOutcome::Failed;
+                    return Ok(dispatch);
+                }
+                Err(error) => {
+                    return Err(SupervisorError::Lifecycle(
+                        LifecycleCommandError::StartPlan(error),
+                    ));
+                }
+            };
             let admission = dispatch_existing_requested_start_plan(
                 &mut work.operations,
                 &mut work.operation_ids,

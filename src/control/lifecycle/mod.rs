@@ -22,3 +22,5 @@ pub use start_plan::{
     plan_binds_to_recovery_start, plan_on_demand_start, plan_on_failure_start,
     plan_restart_policy_start, plan_timer_start, plan_tty_release_start,
 };
+
+pub(crate) use start_plan::plan_queued_start;
