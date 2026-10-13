@@ -194,14 +194,10 @@ impl GraphExecutionStore {
         members
             .iter()
             .any(|(context, member)| context.waits_without_clock(&member.service))
-            || (members
+            || (members.iter().any(|(_, member)| {
+                member.status == GraphMemberStatus::AwaitingRestart && member.held_without_clock
+            }) && !members
                 .iter()
-                .any(|(_, member)| {
-                    member.status == GraphMemberStatus::AwaitingRestart
-                        && member.held_without_clock
-                })
-                && !members
-                    .iter()
-                    .any(|(_, member)| member.status == GraphMemberStatus::Running))
+                .any(|(_, member)| member.status == GraphMemberStatus::Running))
     }
 }
