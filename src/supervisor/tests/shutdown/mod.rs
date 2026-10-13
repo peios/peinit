@@ -6,6 +6,7 @@ mod driver;
 mod finalize;
 mod fixture;
 mod immediate;
+mod operations;
 mod progress;
 mod response;
 mod retained_evidence;

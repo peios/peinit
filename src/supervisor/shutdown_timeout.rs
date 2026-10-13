@@ -23,6 +23,7 @@ impl Supervisor {
         let mut work = SupervisorWork::from_supervisor(self);
         ensure_shutdown(&work)?;
         let mut cgroup_kills = Vec::new();
+        let mut operation_events = Vec::new();
         let mut job_events = Vec::new();
         let mut abandoned = Vec::new();
         let mut submitted = Vec::new();
@@ -67,6 +68,20 @@ impl Supervisor {
                 .map_err(SupervisorError::Shutdown)?,
             );
         }
+        for kill in &cgroup_kills {
+            super::shutdown_operations::fail_stop(
+                &mut work,
+                &kill.service,
+                now_ns,
+                if global_timeout {
+                    "shutdown global timeout"
+                } else {
+                    "operation_timeout: StopTimeout expired"
+                },
+                &mut operation_events,
+            )
+            .map_err(SupervisorError::Shutdown)?;
+        }
         let post_kill = process_due_post_kill_deadlines(&mut work, controller, now_ns)
             .map_err(SupervisorError::Shutdown)?;
         for deadline in self.due_submitted_job_deadlines(now_ns) {
@@ -95,8 +110,9 @@ impl Supervisor {
             return Ok(None);
         }
 
-        let next_wave = advance_shutdown_progress(&mut work, controller, now_ns)
-            .map_err(SupervisorError::Shutdown)?;
+        let next_wave =
+            advance_shutdown_progress(&mut work, controller, now_ns, &mut operation_events)
+                .map_err(SupervisorError::Shutdown)?;
         let shutdown = work.shutdown().map_err(SupervisorError::Shutdown)?;
         let finalization = shutdown.finalization.clone();
         let still_waiting_for = if shutdown.global_timeout_fired
@@ -109,6 +125,7 @@ impl Supervisor {
         work.commit(self);
 
         Ok(Some(SupervisorShutdownTimeoutDispatch {
+            operation_events,
             global_timeout,
             waiting_for,
             still_waiting_for,

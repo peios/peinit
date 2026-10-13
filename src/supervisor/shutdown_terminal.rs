@@ -63,8 +63,10 @@ where
 {
     let service_transition =
         apply_shutdown_job_exit(&mut work, &job_event).map_err(SupervisorError::Shutdown)?;
-    let next_wave = advance_shutdown_progress(&mut work, controller, ended_at_ns)
-        .map_err(SupervisorError::Shutdown)?;
+    let mut operation_events = Vec::new();
+    let next_wave =
+        advance_shutdown_progress(&mut work, controller, ended_at_ns, &mut operation_events)
+            .map_err(SupervisorError::Shutdown)?;
     let finalization = work
         .shutdown()
         .map_err(SupervisorError::Shutdown)?
@@ -73,6 +75,7 @@ where
     work.commit(supervisor);
 
     Ok(SupervisorShutdownTerminalDispatch {
+        operation_events,
         job_event,
         service_transition,
         next_wave,

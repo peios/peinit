@@ -18,10 +18,12 @@ pub(in crate::supervisor) fn advance_shutdown_progress<P>(
     work: &mut SupervisorWork,
     controller: &mut P,
     now_ns: u64,
+    operation_events: &mut Vec<crate::operation::store::OperationEvent>,
 ) -> Result<Vec<SupervisorShutdownStopDispatch>, ShutdownError>
 where
     P: ProcessController + ?Sized,
 {
+    super::shutdown_operations::settle_stopped(work, now_ns, operation_events)?;
     let mut shutdown = work
         .shutdown
         .take()
@@ -63,6 +65,7 @@ where
             controller,
             now_ns,
             &mut next_deadlines,
+            operation_events,
         )?;
         shutdown.stop_deadlines = next_deadlines;
         dispatches.append(&mut wave_dispatches);

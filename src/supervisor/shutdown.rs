@@ -36,6 +36,8 @@ impl Supervisor {
             .map_err(SupervisorError::Shutdown)?;
         let mut work = SupervisorWork::from_supervisor(self);
         let mut stop_deadlines = Vec::new();
+        let mut operation_events =
+            super::shutdown_operations::request_stops(&mut work, &plan, now_ns)?;
 
         let completed_transitions = clear_completed_services(&mut work, &plan)
             .map_err(ShutdownError::ServiceTable)
@@ -48,9 +50,15 @@ impl Supervisor {
             self.settings.shutdown.post_kill_timeout_secs,
         )
         .map_err(SupervisorError::Shutdown)?;
-        let first_wave =
-            begin_first_stop_wave(&mut work, &plan, controller, now_ns, &mut stop_deadlines)
-                .map_err(SupervisorError::Shutdown)?;
+        let first_wave = begin_first_stop_wave(
+            &mut work,
+            &plan,
+            controller,
+            now_ns,
+            &mut stop_deadlines,
+            &mut operation_events,
+        )
+        .map_err(SupervisorError::Shutdown)?;
         let submitted_stops = stop_submitted_jobs_for_shutdown(
             &mut work,
             controller,
@@ -84,6 +92,7 @@ impl Supervisor {
         work.commit(self);
 
         Ok(SupervisorShutdownDispatch {
+            operation_events,
             runtime,
             completed_transitions,
             killed_starting: starting_kills.killed_starting,

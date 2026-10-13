@@ -78,6 +78,7 @@ fn runtime_loop_collector_preserves_phase_order_for_maintenance_events_and_calen
         read: LinuxTimerFdRead::Expired { expirations: 1 },
         drive: Some(Box::new(SupervisorShutdownDriveDispatch {
             timeout: Some(SupervisorShutdownTimeoutDispatch {
+                operation_events: vec![completed_operation(operation_id(4), "shutdown_stop")],
                 submitted: Vec::new(),
                 global_timeout: false,
                 waiting_for: Vec::new(),
@@ -128,6 +129,7 @@ fn runtime_loop_collector_preserves_phase_order_for_maintenance_events_and_calen
             .map(|event| event.event_type.as_str())
             .collect::<Vec<_>>(),
         vec![
+            "peinit.operation.ended",
             "peinit.operation.ended",
             "peinit.service.abandoned",
             "peinit.operation.ended",
