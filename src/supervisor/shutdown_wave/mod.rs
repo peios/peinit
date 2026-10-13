@@ -22,11 +22,20 @@ pub(super) fn begin_first_stop_wave<P>(
     controller: &mut P,
     now_ns: u64,
     stop_deadlines: &mut Vec<ShutdownStopDeadline>,
+    operation_events: &mut Vec<crate::operation::store::OperationEvent>,
 ) -> Result<Vec<SupervisorShutdownStopDispatch>, ShutdownError>
 where
     P: ProcessController + ?Sized,
 {
-    begin_stop_wave(work, plan, 0, controller, now_ns, stop_deadlines)
+    begin_stop_wave(
+        work,
+        plan,
+        0,
+        controller,
+        now_ns,
+        stop_deadlines,
+        operation_events,
+    )
 }
 
 pub(super) fn begin_stop_wave<P>(
@@ -36,6 +45,7 @@ pub(super) fn begin_stop_wave<P>(
     controller: &mut P,
     now_ns: u64,
     stop_deadlines: &mut Vec<ShutdownStopDeadline>,
+    operation_events: &mut Vec<crate::operation::store::OperationEvent>,
 ) -> Result<Vec<SupervisorShutdownStopDispatch>, ShutdownError>
 where
     P: ProcessController + ?Sized,
@@ -60,6 +70,12 @@ where
         }
         if participant.already_stopping {
             let retained = retained_stop_deadline(work, &participant.service, wave_index, now_ns)?;
+            super::shutdown_operations::start_stop(
+                work,
+                &participant.service,
+                now_ns,
+                operation_events,
+            )?;
             stop_deadlines.push(retained.deadline.clone());
             dispatches.push(SupervisorShutdownStopDispatch {
                 service: participant.service.clone(),
@@ -105,13 +121,19 @@ where
                 },
             )
             .map_err(ShutdownError::ServiceTable)?;
+        super::shutdown_operations::start_stop(
+            work,
+            &participant.service,
+            now_ns,
+            operation_events,
+        )?;
         let deadline = ShutdownStopDeadline {
             service: participant.service.clone(),
             cgroup_id: service_root_cgroup_id(&work.services, &participant.service)?,
             started_at_ns: now_ns,
             due_at_ns,
             wave: wave_index,
-            operation_id: None,
+            operation_id: super::shutdown_operations::active_stop(work, &participant.service),
         };
         stop_deadlines.push(deadline.clone());
         dispatches.push(SupervisorShutdownStopDispatch {

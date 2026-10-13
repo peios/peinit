@@ -37,6 +37,7 @@ pub(in crate::runtime::kmes) fn collect_shutdown_drive_dispatch(
     out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     if let Some(timeout) = &dispatch.timeout {
+        push_operations(out, &timeout.operation_events)?;
         for job_event in &timeout.job_events {
             push_job(out, job_event)?;
         }
@@ -61,7 +62,8 @@ pub(in crate::runtime::kmes::system) fn collect_shutdown_terminal_dispatch(
     dispatch: &SupervisorShutdownTerminalDispatch,
     out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
-    push_job(out, &dispatch.job_event)
+    push_job(out, &dispatch.job_event)?;
+    push_operations(out, &dispatch.operation_events)
 }
 
 fn collect_shutdown_signal_dispatch(
@@ -72,8 +74,10 @@ fn collect_shutdown_signal_dispatch(
         SupervisorShutdownSignalAction::Graceful(shutdown) => {
             collect_shutdown_dispatch(shutdown, out)?;
         }
-        SupervisorShutdownSignalAction::Forced(_)
-        | SupervisorShutdownSignalAction::AlreadyInProgress { .. } => {}
+        SupervisorShutdownSignalAction::Forced(shutdown) => {
+            push_operations(out, &shutdown.operation_events)?
+        }
+        SupervisorShutdownSignalAction::AlreadyInProgress { .. } => {}
     }
     Ok(())
 }
@@ -83,6 +87,7 @@ fn collect_shutdown_dispatch(
     out: &mut EventCollector<'_>,
 ) -> Result<(), BoundaryError> {
     push_operations(out, &dispatch.startup_operation_events)?;
+    push_operations(out, &dispatch.operation_events)?;
     for job_event in &dispatch.startup_job_events {
         push_job(out, job_event)?;
     }

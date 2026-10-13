@@ -41,6 +41,7 @@ pub struct SupervisorSubmittedLaunchFailureDispatch {
 /// A submitted job's process ended.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SupervisedSubmittedTerminalDispatch {
+    pub shutdown_operation_events: Vec<crate::operation::store::OperationEvent>,
     pub job_event: JobEvent,
     pub cause: Option<SubmittedJobCause>,
     /// The job's cgroup could not be removed yet; a retry is scheduled.

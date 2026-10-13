@@ -24,6 +24,30 @@ pub struct OperationRequestOutcome {
 }
 
 impl OperationStore {
+    /// Observe a stop owned by the shutdown wave planner. This does not
+    /// supersede an admin operation or queue work on the control boundary:
+    /// shutdown retains that operation's original timeout evidence.
+    pub(crate) fn observe_shutdown_stop(
+        &mut self,
+        id: OperationId,
+        service: String,
+        created_at_ns: u64,
+    ) -> Result<OperationRequestOutcome, OperationStoreError> {
+        self.ensure_unused_id(id)?;
+        self.insert_requested(
+            OperationRequest {
+                id,
+                operation_type: OperationType::Stop,
+                service,
+                source: OperationSource::Shutdown,
+                caller: None,
+                created_at_ns,
+            },
+            OperationConflictDecision::CreateNew,
+            InsertPosition::Back,
+        )
+    }
+
     pub fn request_operation(
         &mut self,
         request: OperationRequest,

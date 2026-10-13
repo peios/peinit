@@ -670,6 +670,7 @@ fn shutdown_signal_emits_shutdown_progress() {
             SupervisorShutdownSignalDispatch {
                 signal: crate::shutdown::ShutdownSignal::Sigterm,
                 action: SupervisorShutdownSignalAction::Graceful(SupervisorShutdownDispatch {
+                    operation_events: Vec::new(),
                     submitted_stops: Vec::new(),
                     runtime: shutdown_runtime(ShutdownKind::Poweroff),
                     completed_transitions: Vec::new(),

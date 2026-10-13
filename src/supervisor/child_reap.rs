@@ -81,10 +81,11 @@ impl Supervisor {
             .map_err(SupervisorError::JobStore)?;
 
         let dispatch = if job_type == JobType::Submitted {
-            let terminal =
+            let mut terminal =
                 self.apply_submitted_reap(job_id, child.status, ended_at_ns, controller)?;
             if self.shutdown.is_some() {
-                self.advance_shutdown_after_submitted_job(controller, ended_at_ns)?;
+                terminal.shutdown_operation_events =
+                    self.advance_shutdown_after_submitted_job(controller, ended_at_ns)?;
             }
             SupervisorChildReapDispatch::Submitted(Box::new(terminal))
         } else if self.shutdown.is_some() {

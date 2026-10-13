@@ -10,6 +10,7 @@ use crate::shutdown::{
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SupervisorShutdownDispatch {
+    pub operation_events: Vec<OperationEvent>,
     pub runtime: ShutdownRuntime,
     pub completed_transitions: Vec<ServiceTableTransition>,
     pub killed_starting: Vec<SupervisorShutdownKillDispatch>,
@@ -68,6 +69,7 @@ pub struct SupervisorShutdownStopDispatch {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SupervisorShutdownTerminalDispatch {
+    pub operation_events: Vec<OperationEvent>,
     pub job_event: crate::job::JobEvent,
     pub service_transition: Option<ServiceTableTransition>,
     pub next_wave: Vec<SupervisorShutdownStopDispatch>,
@@ -76,6 +78,7 @@ pub struct SupervisorShutdownTerminalDispatch {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SupervisorShutdownTimeoutDispatch {
+    pub operation_events: Vec<OperationEvent>,
     pub global_timeout: bool,
     /// What the shutdown was waiting for when the global timeout fired,
     /// before it killed anything; empty on other turns.
@@ -114,6 +117,7 @@ pub struct SupervisorShutdownFinalizationDispatch {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SupervisorImmediateShutdownDispatch {
+    pub operation_events: Vec<OperationEvent>,
     pub killed_services: Vec<SupervisorShutdownCgroupKillDispatch>,
     /// The final action, where the caller asked for it to be attempted at
     /// once; `None` when it was left to the end of the runtime's turn.
