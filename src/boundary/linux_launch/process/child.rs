@@ -253,6 +253,26 @@ mod tests {
         }
     }
 
+    /// PEI-331: the stdio handles are now close-on-exec, and `dup2(fd, fd)`
+    /// does not clear the flag. A handle that already sits on its standard
+    /// slot must still survive exec.
+    #[test]
+    fn dup2_onto_its_own_slot_still_clears_close_on_exec() {
+        let (read, _write) = pipe();
+        let fd = read.as_raw_fd();
+        assert_ne!(
+            fcntl_getfd(fd) & libc::FD_CLOEXEC,
+            0,
+            "fixture starts cloexec"
+        );
+
+        super::sys::dup2_checked(fd, fd).expect("self dup");
+
+        let flags = fcntl_getfd(fd);
+        assert!(flags >= 0);
+        assert_eq!(flags & libc::FD_CLOEXEC, 0);
+    }
+
     fn pipe() -> (OwnedFd, OwnedFd) {
         let mut fds = [0; 2];
         assert_eq!(unsafe { libc::pipe2(fds.as_mut_ptr(), libc::O_CLOEXEC) }, 0);

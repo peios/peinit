@@ -8,7 +8,14 @@ pub(super) fn close_fd_checked(fd: i32) -> Result<(), i32> {
     }
 }
 
+/// Make `to` an inheritable copy of `from`. `dup2` clears close-on-exec on
+/// its target, except when `from == to`, where it changes nothing: a
+/// close-on-exec source already sitting on its target slot would then
+/// vanish at exec. Clear the flag explicitly in that case.
 pub(super) fn dup2_checked(from: i32, to: i32) -> Result<(), i32> {
+    if from == to {
+        return clear_cloexec(to);
+    }
     loop {
         let result = unsafe { libc::dup2(from, to) };
         if result >= 0 {
