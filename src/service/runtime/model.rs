@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use crate::submitted::{JobProgress, JobProgressUnit};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -248,13 +250,13 @@ pub struct ServiceRuntimeSnapshot {
     /// `peinit.notify.progress.reported` event, for the once-a-second bound
     /// of §4.A.
     pub last_progress_event_ns: Option<u64>,
-    /// The readiness level this service last published with `LEVEL=`, for
+    /// The readiness levels this service last published with `LEVEL=`, for
     /// dependents declaring `Requires = ["<service>:<level>"]`.
     ///
     /// Cleared whenever the service leaves the running state, because a
     /// level is a claim about a process that is currently making it. A
     /// stale one would hold a dependent open on a promise nobody is keeping.
-    pub level: Option<String>,
+    pub levels: BTreeSet<String>,
     pub stopping_acknowledged: bool,
     pub stopping_timeout: Option<ServiceStoppingTimeoutEvidence>,
     pub pending_timer: bool,
@@ -277,7 +279,7 @@ impl ServiceRuntimeSnapshot {
             progress: None,
             progress_unit: None,
             last_progress_event_ns: None,
-            level: None,
+            levels: BTreeSet::new(),
             stopping_acknowledged: false,
             stopping_timeout: None,
             pending_timer: false,
