@@ -130,6 +130,11 @@ impl GraphExecutionStore {
         for context_id in context_ids {
             events.extend(self.apply_context_terminal(context_id, operation_id, outcome)?);
         }
+        // Settle other operations' service waiters after all associations
+        // of this operation have received their own terminal event.
+        if let Some(service) = events.first().map(|event| event.service.clone()) {
+            events.extend(self.settle_awaiting_restart(&service, outcome)?);
+        }
         Ok(events)
     }
 
@@ -159,13 +164,6 @@ impl GraphExecutionStore {
         if outcome == GraphTerminalOutcome::Failed {
             events.extend(propagate_hard_dependency_failure(context, &service)?);
         }
-        // This operation may be the restart an earlier context's member was
-        // held for: the relaunch out of Backoff runs under its own context
-        // and operation, so the hold is settled by *service*, not by
-        // association. The events come back through the same list, so
-        // whatever releases or fails after this terminal reaches the held
-        // dependents too (PEI-821).
-        events.extend(self.settle_awaiting_restart(&service, outcome)?);
         Ok(events)
     }
 }
@@ -217,6 +215,9 @@ fn mark_awaiting_restart(
         });
     }
     member.status = GraphMemberStatus::AwaitingRestart;
+    // This operation has ended. Only a newly queued dependency start uses
+    // AwaitingRestart with a held operation of its own (PEI-1379).
+    member.held_without_clock = false;
     Ok(())
 }
 

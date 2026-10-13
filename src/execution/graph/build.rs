@@ -77,7 +77,13 @@ pub(super) fn on_demand_context(
                 }
             })?
         };
-        let status = if matches!(
+        let backoff = services
+            .runtime(&start.service)
+            .is_some_and(|runtime| runtime.state == crate::service::runtime::ServiceState::Backoff);
+        let status = if backoff && start.service != dispatch.plan.requested {
+            // The restart deadline owns activation of this dependency.
+            GraphMemberStatus::AwaitingRestart
+        } else if matches!(
             outcome.decision,
             OperationConflictDecision::MergeIntoExisting { .. }
         ) {
@@ -94,7 +100,7 @@ pub(super) fn on_demand_context(
                 transition_cause: start.transition_cause,
                 sequence,
                 status,
-                held_without_clock: false,
+                held_without_clock: backoff,
             },
         )?;
     }
