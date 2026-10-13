@@ -28,6 +28,17 @@ impl Supervisor {
         let mut work = SupervisorWork::from_supervisor(self);
         let killed_services = kill_all_process_cgroups(&mut work, controller, now_ns)
             .map_err(SupervisorError::Shutdown)?;
+        let mut operation_events = Vec::new();
+        for kill in &killed_services {
+            super::shutdown_operations::fail_stop(
+                &mut work,
+                &kill.service,
+                now_ns,
+                "forced reboot",
+                &mut operation_events,
+            )
+            .map_err(SupervisorError::Shutdown)?;
+        }
         work.shutdown = Some(immediate_runtime(ShutdownKind::Reboot, now_ns));
         work.commit(self);
 
@@ -36,6 +47,7 @@ impl Supervisor {
             None => None,
         };
         Ok(SupervisorImmediateShutdownDispatch {
+            operation_events,
             killed_services,
             finalization,
         })

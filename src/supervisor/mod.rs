@@ -38,6 +38,7 @@ mod shutdown_deadline_timer;
 mod shutdown_driver;
 mod shutdown_finalize;
 mod shutdown_immediate;
+mod shutdown_operations;
 mod shutdown_progress;
 mod shutdown_signal;
 mod shutdown_starting;

@@ -111,6 +111,7 @@ where
         post_kill_timeout_secs,
     )?;
     Ok(SupervisedSubmittedTerminalDispatch {
+        shutdown_operation_events: Vec::new(),
         job_event,
         cause,
         cgroup_busy,
