@@ -1,0 +1,3 @@
+title = "peinit"
+short = "peinit"
+description = "Technical Reference Manual — the init system and service manager: boot, the service model, identity, supervision, jobs and operations, and shutdown."
