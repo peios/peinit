@@ -1,3 +1,5 @@
+#[cfg(any(test, all(feature = "peios-boundary", feature = "peios-registry")))]
+mod autorun_process;
 mod devices;
 mod model;
 mod orchestrator;
