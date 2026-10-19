@@ -111,11 +111,23 @@ fn serializes_status_response_shape_with_structured_warnings_and_timestamps() {
     // A timer's times are the wall clock's already, not projected.
     assert_eq!(
         sorted_keys(&response["timers"][0]),
-        ["fires_at", "last_fired_at", "not_armed", "schedule", "scheduled_at"],
+        [
+            "fires_at",
+            "last_fired_at",
+            "not_armed",
+            "schedule",
+            "scheduled_at"
+        ],
     );
     assert_eq!(response["timers"][0]["schedule"], "*-*-* 00:00:00");
-    assert_eq!(response["timers"][0]["scheduled_at"], "2024-06-01T00:00:00.000000000Z");
-    assert_eq!(response["timers"][0]["fires_at"], "2024-06-01T00:01:30.000000000Z");
+    assert_eq!(
+        response["timers"][0]["scheduled_at"],
+        "2024-06-01T00:00:00.000000000Z"
+    );
+    assert_eq!(
+        response["timers"][0]["fires_at"],
+        "2024-06-01T00:01:30.000000000Z"
+    );
     assert!(response["timers"][0]["last_fired_at"].is_null());
     assert!(response["timers"][0]["not_armed"].is_null());
     assert!(response["timers"][1]["fires_at"].is_null());

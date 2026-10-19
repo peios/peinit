@@ -13,8 +13,7 @@ mod tests;
 pub use crate::security::TokenSummary;
 pub use builder::boot_start_operations_from_phase2_plan;
 pub use internal_error::{
-    INTERNAL_ERROR_RESULT_CODE, internal_error_result, is_internal_error,
-    is_internal_error_result,
+    INTERNAL_ERROR_RESULT_CODE, internal_error_result, is_internal_error, is_internal_error_result,
 };
 pub use model::{
     OperationRecord, OperationSource, OperationState, OperationTransitionAction,

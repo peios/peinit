@@ -58,7 +58,9 @@ pub(in crate::runtime::kmes) fn collect_lifecycle_deadline_dispatch(
         collect_watchdog_timeout(timeout, out)?;
     }
     for leak in &dispatch.cgroup_leaks {
-        out.push(CGROUP_LEAKED, |_| crate::kmes::encode_leaked_cgroup_event(leak))?;
+        out.push(CGROUP_LEAKED, |_| {
+            crate::kmes::encode_leaked_cgroup_event(leak)
+        })?;
     }
     for dispatch in &dispatch.submitted_jobs {
         super::super::submitted::collect_submitted_deadline(dispatch, out)?;

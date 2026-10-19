@@ -1,8 +1,6 @@
 use crate::ids::OperationId;
 
-use crate::operation::{
-    OperationRecord, OperationSource, OperationState, OperationType, TokenSummary,
-};
+use crate::operation::{OperationRecord, OperationSource, OperationState, OperationType, TokenSummary};
 
 use super::OperationStoreError;
 

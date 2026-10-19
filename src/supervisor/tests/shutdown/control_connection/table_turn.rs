@@ -3,12 +3,8 @@ use std::collections::VecDeque;
 use crate::control::connection::{
     ControlConnectionRecord, ControlConnectionTable, ControlConnectionWriteTurn,
 };
-use crate::control::socket::{
-    ControlSocketRead, ControlSocketWrite, DEFAULT_MAX_REQUEST_SIZE_BYTES,
-};
-use crate::supervisor::{
-    SupervisorControlFrameTurn, SupervisorShutdownControlConnectionTableTurnError,
-};
+use crate::control::socket::{ControlSocketRead, ControlSocketWrite, DEFAULT_MAX_REQUEST_SIZE_BYTES};
+use crate::supervisor::{SupervisorControlFrameTurn, SupervisorShutdownControlConnectionTableTurnError};
 
 use super::super::fixture::shutdown_fixture;
 use super::support::{FakeConnectionIo, TurnAccessChecker, connection_turn_context, control_peer};

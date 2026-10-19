@@ -8,9 +8,7 @@ use super::super::{
     AUTHD_LAUNCH_NS, BOOT_NS, ScriptedClock, StaticRegistry, TestProcessController,
     TestProcessLauncher, TestTokenProvider, process, settings,
 };
-use super::{
-    NOTIFY_NS, apply_notify, apply_notify_with_controller, datagram, notify_app_supervisor,
-};
+use super::{NOTIFY_NS, apply_notify, apply_notify_with_controller, datagram, notify_app_supervisor};
 
 #[test]
 fn ready_notification_satisfies_notify_readiness_and_releases_dependent() {

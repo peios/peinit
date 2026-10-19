@@ -26,7 +26,10 @@ pub fn encode_service_internal_error_event(
     payload.set("operation.stage", stage_label(dispatch.step));
     if let Some(service) = dispatch.service() {
         payload.set("object.service.name", service);
-        payload.set("object.service.failed", dispatch.service_transition.is_some());
+        payload.set(
+            "object.service.failed",
+            dispatch.service_transition.is_some(),
+        );
     }
     payload.set_opt("object.job.guid", dispatch.subject.job_id);
     payload.finish(INTERNAL_ERROR_CONTAINED)

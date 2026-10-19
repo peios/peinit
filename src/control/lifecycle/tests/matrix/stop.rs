@@ -1,6 +1,4 @@
-use crate::control::lifecycle::{
-    LifecycleCommand, LifecycleCommandOutcome, admit_lifecycle_command,
-};
+use crate::control::lifecycle::{LifecycleCommand, LifecycleCommandOutcome, admit_lifecycle_command};
 use crate::operation::conflict::OperationConflictDecision;
 use crate::operation::store::OperationStore;
 use crate::operation::{OperationState, OperationType};

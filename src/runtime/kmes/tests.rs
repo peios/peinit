@@ -154,9 +154,8 @@ fn runtime_loop_collector_leaves_out_a_type_the_policy_switches_off() {
         }],
         ..SupervisorOperationMaintenanceTurn::default()
     };
-    let policy = |event_type: &str, _: crate::boundary::EventTier| {
-        event_type != "peinit.operation.ended"
-    };
+    let policy =
+        |event_type: &str, _: crate::boundary::EventTier| event_type != "peinit.operation.ended";
     let mut out = EventCollector::new(&policy, Default::default());
     collect_runtime_loop_kmes_events(
         &RuntimeWorkPumpTurn::default(),
@@ -485,7 +484,10 @@ fn a_cut_job_ended_says_it_was_cut_and_needs_no_notice() {
             job_guid: Some(job_id.as_guid_bytes()),
         },
     );
-    assert!(read_bool(&events[0].payload, &["object", "job", "arguments-truncated"]));
+    assert!(read_bool(
+        &events[0].payload,
+        &["object", "job", "arguments-truncated"]
+    ));
 }
 
 fn read_bool(payload: &[u8], path: &[&str]) -> bool {

@@ -1,8 +1,6 @@
 use crate::notify::{NotifyCredentials, NotifyDatagram};
 use crate::submitted::{JobProgress, JobProgressUnit, SubmittedNotifyField};
-use crate::supervisor::{
-    SupervisorError, SupervisorNotifyOutcome, SupervisorSubmittedNotifyDispatch,
-};
+use crate::supervisor::{SupervisorError, SupervisorNotifyOutcome, SupervisorSubmittedNotifyDispatch};
 
 use super::support::{
     Boundaries, LAUNCH_NS, SUBMIT_NS, SUBMITTER, jobs_peer, launch, message, running_job, submit,

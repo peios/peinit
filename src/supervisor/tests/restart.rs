@@ -1102,7 +1102,9 @@ fn a_relaunch_peinit_cannot_execute_fails_the_service_not_the_loop() {
     assert_eq!(status.cause, Some(TransitionCause::InternalError));
     assert!(supervisor.next_restart_backoff_deadline().is_none());
     assert!(supervisor.pending_launch_jobs().is_empty());
-    let failed = supervisor.operation_status(staged).expect("staged operation");
+    let failed = supervisor
+        .operation_status(staged)
+        .expect("staged operation");
     assert_eq!(failed.state, OperationState::Failed);
     assert!(
         failed

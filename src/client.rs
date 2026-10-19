@@ -511,7 +511,9 @@ fn submitted_job(value: &Value) -> Result<SubmittedJob, Failure> {
         logon_session: value["logon_session"].as_u64(),
         description: text(value, "description").unwrap_or_default(),
         image_path: text(value, "image_path").unwrap_or_default(),
-        pid: value["pid"].as_u64().and_then(|pid| u32::try_from(pid).ok()),
+        pid: value["pid"]
+            .as_u64()
+            .and_then(|pid| u32::try_from(pid).ok()),
         ready: value["ready"].as_bool().unwrap_or(false),
         exit_code: value["exit_code"].as_i64(),
         exit_signal: value["exit_signal"].as_i64(),
@@ -655,7 +657,12 @@ mod tests {
         assert_eq!(job.exit_code, None);
         assert_eq!(
             job.progress,
-            Some(Progress { current: 3, total: Some(10), bounded: true, unit: Some("items".into()) })
+            Some(Progress {
+                current: 3,
+                total: Some(10),
+                bounded: true,
+                unit: Some("items".into())
+            })
         );
         assert_eq!(job.ended_at, None);
         // This peinit said nothing of the caller's rights.

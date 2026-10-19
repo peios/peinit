@@ -1,6 +1,4 @@
-use crate::boundary::{
-    BoundaryError, LinuxTimerFdRead, LinuxTimerFdReadError, ShutdownDeadlineTimer,
-};
+use crate::boundary::{BoundaryError, LinuxTimerFdRead, LinuxTimerFdReadError, ShutdownDeadlineTimer};
 use crate::runtime::{RuntimeLifecycleDeadlineTimer, RuntimeShutdownDeadlineTimer};
 
 #[derive(Debug, Clone, PartialEq, Eq)]

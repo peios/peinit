@@ -6,9 +6,7 @@ use crate::control::system::ControlSecurityDescriptor;
 use crate::service::ServiceEnvironmentVariable;
 use crate::service::runtime::{ServiceState, TransitionCause};
 use crate::shutdown::ShutdownKind;
-use crate::supervisor::{
-    SupervisorControlCommandBodyContext, SupervisorControlCommandBodyResponse,
-};
+use crate::supervisor::{SupervisorControlCommandBodyContext, SupervisorControlCommandBodyResponse};
 
 use super::super::{ScriptedClock, StaticRegistry, TestProcessController};
 use super::support::{

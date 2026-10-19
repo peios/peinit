@@ -150,7 +150,10 @@ impl LinuxCalendarTimerTable {
         // while it runs on, has no key to record a firing in. Writing one
         // would make the key again, under a definition nobody gave, which a
         // reload would then find wanting (PEI-1234).
-        let gone = matches!(supervisor_dispatch.action, SupervisorTimerAction::ServiceGone);
+        let gone = matches!(
+            supervisor_dispatch.action,
+            SupervisorTimerAction::ServiceGone
+        );
         let removed = gone
             || supervisor
                 .services()

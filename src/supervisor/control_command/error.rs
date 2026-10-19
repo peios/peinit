@@ -4,13 +4,9 @@ use crate::boundary::BoundaryError;
 use crate::control::lifecycle::LifecycleCommandError;
 use crate::control::query::QueryError;
 use crate::control::reload_config::ReloadConfigError;
-use crate::control::service_security::{
-    ServiceAccess, ServiceAccessCheckError, ServiceAccessDenied,
-};
+use crate::control::service_security::{ServiceAccess, ServiceAccessCheckError, ServiceAccessDenied};
 use crate::control::system::{SystemAccess, SystemAccessCheckError, SystemAccessDenied};
-use crate::control::wire::{
-    ControlErrorCode, ControlRequestParseError, control_client_error_message,
-};
+use crate::control::wire::{ControlErrorCode, ControlRequestParseError, control_client_error_message};
 use crate::ids::{OperationId, OperationIdParseError};
 use crate::operation::store::OperationStoreError;
 use crate::shutdown::ShutdownError;

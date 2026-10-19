@@ -3,9 +3,7 @@ use crate::operation::store::{OperationEvent, OperationEventDetail};
 
 use super::super::labels::{operation_source_label, operation_state_label, operation_type_label};
 use super::super::payload::{Payload, SUBJECT_TOKEN};
-use super::super::types::{
-    OPERATION_ENDED, OPERATION_MERGED, OPERATION_REQUESTED, OPERATION_STARTED,
-};
+use super::super::types::{OPERATION_ENDED, OPERATION_MERGED, OPERATION_REQUESTED, OPERATION_STARTED};
 
 /// The type an operation event is written as. The four ways an operation
 /// can end other than merging are one type, told apart by
@@ -29,7 +27,10 @@ pub fn encode_operation_event(event: &OperationEvent) -> Result<KmesEvent, Bound
         "object.operation.type",
         operation_type_label(event.operation_type),
     );
-    payload.set("object.operation.source", operation_source_label(event.source));
+    payload.set(
+        "object.operation.source",
+        operation_source_label(event.source),
+    );
     payload.set("object.operation.state", operation_state_label(event.state));
     payload.set("object.service.name", event.service.as_str());
     if let Some(caller) = &event.caller {

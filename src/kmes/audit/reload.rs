@@ -58,10 +58,7 @@ pub fn encode_config_reload_applied_event(
                 summary.marked_removed.len() as u64,
             );
             payload.set("graph.counts.discarded", summary.discarded.len() as u64);
-            payload.set(
-                "graph.counts.undecodable",
-                summary.undecodable.len() as u64,
-            );
+            payload.set("graph.counts.undecodable", summary.undecodable.len() as u64);
         }
         Err(error) => {
             payload.set_opt("outcome.detail", reload_error_detail(error));

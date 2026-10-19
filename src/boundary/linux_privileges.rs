@@ -123,7 +123,10 @@ mod tests {
     fn each_missing_privilege_is_named() {
         let without = |bit: Privileges| ALL.difference(bit);
         assert_eq!(
-            missing_privileges(without(Privileges::CREATE_TOKEN), without(Privileges::CREATE_TOKEN)),
+            missing_privileges(
+                without(Privileges::CREATE_TOKEN),
+                without(Privileges::CREATE_TOKEN)
+            ),
             vec!["SeCreateTokenPrivilege"],
         );
         assert_eq!(
@@ -136,7 +139,11 @@ mod tests {
         );
         assert_eq!(
             missing_privileges(Privileges::empty(), Privileges::empty()),
-            vec!["SeTcbPrivilege", "SeCreateTokenPrivilege", "SeAuditPrivilege"],
+            vec![
+                "SeTcbPrivilege",
+                "SeCreateTokenPrivilege",
+                "SeAuditPrivilege"
+            ],
         );
     }
 
@@ -160,8 +167,7 @@ mod tests {
 
         assert!(privileges_to_enable(ALL, ALL).is_empty());
         assert!(
-            privileges_to_enable(ALL.difference(Privileges::AUDIT), Privileges::empty())
-                .is_empty(),
+            privileges_to_enable(ALL.difference(Privileges::AUDIT), Privileges::empty()).is_empty(),
             "a privilege the token does not hold cannot be enabled",
         );
     }

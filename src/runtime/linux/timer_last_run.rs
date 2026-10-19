@@ -170,7 +170,10 @@ mod tests {
 
         // Not retried: the entry is gone, and there is no other outstanding
         // write to attempt. Nothing anywhere re-queues a failed write.
-        assert_eq!(writes.claim(4242, ChildExitStatus::Exited { code: 1 }), None);
+        assert_eq!(
+            writes.claim(4242, ChildExitStatus::Exited { code: 1 }),
+            None
+        );
         assert!(
             writes.outstanding.is_empty(),
             "a claimed write leaves nothing behind to retry",

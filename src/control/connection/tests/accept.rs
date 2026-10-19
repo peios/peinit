@@ -102,8 +102,15 @@ fn accept_turn_rejects_a_caller_holding_as_many_as_one_caller_may() {
     ]);
     let mut table = ControlConnectionTable::new(8);
     table.set_max_connections_per_caller(2);
-    for (fd, who) in [(30, "S-1-5-21-1-2-3-1001"), (31, "S-1-5-21-1-2-3-1001"), (36, "SYSTEM"), (37, "SYSTEM")] {
-        table.admit(fd, accepted_record(fd, who)).expect("seed connection");
+    for (fd, who) in [
+        (30, "S-1-5-21-1-2-3-1001"),
+        (31, "S-1-5-21-1-2-3-1001"),
+        (36, "SYSTEM"),
+        (37, "SYSTEM"),
+    ] {
+        table
+            .admit(fd, accepted_record(fd, who))
+            .expect("seed connection");
     }
 
     // Its third is refused, with the overall limit nowhere near.

@@ -3,9 +3,7 @@
 
 use std::os::fd::{BorrowedFd, OwnedFd};
 
-use crate::boundary::{
-    Clock, JobIdentityProvider, ProcessController, ProcessSignal, RealtimeClock,
-};
+use crate::boundary::{Clock, JobIdentityProvider, ProcessController, ProcessSignal, RealtimeClock};
 use crate::control::wire::ControlResponseTimeProjection;
 use crate::ids::JobId;
 use crate::job::JobState;

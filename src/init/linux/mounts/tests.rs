@@ -233,7 +233,11 @@ fn an_unreadable_or_unparseable_mountinfo_is_a_recovery_error() {
         "{error:?}",
     );
     assert_eq!(syscalls.reads_at, vec![0], "read once, not retried");
-    assert!(syscalls.calls.is_empty(), "nothing mounted: {:?}", syscalls.calls);
+    assert!(
+        syscalls.calls.is_empty(),
+        "nothing mounted: {:?}",
+        syscalls.calls
+    );
 
     // The bootstrap retry that fails too: /proc was mounted for it, and then
     // the step stops.
@@ -264,7 +268,11 @@ fn an_unreadable_or_unparseable_mountinfo_is_a_recovery_error() {
             if message.contains("parse /proc/self/mountinfo failed")),
         "{error:?}",
     );
-    assert!(syscalls.calls.is_empty(), "nothing mounted: {:?}", syscalls.calls);
+    assert!(
+        syscalls.calls.is_empty(),
+        "nothing mounted: {:?}",
+        syscalls.calls
+    );
 }
 
 /// The CreateDir + Mount calls a spec produces, plus the Seed call for the

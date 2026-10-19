@@ -259,7 +259,10 @@ fn a_firing_for_a_service_that_is_gone_does_nothing_and_is_not_armed_again() {
         )
         .expect("a firing for a service that is gone is not an error");
 
-    assert!(writer.writes.is_empty(), "a firing for a gone service recorded a last run");
+    assert!(
+        writer.writes.is_empty(),
+        "a firing for a gone service recorded a last run"
+    );
     let RuntimeCalendarTimerTurn::Read {
         supervisor: Some(dispatch),
         last_run_write: None,
@@ -270,7 +273,10 @@ fn a_firing_for_a_service_that_is_gone_does_nothing_and_is_not_armed_again() {
         panic!("expected a no-op firing, not armed again, got {turn:?}");
     };
     assert_eq!(dispatch.action, SupervisorTimerAction::ServiceGone);
-    assert_eq!(table.entries[&fd].next_scheduled_ns, scheduled_ns, "re-armed");
+    assert_eq!(
+        table.entries[&fd].next_scheduled_ns, scheduled_ns,
+        "re-armed"
+    );
 }
 
 /// What `status` reports of a timer is what the table has: a firing is its

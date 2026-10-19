@@ -21,9 +21,7 @@ use crate::runtime::{
     process_runtime_shutdown_sources_with_registry,
 };
 use crate::service::runtime::{ServiceState, TransitionCause};
-use crate::supervisor::tests::health::support::{
-    active_health_supervisor, launch_due_health_check,
-};
+use crate::supervisor::tests::health::support::{active_health_supervisor, launch_due_health_check};
 use crate::supervisor::tests::{
     APP_LAUNCH_NS, BOOT_NS, ScriptedClock, StaticRegistry, TestProcessController,
     TestProcessLauncher, TestTokenProvider, alive_service, process, settings,

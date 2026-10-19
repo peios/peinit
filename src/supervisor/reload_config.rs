@@ -1,7 +1,5 @@
 use crate::boundary::RegistryClient;
-use crate::control::reload_config::{
-    ReloadConfigError, ReloadConfigOutcome, reload_config_with_frozen,
-};
+use crate::control::reload_config::{ReloadConfigError, ReloadConfigOutcome, reload_config_with_frozen};
 
 use super::Supervisor;
 

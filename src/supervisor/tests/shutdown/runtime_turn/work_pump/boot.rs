@@ -1,9 +1,7 @@
 use std::io::Write;
 use std::os::fd::IntoRawFd;
 
-use crate::boundary::{
-    BoundaryError, FilesystemCheckReport, FilesystemCheckResult, LaunchedProcess,
-};
+use crate::boundary::{BoundaryError, FilesystemCheckReport, FilesystemCheckResult, LaunchedProcess};
 use crate::runtime::RuntimeEventSource;
 use crate::runtime::{
     RuntimeEventdLogFlush, RuntimeFilesystemCheckHelperTurn, RuntimeLogPipeTurn,

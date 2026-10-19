@@ -1,9 +1,7 @@
 use crate::boot::phase2::{Phase2BootRun, Phase2BootRunError, run_phase2_boot_with_retained};
 use crate::boundary::{Clock, RegistryClient};
 use crate::service::runtime::{ServiceState, ServiceTransition};
-use crate::service::{
-    ServiceDefinition, ServiceSecurityDescriptor, ServiceTable, ServiceTableError,
-};
+use crate::service::{ServiceDefinition, ServiceSecurityDescriptor, ServiceTable, ServiceTableError};
 
 use super::boot_success::BootModeRecord;
 use super::dispatch::SupervisorBootDispatch;

@@ -17,18 +17,14 @@ mod terminal;
 mod view;
 mod wait;
 
-pub use commands::{
-    JobsResponseFrame, SupervisorJobsMessageContext, SupervisorJobsMessageResponse,
-};
+pub use commands::{JobsResponseFrame, SupervisorJobsMessageContext, SupervisorJobsMessageResponse};
 pub use connection::{
     SupervisorJobsConnectionRead, SupervisorJobsConnectionTurn,
     SupervisorJobsConnectionTurnContext, SupervisorJobsConnectionTurnError,
 };
 pub use error::JobsCommandError;
 pub use notify::{JOB_STATUS_EVENT_INTERVAL_NS, SupervisorNotifyOutcome};
-pub use wait::{
-    SupervisorJobsWaitFlush, SupervisorJobsWaitFlushError, SupervisorJobsWaitFlushTurn,
-};
+pub use wait::{SupervisorJobsWaitFlush, SupervisorJobsWaitFlushError, SupervisorJobsWaitFlushTurn};
 
 pub(in crate::supervisor) use deadlines::process_submitted_deadline as process_submitted_deadline_in_work;
 pub(in crate::supervisor) use launch::apply_started_submitted_launch;

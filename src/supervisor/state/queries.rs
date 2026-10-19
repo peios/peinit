@@ -11,7 +11,11 @@ use super::Supervisor;
 impl Supervisor {
     pub fn service_status(&self, service: &str) -> Result<ServiceStatusView, QueryError> {
         let mut view = service_status(&self.services, &self.operations, &self.jobs, service)?;
-        view.timers = self.calendar_timers.get(service).cloned().unwrap_or_default();
+        view.timers = self
+            .calendar_timers
+            .get(service)
+            .cloned()
+            .unwrap_or_default();
         Ok(view)
     }
 

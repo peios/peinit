@@ -1,8 +1,6 @@
 use crate::boundary::{KmesEvent, KmesEventSink, ProcessController};
 use crate::kmes::EventCollector;
-use crate::control::connection::{
-    ControlConnectionIo, ControlConnectionRecord, ControlConnectionTable,
-};
+use crate::control::connection::{ControlConnectionIo, ControlConnectionRecord, ControlConnectionTable};
 #[cfg(feature = "peios-registry")]
 use crate::runtime::RuntimeRegistryWatchTurn;
 use crate::runtime::{

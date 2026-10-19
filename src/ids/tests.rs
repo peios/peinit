@@ -30,10 +30,17 @@ fn the_pcds_form_reads_back_as_the_canonical_text() {
         u16::from_le_bytes([b[6], b[7]]),
         b[8],
         b[9],
-        b[10..].iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
+        b[10..]
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>(),
     );
     assert_eq!(read_back, id.to_string());
-    assert_eq!(b[8..], id.as_bytes()[8..], "the last eight bytes are as they are");
+    assert_eq!(
+        b[8..],
+        id.as_bytes()[8..],
+        "the last eight bytes are as they are"
+    );
 }
 
 #[test]

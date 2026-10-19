@@ -1,7 +1,5 @@
 use super::{ControlBufferConsumeError, ControlConnectionBuffer};
-use crate::control::wire::{
-    ControlFrameDecision, ControlFrameRejectReason, control_frame_decision,
-};
+use crate::control::wire::{ControlFrameDecision, ControlFrameRejectReason, control_frame_decision};
 
 #[test]
 fn buffers_partial_reads_until_complete_frame() {

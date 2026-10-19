@@ -1,7 +1,5 @@
 use crate::job::{JobEvent, JobEventDetail, JobType};
-use crate::supervisor::dispatch::{
-    SupervisorHealthCheckOutcome, SupervisorHealthCheckTerminalDispatch,
-};
+use crate::supervisor::dispatch::{SupervisorHealthCheckOutcome, SupervisorHealthCheckTerminalDispatch};
 use crate::supervisor::state::SupervisorError;
 
 use super::super::HealthCheckError;

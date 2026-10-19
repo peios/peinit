@@ -2,8 +2,7 @@ use crate::boundary::BoundaryError;
 use crate::control::lifecycle::LifecycleCommandOutcome;
 use crate::control::reload_config::{ReloadConfigError, ReloadConfigOutcome};
 use crate::kmes::types::{
-    CONFIG_RELOAD_APPLIED, CONFIG_RELOAD_DEFERRED, GRAPH_VALIDATION_FAILED,
-    GRAPH_VALIDATION_WARNED,
+    CONFIG_RELOAD_APPLIED, CONFIG_RELOAD_DEFERRED, GRAPH_VALIDATION_FAILED, GRAPH_VALIDATION_WARNED,
 };
 use crate::kmes::{
     EventCollector, GraphPhase, encode_config_reload_applied_event,
@@ -15,9 +14,7 @@ use crate::supervisor::{
     SupervisorControlConnectionTableTurn, SupervisorControlFrameTurn, SupervisorLifecycleDispatch,
 };
 
-use super::super::event::{
-    collect_on_demand_start, collect_operation_request_outcome, push_operation,
-};
+use super::super::event::{collect_on_demand_start, collect_operation_request_outcome, push_operation};
 use super::super::job::collect_start_dispatches;
 use super::shutdown::collect_system_shutdown_dispatch;
 

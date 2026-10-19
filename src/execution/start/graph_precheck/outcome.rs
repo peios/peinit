@@ -8,9 +8,7 @@ use super::super::model::{
     GraphPreStartCheckTerminalDispatch, StartExecutionError, StartExecutionRequest,
     StartPreCheckTerminalOutcome,
 };
-use super::super::pre_dependency::{
-    apply_pending_pre_dependency_failure, cancel_dormant_dependencies,
-};
+use super::super::pre_dependency::{apply_pending_pre_dependency_failure, cancel_dormant_dependencies};
 use super::super::store::{PendingPreStartCheck, PendingPreStartCheckStart, PrecheckedGraphStart};
 use super::GraphPreStartCheckTransaction;
 

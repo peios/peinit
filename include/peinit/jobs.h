@@ -84,48 +84,33 @@ int peinit_jobs_fd(const peinit_jobs_t *jobs);
  * peinit_response_take_pidfd. A job that failed to start is an OK response
  * whose view is terminal, not a transport error.
  */
-int peinit_job_submit(peinit_jobs_t *jobs,
-		      const char *definition_json,
-		      int token_fd,
-		      const int *fds,
-		      size_t fd_count,
-		      peinit_response_t **response_out,
-		      peinit_error_t **error_out);
+int peinit_job_submit(peinit_jobs_t *jobs, const char *definition_json, int token_fd,
+                      const int *fds, size_t fd_count, peinit_response_t **response_out,
+                      peinit_error_t **error_out);
 
 /* The job view now (JOB_QUERY). */
-int peinit_jobs_status(peinit_jobs_t *jobs,
-		       const char *job_id,
-		       peinit_response_t **response_out,
-		       peinit_error_t **error_out);
+int peinit_jobs_status(peinit_jobs_t *jobs, const char *job_id, peinit_response_t **response_out,
+                       peinit_error_t **error_out);
 
 /*
  * Block until the job is terminal, or with for_ready until it has sent
  * READY=1 (or is terminal, whichever first); the response is the view then.
  * Requires JOB_QUERY.
  */
-int peinit_jobs_wait(peinit_jobs_t *jobs,
-		     const char *job_id,
-		     bool for_ready,
-		     peinit_response_t **response_out,
-		     peinit_error_t **error_out);
+int peinit_jobs_wait(peinit_jobs_t *jobs, const char *job_id, bool for_ready,
+                     peinit_response_t **response_out, peinit_error_t **error_out);
 
 /*
  * Ask Peinit to stop the job: the termination signal now, SIGKILL to its
  * cgroup after stop_timeout. With wait true the call blocks until the job is
  * terminal. Requires JOB_STOP.
  */
-int peinit_jobs_stop(peinit_jobs_t *jobs,
-		     const char *job_id,
-		     bool wait,
-		     peinit_response_t **response_out,
-		     peinit_error_t **error_out);
+int peinit_jobs_stop(peinit_jobs_t *jobs, const char *job_id, bool wait,
+                     peinit_response_t **response_out, peinit_error_t **error_out);
 
 /* Send one signal to the job's main process. Requires JOB_SIGNAL. */
-int peinit_jobs_signal(peinit_jobs_t *jobs,
-		       const char *job_id,
-		       int signal,
-		       peinit_response_t **response_out,
-		       peinit_error_t **error_out);
+int peinit_jobs_signal(peinit_jobs_t *jobs, const char *job_id, int signal,
+                       peinit_response_t **response_out, peinit_error_t **error_out);
 
 /*
  * peinit_jobs_raw_json - send one JSON record and read one response.
@@ -134,10 +119,8 @@ int peinit_jobs_signal(peinit_jobs_t *jobs,
  * descriptors are attached; use peinit_job_submit for a submit that needs
  * them.
  */
-int peinit_jobs_raw_json(peinit_jobs_t *jobs,
-			 const char *request_json,
-			 peinit_response_t **response_out,
-			 peinit_error_t **error_out);
+int peinit_jobs_raw_json(peinit_jobs_t *jobs, const char *request_json,
+                         peinit_response_t **response_out, peinit_error_t **error_out);
 
 #ifdef __cplusplus
 }

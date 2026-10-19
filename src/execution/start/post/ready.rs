@@ -2,9 +2,7 @@ use crate::execution::command::parse_executable_command;
 use crate::execution::satisfaction::{
     StartSatisfactionDispatch, StartSatisfactionRequest, apply_start_satisfaction,
 };
-use crate::execution::start_validation::{
-    start_transition_cause, validate_running_start_operation,
-};
+use crate::execution::start_validation::{start_transition_cause, validate_running_start_operation};
 use crate::security::{TokenSummary, hook_execution_identity};
 use crate::service::runtime::{ServiceState, ServiceTransition};
 use crate::service::{ServiceDefinition, ServiceTable, ServiceTableError, ServiceType};

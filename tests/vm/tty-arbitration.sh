@@ -14,20 +14,20 @@
 # where the next line of this script is arriving from.
 export REG_ASSUME_YES=1
 OUT=/share/tty-arbitration.txt
-say() { echo "$@" >> "$OUT"; }
+say() { echo "$@" >>"$OUT"; }
 # No filtering: the live image's /bin has no grep, and a report built out of
 # one silently reads "<no status>" for every service (cost one boot).
-state() { svctl status "$1" >> "$OUT" 2>&1; }
+state() { svctl status "$1" >>"$OUT" 2>&1; }
 
 # drive.py has already mounted the 9p share at /share.
-: > "$OUT"
+: >"$OUT"
 
 say "== peinit =="
-svctl --version >> "$OUT" 2>&1 || say "(svctl has no --version)"
+svctl --version >>"$OUT" 2>&1 || say "(svctl has no --version)"
 say "== /dev/tty2 =="
-ls -l /dev/tty2 >> "$OUT" 2>&1
+ls -l /dev/tty2 >>"$OUT" 2>&1
 
-cat > /run/tty-probe.reg <<'REG'
+cat >/run/tty-probe.reg <<'REG'
 {
  "keys": [
   {"path": "Machine\\System\\Services\\ttyprobe-hi",
@@ -69,11 +69,11 @@ cat > /run/tty-probe.reg <<'REG'
 REG
 
 say "== apply definitions =="
-reg apply /run/tty-probe.reg >> "$OUT" 2>&1
-svctl reload-config >> "$OUT" 2>&1
+reg apply /run/tty-probe.reg >>"$OUT" 2>&1
+svctl reload-config >>"$OUT" 2>&1
 
 say "== a definition that names no terminal must refuse these fields =="
-cat > /run/tty-bad.reg <<'REG'
+cat >/run/tty-bad.reg <<'REG'
 {"keys": [
  {"path": "Machine\\System\\Services\\ttyprobe-bad",
   "values": [
@@ -82,31 +82,31 @@ cat > /run/tty-bad.reg <<'REG'
   ]}
 ]}
 REG
-reg apply /run/tty-bad.reg >> "$OUT" 2>&1
+reg apply /run/tty-bad.reg >>"$OUT" 2>&1
 svctl reload-config
 say "-- ttyprobe-bad (expect a validation failure, not a running service):"
 state ttyprobe-bad
-reg del Machine\\System\\Services\\ttyprobe-bad >> "$OUT" 2>&1
-svctl reload-config >> "$OUT" 2>&1
+reg del Machine\\System\\Services\\ttyprobe-bad >>"$OUT" 2>&1
+svctl reload-config >>"$OUT" 2>&1
 
 say ""
 say "== 1. the holder takes the terminal =="
-svctl start ttyprobe-hi >> "$OUT" 2>&1
+svctl start ttyprobe-hi >>"$OUT" 2>&1
 say "-- ttyprobe-hi (expect active):"
 state ttyprobe-hi
 
 say ""
 say "== 2. a second claimant is skipped, not started =="
-svctl start ttyprobe-lo >> "$OUT" 2>&1
+svctl start ttyprobe-lo >>"$OUT" 2>&1
 say "-- ttyprobe-lo (expect skipped / tty_unavailable):"
-svctl status ttyprobe-lo >> "$OUT" 2>&1
+svctl status ttyprobe-lo >>"$OUT" 2>&1
 say "-- ttyprobe-deaf (expect skipped too):"
-svctl start ttyprobe-deaf >> "$OUT" 2>&1
-svctl status ttyprobe-deaf >> "$OUT" 2>&1
+svctl start ttyprobe-deaf >>"$OUT" 2>&1
+svctl status ttyprobe-deaf >>"$OUT" 2>&1
 
 say ""
 say "== 3. stopping the holder hands the terminal on =="
-svctl stop ttyprobe-hi >> "$OUT" 2>&1
+svctl stop ttyprobe-hi >>"$OUT" 2>&1
 sleep 2
 say "-- ttyprobe-hi (expect inactive):"
 state ttyprobe-hi
@@ -117,11 +117,13 @@ state ttyprobe-deaf
 
 say ""
 say "== full status =="
-svctl status ttyprobe-hi >> "$OUT" 2>&1
-svctl status ttyprobe-lo >> "$OUT" 2>&1
-svctl status ttyprobe-deaf >> "$OUT" 2>&1
+{
+    svctl status ttyprobe-hi
+    svctl status ttyprobe-lo
+    svctl status ttyprobe-deaf
+} >>"$OUT" 2>&1
 
 say ""
 say "== boot health (this build is a new PID 1) =="
-svctl list >> "$OUT" 2>&1
+svctl list >>"$OUT" 2>&1
 sync

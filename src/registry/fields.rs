@@ -115,7 +115,9 @@ pub struct FieldInfo {
     pub default: Option<&'static str>,
 }
 
-const SECONDS: FieldKind = FieldKind::Number { unit: Some("seconds") };
+const SECONDS: FieldKind = FieldKind::Number {
+    unit: Some("seconds"),
+};
 const COUNT: FieldKind = FieldKind::Number { unit: None };
 
 macro_rules! service_fields {
@@ -212,7 +214,9 @@ pub(super) fn field_from_name(name: &str) -> Option<Field> {
 
 /// The field called `name`, in any case.
 pub fn service_field(name: &str) -> Option<&'static FieldInfo> {
-    SERVICE_FIELD_INFO.iter().find(|field| field.name.eq_ignore_ascii_case(name))
+    SERVICE_FIELD_INFO
+        .iter()
+        .find(|field| field.name.eq_ignore_ascii_case(name))
 }
 
 pub(super) fn parse_timer_persistent(value: u32) -> Result<bool, ServiceRegistryDecodeError> {

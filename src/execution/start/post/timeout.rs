@@ -1,8 +1,6 @@
 use crate::job::JobStore;
 
-use super::super::model::{
-    PostStartHookTimeoutDispatch, StartExecutionContext, StartExecutionError,
-};
+use super::super::model::{PostStartHookTimeoutDispatch, StartExecutionContext, StartExecutionError};
 use super::super::store::PostStartHookDeadline;
 use super::completion::complete_post_start_operation;
 use super::job::fail_timed_out_hook;

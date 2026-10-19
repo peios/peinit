@@ -1,9 +1,7 @@
 use crate::boundary::ProcessController;
 use crate::job::{JobExit, JobState, JobType, service_cgroup_root_path};
 use crate::supervisor::cgroup_cleanup::{CgroupCleanupKind, record_cgroup_cleanup};
-use crate::supervisor::dispatch::{
-    SupervisorHealthCheckOutcome, SupervisorHealthCheckTerminalDispatch,
-};
+use crate::supervisor::dispatch::{SupervisorHealthCheckOutcome, SupervisorHealthCheckTerminalDispatch};
 use crate::supervisor::state::SupervisorError;
 use crate::supervisor::work::SupervisorWork;
 

@@ -157,8 +157,7 @@ fn every_signalfd_setup_failure_fails_closed() {
         epoll_ctl_error: Some(io::ErrorKind::InvalidInput),
         ..FakeRegisteredSignalSyscalls::default()
     };
-    let err =
-        setup_pid1_signalfd_registered(&mut registering, 30, 700).expect_err("registering");
+    let err = setup_pid1_signalfd_registered(&mut registering, 30, 700).expect_err("registering");
     assert!(matches!(
         err,
         Pid1SignalFdRegisteredSetupError::Register {

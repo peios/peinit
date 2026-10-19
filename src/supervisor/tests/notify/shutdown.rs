@@ -50,8 +50,7 @@ fn shutdown_extend_timeout_takes_the_stricter_of_the_fourfold_and_global_caps() 
         supervisor
             .begin_shutdown(ShutdownKind::Poweroff, &mut controller, SHUTDOWN_NS)
             .expect("begin shutdown");
-        apply_notify(&mut supervisor, datagram(8000, request), EXTEND_NS)
-            .expect("extend timeout");
+        apply_notify(&mut supervisor, datagram(8000, request), EXTEND_NS).expect("extend timeout");
         (
             shutdown_deadline(&supervisor, "app").due_at_ns,
             supervisor.shutdown().expect("shutdown").global_deadline_ns,
@@ -60,14 +59,22 @@ fn shutdown_extend_timeout_takes_the_stricter_of_the_fourfold_and_global_caps() 
 
     let (due, global) = extend(90, b"EXTEND_TIMEOUT_USEC=1000000000");
     assert_eq!(global, SHUTDOWN_NS + 90_000_000_000);
-    assert_eq!(due, SHUTDOWN_NS + 40_000_000_000, "the fourfold cap is the stricter");
+    assert_eq!(
+        due,
+        SHUTDOWN_NS + 40_000_000_000,
+        "the fourfold cap is the stricter"
+    );
 
     let (due, global) = extend(20, b"EXTEND_TIMEOUT_USEC=1000000000");
     assert_eq!(global, SHUTDOWN_NS + 20_000_000_000);
     assert_eq!(due, global, "the global deadline is the stricter");
 
     let (due, _) = extend(20, b"EXTEND_TIMEOUT_USEC=5000000");
-    assert_eq!(due, EXTEND_NS + 5_000_000_000, "a request inside both caps stands");
+    assert_eq!(
+        due,
+        EXTEND_NS + 5_000_000_000,
+        "a request inside both caps stands"
+    );
 }
 
 #[test]

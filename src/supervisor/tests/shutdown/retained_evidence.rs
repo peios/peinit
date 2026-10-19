@@ -48,8 +48,14 @@ fn draining_outcome(supervisor: &mut Supervisor) -> (Option<&'static str>, u64) 
         .iter()
         .find(|stop| stop.service == "draining")
         .expect("draining participant");
-    assert!(draining.already_stopping, "draining joined the wave as already stopping");
-    assert!(draining.signal.is_none(), "and was not sent another SIGTERM");
+    assert!(
+        draining.already_stopping,
+        "draining joined the wave as already stopping"
+    );
+    assert!(
+        draining.signal.is_none(),
+        "and was not sent another SIGTERM"
+    );
     (
         draining.unsubstantiated_deadline,
         draining.deadline.as_ref().expect("a deadline").due_at_ns,
@@ -113,7 +119,10 @@ fn retained_evidence_failing_any_condition_gets_no_graceful_period() {
     }));
     assert_eq!(
         draining_outcome(&mut backwards),
-        (Some("retained timeout is due before it started"), SHUTDOWN_NS),
+        (
+            Some("retained timeout is due before it started"),
+            SHUTDOWN_NS
+        ),
     );
 
     // Belongs to a service actually in Stopping. Only a later wave can meet

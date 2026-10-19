@@ -1,8 +1,6 @@
 use crate::job::JobEvent;
 use crate::service::runtime::ServiceState;
-use crate::supervisor::dispatch::{
-    SupervisorHealthCheckOutcome, SupervisorHealthCheckTerminalDispatch,
-};
+use crate::supervisor::dispatch::{SupervisorHealthCheckOutcome, SupervisorHealthCheckTerminalDispatch};
 use crate::supervisor::state::SupervisorError;
 use crate::supervisor::work::SupervisorWork;
 

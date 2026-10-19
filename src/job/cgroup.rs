@@ -109,7 +109,9 @@ pub enum CgroupMember {
 /// [`submitted_job_cgroup_path`]. `None` for a process outside peinit's tree,
 /// such as peinit itself or a kernel thread.
 pub fn cgroup_member(proc_cgroup: &str) -> Option<CgroupMember> {
-    let path = proc_cgroup.lines().find_map(|line| line.strip_prefix("0::"))?;
+    let path = proc_cgroup
+        .lines()
+        .find_map(|line| line.strip_prefix("0::"))?;
     let mut parts = path.strip_prefix("/peinit/")?.split('/');
     let first = parts.next()?;
     let second = parts.next();

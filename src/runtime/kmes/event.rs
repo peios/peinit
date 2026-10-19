@@ -41,7 +41,9 @@ pub(super) fn push_operation(
     out: &mut EventCollector<'_>,
     event: &OperationEvent,
 ) -> Result<(), BoundaryError> {
-    out.push(operation_event_type(event), |_| encode_operation_event(event))
+    out.push(operation_event_type(event), |_| {
+        encode_operation_event(event)
+    })
 }
 
 pub(super) fn push_operations(
@@ -109,5 +111,7 @@ pub(super) fn push_shutdown_abandoned(
     out: &mut EventCollector<'_>,
     abandoned: &SupervisorShutdownAbandonedDispatch,
 ) -> Result<(), BoundaryError> {
-    out.push(SERVICE_ABANDONED, |_| encode_shutdown_abandoned_event(abandoned))
+    out.push(SERVICE_ABANDONED, |_| {
+        encode_shutdown_abandoned_event(abandoned)
+    })
 }

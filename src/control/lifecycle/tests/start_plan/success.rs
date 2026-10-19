@@ -1,6 +1,4 @@
-use crate::control::lifecycle::{
-    plan_on_demand_start, plan_restart_policy_start, plan_timer_start,
-};
+use crate::control::lifecycle::{plan_on_demand_start, plan_restart_policy_start, plan_timer_start};
 use crate::operation::OperationSource;
 use crate::service::runtime::TransitionCause;
 

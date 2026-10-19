@@ -4,9 +4,7 @@ use crate::ids::{JobIdAllocator, OperationIdAllocator};
 use crate::service::{ServiceDefinition, synthesise_role_dependencies, validate_service_graph};
 
 use super::graph::{BlockedServiceDraft, build_phase2_boot_graph, safe_mode_downgrade_findings};
-use super::model::{
-    BlockedReason, BlockedService, Phase2BootPlan, Phase2BootPlanError, PreparedStart,
-};
+use super::model::{BlockedReason, BlockedService, Phase2BootPlan, Phase2BootPlanError, PreparedStart};
 
 pub fn prepare_phase2_boot_plan(
     mode: BootMode,

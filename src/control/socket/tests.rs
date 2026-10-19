@@ -6,8 +6,7 @@ use super::address::unix_socket_address;
 use super::{
     CONTROL_SOCKET_PATH, ControlSocketPathError, ControlSocketRead, ControlSocketWrite,
     DEFAULT_CONNECTION_TIMEOUT_SECS, DEFAULT_MAX_CONTROL_CONNECTIONS,
-    DEFAULT_MAX_CONTROL_CONNECTIONS_PER_USER,
-    DEFAULT_MAX_REQUEST_SIZE_BYTES, LinuxControlSocket,
+    DEFAULT_MAX_CONTROL_CONNECTIONS_PER_USER, DEFAULT_MAX_REQUEST_SIZE_BYTES, LinuxControlSocket,
 };
 
 #[test]

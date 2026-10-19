@@ -12,13 +12,12 @@ pub mod types;
 pub use audit::{
     DroppedEvent, GraphPhase, KmesEventSubject, collect_init_recovery_events,
     dropped_event_message, encode_boot_blocked_service_event, encode_config_reload_applied_event,
-    encode_critical_failure_event, encode_event_dropped_event,
-    encode_graph_validation_error_event, encode_graph_validation_warning_event,
-    encode_leaked_cgroup_event, encode_leaked_job_cgroup_event,
-    encode_on_failure_loop_suppressed_event, encode_registry_reload_deferred_event,
-    encode_reload_undecodable_service_event, encode_reload_unconfirmed_event,
-    encode_safe_mode_downgrade_event, encode_service_internal_error_event,
-    encode_shutdown_abandoned_event, kmes_event_subject,
+    encode_critical_failure_event, encode_event_dropped_event, encode_graph_validation_error_event,
+    encode_graph_validation_warning_event, encode_leaked_cgroup_event,
+    encode_leaked_job_cgroup_event, encode_on_failure_loop_suppressed_event,
+    encode_registry_reload_deferred_event, encode_reload_undecodable_service_event,
+    encode_reload_unconfirmed_event, encode_safe_mode_downgrade_event,
+    encode_service_internal_error_event, encode_shutdown_abandoned_event, kmes_event_subject,
 };
 pub use collector::EventCollector;
 pub use encode::{

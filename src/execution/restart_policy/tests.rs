@@ -4,9 +4,7 @@ use crate::execution::restart_policy::{
 };
 use crate::execution::satisfaction::{StartSatisfactionRequest, apply_start_satisfaction};
 use crate::execution::start::StartExecutionStore;
-use crate::execution::test_support::{
-    OBSERVED_AT_NS, StartedBootGraph, satisfaction_request, service,
-};
+use crate::execution::test_support::{OBSERVED_AT_NS, StartedBootGraph, satisfaction_request, service};
 use crate::ids::{JobIdAllocator, OperationIdAllocator};
 use crate::job::JobState;
 use crate::operation::{OperationSource, OperationState};

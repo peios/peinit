@@ -56,7 +56,10 @@ fn a_service_with_pre_and_post_hooks_runs_its_post_hooks_after_readiness() {
         supervisor.pending_post_hook_launch_jobs(),
         vec![post_hook.job_id]
     );
-    let job = supervisor.jobs().get(post_hook.job_id).expect("post-hook job");
+    let job = supervisor
+        .jobs()
+        .get(post_hook.job_id)
+        .expect("post-hook job");
     assert_eq!(job.image_path, "/bin/post");
     assert_eq!(job.cgroup_id, "/sys/fs/cgroup/peinit/app/hooks");
 }

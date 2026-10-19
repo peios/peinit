@@ -450,8 +450,10 @@ where
     }
     // The findings are standard, so the emission policy is asked before
     // each is built (PGSS §6.9).
-    if platform.kmes_event_enabled(GRAPH_VALIDATION_FAILED, crate::boundary::EventTier::Standard)
-    {
+    if platform.kmes_event_enabled(
+        GRAPH_VALIDATION_FAILED,
+        crate::boundary::EventTier::Standard,
+    ) {
         for blocked in &dispatch.plan.blocked {
             for reason in std::iter::once(&blocked.reason).chain(&blocked.additional_reasons) {
                 let Ok(event) =
@@ -468,8 +470,10 @@ where
     // dependents is about to release them before it is usable. Tagged
     // `boot` rather than `reload-config`, which was the only phase these
     // were ever emitted under.
-    if platform.kmes_event_enabled(GRAPH_VALIDATION_WARNED, crate::boundary::EventTier::Standard)
-    {
+    if platform.kmes_event_enabled(
+        GRAPH_VALIDATION_WARNED,
+        crate::boundary::EventTier::Standard,
+    ) {
         for warning in &dispatch.plan.warnings {
             let Ok(event) = crate::kmes::encode_graph_validation_warning_event(
                 crate::kmes::GraphPhase::Boot,

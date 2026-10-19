@@ -7,8 +7,8 @@ pub fn service_sid(service_name: &str) -> String {
     }
     let digest = Sha1::digest(&encoded);
     let mut parts = Vec::with_capacity(5);
-    for chunk in digest.chunks_exact(4) {
-        parts.push(u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]));
+    for chunk in digest.as_chunks::<4>().0 {
+        parts.push(u32::from_le_bytes(*chunk));
     }
     format!(
         "S-1-5-80-{}-{}-{}-{}-{}",

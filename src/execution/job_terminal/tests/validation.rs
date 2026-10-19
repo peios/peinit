@@ -1,6 +1,4 @@
-use crate::execution::job_terminal::{
-    ServiceMainJobTerminalError, apply_service_main_job_terminal,
-};
+use crate::execution::job_terminal::{ServiceMainJobTerminalError, apply_service_main_job_terminal};
 use crate::execution::test_support::{StartedBootGraph, service};
 use crate::job::JobEventDetail;
 use crate::service::{ServiceTableError, ServiceType};

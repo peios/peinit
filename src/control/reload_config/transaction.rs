@@ -2,9 +2,7 @@ use crate::boundary::{RegistryClient, UndecodableService};
 use crate::logging::RuntimeLogConfig;
 use crate::registry::services_schema_warnings;
 use crate::registry::{RegistryConfigWarning, read_log_config_from_registry};
-use crate::service::{
-    ServiceDefinition, ServiceTable, is_valid_service_name, validate_service_graph,
-};
+use crate::service::{ServiceDefinition, ServiceTable, is_valid_service_name, validate_service_graph};
 use crate::shutdown::ShutdownSettings;
 
 use super::model::{ReloadConfigError, ReloadConfigOutcome};

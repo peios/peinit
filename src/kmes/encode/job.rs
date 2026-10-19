@@ -77,7 +77,10 @@ pub fn encode_job_event(
                 "object.job.arguments-count",
                 u64::try_from(event.arguments.len()).unwrap_or(u64::MAX),
             );
-            payload.set("object.job.created-time", time.realtime_ns(event.created_at_ns));
+            payload.set(
+                "object.job.created-time",
+                time.realtime_ns(event.created_at_ns),
+            );
             payload.set_opt(
                 "object.job.started-time",
                 event.started_at_ns.map(|ns| time.realtime_ns(ns)),
@@ -99,7 +102,10 @@ fn job_common(event: &JobEvent) -> Payload {
     payload.set("object.job.state", job_state_label(event.state));
     if event.job_type != JobType::Submitted {
         payload.set_opt("object.service.name", event.service.as_deref());
-        payload.set("object.job.activation-generation", event.activation_generation);
+        payload.set(
+            "object.job.activation-generation",
+            event.activation_generation,
+        );
     }
     payload.set_opt("object.operation.guid", event.operation_id);
     payload.set_token(JOB_TOKEN, &event.token_summary);

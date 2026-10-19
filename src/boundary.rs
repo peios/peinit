@@ -35,9 +35,7 @@ pub use linux_child::{
     LinuxChildReapError, LinuxChildReapSyscallApi, LinuxChildReaper, LinuxWaitPid,
     drain_linux_child_reaps, normalize_linux_wait_status, wait_linux_child,
 };
-pub use linux_clock::{
-    LinuxClockError, LinuxClockSyscallApi, LinuxMonotonicClock, linux_monotonic_ns,
-};
+pub use linux_clock::{LinuxClockError, LinuxClockSyscallApi, LinuxMonotonicClock, linux_monotonic_ns};
 #[cfg(feature = "peios-boundary")]
 pub use linux_console::{
     CONSOLE_PATH, LinuxConsoleSink, open_linux_console_fd, write_linux_console_message,
@@ -69,9 +67,7 @@ pub use linux_privileges::verify_peinit_privileges;
 pub use linux_process::LinuxProcessController;
 #[cfg(all(feature = "peios-boundary", feature = "peios-registry"))]
 pub(crate) use linux_provisioning::{ensure_runtime_directory, set_path_security};
-pub use linux_provisioning::{
-    provision_linux_boot_paths, provision_linux_service_runtime_directories,
-};
+pub use linux_provisioning::{provision_linux_boot_paths, provision_linux_service_runtime_directories};
 pub use linux_random_seed::{
     DEFAULT_RANDOM_SEED_PATH, LinuxRandomSeedError, LinuxRandomSeedRestoreStatus,
     restore_linux_random_seed, save_linux_random_seed,

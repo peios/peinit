@@ -1,6 +1,4 @@
-use crate::boundary::{
-    ChildReaper, FilesystemCheckHelperReader, RegistryClient, TimerLastRunWriter,
-};
+use crate::boundary::{ChildReaper, FilesystemCheckHelperReader, RegistryClient, TimerLastRunWriter};
 use crate::control::connection::{
     ControlConnectionIo, ControlConnectionRecord, ControlConnectionTable, ControlListener,
 };

@@ -16,9 +16,7 @@ pub use table::{
     ControlConnectionAdmission, ControlConnectionAdmissionDecision, ControlConnectionTable,
     ControlConnectionTableError, control_connection_admission_decision,
 };
-pub use turn::{
-    ControlConnectionReadTurn, ControlConnectionWriteTurn, ControlConnectionWriteTurnError,
-};
+pub use turn::{ControlConnectionReadTurn, ControlConnectionWriteTurn, ControlConnectionWriteTurnError};
 
 #[cfg(test)]
 mod tests;

@@ -1,7 +1,5 @@
 use crate::execution::graph::GraphExecutionStore;
-use crate::execution::start_validation::{
-    start_transition_cause, validate_running_start_operation,
-};
+use crate::execution::start_validation::{start_transition_cause, validate_running_start_operation};
 use crate::operation::store::OperationStore;
 use crate::service::runtime::{ServiceState, ServiceTransition};
 use crate::service::{ServiceTable, ServiceTableError, ServiceType};

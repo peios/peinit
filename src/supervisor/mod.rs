@@ -76,9 +76,7 @@ pub use control_connection::{
     SupervisorShutdownControlConnectionTableTurnError, SupervisorShutdownControlConnectionTurn,
     SupervisorShutdownControlConnectionTurnContext, SupervisorShutdownControlConnectionTurnError,
 };
-pub use control_connection::{
-    SupervisorControlFrameContext, SupervisorShutdownControlFrameContext,
-};
+pub use control_connection::{SupervisorControlFrameContext, SupervisorShutdownControlFrameContext};
 pub use critical_budget::{
     CriticalRebootOwed, CriticalRebootTrigger, SupervisorCriticalBudgetRebootDispatch,
 };

@@ -5,9 +5,7 @@ use crate::operation::OperationState;
 use crate::service::runtime::ServiceState;
 
 use super::super::{ScriptedClock, TestProcessController};
-use super::{
-    CONTROL_NS, RELOAD_NOTIFY_NS, active_app_supervisor, apply_notify, datagram, reload_app,
-};
+use super::{CONTROL_NS, RELOAD_NOTIFY_NS, active_app_supervisor, apply_notify, datagram, reload_app};
 
 #[test]
 fn ready_notification_confirms_signal_reload() {

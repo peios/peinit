@@ -42,7 +42,9 @@ fn an_undecodable_definition_fails_only_that_service_and_the_boot_proceeds() {
 
     // The broken one is reportable: Failed with ValidationError, and marked
     // definition-removed because peinit holds no definition for it.
-    let broken = supervisor.service_status(BROKEN).expect("a placeholder entry");
+    let broken = supervisor
+        .service_status(BROKEN)
+        .expect("a placeholder entry");
     assert_eq!(broken.state, ServiceState::Failed);
     assert_eq!(broken.cause, Some(TransitionCause::ValidationError));
     assert!(broken.definition_removed);
@@ -107,7 +109,10 @@ fn a_reload_that_repairs_the_key_restores_the_service() {
     assert!(!restored.definition_removed);
     assert_eq!(restored.state, ServiceState::Failed);
     assert_eq!(
-        supervisor.services.definition(BROKEN).map(|d| d.image_path.as_str()),
+        supervisor
+            .services
+            .definition(BROKEN)
+            .map(|d| d.image_path.as_str()),
         Some(repaired.image_path.as_str())
     );
     // Failed -> Starting on an explicit start now works as for any service.

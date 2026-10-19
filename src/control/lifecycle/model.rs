@@ -5,9 +5,7 @@ use crate::security::TokenSummary;
 use crate::service::runtime::{ServiceState, TransitionCause};
 use crate::service::{ServiceTableError, ServiceTableTransition};
 
-use super::start_plan::{
-    OnDemandStartDispatch, OnDemandStartDispatchError, OnDemandStartPlanError,
-};
+use super::start_plan::{OnDemandStartDispatch, OnDemandStartDispatchError, OnDemandStartPlanError};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LifecycleCommand {

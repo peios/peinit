@@ -304,9 +304,12 @@ pub fn build_control_socket_limits_from_registry_values(
         max_connections: optional_init_dword(values, MAX_CONTROL_CONNECTIONS_FIELD)?
             .map(|value| value as usize)
             .unwrap_or(defaults.max_connections),
-        max_connections_per_user: optional_init_dword(values, MAX_CONTROL_CONNECTIONS_PER_USER_FIELD)?
-            .map(|value| value as usize)
-            .unwrap_or(defaults.max_connections_per_user),
+        max_connections_per_user: optional_init_dword(
+            values,
+            MAX_CONTROL_CONNECTIONS_PER_USER_FIELD,
+        )?
+        .map(|value| value as usize)
+        .unwrap_or(defaults.max_connections_per_user),
         max_request_bytes: optional_init_dword(values, MAX_REQUEST_SIZE_FIELD)?
             .map(|value| value as usize)
             .unwrap_or(defaults.max_request_bytes),

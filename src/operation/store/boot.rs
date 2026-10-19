@@ -1,8 +1,6 @@
 use crate::boot::phase2::{BlockedReason, BlockedService, DependencyKind, Phase2BootPlan};
 use crate::ids::OperationId;
-use crate::operation::store::{
-    OperationEvent, OperationRequest, OperationStore, OperationStoreError,
-};
+use crate::operation::store::{OperationEvent, OperationRequest, OperationStore, OperationStoreError};
 use crate::operation::{OperationSource, OperationType};
 
 #[derive(Debug, Clone, PartialEq, Eq)]

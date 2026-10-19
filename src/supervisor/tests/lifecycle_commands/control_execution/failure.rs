@@ -140,7 +140,10 @@ fn the_work_pump_reports_a_contained_control_failure_and_keeps_going() {
 
     assert!(turn.control_operations.is_empty());
     assert_eq!(turn.control_operation_failures.len(), 1);
-    assert_eq!(turn.control_operation_failures[0].operation_id, operation_id);
+    assert_eq!(
+        turn.control_operation_failures[0].operation_id,
+        operation_id
+    );
     // A failed operation is not a stale queue entry: it was live and refused.
     assert_eq!(turn.stale_control_operations, 0);
     assert!(supervisor.pending_control_operations().is_empty());

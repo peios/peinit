@@ -59,7 +59,9 @@ impl OperationStore {
                 self.insert_requested(request, decision, InsertPosition::Back)
             }
             OperationConflictDecision::QueueNew => {
-                let head = self.current_for_service(&request.service).map(|head| head.id);
+                let head = self
+                    .current_for_service(&request.service)
+                    .map(|head| head.id);
                 let outcome = self.insert_requested(request, decision, InsertPosition::Back)?;
                 if let Some(head) = head {
                     self.queued_behind.insert(outcome.stored_operation_id, head);

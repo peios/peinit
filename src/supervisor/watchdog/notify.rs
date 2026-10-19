@@ -1,8 +1,6 @@
 use crate::execution::notify::{NotifyAppliedField, NotifyApplyDispatch};
 use crate::service::runtime::ServiceState;
-use crate::supervisor::dispatch::{
-    SupervisorWatchdogNotifyDispatch, SupervisorWatchdogNotifyOutcome,
-};
+use crate::supervisor::dispatch::{SupervisorWatchdogNotifyDispatch, SupervisorWatchdogNotifyOutcome};
 use crate::supervisor::work::SupervisorWork;
 
 use super::WatchdogError;

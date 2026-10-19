@@ -8,9 +8,7 @@ use crate::supervisor::{
     SupervisorRestartBackoffDispatch, SupervisorWatchdogTimeoutDispatch,
 };
 
-use super::super::event::{
-    collect_on_demand_start, push_critical_failure, push_job, push_operation,
-};
+use super::super::event::{collect_on_demand_start, push_critical_failure, push_job, push_operation};
 use super::start::collect_start_dispatches;
 
 pub(in crate::runtime::kmes) fn collect_reload_command_timeout(

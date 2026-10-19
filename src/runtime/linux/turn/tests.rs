@@ -206,7 +206,10 @@ impl KmesEventSink for RecordingKmesSink {
         }
         if let Some((service, error)) = &self.refuse_service
             && event.event_type != "peinit.event.dropped"
-            && crate::kmes::kmes_event_subject(&event.payload).service.as_deref() == Some(service)
+            && crate::kmes::kmes_event_subject(&event.payload)
+                .service
+                .as_deref()
+                == Some(service)
         {
             return Err(BoundaryError::KmesRefused {
                 errno: 28,

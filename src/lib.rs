@@ -1,13 +1,9 @@
-//! Small replacement spine for peinit.
-//!
-//! This crate is intentionally separate from `peinit` while the production path is
-//! rebuilt. The rule is that production orchestration owns IDs, timestamps, and
-//! state transitions; test doubles belong only behind explicit external
-//! boundaries.
+//! Peios PID 1 service manager and control clients.
 //!
 //! The public crate surface is deliberately small: the binary entrypoint lives in
 //! `init`, and `client` is what a program that manages services from outside
-//! may use, while service-manager internals stay crate-private. Within the crate
+//! can use. Internal modules remain public for compatibility but are hidden from
+//! generated API documentation. Within the crate
 //! the architecture is layered as:
 //!
 //! - data/state models: `service`, `operation`, `job`, `timer`, `logging`
@@ -25,9 +21,9 @@ pub mod boot;
 pub mod boundary;
 #[doc(hidden)]
 pub mod capi;
-pub mod client;
 #[doc(hidden)]
 pub mod cli;
+pub mod client;
 /// The console line format: the tag column, its colours, and the stage
 /// banners. Public because `ConsoleTag` appears in the `InitPlatform` trait,
 /// which an out-of-crate platform implements; `pub` rather than crate-private

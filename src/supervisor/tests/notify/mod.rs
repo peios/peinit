@@ -9,9 +9,7 @@ mod timeout_extension;
 use crate::control::lifecycle::LifecycleCommandOutcome;
 use crate::notify::{NotifyCredentials, NotifyDatagram};
 use crate::service::ServiceDefinition;
-use crate::supervisor::{
-    Supervisor, SupervisorError, SupervisorNotifyDispatch, SupervisorSettings,
-};
+use crate::supervisor::{Supervisor, SupervisorError, SupervisorNotifyDispatch, SupervisorSettings};
 
 use super::{
     APP_LAUNCH_NS, BOOT_NS, LIFECYCLE_COMMAND_NS, ScriptedClock, StaticRegistry,

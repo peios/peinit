@@ -1,6 +1,4 @@
-use crate::execution::control::{
-    ReloadCommandDeadline, ReloadDetectionDeadline, StopTimeoutDeadline,
-};
+use crate::execution::control::{ReloadCommandDeadline, ReloadDetectionDeadline, StopTimeoutDeadline};
 use crate::execution::start::{
     PostStartHookDeadline, PreStartCheckDeadline, PreStartHookDeadline, ReadinessDeadline,
 };

@@ -65,7 +65,10 @@ fn a_process_s_cgroup_names_its_service_and_part_whatever_the_name_or_generation
                 let path = service_job_cgroup_path(name, generation, kind);
                 assert_eq!(
                     cgroup_member(&proc_cgroup(&path)),
-                    Some(CgroupMember::Service { service: name.to_string(), part: Some(part) }),
+                    Some(CgroupMember::Service {
+                        service: name.to_string(),
+                        part: Some(part)
+                    }),
                     "{path}",
                 );
             }
@@ -74,7 +77,10 @@ fn a_process_s_cgroup_names_its_service_and_part_whatever_the_name_or_generation
     let checks = format!("{}/checks", service_cgroup_root_path("sshd", 0));
     assert_eq!(
         cgroup_member(&proc_cgroup(&checks)),
-        Some(CgroupMember::Service { service: "sshd".into(), part: Some(ServicePart::Checks) }),
+        Some(CgroupMember::Service {
+            service: "sshd".into(),
+            part: Some(ServicePart::Checks)
+        }),
     );
 }
 

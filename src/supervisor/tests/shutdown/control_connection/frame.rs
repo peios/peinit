@@ -8,9 +8,7 @@ use crate::supervisor::{SupervisorControlFrameTurn, SupervisorSystemShutdownCont
 
 use super::super::SHUTDOWN_NS;
 use super::super::fixture::shutdown_fixture;
-use super::support::{
-    TurnAccessCall, TurnAccessChecker, assert_response, control_peer, turn_context,
-};
+use super::support::{TurnAccessCall, TurnAccessChecker, assert_response, control_peer, turn_context};
 use crate::supervisor::tests::{ScriptedClock, TestProcessController};
 
 #[test]

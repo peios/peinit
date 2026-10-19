@@ -5,9 +5,7 @@ use crate::operation::store::OperationStore;
 use crate::service::ServiceTable;
 use crate::service::runtime::{ServiceState, ServiceTransition, TransitionCause};
 
-use super::model::{
-    ControlExecutionError, ReloadCommandTerminalDispatch, ReloadCommandTimeoutDispatch,
-};
+use super::model::{ControlExecutionError, ReloadCommandTerminalDispatch, ReloadCommandTimeoutDispatch};
 use super::store::{ControlExecutionStore, ReloadCommandDeadline};
 use super::terminal_event::{
     ended_at_ns, operation_id, reload_command_failure_reason, reload_command_succeeded, service,

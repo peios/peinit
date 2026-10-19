@@ -5,9 +5,7 @@ use crate::ids::JobId;
 use crate::job::JobExit;
 
 use super::cgroup_cleanup::{CgroupCleanupKind, record_cgroup_cleanup};
-use super::dispatch::{
-    SupervisorPreStartHookTerminalDispatch, SupervisorPreStartHookTimeoutDispatch,
-};
+use super::dispatch::{SupervisorPreStartHookTerminalDispatch, SupervisorPreStartHookTimeoutDispatch};
 use super::relationships::apply_relationship_reactions_after_transitions;
 use super::state::{Supervisor, SupervisorError};
 use super::work::SupervisorWork;

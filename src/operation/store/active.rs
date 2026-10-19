@@ -86,15 +86,12 @@ impl OperationStore {
                     .get(behind)
                     .is_none_or(|operation| operation.state.is_terminal());
                 predecessor_done
-                    && self
-                        .records
-                        .get(id)
-                        .is_some_and(|operation| {
-                            operation.state == crate::operation::OperationState::Pending
-                                && self
-                                    .current_for_service(&operation.service)
-                                    .is_some_and(|head| head.id == operation.id)
-                        })
+                    && self.records.get(id).is_some_and(|operation| {
+                        operation.state == crate::operation::OperationState::Pending
+                            && self
+                                .current_for_service(&operation.service)
+                                .is_some_and(|head| head.id == operation.id)
+                    })
             })
             .filter_map(|(id, _)| self.records.get(id).cloned())
             .collect()

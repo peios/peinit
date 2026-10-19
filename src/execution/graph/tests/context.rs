@@ -95,7 +95,9 @@ fn a_context_is_retired_only_once_every_member_is_terminal() {
 
     // db is satisfied in both contexts, but each still has a member
     // running: still nothing to retire.
-    store.apply_operation_satisfied(ids[0]).expect("db satisfied");
+    store
+        .apply_operation_satisfied(ids[0])
+        .expect("db satisfied");
     assert!(
         store.retire_drained_contexts().is_empty(),
         "a context with a live member is not retired",
@@ -103,7 +105,9 @@ fn a_context_is_retired_only_once_every_member_is_terminal() {
     assert_eq!(store.context_count(), 2);
 
     // app completes, which drains app's context and only app's.
-    store.apply_operation_satisfied(ids[1]).expect("app satisfied");
+    store
+        .apply_operation_satisfied(ids[1])
+        .expect("app satisfied");
     assert_eq!(store.retire_drained_contexts(), vec![app_context]);
     assert!(store.context(app_context).is_none());
     assert!(store.context(web_context).is_some());
@@ -119,7 +123,9 @@ fn a_context_is_retired_only_once_every_member_is_terminal() {
 
     // web completes: the last context drains and goes, and nothing is
     // left pointing anywhere.
-    store.apply_operation_satisfied(ids[2]).expect("web satisfied");
+    store
+        .apply_operation_satisfied(ids[2])
+        .expect("web satisfied");
     assert_eq!(store.retire_drained_contexts(), vec![web_context]);
     assert_eq!(store.context_count(), 0);
     assert_eq!(store.association_count(), 0);

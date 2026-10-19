@@ -1,7 +1,5 @@
 use crate::boundary::{Clock, ProcessController, RealtimeClock, RegistryClient, ShutdownFinalizer};
-use crate::control::connection::{
-    ControlConnectionIo, ControlConnectionRecord, ControlConnectionTable,
-};
+use crate::control::connection::{ControlConnectionIo, ControlConnectionRecord, ControlConnectionTable};
 use crate::control::service_security::ServiceAccessChecker;
 use crate::control::system::SystemAccessChecker;
 use crate::supervisor::{

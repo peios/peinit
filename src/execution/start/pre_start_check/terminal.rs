@@ -2,9 +2,7 @@ use crate::execution::failure::{StartFailureRequest, apply_start_failure};
 use crate::service::runtime::{ServiceState, ServiceTransition, TransitionCause};
 
 use super::super::model::{PreStartCheckCompletionDispatch, StartExecutionError};
-use super::super::pre_dependency::{
-    apply_pending_pre_dependency_failure, cancel_dormant_dependencies,
-};
+use super::super::pre_dependency::{apply_pending_pre_dependency_failure, cancel_dormant_dependencies};
 use super::super::store::{PendingPreStartCheck, PendingPreStartCheckStart};
 use super::transaction::PreStartCheckTransaction;
 

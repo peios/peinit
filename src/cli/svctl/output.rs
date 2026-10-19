@@ -306,7 +306,11 @@ fn write_timers(out: &mut dyn Write, value: &Value) -> io::Result<()> {
             _ => write_optional_line(out, "    next", fires.or(scheduled).as_deref())?,
         }
         let last = str_field(timer, "last_fired_at").map(to_the_second);
-        writeln!(out, "    last fired: {}", last.as_deref().unwrap_or("never"))?;
+        writeln!(
+            out,
+            "    last fired: {}",
+            last.as_deref().unwrap_or("never")
+        )?;
     }
     Ok(())
 }

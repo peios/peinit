@@ -3,9 +3,7 @@ use crate::ids::{JobIdAllocator, OperationIdAllocator};
 use crate::operation::store::{OperationRequest, OperationStore, OperationStoreError};
 use crate::operation::{OperationSource, OperationType};
 
-use super::{
-    FixedClock, OBSERVED_AT_NS, StaticRegistry, allocated_operation_id, service, settings,
-};
+use super::{FixedClock, OBSERVED_AT_NS, StaticRegistry, allocated_operation_id, service, settings};
 
 #[test]
 fn graph_validation_error_does_not_advance_ids_or_dispatch_operations() {

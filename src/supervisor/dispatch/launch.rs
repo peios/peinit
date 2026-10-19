@@ -5,9 +5,7 @@ use crate::execution::start::{PostStartHookTerminalDispatch, StartExecutionDispa
 use crate::job::{JobEvent, JobType};
 
 use super::control::{SupervisorControlLaunchDispatch, SupervisorReloadCommandTimeoutDispatch};
-use super::health::{
-    SupervisorHealthCheckLaunchDispatch, SupervisorHealthCheckLaunchFailureDispatch,
-};
+use super::health::{SupervisorHealthCheckLaunchDispatch, SupervisorHealthCheckLaunchFailureDispatch};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SupervisorPendingProcessSetupDispatch {

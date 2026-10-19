@@ -34,22 +34,28 @@ impl LinuxCalendarTimerTable {
     pub(in crate::runtime::linux) fn views(&self) -> BTreeMap<String, Vec<ServiceTimerView>> {
         let mut views: BTreeMap<String, Vec<ServiceTimerView>> = BTreeMap::new();
         for entry in self.entries.values() {
-            views.entry(entry.service.clone()).or_default().push(ServiceTimerView {
-                schedule: entry.schedule.clone(),
-                arming: ServiceTimerArming::Armed {
-                    scheduled_ns: entry.next_scheduled_ns,
-                    fires_ns: entry.armed_deadline_ns,
-                    last_fired_ns: entry.last_fired_ns,
-                },
-            });
+            views
+                .entry(entry.service.clone())
+                .or_default()
+                .push(ServiceTimerView {
+                    schedule: entry.schedule.clone(),
+                    arming: ServiceTimerArming::Armed {
+                        scheduled_ns: entry.next_scheduled_ns,
+                        fires_ns: entry.armed_deadline_ns,
+                        last_fired_ns: entry.last_fired_ns,
+                    },
+                });
         }
         for (service, schedule, reason) in &self.rejected {
-            views.entry(service.clone()).or_default().push(ServiceTimerView {
-                schedule: schedule.clone(),
-                arming: ServiceTimerArming::NotArmed {
-                    reason: reason.clone(),
-                },
-            });
+            views
+                .entry(service.clone())
+                .or_default()
+                .push(ServiceTimerView {
+                    schedule: schedule.clone(),
+                    arming: ServiceTimerArming::NotArmed {
+                        reason: reason.clone(),
+                    },
+                });
         }
         for timers in views.values_mut() {
             timers.sort_by(|a, b| a.schedule.cmp(&b.schedule));

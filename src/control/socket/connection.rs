@@ -1,9 +1,7 @@
 use std::io;
 use std::os::fd::{AsRawFd, OwnedFd};
 
-use super::{
-    ControlSocketRead, ControlSocketReadError, ControlSocketWrite, ControlSocketWriteError,
-};
+use super::{ControlSocketRead, ControlSocketReadError, ControlSocketWrite, ControlSocketWriteError};
 
 #[derive(Debug)]
 pub struct LinuxControlConnection {

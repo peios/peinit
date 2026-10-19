@@ -1,6 +1,4 @@
-use crate::boundary::{
-    FilesystemCheckReport, FilesystemCheckResult, LaunchedFilesystemCheckHelper,
-};
+use crate::boundary::{FilesystemCheckReport, FilesystemCheckResult, LaunchedFilesystemCheckHelper};
 use crate::control::lifecycle::{OnDemandStartDispatch, OnDemandStartPlan, PlannedStart};
 use crate::execution::start::{RestartStartExecutionRequest, StartExecutionStore};
 use crate::operation::conflict::OperationConflictDecision;

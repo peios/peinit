@@ -58,57 +58,35 @@ void peinit_client_free(peinit_client_t *client);
  * the newline frame terminator, waits for one newline-delimited JSON response,
  * and stores it in *response_out.
  */
-int peinit_control_raw_json(peinit_client_t *client,
-			    const char *request_json,
-			    peinit_response_t **response_out,
-			    peinit_error_t **error_out);
+int peinit_control_raw_json(peinit_client_t *client, const char *request_json,
+                            peinit_response_t **response_out, peinit_error_t **error_out);
 
-int peinit_service_start(peinit_client_t *client,
-			 const char *service,
-			 bool wait,
-			 peinit_response_t **response_out,
-			 peinit_error_t **error_out);
+int peinit_service_start(peinit_client_t *client, const char *service, bool wait,
+                         peinit_response_t **response_out, peinit_error_t **error_out);
 
-int peinit_service_stop(peinit_client_t *client,
-			const char *service,
-			bool wait,
-			peinit_response_t **response_out,
-			peinit_error_t **error_out);
+int peinit_service_stop(peinit_client_t *client, const char *service, bool wait,
+                        peinit_response_t **response_out, peinit_error_t **error_out);
 
-int peinit_service_restart(peinit_client_t *client,
-			   const char *service,
-			   bool wait,
-			   peinit_response_t **response_out,
-			   peinit_error_t **error_out);
+int peinit_service_restart(peinit_client_t *client, const char *service, bool wait,
+                           peinit_response_t **response_out, peinit_error_t **error_out);
 
-int peinit_service_reload(peinit_client_t *client,
-			  const char *service,
-			  bool wait,
-			  peinit_response_t **response_out,
-			  peinit_error_t **error_out);
+int peinit_service_reload(peinit_client_t *client, const char *service, bool wait,
+                          peinit_response_t **response_out, peinit_error_t **error_out);
 
-int peinit_service_reset(peinit_client_t *client,
-			 const char *service,
-			 peinit_response_t **response_out,
-			 peinit_error_t **error_out);
+int peinit_service_reset(peinit_client_t *client, const char *service,
+                         peinit_response_t **response_out, peinit_error_t **error_out);
 
-int peinit_service_status(peinit_client_t *client,
-			  const char *service,
-			  peinit_response_t **response_out,
-			  peinit_error_t **error_out);
+int peinit_service_status(peinit_client_t *client, const char *service,
+                          peinit_response_t **response_out, peinit_error_t **error_out);
 
-int peinit_service_list(peinit_client_t *client,
-			peinit_response_t **response_out,
-			peinit_error_t **error_out);
+int peinit_service_list(peinit_client_t *client, peinit_response_t **response_out,
+                        peinit_error_t **error_out);
 
-int peinit_operation_status(peinit_client_t *client,
-			    const char *operation_id,
-			    peinit_response_t **response_out,
-			    peinit_error_t **error_out);
+int peinit_operation_status(peinit_client_t *client, const char *operation_id,
+                            peinit_response_t **response_out, peinit_error_t **error_out);
 
-int peinit_reload_config(peinit_client_t *client,
-			 peinit_response_t **response_out,
-			 peinit_error_t **error_out);
+int peinit_reload_config(peinit_client_t *client, peinit_response_t **response_out,
+                         peinit_error_t **error_out);
 
 /*
  * Submitted jobs, as the control socket sees them (PSPU §4.14).
@@ -122,21 +100,14 @@ int peinit_reload_config(peinit_client_t *client,
  *
  * Submitting a job is not a control command: see <peinit/jobs.h>.
  */
-int peinit_job_status(peinit_client_t *client,
-		      const char *job_id,
-		      peinit_response_t **response_out,
-		      peinit_error_t **error_out);
+int peinit_job_status(peinit_client_t *client, const char *job_id, peinit_response_t **response_out,
+                      peinit_error_t **error_out);
 
-int peinit_job_list(peinit_client_t *client,
-		    const char *filter_json,
-		    peinit_response_t **response_out,
-		    peinit_error_t **error_out);
+int peinit_job_list(peinit_client_t *client, const char *filter_json,
+                    peinit_response_t **response_out, peinit_error_t **error_out);
 
-int peinit_job_stop(peinit_client_t *client,
-		    const char *job_id,
-		    bool wait,
-		    peinit_response_t **response_out,
-		    peinit_error_t **error_out);
+int peinit_job_stop(peinit_client_t *client, const char *job_id, bool wait,
+                    peinit_response_t **response_out, peinit_error_t **error_out);
 
 /*
  * peinit_system_shutdown - request graceful poweroff/reboot/halt.
@@ -144,10 +115,8 @@ int peinit_job_stop(peinit_client_t *client,
  * shutdown_kind must be PEINIT_SHUTDOWN_POWEROFF, PEINIT_SHUTDOWN_REBOOT, or
  * PEINIT_SHUTDOWN_HALT. Tests should not call this against the host PID 1.
  */
-int peinit_system_shutdown(peinit_client_t *client,
-			   int shutdown_kind,
-			   peinit_response_t **response_out,
-			   peinit_error_t **error_out);
+int peinit_system_shutdown(peinit_client_t *client, int shutdown_kind,
+                           peinit_response_t **response_out, peinit_error_t **error_out);
 
 /* Free a response returned by a control command. NULL is valid. */
 void peinit_response_free(peinit_response_t *response);

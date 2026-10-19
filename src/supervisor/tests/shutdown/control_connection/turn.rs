@@ -3,9 +3,7 @@ use std::collections::VecDeque;
 use crate::control::connection::{
     ControlConnectionReadTurn, ControlConnectionRecord, ControlConnectionWriteTurn,
 };
-use crate::control::socket::{
-    ControlSocketRead, ControlSocketWrite, DEFAULT_MAX_REQUEST_SIZE_BYTES,
-};
+use crate::control::socket::{ControlSocketRead, ControlSocketWrite, DEFAULT_MAX_REQUEST_SIZE_BYTES};
 use crate::supervisor::SupervisorControlFrameTurn;
 
 use super::super::fixture::shutdown_fixture;

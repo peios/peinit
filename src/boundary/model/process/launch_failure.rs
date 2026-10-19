@@ -194,6 +194,9 @@ mod tests {
             Some(ProcessPreExecStep::SetEnvironment),
         );
         assert_eq!(ProcessPreExecStep::SetEnvironment.id(), 8);
-        assert_eq!(ProcessPreExecStep::SetEnvironment.label(), "set-environment");
+        assert_eq!(
+            ProcessPreExecStep::SetEnvironment.label(),
+            "set-environment"
+        );
     }
 }

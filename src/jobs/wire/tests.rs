@@ -1,6 +1,4 @@
-use super::{
-    JobsCommand, JobsErrorCode, JobsRequestParseError, JobsWaitCondition, parse_jobs_request,
-};
+use super::{JobsCommand, JobsErrorCode, JobsRequestParseError, JobsWaitCondition, parse_jobs_request};
 
 #[test]
 fn submit_keeps_the_object_for_the_definition_parser() {

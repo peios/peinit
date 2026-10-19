@@ -38,9 +38,10 @@ impl Supervisor {
         // service until the next reload, not an internal error, and it is
         // answered as one more no-op for the same reason as a shutdown is
         // (PEI-1234).
-        let (Some(definition), Some(runtime)) =
-            (self.services.definition(service), self.services.runtime(service))
-        else {
+        let (Some(definition), Some(runtime)) = (
+            self.services.definition(service),
+            self.services.runtime(service),
+        ) else {
             return Ok(SupervisorTimerDispatch {
                 service: service.to_string(),
                 schedule: schedule.to_string(),

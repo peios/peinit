@@ -216,7 +216,11 @@ fn pid_and_pidfd_land_only_on_exec_confirmation() {
         .expect("complete setup");
     let confirmed = supervisor.jobs().get(job_id).expect("job");
     assert_eq!(confirmed.state, JobState::Running);
-    assert_eq!(confirmed.pid, Some(4242), "the pid lands on exec confirmation");
+    assert_eq!(
+        confirmed.pid,
+        Some(4242),
+        "the pid lands on exec confirmation"
+    );
     assert_eq!(confirmed.pidfd, Some(9), "and so does the pidfd");
 }
 

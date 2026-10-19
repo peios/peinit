@@ -15,7 +15,10 @@ pub enum BoundaryError {
     /// The kernel refused an event with this error number, kept as a
     /// number so the record of the refusal can carry it
     /// (`peinit.event.dropped`'s `outcome.errno`).
-    KmesRefused { errno: i32, message: String },
+    KmesRefused {
+        errno: i32,
+        message: String,
+    },
 }
 
 impl BoundaryError {

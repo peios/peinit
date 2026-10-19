@@ -1,8 +1,6 @@
 use std::os::fd::{FromRawFd, OwnedFd};
 
-use crate::boundary::{
-    Clock, ProcessController, ProcessInheritedFd, ProcessLauncher, TokenProvider,
-};
+use crate::boundary::{Clock, ProcessController, ProcessInheritedFd, ProcessLauncher, TokenProvider};
 use crate::execution::launch::{
     LaunchCreatedJobError, LaunchCreatedJobResult, LaunchTokenSource, launch_created_submitted_job,
 };
@@ -10,9 +8,7 @@ use crate::submitted::SubmittedJobCause;
 
 use super::setup::apply_submitted_setup_failure;
 use super::submit::close_fd;
-use crate::supervisor::dispatch::{
-    SupervisorSubmittedLaunchDispatch, SupervisorSubmittedLaunchResult,
-};
+use crate::supervisor::dispatch::{SupervisorSubmittedLaunchDispatch, SupervisorSubmittedLaunchResult};
 use crate::supervisor::launch::record_pending_process_setup;
 use crate::supervisor::state::{Supervisor, SupervisorError};
 use crate::supervisor::work::SupervisorWork;

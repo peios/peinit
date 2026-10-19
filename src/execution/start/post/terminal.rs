@@ -3,9 +3,7 @@ use crate::operation::store::OperationStore;
 use crate::service::ServiceTable;
 
 use super::super::deadline::post_start_hook_deadline;
-use super::super::model::{
-    PostStartHookTerminalDispatch, StartExecutionContext, StartExecutionError,
-};
+use super::super::model::{PostStartHookTerminalDispatch, StartExecutionContext, StartExecutionError};
 use super::super::store::{PostStartHookSequence, StartExecutionStore};
 use super::completion::complete_post_start_operation;
 use super::job::{

@@ -4,9 +4,7 @@ use crate::runtime::{
     process_runtime_shutdown_event,
 };
 use crate::service::runtime::ServiceState;
-use crate::shutdown::{
-    ShutdownDeadlineKind, ShutdownFinalizationState, ShutdownKind, ShutdownSignal,
-};
+use crate::shutdown::{ShutdownDeadlineKind, ShutdownFinalizationState, ShutdownKind, ShutdownSignal};
 use crate::supervisor::{SupervisorChildReapDispatch, SupervisorChildReapTurn};
 
 use super::super::SHUTDOWN_NS;

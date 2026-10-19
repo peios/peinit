@@ -6,9 +6,7 @@ use crate::service::{
 };
 use crate::supervisor::cgroup_cleanup::{CgroupCleanupKind, record_cgroup_cleanup};
 use crate::supervisor::critical_budget::CriticalRebootTrigger;
-use crate::supervisor::dispatch::{
-    SupervisorWatchdogTimeoutDispatch, SupervisorWatchdogTimeoutOutcome,
-};
+use crate::supervisor::dispatch::{SupervisorWatchdogTimeoutDispatch, SupervisorWatchdogTimeoutOutcome};
 use crate::supervisor::relationships::apply_relationship_reactions_after_transitions;
 use crate::supervisor::state::{Supervisor, SupervisorError};
 use crate::supervisor::work::SupervisorWork;

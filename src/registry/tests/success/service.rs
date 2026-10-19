@@ -1,7 +1,5 @@
 use crate::provisioning::ServiceRuntimeDirectory;
-use crate::registry::{
-    apply_inherited_service_security, build_service_definition_from_registry_values,
-};
+use crate::registry::{apply_inherited_service_security, build_service_definition_from_registry_values};
 use crate::service::{
     ErrorControl, NotifyAccess, Readiness, RestartPolicy, ServiceCheck, ServiceCheckKind,
     ServiceEnvironmentVariable, ServiceSecurityDescriptor, ServiceTrigger, ServiceType,

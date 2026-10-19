@@ -5,9 +5,7 @@ use serde_json::json;
 
 use crate::boundary::{Clock, ProcessController, RealtimeClock};
 use crate::control::system::ControlPeer;
-use crate::control::wire::{
-    ControlResponseStatus, ControlResponseTimeProjection, ParsedControlRequest,
-};
+use crate::control::wire::{ControlResponseStatus, ControlResponseTimeProjection, ParsedControlRequest};
 use crate::ids::JobId;
 use crate::submitted::{
     JobAccess, JobAccessCheckRequest, JobAccessChecker, JobAccessDenied, job_view_json,

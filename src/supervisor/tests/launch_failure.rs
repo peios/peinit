@@ -84,9 +84,11 @@ fn a_clone3_enomem_is_a_restart_eligible_parent_setup_failure() {
     let mut supervisor = boot_single_service("authd");
     let mut tokens = TestTokenProvider::default();
     let mut launcher = TestProcessLauncher::results(vec![
-        Err(BoundaryError::ProcessLaunch(ProcessLaunchError::parent_setup(
-            "clone3(CLONE_PIDFD|CLONE_INTO_CGROUP) failed: Cannot allocate memory (os error 12)",
-        ))),
+        Err(BoundaryError::ProcessLaunch(
+            ProcessLaunchError::parent_setup(
+                "clone3(CLONE_PIDFD|CLONE_INTO_CGROUP) failed: Cannot allocate memory (os error 12)",
+            ),
+        )),
         Ok(process(7001, 71)),
     ]);
     let mut clock = ScriptedClock::new([AUTHD_LAUNCH_NS]);

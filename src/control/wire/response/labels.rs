@@ -31,7 +31,8 @@ pub(crate) fn service_state_from_wire(label: &str) -> Option<ServiceState> {
         ServiceState::Abandoned,
         ServiceState::Skipped,
     ];
-    ALL.into_iter().find(|state| service_state_wire(*state) == label)
+    ALL.into_iter()
+        .find(|state| service_state_wire(*state) == label)
 }
 
 /// The health a wire label names.

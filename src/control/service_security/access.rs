@@ -127,7 +127,8 @@ mod tests {
     #[test]
     fn the_default_in_sddl_is_the_default_built() {
         let built = default_service_security_descriptor().expect("build the default");
-        let said = peios::security::sddl::parse(DEFAULT_SERVICE_SECURITY_SDDL).expect("parse the SDDL");
+        let said =
+            peios::security::sddl::parse(DEFAULT_SERVICE_SECURITY_SDDL).expect("parse the SDDL");
         assert_eq!(said.as_bytes(), built.as_bytes());
     }
 }

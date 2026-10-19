@@ -7,9 +7,7 @@ use crate::operation::OperationState;
 use crate::operation::store::OperationStore;
 use crate::service::{ServiceTable, ServiceType};
 
-use crate::execution::test_support::{
-    OBSERVED_AT_NS, StartedBootGraph, satisfaction_request, service,
-};
+use crate::execution::test_support::{OBSERVED_AT_NS, StartedBootGraph, satisfaction_request, service};
 
 #[test]
 fn satisfaction_rejects_wrong_service_without_mutation() {

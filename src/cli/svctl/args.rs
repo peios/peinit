@@ -256,7 +256,12 @@ fn parse_definition_command(program: &str, positionals: &[String]) -> Result<Com
         other if other.starts_with('-') => {
             return Err(usage(program, format!("unknown option {other}")));
         }
-        other => return Err(usage(program, format!("unknown definition subcommand {other}"))),
+        other => {
+            return Err(usage(
+                program,
+                format!("unknown definition subcommand {other}"),
+            ));
+        }
     };
     Ok(Command::Definition { action, service })
 }
@@ -290,11 +295,17 @@ fn parse_definition_edits(
         } else if service.is_none() {
             service = Some(arg.clone());
         } else {
-            return Err(usage(program, format!("definition {what} takes one service")));
+            return Err(usage(
+                program,
+                format!("definition {what} takes one service"),
+            ));
         }
     }
     let Some(service) = service else {
-        return Err(usage(program, format!("definition {what} requires a service")));
+        return Err(usage(
+            program,
+            format!("definition {what} requires a service"),
+        ));
     };
     Ok((service, edits))
 }
@@ -724,7 +735,14 @@ mod tests {
     #[test]
     fn parses_a_definition_command_and_its_edits_in_order() {
         let ParseOutcome::Run(invocation) = parse([
-            "svctl", "--json", "def", "edit", "web", "--set", "Arguments=-D", "--unset=Wants",
+            "svctl",
+            "--json",
+            "def",
+            "edit",
+            "web",
+            "--set",
+            "Arguments=-D",
+            "--unset=Wants",
             "--set=Arguments=--verbose",
         ])
         .expect("parse") else {
@@ -735,18 +753,39 @@ mod tests {
             invocation.command,
             Command::Definition {
                 action: DefinitionAction::Edit(vec![
-                    Edit::Set { field: "Arguments".into(), value: "-D".into() },
-                    Edit::Unset { field: "Wants".into() },
-                    Edit::Set { field: "Arguments".into(), value: "--verbose".into() },
+                    Edit::Set {
+                        field: "Arguments".into(),
+                        value: "-D".into()
+                    },
+                    Edit::Unset {
+                        field: "Wants".into()
+                    },
+                    Edit::Set {
+                        field: "Arguments".into(),
+                        value: "--verbose".into()
+                    },
                 ]),
                 service: "web".into(),
             }
         );
-        let error = |args: &[&str]| parse(args.iter().copied()).expect_err("usage error").message;
-        assert_eq!(error(&["svctl", "definition", "edit", "web"]), "definition edit requires --set or --unset");
-        assert_eq!(error(&["svctl", "definition", "edit", "web", "--set", "=x"]), "--set takes FIELD=VALUE");
-        assert_eq!(error(&["svctl", "definition", "show"]), "definition show requires a service");
-        assert_eq!(error(&["svctl", "--wait", "definition", "show", "web"]).contains("--wait"), true);
+        let error = |args: &[&str]| {
+            parse(args.iter().copied())
+                .expect_err("usage error")
+                .message
+        };
+        assert_eq!(
+            error(&["svctl", "definition", "edit", "web"]),
+            "definition edit requires --set or --unset"
+        );
+        assert_eq!(
+            error(&["svctl", "definition", "edit", "web", "--set", "=x"]),
+            "--set takes FIELD=VALUE"
+        );
+        assert_eq!(
+            error(&["svctl", "definition", "show"]),
+            "definition show requires a service"
+        );
+        assert!(error(&["svctl", "--wait", "definition", "show", "web"]).contains("--wait"));
         assert!(matches!(
             parse(["svctl", "definition", "create", "web", "--set", "ImagePath=/x"]),
             Ok(ParseOutcome::Run(invocation)) if matches!(invocation.command, Command::Definition { action: DefinitionAction::Create(_), .. })

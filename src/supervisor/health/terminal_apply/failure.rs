@@ -1,9 +1,7 @@
 use crate::job::JobEvent;
 use crate::service::runtime::{ServiceTransition, TransitionCause};
 use crate::service::{RestartEvaluationAction, ServiceDefinition, evaluate_restart_after_failure};
-use crate::supervisor::dispatch::{
-    SupervisorHealthCheckOutcome, SupervisorHealthCheckTerminalDispatch,
-};
+use crate::supervisor::dispatch::{SupervisorHealthCheckOutcome, SupervisorHealthCheckTerminalDispatch};
 use crate::supervisor::state::SupervisorError;
 use crate::supervisor::work::SupervisorWork;
 
