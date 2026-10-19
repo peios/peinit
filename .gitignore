@@ -3,3 +3,9 @@
 
 # pekit build + package output (out_dir)
 /out
+
+/bazel-*
+/.ci-sdk/
+/docs/learn/dist/
+**/__pycache__/
+**/.ruff_cache/

@@ -38,8 +38,8 @@ use std::os::fd::OwnedFd;
 use std::os::unix::net::UnixStream;
 use std::time::Duration;
 
-use libauthd::transport::{recv_message_with_fd, send_message};
-use libauthd::wire::{
+use auth_core::transport::{recv_message_with_fd, send_message};
+use auth_core::wire::{
     self, MSG_ACCESS_DENIED, MSG_ACCESS_GRANTED, ServiceAttest, decode_access_denied,
     decode_header, encode_service_attest,
 };

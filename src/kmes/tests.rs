@@ -30,8 +30,8 @@ use super::{
     encode_fd_store_rejection_event, encode_graph_event, encode_graph_validation_error_event,
     encode_graph_validation_warning_event, encode_job_event, encode_job_status_event,
     encode_leaked_job_cgroup_event, encode_notify_field_event, encode_notify_progress_event,
-    encode_notify_rejection_event, encode_on_failure_loop_suppressed_event,
-    encode_operation_event, encode_output_dropped_event, encode_registry_reload_deferred_event,
+    encode_notify_rejection_event, encode_on_failure_loop_suppressed_event, encode_operation_event,
+    encode_output_dropped_event, encode_registry_reload_deferred_event,
     encode_reload_undecodable_service_event, encode_reload_unconfirmed_event,
     encode_shutdown_abandoned_event, kmes_event_subject, notify_field_event_type,
 };
@@ -86,21 +86,36 @@ fn a_job_ended_is_the_whole_job_record_nested_under_its_catalogue_paths() {
     assert_eq!(read_str(p, "object.job.state"), "failed");
     assert_eq!(read_str(p, "object.service.name"), "app");
     assert_eq!(read_uint(p, "object.job.activation-generation"), 3);
-    assert_eq!(read_bin(p, "object.operation.guid"), operation_id.as_guid_bytes());
+    assert_eq!(
+        read_bin(p, "object.operation.guid"),
+        operation_id.as_guid_bytes()
+    );
     assert!(!read_bool(p, "outcome.success"));
     assert_eq!(read_str(p, "outcome.detail"), "exit-code");
     assert_eq!(read_uint(p, "object.process.pid"), 123);
     assert_eq!(read_int(p, "object.process.exit-code"), 2);
     assert_absent(p, "object.process.exit-signal");
     assert_eq!(read_str(p, "object.job.executable"), "/sbin/app");
-    assert_eq!(read_str_array(p, "object.job.arguments"), ["--foreground", "--ready"]);
+    assert_eq!(
+        read_str_array(p, "object.job.arguments"),
+        ["--foreground", "--ready"]
+    );
     assert!(!read_bool(p, "object.job.arguments-truncated"));
     assert_eq!(read_uint(p, "object.job.arguments-count"), 2);
     // Monotonic instants are written as the wall-clock times they were.
-    assert_eq!(read_uint(p, "object.job.created-time"), 1_700_000_000_000_000_400);
-    assert_eq!(read_uint(p, "object.job.started-time"), 1_700_000_000_000_000_600);
+    assert_eq!(
+        read_uint(p, "object.job.created-time"),
+        1_700_000_000_000_000_400
+    );
+    assert_eq!(
+        read_uint(p, "object.job.started-time"),
+        1_700_000_000_000_000_600
+    );
     assert_eq!(read_uint(p, "object.job.duration"), 600);
-    assert_eq!(read_str(p, "object.cgroup.path"), "/sys/fs/cgroup/peinit/app");
+    assert_eq!(
+        read_str(p, "object.cgroup.path"),
+        "/sys/fs/cgroup/peinit/app"
+    );
     assert_eq!(read_uint(p, "object.cgroup.generation"), 7);
     assert_eq!(read_bin(p, "object.job.token.sid"), sid("S-1-5-18"));
     assert_eq!(
@@ -112,7 +127,13 @@ fn a_job_ended_is_the_whole_job_record_nested_under_its_catalogue_paths() {
     assert_eq!(read_uint(p, "object.job.token.privileges"), tcb | audit);
     assert_eq!(read_uint(p, "object.job.token.privileges-enabled"), tcb);
     // Names are never carried, and nothing is written as nil.
-    for gone in ["job_id", "pidfd", "resolved_identity", "token_identity", "final_state"] {
+    for gone in [
+        "job_id",
+        "pidfd",
+        "resolved_identity",
+        "token_identity",
+        "final_state",
+    ] {
         assert_absent(p, gone);
     }
     assert_no_nil(p);
@@ -161,23 +182,32 @@ fn a_job_created_and_started_carry_the_job_and_what_they_add() {
 
     let created = encode_job_event(&JobEvent::created(&record), TIME).expect("created");
     assert_eq!(created.event_type, "peinit.job.created");
-    assert_eq!(read_str(&created.payload, "object.job.type"), "pre-exec-hook");
+    assert_eq!(
+        read_str(&created.payload, "object.job.type"),
+        "pre-exec-hook"
+    );
     assert_eq!(read_str(&created.payload, "object.job.state"), "created");
-    assert_eq!(read_str(&created.payload, "object.job.executable"), "/sbin/app");
-    assert_eq!(read_uint(&created.payload, "object.job.activation-generation"), 4);
+    assert_eq!(
+        read_str(&created.payload, "object.job.executable"),
+        "/sbin/app"
+    );
+    assert_eq!(
+        read_uint(&created.payload, "object.job.activation-generation"),
+        4
+    );
     assert_absent(&created.payload, "object.process");
     assert_no_nil(&created.payload);
 
     record.state = JobState::Running;
     record.pid = Some(321);
-    let started = encode_job_event(
-        &JobEvent::started(&record).expect("started event"),
-        TIME,
-    )
-    .expect("started");
+    let started = encode_job_event(&JobEvent::started(&record).expect("started event"), TIME)
+        .expect("started");
     assert_eq!(started.event_type, "peinit.job.started");
     assert_eq!(read_uint(&started.payload, "object.process.pid"), 321);
-    assert_eq!(read_str(&started.payload, "object.cgroup.path"), "c".repeat(512));
+    assert_eq!(
+        read_str(&started.payload, "object.cgroup.path"),
+        "c".repeat(512)
+    );
     assert_absent(&started.payload, "started_at_ns");
     assert_no_nil(&started.payload);
 }
@@ -202,15 +232,25 @@ fn every_way_an_operation_ends_is_one_type_told_apart_by_its_state() {
     };
 
     let completed = encode_operation_event(
-        &OperationEvent::completed(&record(OperationState::Completed, Some("started"), Some(12)))
-            .expect("completed"),
+        &OperationEvent::completed(&record(
+            OperationState::Completed,
+            Some("started"),
+            Some(12),
+        ))
+        .expect("completed"),
     )
     .expect("encoded");
     let p = &completed.payload;
     assert_eq!(completed.event_type, "peinit.operation.ended");
-    assert_eq!(read_bin(p, "object.operation.guid"), operation_id.as_guid_bytes());
+    assert_eq!(
+        read_bin(p, "object.operation.guid"),
+        operation_id.as_guid_bytes()
+    );
     assert_eq!(read_str(p, "object.operation.type"), "start");
-    assert_eq!(read_str(p, "object.operation.source"), "dependency-propagation");
+    assert_eq!(
+        read_str(p, "object.operation.source"),
+        "dependency-propagation"
+    );
     assert_eq!(read_str(p, "object.operation.state"), "completed");
     assert_eq!(read_str(p, "object.service.name"), "app");
     assert!(read_bool(p, "outcome.success"));
@@ -230,7 +270,10 @@ fn every_way_an_operation_ends_is_one_type_told_apart_by_its_state() {
     .expect("encoded");
     assert_eq!(failed.event_type, "peinit.operation.ended");
     assert!(!read_bool(&failed.payload, "outcome.success"));
-    assert_eq!(read_str(&failed.payload, "object.operation.state"), "failed");
+    assert_eq!(
+        read_str(&failed.payload, "object.operation.state"),
+        "failed"
+    );
     assert_eq!(read_str(&failed.payload, "outcome.detail"), "inactive");
 }
 
@@ -253,8 +296,14 @@ fn an_operation_requested_by_peinit_itself_has_no_subject() {
     });
     let encoded = encode_operation_event(&event).expect("encoded");
     assert_eq!(encoded.event_type, "peinit.operation.requested");
-    assert_eq!(read_str(&encoded.payload, "object.operation.state"), "pending");
-    assert_eq!(read_str(&encoded.payload, "object.operation.source"), "restart-policy");
+    assert_eq!(
+        read_str(&encoded.payload, "object.operation.state"),
+        "pending"
+    );
+    assert_eq!(
+        read_str(&encoded.payload, "object.operation.source"),
+        "restart-policy"
+    );
     assert_absent(&encoded.payload, "subject");
     assert_absent(&encoded.payload, "outcome");
 }
@@ -272,7 +321,10 @@ fn a_graph_member_reaching_its_outcome_is_a_graph_operation_ended() {
     assert_eq!(event.event_type, "peinit.graph.operation.ended");
     assert_eq!(read_uint(&event.payload, "graph.context"), 4);
     assert_eq!(read_str(&event.payload, "object.service.name"), "db");
-    assert_eq!(read_bin(&event.payload, "object.operation.guid"), operation_id.as_guid_bytes());
+    assert_eq!(
+        read_bin(&event.payload, "object.operation.guid"),
+        operation_id.as_guid_bytes()
+    );
     assert!(read_bool(&event.payload, "outcome.success"));
 }
 
@@ -301,7 +353,10 @@ fn notify_fields_are_recorded_with_their_sender_and_their_value_typed() {
         .collect();
 
     assert_eq!(
-        events.iter().map(|event| event.event_type.as_str()).collect::<Vec<_>>(),
+        events
+            .iter()
+            .map(|event| event.event_type.as_str())
+            .collect::<Vec<_>>(),
         [
             "peinit.notify.status.reported",
             "peinit.notify.errno.reported",
@@ -311,7 +366,10 @@ fn notify_fields_are_recorded_with_their_sender_and_their_value_typed() {
     );
     let status = &events[0].payload;
     assert_eq!(read_str(status, "subject.service.name"), "app");
-    assert_eq!(read_bin(status, "subject.job.guid"), sender.job_id.as_guid_bytes());
+    assert_eq!(
+        read_bin(status, "subject.job.guid"),
+        sender.job_id.as_guid_bytes()
+    );
     assert_eq!(read_uint(status, "subject.job.activation-generation"), 3);
     assert_eq!(
         read_bin(status, "subject.operation.guid"),
@@ -447,7 +505,10 @@ fn a_submitted_jobs_status_names_its_submitter_by_sid() {
     let p = &event.payload;
     assert_eq!(event.event_type, "peinit.job.status.reported");
     assert_eq!(read_bin(p, "object.job.guid"), job_id.as_guid_bytes());
-    assert_eq!(read_bin(p, "object.job.submitter.sid"), sid("S-1-5-21-1-2-3-1001"));
+    assert_eq!(
+        read_bin(p, "object.job.submitter.sid"),
+        sid("S-1-5-21-1-2-3-1001")
+    );
     assert_eq!(read_str(p, "notify.status"), "copying");
     assert_eq!(read_uint(p, "notify.progress.total"), 4);
     assert_eq!(read_str(p, "notify.progress.unit"), "percent");
@@ -488,7 +549,10 @@ fn a_notify_rejection_names_its_reason_and_whoever_peinit_could_attribute() {
     assert_eq!(read_str(p, "outcome.reason"), "generation-mismatch");
     assert_eq!(read_uint(p, "subject.process.pid"), 55);
     assert_eq!(read_str(p, "subject.service.name"), "app");
-    assert_eq!(read_bin(p, "subject.job.guid"), sender.job_id.as_guid_bytes());
+    assert_eq!(
+        read_bin(p, "subject.job.guid"),
+        sender.job_id.as_guid_bytes()
+    );
     assert_absent(p, "outcome.success");
 
     let anonymous = encode_notify_rejection_event(None, NotifyRejectionReason::Truncated, None)
@@ -499,7 +563,7 @@ fn a_notify_rejection_names_its_reason_and_whoever_peinit_could_attribute() {
 
 #[test]
 fn every_notify_rejection_reason_is_one_the_fragment_declares() {
-    let fragment = include_str!("../../peinit.evman");
+    let fragment = include_str!("../../docs/peinit.evman");
     let declared = declared_values(fragment, "peinit.notify.rejected", "outcome.reason");
     use NotifyRejectionReason::*;
     for reason in [
@@ -520,7 +584,11 @@ fn every_notify_rejection_reason_is_one_the_fragment_declares() {
         ShutdownRefused,
         InternalError,
     ] {
-        assert!(declared.contains(&reason.label().to_string()), "{}", reason.label());
+        assert!(
+            declared.contains(&reason.label().to_string()),
+            "{}",
+            reason.label()
+        );
     }
 }
 
@@ -541,7 +609,10 @@ fn graph_validation_findings_and_warnings_carry_their_reason_and_subjects() {
         "alive-readiness-with-hard-dependents"
     );
     assert_eq!(read_str(&warning.payload, "object.service.name"), "db");
-    assert_eq!(read_str_array(&warning.payload, "object.service.dependents"), ["app"]);
+    assert_eq!(
+        read_str_array(&warning.payload, "object.service.dependents"),
+        ["app"]
+    );
     assert_absent(&warning.payload, "message");
 
     let role = encode_graph_validation_warning_event(
@@ -566,9 +637,18 @@ fn graph_validation_findings_and_warnings_carry_their_reason_and_subjects() {
     )
     .expect("graph error event");
     assert_eq!(error.event_type, "peinit.graph.validation.failed");
-    assert_eq!(read_str(&error.payload, "outcome.reason"), "missing-hard-dependency");
-    assert_eq!(read_str(&error.payload, "object.service.dependency.name"), "db");
-    assert_eq!(read_str(&error.payload, "object.service.dependency.kind"), "binds-to");
+    assert_eq!(
+        read_str(&error.payload, "outcome.reason"),
+        "missing-hard-dependency"
+    );
+    assert_eq!(
+        read_str(&error.payload, "object.service.dependency.name"),
+        "db"
+    );
+    assert_eq!(
+        read_str(&error.payload, "object.service.dependency.kind"),
+        "binds-to"
+    );
 
     let timer = encode_graph_validation_error_event(
         GraphPhase::ReloadConfig,
@@ -579,7 +659,10 @@ fn graph_validation_findings_and_warnings_carry_their_reason_and_subjects() {
         },
     )
     .expect("timer graph error event");
-    assert_eq!(read_str(&timer.payload, "outcome.reason"), "invalid-timer-schedule");
+    assert_eq!(
+        read_str(&timer.payload, "outcome.reason"),
+        "invalid-timer-schedule"
+    );
     assert_eq!(
         read_str(&timer.payload, "object.service.timer.schedule"),
         "*-*-* 12:00:00.5 UTC"
@@ -604,9 +687,15 @@ fn graph_validation_findings_and_warnings_carry_their_reason_and_subjects() {
         read_uint(&health.payload, "object.service.health-check.interval"),
         10_000_000_000
     );
-    assert_eq!(read_uint(&health.payload, "object.service.health-check.retries"), 3);
     assert_eq!(
-        read_uint(&health.payload, "object.service.health-check.restart-window"),
+        read_uint(&health.payload, "object.service.health-check.retries"),
+        3
+    );
+    assert_eq!(
+        read_uint(
+            &health.payload,
+            "object.service.health-check.restart-window"
+        ),
         20_000_000_000
     );
 }
@@ -619,7 +708,10 @@ fn a_reload_records_that_it_applied_with_counts_only_on_success() {
     let deferred = encode_registry_reload_deferred_event(&["app".to_string(), "db".to_string()])
         .expect("deferred event");
     assert_eq!(deferred.event_type, "peinit.config.reload.deferred");
-    assert_eq!(read_str_array(&deferred.payload, "graph.services"), ["app", "db"]);
+    assert_eq!(
+        read_str_array(&deferred.payload, "graph.services"),
+        ["app", "db"]
+    );
     assert_eq!(top_level_keys(&deferred.payload), ["graph"]);
 
     let outcome = reload_outcome();
@@ -639,7 +731,10 @@ fn a_reload_records_that_it_applied_with_counts_only_on_success() {
     let explicit =
         encode_config_reload_applied_event(None, Ok(&outcome)).expect("explicit reload event");
     assert_absent(&explicit.payload, "graph.services");
-    assert_eq!(read_uint(&explicit.payload, "graph.counts.marked-removed"), 0);
+    assert_eq!(
+        read_uint(&explicit.payload, "graph.counts.marked-removed"),
+        0
+    );
 
     let failed = encode_config_reload_applied_event(
         None,
@@ -669,7 +764,10 @@ fn encodes_reload_undecodable_service_as_a_validation_error() {
 
     assert_eq!(event.event_type, "peinit.graph.validation.failed");
     assert_eq!(read_str(&event.payload, "graph.phase"), "reload-config");
-    assert_eq!(read_str(&event.payload, "outcome.reason"), "validation-error");
+    assert_eq!(
+        read_str(&event.payload, "outcome.reason"),
+        "validation-error"
+    );
     assert_eq!(read_str(&event.payload, "object.service.name"), "broken");
     assert_eq!(
         read_str(&event.payload, "outcome.detail"),
@@ -690,7 +788,10 @@ fn encodes_on_failure_loop_suppression_payload() {
 
     assert_eq!(event.event_type, "peinit.on-failure.suppressed");
     assert_eq!(read_str(&event.payload, "object.service.name"), "a");
-    assert_eq!(read_str(&event.payload, "object.service.on-failure.name"), "b");
+    assert_eq!(
+        read_str(&event.payload, "object.service.on-failure.name"),
+        "b"
+    );
     assert_eq!(
         read_str_array(&event.payload, "object.service.on-failure-chain"),
         ["b", "a", "b"]
@@ -713,14 +814,20 @@ fn recovery_writes_its_reason_and_the_plans_finding_with_no_debug_text() {
     let events = out.into_events();
 
     assert_eq!(
-        events.iter().map(|event| event.event_type.as_str()).collect::<Vec<_>>(),
+        events
+            .iter()
+            .map(|event| event.event_type.as_str())
+            .collect::<Vec<_>>(),
         ["peinit.recovery.entered", "peinit.graph.validation.failed"],
     );
     assert_eq!(read_str(&events[0].payload, "outcome.reason"), "phase2");
     assert_absent(&events[0].payload, "outcome.detail");
     assert_eq!(read_str(&events[1].payload, "graph.phase"), "phase2-boot");
     assert_eq!(read_str(&events[1].payload, "outcome.reason"), "cycle");
-    assert_eq!(read_str_array(&events[1].payload, "graph.services"), ["a", "b", "a"]);
+    assert_eq!(
+        read_str_array(&events[1].payload, "graph.services"),
+        ["a", "b", "a"]
+    );
 
     let mut out = EventCollector::everything(TIME);
     collect_init_recovery_events(
@@ -755,7 +862,10 @@ fn a_policy_that_switches_everything_off_still_gets_the_recovery_record() {
     )
     .expect("recovery events");
     assert_eq!(
-        out.events().iter().map(|event| event.event_type.as_str()).collect::<Vec<_>>(),
+        out.events()
+            .iter()
+            .map(|event| event.event_type.as_str())
+            .collect::<Vec<_>>(),
         ["peinit.recovery.entered"]
     );
 }
@@ -781,10 +891,16 @@ fn encodes_shutdown_abandonment_and_critical_failure() {
     let p = &abandoned.payload;
     assert_eq!(abandoned.event_type, "peinit.service.abandoned");
     assert_eq!(read_str(p, "object.service.name"), "app");
-    assert_eq!(read_str(p, "object.cgroup.path"), "/sys/fs/cgroup/peinit/app");
+    assert_eq!(
+        read_str(p, "object.cgroup.path"),
+        "/sys/fs/cgroup/peinit/app"
+    );
     assert_eq!(read_str(p, "object.service.state-previous"), "stopping");
     assert_eq!(read_str(p, "object.service.state"), "abandoned");
-    assert_eq!(read_str(p, "object.service.transition-cause"), "process-unkillable");
+    assert_eq!(
+        read_str(p, "object.service.transition-cause"),
+        "process-unkillable"
+    );
     assert_eq!(read_uint(p, "object.service.generation"), 6);
 
     let critical = encode_critical_failure_event(
@@ -800,7 +916,10 @@ fn encodes_shutdown_abandonment_and_critical_failure() {
     assert_eq!(critical.event_type, "peinit.critical-service.failed");
     assert_eq!(read_str(p, "object.service.name"), "app");
     assert_eq!(read_str(p, "outcome.reason"), "watchdog-timeout");
-    assert_eq!(read_str(p, "shutdown.finalization-state"), "waiting-for-services");
+    assert_eq!(
+        read_str(p, "shutdown.finalization-state"),
+        "waiting-for-services"
+    );
     assert_absent(p, "outcome.detail");
     for gone in ["final_action", "observed_at_ns", "trigger"] {
         assert_absent(p, gone);
@@ -819,9 +938,15 @@ fn a_reload_left_unconfirmed_and_a_leaked_job_cgroup_name_what_they_are_about() 
         encode_leaked_job_cgroup_event(job_id, "/sys/fs/cgroup/peinit/jobs/x").expect("leak");
     assert_eq!(leaked.event_type, "peinit.cgroup.leaked");
     // A submitted job's cgroup belongs to the job, not to a service.
-    assert_eq!(read_bin(&leaked.payload, "object.job.guid"), job_id.as_guid_bytes());
+    assert_eq!(
+        read_bin(&leaked.payload, "object.job.guid"),
+        job_id.as_guid_bytes()
+    );
     assert_absent(&leaked.payload, "object.service");
-    assert_eq!(read_str(&leaked.payload, "object.cgroup.type"), "service-tree");
+    assert_eq!(
+        read_str(&leaked.payload, "object.cgroup.type"),
+        "service-tree"
+    );
 }
 
 /// Boot findings reuse `peinit.graph.validation.failed` and are told apart
@@ -839,10 +964,19 @@ fn encodes_boot_blocked_service_payloads() {
 
     assert_eq!(missing.event_type, "peinit.graph.validation.failed");
     assert_eq!(read_str(&missing.payload, "graph.phase"), "boot");
-    assert_eq!(read_str(&missing.payload, "outcome.reason"), "missing-hard-dependency");
+    assert_eq!(
+        read_str(&missing.payload, "outcome.reason"),
+        "missing-hard-dependency"
+    );
     assert_eq!(read_str(&missing.payload, "object.service.name"), "app");
-    assert_eq!(read_str(&missing.payload, "object.service.dependency.name"), "db");
-    assert_eq!(read_str(&missing.payload, "object.service.dependency.kind"), "requires");
+    assert_eq!(
+        read_str(&missing.payload, "object.service.dependency.name"),
+        "db"
+    );
+    assert_eq!(
+        read_str(&missing.payload, "object.service.dependency.kind"),
+        "requires"
+    );
 
     // The finding reload cannot produce: blocked because a dependency is
     // blocked, which is not the same claim as the dependency being missing.
@@ -854,7 +988,10 @@ fn encodes_boot_blocked_service_payloads() {
         },
     )
     .expect("blocked dependency event");
-    assert_eq!(read_str(&blocked.payload, "outcome.reason"), "hard-dependency-blocked");
+    assert_eq!(
+        read_str(&blocked.payload, "outcome.reason"),
+        "hard-dependency-blocked"
+    );
 
     let conflict = encode_boot_blocked_service_event(
         "a",
@@ -863,8 +1000,14 @@ fn encodes_boot_blocked_service_payloads() {
         },
     )
     .expect("conflict event");
-    assert_eq!(read_str(&conflict.payload, "outcome.reason"), "conflicting-boot-services");
-    assert_eq!(read_str(&conflict.payload, "object.service.conflict.name"), "b");
+    assert_eq!(
+        read_str(&conflict.payload, "outcome.reason"),
+        "conflicting-boot-services"
+    );
+    assert_eq!(
+        read_str(&conflict.payload, "object.service.conflict.name"),
+        "b"
+    );
 
     let validation = encode_boot_blocked_service_event(
         "app",
@@ -873,7 +1016,10 @@ fn encodes_boot_blocked_service_payloads() {
         },
     )
     .expect("validation event");
-    assert_eq!(read_str(&validation.payload, "outcome.reason"), "validation-error");
+    assert_eq!(
+        read_str(&validation.payload, "outcome.reason"),
+        "validation-error"
+    );
     assert_eq!(
         read_str(&validation.payload, "outcome.detail"),
         "health check interval exceeds the restart window"
@@ -988,7 +1134,10 @@ fn the_subject_of_any_event_is_found_in_its_nested_payload() {
         }
     );
 
-    assert_eq!(kmes_event_subject(b"\xc1 not msgpack"), KmesEventSubject::default());
+    assert_eq!(
+        kmes_event_subject(b"\xc1 not msgpack"),
+        KmesEventSubject::default()
+    );
 }
 
 /// A finished job record whose `arguments` and the other fields that can be
@@ -1052,8 +1201,14 @@ fn a_job_ended_event_cuts_its_arguments_to_the_budget_and_says_so() {
     // them fit the 32,768-byte budget and the eighth does not.
     let kept = read_str_array(&encoded.payload, "object.job.arguments");
     assert_eq!(kept.len(), 7);
-    assert!(read_bool(&encoded.payload, "object.job.arguments-truncated"));
-    assert_eq!(read_uint(&encoded.payload, "object.job.arguments-count"), 10);
+    assert!(read_bool(
+        &encoded.payload,
+        "object.job.arguments-truncated"
+    ));
+    assert_eq!(
+        read_uint(&encoded.payload, "object.job.arguments-count"),
+        10
+    );
     assert!(
         encoded.payload.len() < 65_536,
         "{} bytes",
@@ -1105,8 +1260,14 @@ fn a_record_at_the_default_message_size_produces_a_job_ended_that_fits_the_defau
 
     let encoded = encode_job_event(&event, TIME).expect("encoded event");
 
-    assert!(!read_bool(&encoded.payload, "object.job.arguments-truncated"));
-    assert_eq!(read_bin_array(&encoded.payload, "object.job.token.groups").len(), 128);
+    assert!(!read_bool(
+        &encoded.payload,
+        "object.job.arguments-truncated"
+    ));
+    assert_eq!(
+        read_bin_array(&encoded.payload, "object.job.token.groups").len(),
+        128
+    );
     // Header plus payload is what the ring counts; the header and the
     // event type are well under a kilobyte.
     assert!(
@@ -1163,7 +1324,7 @@ fn the_collector_asks_the_policy_before_building_and_never_for_essential_types()
 /// events, so `peinit.evman` matches what peinit emits.
 #[test]
 fn every_type_peinit_emits_is_in_the_fragment_at_the_same_tier() {
-    let fragment = include_str!("../../peinit.evman");
+    let fragment = include_str!("../../docs/peinit.evman");
     let mut declared = Vec::new();
     let mut current: Option<String> = None;
     for line in fragment.lines() {
@@ -1211,7 +1372,10 @@ fn declared_values(fragment: &str, event: &str, field: &str) -> Vec<String> {
         .lines()
         .find_map(|line| line.trim().strip_prefix("values: "))
         .expect("values line");
-    values_line.split('|').map(|value| value.trim().to_string()).collect()
+    values_line
+        .split('|')
+        .map(|value| value.trim().to_string())
+        .collect()
 }
 
 fn sender(operation_id: Option<OperationId>) -> AuthenticatedNotifySender {
@@ -1268,10 +1432,7 @@ fn system_token() -> TokenSummary {
         "SYSTEM",
         "S-1-5-18",
         vec!["S-1-5-32-544".to_string(), "S-1-1-0".to_string()],
-        vec![
-            "SeTcbPrivilege".to_string(),
-            "SeAuditPrivilege".to_string(),
-        ],
+        vec!["SeTcbPrivilege".to_string(), "SeAuditPrivilege".to_string()],
         vec!["SeTcbPrivilege".to_string()],
     )
 }

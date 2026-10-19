@@ -1,7 +1,7 @@
 [package]
 name = "peinit2"
 version = "0.0.12"
-description = "Replacement Peios PID 1 service-manager spine."
+description = "Peios PID 1, service control and the public libpeinit client library."
 edition = "2024"
 license = "MIT"
 publish = false
@@ -14,20 +14,13 @@ crate-type = ["rlib", "cdylib"]
 [dependencies]
 jiff = "0.2.29"
 libc = "0.2"
-# The PGSS Logon codec, for asking the authority to mint a service token
-# (§2.19). A sibling path dep like `peios`, and dependency-free apart from
-# libc, so it adds nothing to PID 1's dependency tree.
-#
-# Speaking the protocol through its own definition rather than hand-rolling the
-# message: a second implementation of a security-critical wire format is the
-# hazard authd's own service_sid module documents at length, and this is the
-# message that mints identity.
-libauthd = { git = "https://github.com/peios/authd.git", rev = "5966669b523585c2e901b4c27d8bba6547691fc8", optional = true }
+# Use authd's shared PGSS codec for service-token requests.
+auth-core = { git = "https://github.com/peios/authd.git", rev = "a014fa4c74f17ce4f67ba964eefce33a1a3dbdfa", optional = true }
 peios = { git = "https://github.com/peios/peios-rs.git", rev = "f8c84930f2b71763bcf0550df0b1420a0f63b21e", optional = true }
 serde_json = "1"
 sha1 = "0.10"
 
 [features]
 default = []
-peios-boundary = ["dep:peios", "dep:libauthd"]
+peios-boundary = ["dep:peios", "dep:auth-core"]
 peios-registry = ["dep:peios"]

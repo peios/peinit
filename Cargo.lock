@@ -12,6 +12,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "auth-core"
+version = "0.0.24"
+source = "git+https://github.com/peios/authd.git?rev=a014fa4c74f17ce4f67ba964eefce33a1a3dbdfa#a014fa4c74f17ce4f67ba964eefce33a1a3dbdfa"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "bindgen"
 version = "0.70.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -229,14 +237,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "libauthd"
-version = "0.0.22"
-source = "git+https://github.com/peios/authd.git?rev=5966669b523585c2e901b4c27d8bba6547691fc8#5966669b523585c2e901b4c27d8bba6547691fc8"
-dependencies = [
- "libc",
-]
-
-[[package]]
 name = "libc"
 version = "0.2.189"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -284,8 +284,8 @@ dependencies = [
 name = "peinit2"
 version = "0.0.12"
 dependencies = [
+ "auth-core",
  "jiff",
- "libauthd",
  "libc",
  "peios",
  "serde_json",

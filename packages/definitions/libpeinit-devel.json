@@ -1,0 +1,20 @@
+{
+    "package": {
+        "version": "0.0.12-1",
+        "architecture": "x86_64",
+        "license": "MIT",
+        "license_class": "free",
+        "homepage": "https://github.com/peios/peinit",
+        "name": "dev.peios.libpeinit-devel",
+        "description": "Peios service-manager client library development files"
+    },
+    "dependencies": {
+        "dev.peios.libpeinit": "= 0.0.12-1"
+    },
+    "files": {
+        "source:LICENSE": "usr/share/licenses/dev.peios.libpeinit-devel/LICENSE",
+        "stage:usr/include/**": "usr/include/",
+        "stage:usr/lib/x86_64-linux-peios/libpeinit.so": "usr/lib/x86_64-linux-peios/libpeinit.so",
+        "stage:usr/lib/x86_64-linux-peios/pkgconfig/peinit.pc": "usr/lib/x86_64-linux-peios/pkgconfig/peinit.pc"
+    }
+}

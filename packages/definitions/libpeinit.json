@@ -1,0 +1,21 @@
+{
+    "package": {
+        "version": "0.0.12-1",
+        "architecture": "x86_64",
+        "license": "((MIT OR Apache-2.0) AND Unicode-3.0) AND Apache-2.0 AND (Apache-2.0 OR MIT) AND BSD-3-Clause AND ISC AND MIT AND (MIT OR Unlicense)",
+        "license_class": "free",
+        "homepage": "https://github.com/peios/peinit",
+        "name": "dev.peios.libpeinit",
+        "description": "Peios service manager client library"
+    },
+    "files": {
+        "source:LICENSE": "usr/share/licenses/dev.peios.libpeinit/LICENSE",
+        "stage:licenses/peinit/**": "usr/share/licenses/dev.peios.libpeinit/third-party",
+        "stage:usr/lib/x86_64-linux-peios/libpeinit.so.0": "usr/lib/x86_64-linux-peios/libpeinit.so.0"
+    },
+    "dependencies": {
+        "dev.peios.libpeios": ">= 0.5.8-1",
+        "org.gnu.glibc": "*"
+    },
+    "executables": ["usr/lib/x86_64-linux-peios/libpeinit.so.0"]
+}

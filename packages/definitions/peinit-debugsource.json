@@ -1,0 +1,19 @@
+{
+    "package": {
+        "version": "0.0.12-1",
+        "architecture": "noarch",
+        "license": "((MIT OR Apache-2.0) AND Unicode-3.0) AND Apache-2.0 AND (Apache-2.0 OR MIT) AND BSD-3-Clause AND ISC AND MIT AND (MIT OR Unlicense)",
+        "license_class": "free",
+        "homepage": "https://github.com/peios/peinit",
+        "name": "dev.peios.peinit-debugsource",
+        "description": "Peios PID 1 service manager - debug sources"
+    },
+    "dependencies": {
+        "dev.peios.peinit-debuginfo": "= 0.0.12-1"
+    },
+    "files": {
+        "source:LICENSE": "usr/share/licenses/dev.peios.peinit-debugsource/LICENSE",
+        "stage:licenses/peinit/**": "usr/share/licenses/dev.peios.peinit-debugsource/third-party",
+        "stage:usr/src/debug/**": "usr/src/debug/"
+    }
+}
