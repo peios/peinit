@@ -1,5 +1,5 @@
-use std::io::{self, ErrorKind};
-use std::mem::{MaybeUninit, size_of};
+use std::io::{self, ErrorKind, Read};
+use std::mem::{MaybeUninit, size_of, size_of_val};
 use std::os::fd::{AsRawFd, RawFd};
 use std::os::unix::net::{UnixDatagram, UnixStream};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -47,11 +47,12 @@ fn received_rights_are_close_on_exec() {
     sender.connect(notify.path()).expect("connect sender");
     let (sent_fd, _peer) = UnixStream::pair().expect("fd pair");
 
-    send_datagram_with_fd(sender.as_raw_fd(), b"FDSTORE=1", sent_fd.as_raw_fd())
+    send_datagram_with_fds(sender.as_raw_fd(), b"FDSTORE=1", &[sent_fd.as_raw_fd()])
         .expect("send fd datagram");
     let datagram = notify.receive().expect("receive datagram");
 
     assert_eq!(datagram.payload, b"FDSTORE=1");
+    assert_eq!(datagram.credentials.pid, std::process::id());
     assert_eq!(datagram.fds.len(), 1);
     assert!(fd_has_cloexec(datagram.fds[0].as_raw_fd()));
 }
@@ -68,14 +69,19 @@ fn received_rights_are_close_on_exec() {
 #[test]
 fn a_datagram_without_credentials_is_rejected() {
     let (receiver, sender) = UnixDatagram::pair().expect("datagram pair");
-    receiver.set_nonblocking(true).expect("non-blocking receiver");
+    receiver
+        .set_nonblocking(true)
+        .expect("non-blocking receiver");
 
     sender
         .send(b"READY=1\nSTATUS=unauthenticated")
         .expect("send datagram");
     let refused = super::receive::receive_datagram(receiver.as_raw_fd());
     assert!(
-        matches!(refused, Err(super::NotifySocketReadError::MissingCredentials)),
+        matches!(
+            refused,
+            Err(super::NotifySocketReadError::MissingCredentials)
+        ),
         "a datagram with no SCM_CREDENTIALS must be refused, got {refused:?}",
     );
 
@@ -115,8 +121,9 @@ fn temp_socket_path(prefix: &str) -> std::path::PathBuf {
     std::env::temp_dir().join(format!("{prefix}-{}-{nanos}.sock", std::process::id()))
 }
 
-fn send_datagram_with_fd(socket_fd: RawFd, payload: &[u8], fd: RawFd) -> io::Result<()> {
-    let mut control = vec![0_u8; cmsg_space(size_of::<RawFd>())];
+fn send_datagram_with_fds(socket_fd: RawFd, payload: &[u8], fds: &[RawFd]) -> io::Result<()> {
+    let bytes = size_of_val(fds);
+    let mut control = vec![0_usize; cmsg_space(bytes).div_ceil(size_of::<usize>())];
     let mut iov = libc::iovec {
         iov_base: payload.as_ptr().cast_mut().cast(),
         iov_len: payload.len(),
@@ -125,7 +132,7 @@ fn send_datagram_with_fd(socket_fd: RawFd, payload: &[u8], fd: RawFd) -> io::Res
     msg.msg_iov = &mut iov;
     msg.msg_iovlen = 1;
     msg.msg_control = control.as_mut_ptr().cast();
-    msg.msg_controllen = control.len();
+    msg.msg_controllen = size_of_val(control.as_slice());
 
     let cmsg = unsafe { libc::CMSG_FIRSTHDR(&msg) };
     if cmsg.is_null() {
@@ -134,9 +141,9 @@ fn send_datagram_with_fd(socket_fd: RawFd, payload: &[u8], fd: RawFd) -> io::Res
     unsafe {
         (*cmsg).cmsg_level = libc::SOL_SOCKET;
         (*cmsg).cmsg_type = libc::SCM_RIGHTS;
-        (*cmsg).cmsg_len = cmsg_len(size_of::<RawFd>());
+        (*cmsg).cmsg_len = cmsg_len(bytes);
         let data = libc::CMSG_DATA(cmsg).cast::<RawFd>();
-        *data = fd;
+        std::ptr::copy_nonoverlapping(fds.as_ptr(), data, fds.len());
     }
 
     if unsafe { libc::sendmsg(socket_fd, &msg, 0) } < 0 {
@@ -163,4 +170,26 @@ fn cmsg_len(payload_len: usize) -> usize {
 fn align_to_usize(value: usize) -> usize {
     let align = size_of::<usize>();
     (value + align - 1) & !(align - 1)
+}
+
+/// Rejected datagrams must release both delivered and kernel-discarded rights.
+#[test]
+fn truncation_closes_received_descriptors() {
+    for (payload, count) in [(vec![b'x'; 65 * 1024], 1), (b"FDSTORE=1".to_vec(), 70)] {
+        let path = temp_socket_path("peinit-truncated");
+        let notify = NotifySocket::bind(&path).expect("bind notification socket");
+        let sender = UnixDatagram::unbound().expect("sender");
+        sender.connect(notify.path()).expect("connect sender");
+        let (sent, mut peer) = UnixStream::pair().expect("descriptor pair");
+        peer.set_nonblocking(true).expect("nonblocking peer");
+        send_datagram_with_fds(sender.as_raw_fd(), &payload, &vec![sent.as_raw_fd(); count])
+            .expect("send notification with descriptors");
+        drop(sent);
+        let error = notify.receive().expect_err("reject truncated notification");
+        assert!(matches!(
+            error,
+            super::NotifySocketReadError::Truncated { .. }
+        ));
+        assert_eq!(peer.read(&mut [0]).expect("all received rights closed"), 0);
+    }
 }
