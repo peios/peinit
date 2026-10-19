@@ -9,6 +9,11 @@ use crate::notify::parse_notify_message;
 use super::error::{ErrorDetail, c_str_arg, ffi_status, utf8_arg};
 use super::types::peinit_error_t;
 
+/// # Safety
+/// Input strings must remain readable through a terminating NUL for this call.
+/// Non-null output pointers must be writable, aligned, and non-aliasing.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_notify_send(
     message: *const c_char,
@@ -21,6 +26,11 @@ pub unsafe extern "C" fn peinit_notify_send(
     })
 }
 
+/// # Safety
+/// Input strings must remain readable through a terminating NUL for this call.
+/// Non-null output pointers must be writable, aligned, and non-aliasing.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_notify_send_to(
     socket_path: *const c_char,
@@ -34,26 +44,47 @@ pub unsafe extern "C" fn peinit_notify_send_to(
     })
 }
 
+/// # Safety
+/// Non-null output pointers must be writable, aligned, and non-aliasing.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_notify_ready(error_out: *mut *mut peinit_error_t) -> c_int {
     notify_static(c"READY=1".as_ptr(), error_out)
 }
 
+/// # Safety
+/// Non-null output pointers must be writable, aligned, and non-aliasing.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_notify_reloading(error_out: *mut *mut peinit_error_t) -> c_int {
     notify_static(c"RELOADING=1".as_ptr(), error_out)
 }
 
+/// # Safety
+/// Non-null output pointers must be writable, aligned, and non-aliasing.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_notify_stopping(error_out: *mut *mut peinit_error_t) -> c_int {
     notify_static(c"STOPPING=1".as_ptr(), error_out)
 }
 
+/// # Safety
+/// Non-null output pointers must be writable, aligned, and non-aliasing.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_notify_watchdog(error_out: *mut *mut peinit_error_t) -> c_int {
     notify_static(c"WATCHDOG=1".as_ptr(), error_out)
 }
 
+/// # Safety
+/// Input strings must remain readable through a terminating NUL for this call.
+/// Non-null output pointers must be writable, aligned, and non-aliasing.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_notify_status(
     status: *const c_char,
@@ -71,6 +102,10 @@ pub unsafe extern "C" fn peinit_notify_status(
     })
 }
 
+/// # Safety
+/// Non-null output pointers must be writable, aligned, and non-aliasing.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_notify_watchdog_usec(
     usec: c_ulonglong,
@@ -82,6 +117,10 @@ pub unsafe extern "C" fn peinit_notify_watchdog_usec(
     })
 }
 
+/// # Safety
+/// Non-null output pointers must be writable, aligned, and non-aliasing.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_notify_extend_timeout_usec(
     usec: c_ulonglong,

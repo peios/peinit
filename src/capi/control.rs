@@ -23,6 +23,10 @@ pub(super) struct ResponseObject {
     pidfd: Option<OwnedFd>,
 }
 
+/// # Safety
+/// Non-null output pointers must be writable, aligned, and non-aliasing.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_client_connect_default(
     out: *mut *mut peinit_client_t,
@@ -37,6 +41,11 @@ pub unsafe extern "C" fn peinit_client_connect_default(
     }
 }
 
+/// # Safety
+/// Input strings must remain readable through a terminating NUL for this call.
+/// Non-null output pointers must be writable, aligned, and non-aliasing.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_client_connect_path(
     path: *const c_char,
@@ -54,6 +63,11 @@ pub unsafe extern "C" fn peinit_client_connect_path(
     })
 }
 
+/// # Safety
+/// Non-null handles must be live library objects with exclusive access.
+/// A non-null argument is consumed and must not be used or freed again.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_client_free(client: *mut peinit_client_t) {
     if !client.is_null() {
@@ -63,6 +77,12 @@ pub unsafe extern "C" fn peinit_client_free(client: *mut peinit_client_t) {
     }
 }
 
+/// # Safety
+/// Input strings must remain readable through a terminating NUL for this call.
+/// Non-null output pointers must be writable, aligned, and non-aliasing.
+/// Handles must be live library objects; mutating calls require exclusive access.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_control_raw_json(
     client: *mut peinit_client_t,
@@ -84,6 +104,12 @@ pub unsafe extern "C" fn peinit_control_raw_json(
     })
 }
 
+/// # Safety
+/// Input strings must remain readable through a terminating NUL for this call.
+/// Non-null output pointers must be writable, aligned, and non-aliasing.
+/// Handles must be live library objects; mutating calls require exclusive access.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_service_start(
     client: *mut peinit_client_t,
@@ -95,6 +121,12 @@ pub unsafe extern "C" fn peinit_service_start(
     service_command(client, "start", service, wait, response_out, error_out)
 }
 
+/// # Safety
+/// Input strings must remain readable through a terminating NUL for this call.
+/// Non-null output pointers must be writable, aligned, and non-aliasing.
+/// Handles must be live library objects; mutating calls require exclusive access.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_service_stop(
     client: *mut peinit_client_t,
@@ -106,6 +138,12 @@ pub unsafe extern "C" fn peinit_service_stop(
     service_command(client, "stop", service, wait, response_out, error_out)
 }
 
+/// # Safety
+/// Input strings must remain readable through a terminating NUL for this call.
+/// Non-null output pointers must be writable, aligned, and non-aliasing.
+/// Handles must be live library objects; mutating calls require exclusive access.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_service_restart(
     client: *mut peinit_client_t,
@@ -117,6 +155,12 @@ pub unsafe extern "C" fn peinit_service_restart(
     service_command(client, "restart", service, wait, response_out, error_out)
 }
 
+/// # Safety
+/// Input strings must remain readable through a terminating NUL for this call.
+/// Non-null output pointers must be writable, aligned, and non-aliasing.
+/// Handles must be live library objects; mutating calls require exclusive access.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_service_reload(
     client: *mut peinit_client_t,
@@ -128,6 +172,12 @@ pub unsafe extern "C" fn peinit_service_reload(
     service_command(client, "reload", service, wait, response_out, error_out)
 }
 
+/// # Safety
+/// Input strings must remain readable through a terminating NUL for this call.
+/// Non-null output pointers must be writable, aligned, and non-aliasing.
+/// Handles must be live library objects; mutating calls require exclusive access.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_service_reset(
     client: *mut peinit_client_t,
@@ -138,6 +188,12 @@ pub unsafe extern "C" fn peinit_service_reset(
     service_command(client, "reset", service, false, response_out, error_out)
 }
 
+/// # Safety
+/// Input strings must remain readable through a terminating NUL for this call.
+/// Non-null output pointers must be writable, aligned, and non-aliasing.
+/// Handles must be live library objects; mutating calls require exclusive access.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_service_status(
     client: *mut peinit_client_t,
@@ -148,6 +204,11 @@ pub unsafe extern "C" fn peinit_service_status(
     service_command(client, "status", service, false, response_out, error_out)
 }
 
+/// # Safety
+/// Non-null output pointers must be writable, aligned, and non-aliasing.
+/// Handles must be live library objects; mutating calls require exclusive access.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_service_list(
     client: *mut peinit_client_t,
@@ -160,6 +221,12 @@ pub unsafe extern "C" fn peinit_service_list(
     })
 }
 
+/// # Safety
+/// Input strings must remain readable through a terminating NUL for this call.
+/// Non-null output pointers must be writable, aligned, and non-aliasing.
+/// Handles must be live library objects; mutating calls require exclusive access.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_operation_status(
     client: *mut peinit_client_t,
@@ -181,6 +248,12 @@ pub unsafe extern "C" fn peinit_operation_status(
     })
 }
 
+/// # Safety
+/// Input strings must remain readable through a terminating NUL for this call.
+/// Non-null output pointers must be writable, aligned, and non-aliasing.
+/// Handles must be live library objects; mutating calls require exclusive access.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_job_status(
     client: *mut peinit_client_t,
@@ -202,6 +275,12 @@ pub unsafe extern "C" fn peinit_job_status(
     })
 }
 
+/// # Safety
+/// Input strings must remain readable through a terminating NUL for this call.
+/// Non-null output pointers must be writable, aligned, and non-aliasing.
+/// Handles must be live library objects; mutating calls require exclusive access.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_job_list(
     client: *mut peinit_client_t,
@@ -238,6 +317,12 @@ pub unsafe extern "C" fn peinit_job_list(
     })
 }
 
+/// # Safety
+/// Input strings must remain readable through a terminating NUL for this call.
+/// Non-null output pointers must be writable, aligned, and non-aliasing.
+/// Handles must be live library objects; mutating calls require exclusive access.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_job_stop(
     client: *mut peinit_client_t,
@@ -261,6 +346,11 @@ pub unsafe extern "C" fn peinit_job_stop(
     })
 }
 
+/// # Safety
+/// Non-null output pointers must be writable, aligned, and non-aliasing.
+/// Handles must be live library objects; mutating calls require exclusive access.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_reload_config(
     client: *mut peinit_client_t,
@@ -273,6 +363,11 @@ pub unsafe extern "C" fn peinit_reload_config(
     })
 }
 
+/// # Safety
+/// Non-null output pointers must be writable, aligned, and non-aliasing.
+/// Handles must be live library objects; mutating calls require exclusive access.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_system_shutdown(
     client: *mut peinit_client_t,
@@ -421,6 +516,11 @@ fn response_ref<'a>(response: *const peinit_response_t) -> Result<&'a ResponseOb
     Ok(unsafe { &*response.cast::<ResponseObject>() })
 }
 
+/// # Safety
+/// Non-null handles must be live library objects with exclusive access.
+/// A non-null argument is consumed and must not be used or freed again.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_response_free(response: *mut peinit_response_t) {
     if !response.is_null() {
@@ -430,6 +530,10 @@ pub unsafe extern "C" fn peinit_response_free(response: *mut peinit_response_t) 
     }
 }
 
+/// # Safety
+/// Handles must be live library objects; mutating calls require exclusive access.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_response_json(response: *const peinit_response_t) -> *const c_char {
     match response_ref(response) {
@@ -438,6 +542,10 @@ pub unsafe extern "C" fn peinit_response_json(response: *const peinit_response_t
     }
 }
 
+/// # Safety
+/// Handles must be live library objects; mutating calls require exclusive access.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_response_status(
     response: *const peinit_response_t,
@@ -448,6 +556,10 @@ pub unsafe extern "C" fn peinit_response_status(
     }
 }
 
+/// # Safety
+/// Handles must be live library objects; mutating calls require exclusive access.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_response_is_ok(response: *const peinit_response_t) -> c_int {
     match response_ref(response) {
@@ -457,6 +569,10 @@ pub unsafe extern "C" fn peinit_response_is_ok(response: *const peinit_response_
     }
 }
 
+/// # Safety
+/// Handles must be live library objects; mutating calls require exclusive access.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_response_error_code(
     response: *const peinit_response_t,
@@ -470,6 +586,10 @@ pub unsafe extern "C" fn peinit_response_error_code(
     }
 }
 
+/// # Safety
+/// Non-null handles must be live library objects with exclusive access.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_response_take_pidfd(response: *mut peinit_response_t) -> c_int {
     if response.is_null() {
@@ -482,6 +602,10 @@ pub unsafe extern "C" fn peinit_response_take_pidfd(response: *mut peinit_respon
         .map_or(-1, |pidfd| pidfd.into_raw_fd())
 }
 
+/// # Safety
+/// Handles must be live library objects; mutating calls require exclusive access.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_response_error_message(
     response: *const peinit_response_t,

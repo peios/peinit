@@ -409,3 +409,14 @@ fn seqpacket_listener_or_skip(path: &std::path::Path) -> Option<std::os::fd::Own
     }
     Some(socket)
 }
+
+#[test]
+fn library_version_matches_package_without_changing_abi() {
+    // SAFETY: the API returns a static, NUL-terminated version string.
+    let version = unsafe { CStr::from_ptr(peinit_library_version()) };
+    assert_eq!(
+        version.to_str().expect("version is UTF-8"),
+        env!("CARGO_PKG_VERSION")
+    );
+    assert_eq!(peinit_abi_version(), 0);
+}

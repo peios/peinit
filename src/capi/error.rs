@@ -55,6 +55,8 @@ impl ErrorDetail {
     }
 }
 
+/// Clear the caller-owned error slot and contain unwinding at the C boundary.
+/// The slot follows the module output-pointer contract.
 pub(super) fn ffi_status<F>(error_out: *mut *mut peinit_error_t, f: F) -> c_int
 where
     F: FnOnce() -> Result<(), ErrorDetail>,
@@ -70,10 +72,13 @@ where
     }
 }
 
+/// Borrow a caller-owned NUL-terminated string under the C entry-point contract.
+/// The inferred lifetime must not outlive the caller's input allocation.
 pub(super) fn c_str_arg<'a>(ptr: *const c_char, name: &str) -> Result<&'a CStr, ErrorDetail> {
     if ptr.is_null() {
         return Err(ErrorDetail::invalid_argument(format!("{name} is NULL")));
     }
+    // SAFETY: C entry points require a live NUL-terminated input for this borrow.
     Ok(unsafe { CStr::from_ptr(ptr) })
 }
 
@@ -85,6 +90,7 @@ pub(super) fn utf8_arg<'a>(ptr: *const c_char, name: &str) -> Result<&'a str, Er
 
 fn clear_error(error_out: *mut *mut peinit_error_t) {
     if !error_out.is_null() {
+        // SAFETY: the entry-point contract grants unique writable access to this slot.
         unsafe {
             *error_out = std::ptr::null_mut();
         }
@@ -108,6 +114,7 @@ fn write_error(error_out: *mut *mut peinit_error_t, error: ErrorDetail) -> c_int
             }
         };
         let object = Box::new(ErrorObject { code, message });
+        // SAFETY: the entry-point contract grants unique writable access to this slot.
         unsafe {
             *error_out = Box::into_raw(object).cast::<peinit_error_t>();
         }
@@ -115,34 +122,55 @@ fn write_error(error_out: *mut *mut peinit_error_t, error: ErrorDetail) -> c_int
     code
 }
 
+/// # Safety
+/// Non-null handles must be live library objects with exclusive access.
+/// A non-null argument is consumed and must not be used or freed again.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_error_free(error: *mut peinit_error_t) {
     if !error.is_null() {
+        // SAFETY: the caller transfers this live library allocation back exactly once.
         unsafe {
             drop(Box::from_raw(error.cast::<ErrorObject>()));
         }
     }
 }
 
+/// # Safety
+/// Handles must be live library objects; mutating calls require exclusive access.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_error_code(error: *const peinit_error_t) -> c_int {
     if error.is_null() {
         return 0;
     }
+    // SAFETY: the caller keeps the library error alive for this read.
     unsafe { (*error.cast::<ErrorObject>()).code }
 }
 
+/// # Safety
+/// Handles must be live library objects; mutating calls require exclusive access.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_error_message(error: *const peinit_error_t) -> *const c_char {
     if error.is_null() {
         return std::ptr::null();
     }
+    // SAFETY: the caller keeps the error alive for this access and the returned borrow.
     unsafe { (*error.cast::<ErrorObject>()).message.as_ptr() }
 }
 
+/// # Safety
+/// A non-null argument is consumed and must not be used or freed again.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_string_free(value: *mut c_char) {
     if !value.is_null() {
+        // SAFETY: the contract accepts only an owned CString returned by this library.
         unsafe {
             drop(CString::from_raw(value));
         }

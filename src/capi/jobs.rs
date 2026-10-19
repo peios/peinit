@@ -24,6 +24,10 @@ fn _assert_default_jobs_path_matches_runtime() {
     assert_eq!(JOBS_SOCKET_PATH, "/run/services/peinit/jobs.sock");
 }
 
+/// # Safety
+/// Non-null output pointers must be writable, aligned, and non-aliasing.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_jobs_connect_default(
     out: *mut *mut peinit_jobs_t,
@@ -32,6 +36,11 @@ pub unsafe extern "C" fn peinit_jobs_connect_default(
     unsafe { peinit_jobs_connect_path(peinit_default_jobs_socket_path(), out, error_out) }
 }
 
+/// # Safety
+/// Input strings must remain readable through a terminating NUL for this call.
+/// Non-null output pointers must be writable, aligned, and non-aliasing.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_jobs_connect_path(
     path: *const c_char,
@@ -54,6 +63,11 @@ pub unsafe extern "C" fn peinit_jobs_connect_path(
     })
 }
 
+/// # Safety
+/// Non-null handles must be live library objects with exclusive access.
+/// A non-null argument is consumed and must not be used or freed again.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_jobs_free(jobs: *mut peinit_jobs_t) {
     if !jobs.is_null() {
@@ -63,6 +77,10 @@ pub unsafe extern "C" fn peinit_jobs_free(jobs: *mut peinit_jobs_t) {
     }
 }
 
+/// # Safety
+/// Handles must be live library objects; mutating calls require exclusive access.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_jobs_fd(jobs: *const peinit_jobs_t) -> c_int {
     if jobs.is_null() {
@@ -71,6 +89,14 @@ pub unsafe extern "C" fn peinit_jobs_fd(jobs: *const peinit_jobs_t) -> c_int {
     unsafe { &*jobs.cast::<JobsClient>() }.as_fd().as_raw_fd()
 }
 
+/// # Safety
+/// Input strings must remain readable through a terminating NUL for this call.
+/// Non-null output pointers must be writable, aligned, and non-aliasing.
+/// Handles must be live library objects; mutating calls require exclusive access.
+/// The descriptor array must contain fd_count readable entries. All supplied
+/// descriptors must remain open throughout the call; ownership stays with the caller.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_job_submit(
     jobs: *mut peinit_jobs_t,
@@ -131,6 +157,12 @@ pub unsafe extern "C" fn peinit_job_submit(
     })
 }
 
+/// # Safety
+/// Input strings must remain readable through a terminating NUL for this call.
+/// Non-null output pointers must be writable, aligned, and non-aliasing.
+/// Handles must be live library objects; mutating calls require exclusive access.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_jobs_status(
     jobs: *mut peinit_jobs_t,
@@ -143,6 +175,12 @@ pub unsafe extern "C" fn peinit_jobs_status(
     })
 }
 
+/// # Safety
+/// Input strings must remain readable through a terminating NUL for this call.
+/// Non-null output pointers must be writable, aligned, and non-aliasing.
+/// Handles must be live library objects; mutating calls require exclusive access.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_jobs_wait(
     jobs: *mut peinit_jobs_t,
@@ -156,6 +194,12 @@ pub unsafe extern "C" fn peinit_jobs_wait(
     })
 }
 
+/// # Safety
+/// Input strings must remain readable through a terminating NUL for this call.
+/// Non-null output pointers must be writable, aligned, and non-aliasing.
+/// Handles must be live library objects; mutating calls require exclusive access.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_jobs_stop(
     jobs: *mut peinit_jobs_t,
@@ -169,6 +213,12 @@ pub unsafe extern "C" fn peinit_jobs_stop(
     })
 }
 
+/// # Safety
+/// Input strings must remain readable through a terminating NUL for this call.
+/// Non-null output pointers must be writable, aligned, and non-aliasing.
+/// Handles must be live library objects; mutating calls require exclusive access.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_jobs_signal(
     jobs: *mut peinit_jobs_t,
@@ -182,6 +232,12 @@ pub unsafe extern "C" fn peinit_jobs_signal(
     })
 }
 
+/// # Safety
+/// Input strings must remain readable through a terminating NUL for this call.
+/// Non-null output pointers must be writable, aligned, and non-aliasing.
+/// Handles must be live library objects; mutating calls require exclusive access.
+/// The module pointer contracts and the matching public header define null handling
+/// and the lifetime of borrowed results.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn peinit_jobs_raw_json(
     jobs: *mut peinit_jobs_t,
