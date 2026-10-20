@@ -189,3 +189,20 @@ environment](~peios/services-and-jobs/execution-environment).
 
 For the identity primitives themselves — tokens, SIDs, privileges — start at
 [Tokens](~kernel/internals/kacs/tokens/the-token-model).
+
+## Token installation and executable trust
+
+The service child receives its prepared identity before exec. PIP is then
+established from the executable by the kernel; it is not chosen by the service
+account or inherited unchanged through exec. Peinit needs sufficient PIP
+dominance to manage protected services, but that does not make it the only
+trusted process or exempt it from service-management authorization.
+
+The launch path does not add a per-service PSB mitigation request. Inherited
+mitigations and application self-hardening can still apply. Inspect the
+running process's committed mask, including after a replacement, rather than
+interpreting successful launch as proof of a requested hardening profile.
+
+Peinit also does not populate the global TLP or CAAP caches or install mount
+policies. Those mechanisms require their own deployment owner. A service's
+readiness event proves only the readiness contract that service implements.

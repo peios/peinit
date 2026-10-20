@@ -4,722 +4,722 @@
   "files": [
     {
       "source": "peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/100--overview.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/100--overview.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/100--overview.md",
       "sha256": "db61f58132421abfa438402bdee6fb94e94fdb73b660d7b167cec609a6b08058"
     },
     {
       "source": "peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/1100--who-can-manage-a-service.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/1100--who-can-manage-a-service.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/1100--who-can-manage-a-service.md",
       "sha256": "28c76c733b9c9eb230e4e062e6c14c27b096e2210cbb4572d538a904488e6dab"
     },
     {
       "source": "peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/1400--boot-and-boot-modes.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/1400--boot-and-boot-modes.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/1400--boot-and-boot-modes.md",
       "sha256": "b9ff79a00a07426d6cbd84054258ed15205b77ef2938f255e03146be815f3488"
     },
     {
       "source": "peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/150--controlling-services.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/150--controlling-services.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/150--controlling-services.md",
       "sha256": "b5287dcafedc4b8012a2560b17f5595b30a71d8b0be08325e52e42a41ae23b72"
     },
     {
       "source": "peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/1500--shutdown.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/1500--shutdown.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/1500--shutdown.md",
       "sha256": "d07b2780513553152739a9d19639f254cc2242914612028188ff6ed65d3001f1"
     },
     {
       "source": "peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/160--output-and-logging.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/160--output-and-logging.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/160--output-and-logging.md",
       "sha256": "551e4150696c3f7dbbf550521cacfbefc0aca2a68dbaf4f9ae048e311f217021"
     },
     {
       "source": "peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/170--troubleshooting.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/170--troubleshooting.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/170--troubleshooting.md",
       "sha256": "7bf0bd99febaa50b5665ec18f1cd5179a72230a1236aadec1e8c9d58fa5d49bc"
     },
     {
       "source": "peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/1700--registry-key-reference.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/1700--registry-key-reference.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/1700--registry-key-reference.md",
       "sha256": "113f65c7a67aa1342f1d2753aa61168c7e6e11f3e31b3391fc4491a671020f1e"
     },
     {
       "source": "peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/180--the-service-lifecycle.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/180--the-service-lifecycle.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/180--the-service-lifecycle.md",
       "sha256": "e6e1a042ab3cef83e0a1b4f18f06377c60528ce54975f050fa89178789cdd58b"
     },
     {
       "source": "peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/190--jobs-and-operations.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/190--jobs-and-operations.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/190--jobs-and-operations.md",
       "sha256": "835bcdb1ca0f3d165b2135ad889474a742019d19c36a8ad23ee014889b96780a"
     },
     {
       "source": "peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/200--defining-a-service.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/200--defining-a-service.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/200--defining-a-service.md",
       "sha256": "66fccf948d337fa225d11b803373739a01fb3ff42f2c1085680ee6f37a909dfa"
     },
     {
       "source": "peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/300--service-types.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/300--service-types.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/300--service-types.md",
       "sha256": "9b503a33a1b19b4de9b265129655603f6a53d67ac17bee8dcd64c8b6583ad0f3"
     },
     {
       "source": "peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/400--triggers-and-timers.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/400--triggers-and-timers.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/400--triggers-and-timers.md",
       "sha256": "98649169b098764d0d83a6811e408e53fd291b616c3a8a85ac70186a6c4c8fc6"
     },
     {
       "source": "peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/600--supervision.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/600--supervision.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/600--supervision.md",
       "sha256": "4180cd6f6a7ddc3111327b3c48a733465803843f3a45836ee78eec161050ef37"
     },
     {
       "source": "peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/700--dependencies.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/700--dependencies.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/700--dependencies.md",
       "sha256": "a9e2f7ba7e59006ee69351c9dd2f1b2d6b5a49bb237fb5e7dfd8d49be95158a3"
     },
     {
       "source": "peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/800--identity-and-privileges.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/800--identity-and-privileges.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/800--identity-and-privileges.md",
       "sha256": "fd4b79c6154330e8b4c00b367564572666d32132553b7a572ac959f24ea50bee"
     },
     {
       "source": "peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/900--execution-environment.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/900--execution-environment.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/900--execution-environment.md",
       "sha256": "ba0ba6f56494f23551a0bcb83987cbd732ca79bf52ff1c6e9ae300307005072e"
     },
     {
       "source": "peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/trail.toml",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/trail.toml",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/trail.toml",
       "sha256": "dec48d26db4c291bf653e711b3cb27f91374dd86ccf8ebbc7f169f53ae4693a3"
     },
     {
       "source": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/1--peinit-boot-downgraded.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/1--peinit-boot-downgraded.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/1--peinit-boot-downgraded.md",
       "sha256": "44d6ff5e8ddab97f227c32589af016b61af2358054c789fd2afae421a6c6c683"
     },
     {
       "source": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/10--peinit-graph-validation-warned.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/10--peinit-graph-validation-warned.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/10--peinit-graph-validation-warned.md",
       "sha256": "f189d724aa042ee7002e1c0a9b3bea0f59f08f48a4ceb2441d7b1ddbb4898715"
     },
     {
       "source": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/11--peinit-internal-error-contained.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/11--peinit-internal-error-contained.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/11--peinit-internal-error-contained.md",
       "sha256": "d4faf97d6e4885b86f8d1a842abcd4b7c4d352f2fb54ddb5b7974a074776e759"
     },
     {
       "source": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/12--peinit-job-created.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/12--peinit-job-created.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/12--peinit-job-created.md",
       "sha256": "724a3a770014f68ee1e4e952b7c183dcbde4d3f02711cda57894bc27717bf775"
     },
     {
       "source": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
       "sha256": "491dd05395e81dc1520bac49db6a4cd945e10906f66f49c39c00d5ee6f64c909"
     },
     {
       "source": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/14--peinit-job-output-dropped.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/14--peinit-job-output-dropped.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/14--peinit-job-output-dropped.md",
       "sha256": "a928d0bbfc7612e9963637171d2859230cf05f9ae243f885b3f275aa51936b6d"
     },
     {
       "source": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/15--peinit-job-started.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/15--peinit-job-started.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/15--peinit-job-started.md",
       "sha256": "4827332ad96d610291a7d5fc0c0a33d687a7147d6f4085f7152f429d67f7740f"
     },
     {
       "source": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/16--peinit-job-status-reported.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/16--peinit-job-status-reported.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/16--peinit-job-status-reported.md",
       "sha256": "b496afe8b1707c721f28fabede4ce10448a4b8c1c9150c9945e424f96378a182"
     },
     {
       "source": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/17--peinit-notify-errno-reported.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/17--peinit-notify-errno-reported.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/17--peinit-notify-errno-reported.md",
       "sha256": "deaaad72134eb4bdcbd407635252b850326f9b486783634840f916f12167e8ba"
     },
     {
       "source": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/18--peinit-notify-exit-status-reported.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/18--peinit-notify-exit-status-reported.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/18--peinit-notify-exit-status-reported.md",
       "sha256": "7f81660ae6bb0f3516d1fe522b9ef7542a752739c2d41cc20ba81bce24d1bf86"
     },
     {
       "source": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/19--peinit-notify-progress-reported.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/19--peinit-notify-progress-reported.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/19--peinit-notify-progress-reported.md",
       "sha256": "c3e7dc3a592a939d13c07123fac315ac9900ab49b9feb0e12ad89a5dc133c75d"
     },
     {
       "source": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/2--peinit-cgroup-leaked.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/2--peinit-cgroup-leaked.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/2--peinit-cgroup-leaked.md",
       "sha256": "ab8614526a68d713f1e9326a898bc5e2155ac1fceb2f0efb4e75b0276c1ccd29"
     },
     {
       "source": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/20--peinit-notify-rejected.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/20--peinit-notify-rejected.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/20--peinit-notify-rejected.md",
       "sha256": "c8bd021f15c7b125461bda53812385dcb7d436d638bbc9e54bc5b32877fe6025"
     },
     {
       "source": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/21--peinit-notify-status-reported.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/21--peinit-notify-status-reported.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/21--peinit-notify-status-reported.md",
       "sha256": "31d516245c07cd133411a13ef92268210d238b646153f8785d74898ee1280d6f"
     },
     {
       "source": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/22--peinit-notify-stopping-reported.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/22--peinit-notify-stopping-reported.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/22--peinit-notify-stopping-reported.md",
       "sha256": "57b39d3a7b6926d0c1a81b3443b168486329b1562647ba733cb106860be1b3be"
     },
     {
       "source": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/23--peinit-on-failure-suppressed.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/23--peinit-on-failure-suppressed.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/23--peinit-on-failure-suppressed.md",
       "sha256": "92199da618ed6cdb346c4080970c360b0b1bb10ee0c7f7987866a4107e2fd57e"
     },
     {
       "source": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/24--peinit-operation-ended.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/24--peinit-operation-ended.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/24--peinit-operation-ended.md",
       "sha256": "c52eeaace36b57a2b658ce25e5b5809b11b60a6ba31e861105d6d4866cd774f7"
     },
     {
       "source": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/25--peinit-operation-merged.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/25--peinit-operation-merged.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/25--peinit-operation-merged.md",
       "sha256": "ef4d6435baa4748ee51cbd0b5d875084cb3d854c867603c8d4a4858e340debc3"
     },
     {
       "source": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/26--peinit-operation-requested.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/26--peinit-operation-requested.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/26--peinit-operation-requested.md",
       "sha256": "83a53385f567475c15f5ace8c2ce14ca3c6d24c38c269835e0e05cfa2457cb84"
     },
     {
       "source": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/27--peinit-operation-started.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/27--peinit-operation-started.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/27--peinit-operation-started.md",
       "sha256": "5a9b5c8b78be2b1d79e9cfe677dc617f9e84e1c21f2e455bc3f4beb0dfd365f0"
     },
     {
       "source": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/28--peinit-recovery-entered.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/28--peinit-recovery-entered.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/28--peinit-recovery-entered.md",
       "sha256": "cfb906382d8fc245936f31a11af708ff3083baf44b85560d4163a4757a702bf7"
     },
     {
       "source": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/29--peinit-service-abandoned.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/29--peinit-service-abandoned.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/29--peinit-service-abandoned.md",
       "sha256": "9315589785e6e782203fee4465a25c43ba533deec2f490789d76f57400c30190"
     },
     {
       "source": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/3--peinit-config-reload-applied.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/3--peinit-config-reload-applied.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/3--peinit-config-reload-applied.md",
       "sha256": "f4af70a624f03166c6c6563fd812758219670f7c7d43c0887acc171dbed261dd"
     },
     {
       "source": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/30--peinit-service-reload-timed-out.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/30--peinit-service-reload-timed-out.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/30--peinit-service-reload-timed-out.md",
       "sha256": "d01e3dab99980a3cbcfeb68cd382d1b7a222570ee6da3cbfea92bf2fedb7a6fe"
     },
     {
       "source": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/4--peinit-config-reload-deferred.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/4--peinit-config-reload-deferred.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/4--peinit-config-reload-deferred.md",
       "sha256": "aaa860e60e837a82c40f80e5b6008c247a993076e9f1ed48abd1cfe465d5d0eb"
     },
     {
       "source": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/5--peinit-critical-service-failed.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/5--peinit-critical-service-failed.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/5--peinit-critical-service-failed.md",
       "sha256": "6cb8908da8d4e76239f225faacf0879603328721b31fa7d21955fe5c03cc8bd0"
     },
     {
       "source": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/6--peinit-event-dropped.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/6--peinit-event-dropped.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/6--peinit-event-dropped.md",
       "sha256": "c23caf51c981469879c98c1bd30b37f4540477bc7ada683796b40d449bc72ce2"
     },
     {
       "source": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/7--peinit-fd-store-rejected.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/7--peinit-fd-store-rejected.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/7--peinit-fd-store-rejected.md",
       "sha256": "13e310d323c76db397afaa046cf68bc7ec60ca0bfe984e7356634823437af4ff"
     },
     {
       "source": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/8--peinit-graph-operation-ended.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/8--peinit-graph-operation-ended.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/8--peinit-graph-operation-ended.md",
       "sha256": "6344ef11b63cba2e56b2e36f54ecf1454b1c7f8d837b1fc101fbf8e23751ed4b"
     },
     {
       "source": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/9--peinit-graph-validation-failed.md",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/9--peinit-graph-validation-failed.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/9--peinit-graph-validation-failed.md",
       "sha256": "cd413cba7896b09ecca5d7f6addfebab0f5b39bca09253e4c1270ab93fab54f0"
     },
     {
       "source": "peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/trail.toml",
-      "destination": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/trail.toml",
+      "destination": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/trail.toml",
       "sha256": "77129359364c91326deb1da5ec68db62f21bd7cad5effb51130b8e7c07355a80"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/1--introduction/1--overview.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/1--introduction/1--overview.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/1--introduction/1--overview.md",
       "sha256": "eededbde43f40f8bc6dfe29199109b3c27f1b6eafc0f557b3cd70f5f40ce4e42"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/1--introduction/2--what-this-manual-covers.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/1--introduction/2--what-this-manual-covers.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/1--introduction/2--what-this-manual-covers.md",
       "sha256": "9e26795c8a7c37849fea4f9a99e4e219a0f180ae18b35c9166b533419ac358b5"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/1--introduction/3--terminology.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/1--introduction/3--terminology.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/1--introduction/3--terminology.md",
       "sha256": "fb1cc8eed1f31b2f4844b2e053e0e6260b603f0f57db1500dab8b003decc2928"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/1--introduction/4--compatibility.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/1--introduction/4--compatibility.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/1--introduction/4--compatibility.md",
       "sha256": "457920d361d7345b50a88396e5af58713303fadb3c2dce7dec4f4b6ed633560c"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/1--introduction/5--service-manager-boundaries.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/1--introduction/5--service-manager-boundaries.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/1--introduction/5--service-manager-boundaries.md",
       "sha256": "9cad6b6ce87d7d6c42c4b5dfd6a116a1b76e2c4e13b0994252cdd08d98a8b97c"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/10--the-control-interface/1--the-control-socket.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/10--the-control-interface/1--the-control-socket.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/10--the-control-interface/1--the-control-socket.md",
       "sha256": "f329c84d1c821a03b43e3ac2328c5a65822172256fd97662c0aed9fcdf0f921c"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/10--the-control-interface/2--dispatch-and-authorisation.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/10--the-control-interface/2--dispatch-and-authorisation.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/10--the-control-interface/2--dispatch-and-authorisation.md",
       "sha256": "94b0d300c594c415a255f26a21985c76647215316167846f35db4aad1b94f54d"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/10--the-control-interface/3--the-command-state-matrix.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/10--the-control-interface/3--the-command-state-matrix.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/10--the-control-interface/3--the-command-state-matrix.md",
       "sha256": "fcc00f920c57b83aca7e3612c3984b21efb698375a0af1c116a0ced325c8b603"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/10--the-control-interface/4--reload-config.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/10--the-control-interface/4--reload-config.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/10--the-control-interface/4--reload-config.md",
       "sha256": "cb290e54f0f97ce5af9cd7f60cbea7e4488d91697b8f78ee177f03874853a9fc"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/10--the-control-interface/5--the-notification-socket.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/10--the-control-interface/5--the-notification-socket.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/10--the-control-interface/5--the-notification-socket.md",
       "sha256": "2ff8b99b393391cf8714fed0165f09ad38617e7ba7b21b27f9774d6ca96ad726"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/10--the-control-interface/6--the-fd-store.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/10--the-control-interface/6--the-fd-store.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/10--the-control-interface/6--the-fd-store.md",
       "sha256": "16f13a00b47e58d8e4f4b0545ef4a845596353731f0e4e441e1c032082fdf2ba"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/10--the-control-interface/7--the-jobs-socket.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/10--the-control-interface/7--the-jobs-socket.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/10--the-control-interface/7--the-jobs-socket.md",
       "sha256": "ecc02eab31e3d82a44e71907becdc45014075b98faf5dc5d0c61758d812c3bc1"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/10--the-control-interface/8--the-boot-query.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/10--the-control-interface/8--the-boot-query.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/10--the-control-interface/8--the-boot-query.md",
       "sha256": "4eec7be46e13463759ca7c12e7f6fd6ccfde05137cfcf395566634f155307763"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/10--the-control-interface/9--operator-client-examples.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/10--the-control-interface/9--operator-client-examples.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/10--the-control-interface/9--operator-client-examples.md",
       "sha256": "6096985ae9d3f0e46157f9b7aee484df1d6c178f8371f4c677f336dff4cace38"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/10--the-control-interface/trail.toml",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/10--the-control-interface/trail.toml",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/10--the-control-interface/trail.toml",
       "sha256": "8b2a5b26d20d3c0b36ed68ddb8c390dbad4bf247456871e56e4bc31b037d535a"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/11--output-handling/1--wiring.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/11--output-handling/1--wiring.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/11--output-handling/1--wiring.md",
       "sha256": "92a4d7ad85a1d707993e295c1fd4058d5c2d77752942bc1e2796d0d661110acf"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/11--output-handling/2--the-pre-eventd-buffer.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/11--output-handling/2--the-pre-eventd-buffer.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/11--output-handling/2--the-pre-eventd-buffer.md",
       "sha256": "784a8fc851b745af6ce1247f35aa8698e552a21b63e99c512fa76e9074b3a579"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/11--output-handling/3--flood-protection.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/11--output-handling/3--flood-protection.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/11--output-handling/3--flood-protection.md",
       "sha256": "27113d5cd211f1a27a7b83abd39ea9386809cb8c795e682531148dee4721807e"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/11--output-handling/4--the-eventd-handoff.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/11--output-handling/4--the-eventd-handoff.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/11--output-handling/4--the-eventd-handoff.md",
       "sha256": "0c1c6ae3b4ca90d0dd72d59dc032dbc5c540da601059ecb65ee842203c4d71ad"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/11--output-handling/5--console-output.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/11--output-handling/5--console-output.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/11--output-handling/5--console-output.md",
       "sha256": "328f366d50549c0c3b87762a8f79da886824e4b671fdd4195bf4aff8287f4790"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/11--output-handling/6--terminal-ownership.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/11--output-handling/6--terminal-ownership.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/11--output-handling/6--terminal-ownership.md",
       "sha256": "71cc7963fd4960cf27d484e602b1aaf882d3ad3103a181d928405b2cc6a66915"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/11--output-handling/7--service-output-flow.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/11--output-handling/7--service-output-flow.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/11--output-handling/7--service-output-flow.md",
       "sha256": "001e01d04239c1e02de1870a4ca20e7496e4f4e88ce0a3fe4bc8a2d1dce927c4"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/12--shutdown/1--triggers.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/12--shutdown/1--triggers.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/12--shutdown/1--triggers.md",
       "sha256": "66d276aeb6be7743a8312704b2a1b262ca8125a4b772d629d13771accb726ed4"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/12--shutdown/2--the-graceful-sequence.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/12--shutdown/2--the-graceful-sequence.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/12--shutdown/2--the-graceful-sequence.md",
       "sha256": "47ad93bd3fea238f7fc811718da373660181d4ce1a2cc0c7bae4116dc74cdecb"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/12--shutdown/3--signals.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/12--shutdown/3--signals.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/12--shutdown/3--signals.md",
       "sha256": "54f022bfa2e44616b1eba50e4d62612171262f2edcc1abbc10258efba56d2b06"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/12--shutdown/4--finalisation.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/12--shutdown/4--finalisation.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/12--shutdown/4--finalisation.md",
       "sha256": "e78d557b92e1d17d4ff54e9153bee5fc5eda5477be6247fdbbb8ad32c21da746"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/13--security/1--trust-boundaries.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/13--security/1--trust-boundaries.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/13--security/1--trust-boundaries.md",
       "sha256": "a7cc0f28c258e6fdc19a476b30f53b01ff2e93cf0bd5374e0e662d2f29a546e8"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/13--security/2--privileges.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/13--security/2--privileges.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/13--security/2--privileges.md",
       "sha256": "f5f8da9e6461a729239d58333ab72e2634e7e3f3f4891f128518ba03966674f4"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/13--security/3--the-attack-surface.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/13--security/3--the-attack-surface.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/13--security/3--the-attack-surface.md",
       "sha256": "e8b85d6a98dbe84f6d1b510ed7274e5345e2c110ff43815c8b7d043518d56913"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/13--security/4--invariants.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/13--security/4--invariants.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/13--security/4--invariants.md",
       "sha256": "53da418e4dce8ff718dae484ecdc3d1cb1996215478b24ec2dad9e25029edd42"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/14--failure-modes/1--losing-the-registry.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/14--failure-modes/1--losing-the-registry.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/14--failure-modes/1--losing-the-registry.md",
       "sha256": "382da2946cb7e8d56067740937c22f28e291007b1591a546f53789cc0aa58186"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/14--failure-modes/2--losing-a-dependency.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/14--failure-modes/2--losing-a-dependency.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/14--failure-modes/2--losing-a-dependency.md",
       "sha256": "3c7e3a39a769bab60070b71aeb59c1c0c812ba1c5bc8ffa7625dd414e14dd273"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/14--failure-modes/3--unkillable-processes.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/14--failure-modes/3--unkillable-processes.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/14--failure-modes/3--unkillable-processes.md",
       "sha256": "ae57b7c2a6c78c8049509c3091b88606c967baa914ea245f08957f10e016f03d"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/14--failure-modes/4--resource-exhaustion.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/14--failure-modes/4--resource-exhaustion.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/14--failure-modes/4--resource-exhaustion.md",
       "sha256": "3f0f070bdbe793fbc5e1717487de8ebc6f96afc5556c0fcd3acf6f0d84ff1453"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/14--failure-modes/5--power-loss-and-corruption.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/14--failure-modes/5--power-loss-and-corruption.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/14--failure-modes/5--power-loss-and-corruption.md",
       "sha256": "6ceca94d6a1ad2b5a70e2f1b46c8fa7b59be4296e3dc3c46bfb390fe8c54b29e"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/2--boot/1--the-initramfs-contract.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/2--boot/1--the-initramfs-contract.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/2--boot/1--the-initramfs-contract.md",
       "sha256": "15914998cef1484708aaeeec99dfc26053aaf20f9768208794b57594d0dc6a2b"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/2--boot/2--bootstrap-identity.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/2--boot/2--bootstrap-identity.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/2--boot/2--bootstrap-identity.md",
       "sha256": "f3216f1117901c3f243823aac29eb9df2fc965f5ef23556178d14a03a73fb9a4"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/2--boot/3--phase-1.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/2--boot/3--phase-1.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/2--boot/3--phase-1.md",
       "sha256": "1c5d5554bd65137fcf7cc039261ba886df6f3f633dd50cde41b2bc07825f05c0"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/2--boot/4--path-provisioning.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/2--boot/4--path-provisioning.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/2--boot/4--path-provisioning.md",
       "sha256": "94d4d5fd4ff57090f5e8521753b06ba901c28df8ea652bd91b8ae088db5b0191"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/2--boot/5--phase-2.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/2--boot/5--phase-2.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/2--boot/5--phase-2.md",
       "sha256": "badf32d5cbf75ea8d4ca36b041c587a606c3714045bf00353d5f2aab3bf9d809"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/2--boot/6--boot-modes.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/2--boot/6--boot-modes.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/2--boot/6--boot-modes.md",
       "sha256": "142bbcdc9ca539f2dbaf608c71a5a9375ed883005eb0280e60427016d6dac38d"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/2--boot/7--the-boot-attempt-counter.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/2--boot/7--the-boot-attempt-counter.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/2--boot/7--the-boot-attempt-counter.md",
       "sha256": "15b9d912f9da471f12496399f81728cd2a778446660aebee3378b5c3e96974cb"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/2--boot/8--recovery-mode.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/2--boot/8--recovery-mode.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/2--boot/8--recovery-mode.md",
       "sha256": "a5c969175b188eef3086d5437960d8d62c05e8fc1f1357d6f89014ca8e1fdf3d"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/3--the-service-model/1--services.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/3--the-service-model/1--services.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/3--the-service-model/1--services.md",
       "sha256": "ec156457ef5f2ff0e9808bb34bd0ce3abdd776c5e66097b3170f4091b8ff7612"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/3--the-service-model/2--the-definition-schema.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/3--the-service-model/2--the-definition-schema.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/3--the-service-model/2--the-definition-schema.md",
       "sha256": "f3167e54ae7375fbe6f310876010c38725d656db5bd4b91c9e2db0b6f174ae95"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/3--the-service-model/3--field-formats.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/3--the-service-model/3--field-formats.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/3--the-service-model/3--field-formats.md",
       "sha256": "492417d96dc0daf5a691cdcb11e10c514f0966bf24d39236d64ff25537f9160c"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/3--the-service-model/4--triggers.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/3--the-service-model/4--triggers.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/3--the-service-model/4--triggers.md",
       "sha256": "750680ca668f770ce19706ca0d3cd516762dfc94e8b0ecf875d7138c8ee18853"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/3--the-service-model/5--conditions-and-asserts.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/3--the-service-model/5--conditions-and-asserts.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/3--the-service-model/5--conditions-and-asserts.md",
       "sha256": "a45545ed9770a39ade0baa65e0e254213876bb2bb56a44ce87bb9fa22f49a88e"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/3--the-service-model/6--command-strings.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/3--the-service-model/6--command-strings.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/3--the-service-model/6--command-strings.md",
       "sha256": "e5c18ff04a6cb9094e6e48cac43c31d78c1fc1e453acb92f9dd758454675bf0b"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/3--the-service-model/7--configuration-generations.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/3--the-service-model/7--configuration-generations.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/3--the-service-model/7--configuration-generations.md",
       "sha256": "876c757b35c005c4db462ecad2b2511dce926689a7dcb133207e56fea3584393"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/3--the-service-model/8--service-removal.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/3--the-service-model/8--service-removal.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/3--the-service-model/8--service-removal.md",
       "sha256": "1e96ed94c0f6be31c7276456ad06237669d20592064fca0d620d58fc93924563"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/3--the-service-model/trail.toml",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/3--the-service-model/trail.toml",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/3--the-service-model/trail.toml",
       "sha256": "277590029bce4b11487d3a095a506a422b734ae30564f8ab73c768f9551324f3"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/4--service-identity/1--token-materialisation.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/4--service-identity/1--token-materialisation.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/4--service-identity/1--token-materialisation.md",
       "sha256": "dcd3d26111bbdc031a85c991a774e65dc184ccea37043abdb9e1b6473e0200b5"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/4--service-identity/2--the-system-path.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/4--service-identity/2--the-system-path.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/4--service-identity/2--the-system-path.md",
       "sha256": "a74e110473d2bd5234964a344c34fec7e9e9c6b3538c70328211da89480f638d"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/4--service-identity/3--the-authd-path.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/4--service-identity/3--the-authd-path.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/4--service-identity/3--the-authd-path.md",
       "sha256": "4b97856e0696d5baaaa6b97da16087b8039acebfa6e5c3998980207c6c61a552"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/4--service-identity/4--per-service-sids.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/4--service-identity/4--per-service-sids.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/4--service-identity/4--per-service-sids.md",
       "sha256": "059ca7c26b454226d95b0089bca386961ba7aaa1690fbad38d81aa6d2a228cd7"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/4--service-identity/5--privilege-restriction.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/4--service-identity/5--privilege-restriction.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/4--service-identity/5--privilege-restriction.md",
       "sha256": "62d76e59fe90ad6123f1fa1101eed22bb76631368237115339855b8df801f537"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/4--service-identity/6--service-security-descriptors.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/4--service-identity/6--service-security-descriptors.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/4--service-identity/6--service-security-descriptors.md",
       "sha256": "eec2dec8d1d07fbc80701ab9b648540f9f9431bada9781ca6725d12baa003146"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/4--service-identity/7--the-control-descriptor.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/4--service-identity/7--the-control-descriptor.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/4--service-identity/7--the-control-descriptor.md",
       "sha256": "9463f248d813863f71eee6a16a8f55ee76f218beb1adf994212f88632ab99f29"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/5--starting-a-service/1--the-cgroup-tree.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/5--starting-a-service/1--the-cgroup-tree.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/5--starting-a-service/1--the-cgroup-tree.md",
       "sha256": "97374a1eefa97b63e0dc007b01311862751bad3b96fd1a7d2565f179098407aa"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/5--starting-a-service/2--pre-start-evaluation.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/5--starting-a-service/2--pre-start-evaluation.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/5--starting-a-service/2--pre-start-evaluation.md",
       "sha256": "9541b5927bba70ef6eaf37f974c2c4a3e5959eaa9df035d27eac3b7275cac516"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/5--starting-a-service/3--the-pre-exec-sequence.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/5--starting-a-service/3--the-pre-exec-sequence.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/5--starting-a-service/3--the-pre-exec-sequence.md",
       "sha256": "9066fa091ce38dea579abf956c8afac838736363b66c43b9d7fee957d5f5fcea"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/5--starting-a-service/4--the-child-path.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/5--starting-a-service/4--the-child-path.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/5--starting-a-service/4--the-child-path.md",
       "sha256": "1a12eac27f73b35b9bfa6a397c24a18bf1fd2790c14a21ba93b9581a661b14e5"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/5--starting-a-service/5--the-base-environment.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/5--starting-a-service/5--the-base-environment.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/5--starting-a-service/5--the-base-environment.md",
       "sha256": "3a02b02f70d628cb0321c995a4d5c6c46b327371fe99fb722e2d0c6e3c911d91"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/5--starting-a-service/6--health-checks.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/5--starting-a-service/6--health-checks.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/5--starting-a-service/6--health-checks.md",
       "sha256": "b99dd369028d8c9e92afbd22a2249929c287e59d2245cb5341fcee4b5d02c485"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/5--starting-a-service/7--leaked-sub-cgroups.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/5--starting-a-service/7--leaked-sub-cgroups.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/5--starting-a-service/7--leaked-sub-cgroups.md",
       "sha256": "7e797c9203b88c602304bf996f6dca0772f0937a295ec22d858aa4ef6738e7be"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/5--starting-a-service/trail.toml",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/5--starting-a-service/trail.toml",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/5--starting-a-service/trail.toml",
       "sha256": "23f6a7a15d02e021035995b5eeff595e611a9a6999e9b3eb59ec9ca8c914c593"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/6--the-state-machine/1--states.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/6--the-state-machine/1--states.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/6--the-state-machine/1--states.md",
       "sha256": "83332a539b7f78ae87d9d6fcf7b4155d6625cf6e56320505d4f46274bab622b5"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/6--the-state-machine/2--transitions.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/6--the-state-machine/2--transitions.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/6--the-state-machine/2--transitions.md",
       "sha256": "c76e9b4a8953b1218ab6943331e37902229ca1b264d463d933c950c3d494089f"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/6--the-state-machine/3--causes.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/6--the-state-machine/3--causes.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/6--the-state-machine/3--causes.md",
       "sha256": "361ab5684ec7f5c65b9df5211fe4427f715bcbbab90c448e75cbd5b85e1f9141"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/6--the-state-machine/4--restart.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/6--the-state-machine/4--restart.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/6--the-state-machine/4--restart.md",
       "sha256": "d4a483c09c43b53a22b7c0bf29aee9fcf2069f58d4413c29c46b2cb91797dcb5"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/6--the-state-machine/5--reload.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/6--the-state-machine/5--reload.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/6--the-state-machine/5--reload.md",
       "sha256": "82ba0b700142a9296303a870e10432cf15a1017d742688652dcf76f6cf85ce73"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/6--the-state-machine/6--watchdog-and-timeout-extension.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/6--the-state-machine/6--watchdog-and-timeout-extension.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/6--the-state-machine/6--watchdog-and-timeout-extension.md",
       "sha256": "c63e2d538d7f7f604dcd6833f03e2128a9b8f75755fbabc5058b7ba7cec7df64"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/6--the-state-machine/trail.toml",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/6--the-state-machine/trail.toml",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/6--the-state-machine/trail.toml",
       "sha256": "4f698b06620277e89a0c44ad2be49b7985a09482a6c06288583b1b6f9374cc07"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/7--dependencies/1--relationships.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/7--dependencies/1--relationships.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/7--dependencies/1--relationships.md",
       "sha256": "9664e62357adbe0384f5bf821059f7095a2496b1b862364f0d91cb1527068113"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/7--dependencies/2--graph-validation.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/7--dependencies/2--graph-validation.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/7--dependencies/2--graph-validation.md",
       "sha256": "2b4d6fbe3846d258ec2995fe7103e5a1e34170aa1e67c56e5cf56469b0ae0721"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/7--dependencies/3--graph-execution.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/7--dependencies/3--graph-execution.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/7--dependencies/3--graph-execution.md",
       "sha256": "15fd782e9dabfefe9e984894826a586101c43a01b7fc242f21951227527e69b1"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/7--dependencies/4--the-boot-and-on-demand-paths.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/7--dependencies/4--the-boot-and-on-demand-paths.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/7--dependencies/4--the-boot-and-on-demand-paths.md",
       "sha256": "132f113632bf7c3b181f8dba44d7534693a1ec0f602006fec8318ba3c5b2f54e"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/7--dependencies/5--readiness-levels.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/7--dependencies/5--readiness-levels.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/7--dependencies/5--readiness-levels.md",
       "sha256": "c38717cb44ab206c4023c79c7cf06d9be83ef9be4bf47d73d8ec65f77d06cf92"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/7--dependencies/6--derived-dependencies.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/7--dependencies/6--derived-dependencies.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/7--dependencies/6--derived-dependencies.md",
       "sha256": "920741d2c3a908088b779e5269090fe6e69a55fc6e5ad3ebb0d45337ef13db68"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/8--jobs-and-operations/1--jobs.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/8--jobs-and-operations/1--jobs.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/8--jobs-and-operations/1--jobs.md",
       "sha256": "ac38b95dd8eb62553c7c7d1388290945ab3f8d1925eb4a8152460c6a803a03bf"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/8--jobs-and-operations/2--operations.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/8--jobs-and-operations/2--operations.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/8--jobs-and-operations/2--operations.md",
       "sha256": "c4cee61078bce4c87d504100a2f1c990db5c7c7c9c34fa47aa977b49e2e92f03"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/8--jobs-and-operations/3--conflict-resolution.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/8--jobs-and-operations/3--conflict-resolution.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/8--jobs-and-operations/3--conflict-resolution.md",
       "sha256": "a182d4060c25cf04b44e9adda23b3fdbe02f929af7d3668784872df6c1f866a0"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/8--jobs-and-operations/4--event-emission.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/8--jobs-and-operations/4--event-emission.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/8--jobs-and-operations/4--event-emission.md",
       "sha256": "c911a67709553a4ee74927bebc216b9fa28c0392fa66b92e8863378c90870e71"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/8--jobs-and-operations/5--submitted-jobs.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/8--jobs-and-operations/5--submitted-jobs.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/8--jobs-and-operations/5--submitted-jobs.md",
       "sha256": "14cb947ba414b8363230b4c04d8cc8a98efdbc0e964975cee8e9e447ccf23d9e"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/8--jobs-and-operations/6--the-control-protocol-view.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/8--jobs-and-operations/6--the-control-protocol-view.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/8--jobs-and-operations/6--the-control-protocol-view.md",
       "sha256": "618ee56e5c76274be43df22cf53ed84850d9de7c760dcc81057a3181e8d5c7d7"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/8--jobs-and-operations/7--submission-and-progress-examples.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/8--jobs-and-operations/7--submission-and-progress-examples.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/8--jobs-and-operations/7--submission-and-progress-examples.md",
       "sha256": "10234e4b6996f6e6575fda2e660f26b5dd746720a9847805a8aac9f57c04ad99"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/8--jobs-and-operations/trail.toml",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/8--jobs-and-operations/trail.toml",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/8--jobs-and-operations/trail.toml",
       "sha256": "6ff4c8a04c05934a77f4a36c48368d53678a5d8495df79e9e708479e11030c3a"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/9--timers/1--calendar-expressions.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/9--timers/1--calendar-expressions.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/9--timers/1--calendar-expressions.md",
       "sha256": "7f67737ac658cc251fb6c9190b7c19570ee9339fd4ec0ab2ecc5e93c5931783e"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/9--timers/2--evaluation.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/9--timers/2--evaluation.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/9--timers/2--evaluation.md",
       "sha256": "1bae519f612d59d3a9d6b6b369997d7a2547e8219ca561b81bf0ff5d9d9b72e0"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/9--timers/3--persistence.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/9--timers/3--persistence.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/9--timers/3--persistence.md",
       "sha256": "0c494ba6af7d78dde92b09738ca65063b2c5a96e7ed90acc8d4b20cce720194c"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/9--timers/4--jitter-and-clocks.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/9--timers/4--jitter-and-clocks.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/9--timers/4--jitter-and-clocks.md",
       "sha256": "0507cc373b9131d80c3098e9be76300731a1635373b65cfc845ce595c98a3ff2"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/a1--registry-keys.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/a1--registry-keys.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/a1--registry-keys.md",
       "sha256": "12c60c6e8eca3726774204ea06a980f973b2a4375afd949af0d5326cf05ec0d2"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/a2--constants-and-paths.md",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/a2--constants-and-paths.md",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/a2--constants-and-paths.md",
       "sha256": "029b278e78141ba909750b0c5bf4f891ec4a058f633064d58e18d9ca09e72a1e"
     },
     {
       "source": "peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/trail.toml",
-      "destination": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/trail.toml",
+      "destination": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/trail.toml",
       "sha256": "f050aad148b9903ff17d4ccc8ea7418a95b70e6f6fb1ce90c7b8341167e4559a"
     }
   ],
@@ -751,1132 +751,1132 @@
     },
     "plain_references_pending_shared_publication": [
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/900--execution-environment.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/900--execution-environment.md",
         "target": "~peios/registry-security/access-control",
         "label": "security > descriptor"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/900--execution-environment.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/900--execution-environment.md",
         "target": "~peios/registry-security/access-control",
         "label": "security descriptor"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/200--defining-a-service.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/200--defining-a-service.md",
         "target": "~peios/registry-concepts/watches",
         "label": "change notifications"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/1700--registry-key-reference.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/1700--registry-key-reference.md",
         "target": "~peios/registry-administration/regman",
         "label": "`regman`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/1700--registry-key-reference.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/1700--registry-key-reference.md",
         "target": "~peios/registry-concepts/keys-values-and-types",
         "label": "value types"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/1700--registry-key-reference.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/1700--registry-key-reference.md",
         "target": "~peios/registry-administration/regman",
         "label": "`regman`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/170--troubleshooting.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/170--troubleshooting.md",
         "target": "~peios/registry-concepts/watches",
         "label": "registry notifications"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/170--troubleshooting.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/170--troubleshooting.md",
         "target": "~peios/inspecting/debugging-a-denial",
         "label": "Debugging a denial"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/190--jobs-and-operations.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/190--jobs-and-operations.md",
         "target": "~peios/security-descriptors/overview",
         "label": "security descriptor"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/1400--boot-and-boot-modes.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/1400--boot-and-boot-modes.md",
         "target": "~peios/peiso/editions-and-upgrades/upgrading-peios#check-what-an-update-has-activated",
         "label": "activation chain"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/1400--boot-and-boot-modes.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/1400--boot-and-boot-modes.md",
         "target": "~peios/peiso/editions-and-upgrades/upgrading-peios#check-what-an-update-has-activated",
         "label": "activation checklist"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/1100--who-can-manage-a-service.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/1100--who-can-manage-a-service.md",
         "target": "~peios/registry-security/access-control",
         "label": "LCS"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/1100--who-can-manage-a-service.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/1100--who-can-manage-a-service.md",
         "target": "~peios/registry-security/access-control",
         "label": "registry access control"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/1100--who-can-manage-a-service.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/1100--who-can-manage-a-service.md",
         "target": "~peios/registry-concepts/watches",
         "label": "registry notification"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/1100--who-can-manage-a-service.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/1100--who-can-manage-a-service.md",
         "target": "~peios/inspecting/debugging-a-denial",
         "label": "Debugging a denial"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/1100--who-can-manage-a-service.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/1100--who-can-manage-a-service.md",
         "target": "~peios/security-descriptors/overview",
         "label": "Security descriptors"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/400--triggers-and-timers.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/400--triggers-and-timers.md",
         "target": "~peios/registry-concepts/watches",
         "label": "registry notification"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/700--dependencies.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/100--fundamentals.shelf/200--services-and-jobs.topic/700--dependencies.md",
         "target": "~peios/networking/overview",
         "label": "network policy"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/7--peinit-fd-store-rejected.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/7--peinit-fd-store-rejected.md",
         "target": "~peios/events/field-index/fields-object#object.service.name",
         "label": "`object.service.name`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/7--peinit-fd-store-rejected.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/7--peinit-fd-store-rejected.md",
         "target": "~peios/events/field-index/fields-object#object.fd-store.name",
         "label": "`object.fd-store.name`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/7--peinit-fd-store-rejected.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/7--peinit-fd-store-rejected.md",
         "target": "~peios/events/field-index/fields-outcome#outcome.reason",
         "label": "`outcome.reason`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/17--peinit-notify-errno-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/17--peinit-notify-errno-reported.md",
         "target": "~peios/events/field-index/fields-subject#subject.service.name",
         "label": "`subject.service.name`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/17--peinit-notify-errno-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/17--peinit-notify-errno-reported.md",
         "target": "~peios/events/field-index/fields-subject#subject.job.guid",
         "label": "`subject.job.guid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/17--peinit-notify-errno-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/17--peinit-notify-errno-reported.md",
         "target": "~peios/events/field-index/fields-subject#subject.job.activation-generation",
         "label": "`subject.job.activation-generation`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/17--peinit-notify-errno-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/17--peinit-notify-errno-reported.md",
         "target": "~peios/events/field-index/fields-subject#subject.operation.guid",
         "label": "`subject.operation.guid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/17--peinit-notify-errno-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/17--peinit-notify-errno-reported.md",
         "target": "~peios/events/field-index/fields-notify#notify.errno",
         "label": "`notify.errno`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/4--peinit-config-reload-deferred.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/4--peinit-config-reload-deferred.md",
         "target": "~peios/events/field-index/fields-graph#graph.services",
         "label": "`graph.services`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/11--peinit-internal-error-contained.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/11--peinit-internal-error-contained.md",
         "target": "~peios/events/field-index/fields-operation#operation.stage",
         "label": "`operation.stage`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/11--peinit-internal-error-contained.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/11--peinit-internal-error-contained.md",
         "target": "~peios/events/field-index/fields-object#object.service.name",
         "label": "`object.service.name`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/11--peinit-internal-error-contained.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/11--peinit-internal-error-contained.md",
         "target": "~peios/events/field-index/fields-object#object.job.guid",
         "label": "`object.job.guid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/11--peinit-internal-error-contained.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/11--peinit-internal-error-contained.md",
         "target": "~peios/events/field-index/fields-object#object.service.failed",
         "label": "`object.service.failed`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/5--peinit-critical-service-failed.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/5--peinit-critical-service-failed.md",
         "target": "~peios/events/field-index/fields-object#object.service.name",
         "label": "`object.service.name`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/5--peinit-critical-service-failed.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/5--peinit-critical-service-failed.md",
         "target": "~peios/events/field-index/fields-outcome#outcome.reason",
         "label": "`outcome.reason`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/5--peinit-critical-service-failed.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/5--peinit-critical-service-failed.md",
         "target": "~peios/events/field-index/fields-shutdown#shutdown.finalization-state",
         "label": "`shutdown.finalization-state`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/5--peinit-critical-service-failed.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/5--peinit-critical-service-failed.md",
         "target": "~peios/events/field-index/fields-outcome#outcome.detail",
         "label": "`outcome.detail`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/29--peinit-service-abandoned.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/29--peinit-service-abandoned.md",
         "target": "~peios/events/field-index/fields-object#object.service.name",
         "label": "`object.service.name`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/29--peinit-service-abandoned.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/29--peinit-service-abandoned.md",
         "target": "~peios/events/field-index/fields-object#object.cgroup.path",
         "label": "`object.cgroup.path`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/29--peinit-service-abandoned.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/29--peinit-service-abandoned.md",
         "target": "~peios/events/field-index/fields-object#object.service.state-previous",
         "label": "`object.service.state-previous`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/29--peinit-service-abandoned.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/29--peinit-service-abandoned.md",
         "target": "~peios/events/field-index/fields-object#object.service.state",
         "label": "`object.service.state`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/29--peinit-service-abandoned.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/29--peinit-service-abandoned.md",
         "target": "~peios/events/field-index/fields-object#object.service.transition-cause",
         "label": "`object.service.transition-cause`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/29--peinit-service-abandoned.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/29--peinit-service-abandoned.md",
         "target": "~peios/events/field-index/fields-object#object.service.generation",
         "label": "`object.service.generation`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/10--peinit-graph-validation-warned.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/10--peinit-graph-validation-warned.md",
         "target": "~peios/events/field-index/fields-graph#graph.phase",
         "label": "`graph.phase`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/10--peinit-graph-validation-warned.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/10--peinit-graph-validation-warned.md",
         "target": "~peios/events/field-index/fields-outcome#outcome.reason",
         "label": "`outcome.reason`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/10--peinit-graph-validation-warned.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/10--peinit-graph-validation-warned.md",
         "target": "~peios/events/field-index/fields-object#object.service.name",
         "label": "`object.service.name`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/10--peinit-graph-validation-warned.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/10--peinit-graph-validation-warned.md",
         "target": "~peios/events/field-index/fields-object#object.service.dependents",
         "label": "`object.service.dependents`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/10--peinit-graph-validation-warned.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/10--peinit-graph-validation-warned.md",
         "target": "~peios/events/field-index/fields-graph#graph.role",
         "label": "`graph.role`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/10--peinit-graph-validation-warned.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/10--peinit-graph-validation-warned.md",
         "target": "~peios/events/field-index/fields-graph#graph.services",
         "label": "`graph.services`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/9--peinit-graph-validation-failed.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/9--peinit-graph-validation-failed.md",
         "target": "~peios/events/field-index/fields-graph#graph.phase",
         "label": "`graph.phase`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/9--peinit-graph-validation-failed.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/9--peinit-graph-validation-failed.md",
         "target": "~peios/events/field-index/fields-outcome#outcome.reason",
         "label": "`outcome.reason`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/9--peinit-graph-validation-failed.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/9--peinit-graph-validation-failed.md",
         "target": "~peios/events/field-index/fields-object#object.service.name",
         "label": "`object.service.name`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/9--peinit-graph-validation-failed.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/9--peinit-graph-validation-failed.md",
         "target": "~peios/events/field-index/fields-graph#graph.services",
         "label": "`graph.services`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/9--peinit-graph-validation-failed.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/9--peinit-graph-validation-failed.md",
         "target": "~peios/events/field-index/fields-object#object.service.dependency.name",
         "label": "`object.service.dependency.name`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/9--peinit-graph-validation-failed.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/9--peinit-graph-validation-failed.md",
         "target": "~peios/events/field-index/fields-object#object.service.dependency.kind",
         "label": "`object.service.dependency.kind`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/9--peinit-graph-validation-failed.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/9--peinit-graph-validation-failed.md",
         "target": "~peios/events/field-index/fields-object#object.service.conflict.name",
         "label": "`object.service.conflict.name`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/9--peinit-graph-validation-failed.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/9--peinit-graph-validation-failed.md",
         "target": "~peios/events/field-index/fields-object#object.service.health-check.interval",
         "label": "`object.service.health-check.interval`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/9--peinit-graph-validation-failed.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/9--peinit-graph-validation-failed.md",
         "target": "~peios/events/field-index/fields-object#object.service.health-check.retries",
         "label": "`object.service.health-check.retries`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/9--peinit-graph-validation-failed.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/9--peinit-graph-validation-failed.md",
         "target": "~peios/events/field-index/fields-object#object.service.health-check.restart-window",
         "label": "`object.service.health-check.restart-window`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/9--peinit-graph-validation-failed.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/9--peinit-graph-validation-failed.md",
         "target": "~peios/events/field-index/fields-object#object.service.type",
         "label": "`object.service.type`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/9--peinit-graph-validation-failed.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/9--peinit-graph-validation-failed.md",
         "target": "~peios/events/field-index/fields-object#object.service.timer.schedule",
         "label": "`object.service.timer.schedule`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/9--peinit-graph-validation-failed.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/9--peinit-graph-validation-failed.md",
         "target": "~peios/events/field-index/fields-outcome#outcome.detail",
         "label": "`outcome.detail`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/1--peinit-boot-downgraded.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/1--peinit-boot-downgraded.md",
         "target": "~peios/events/field-index/fields-outcome#outcome.reason",
         "label": "`outcome.reason`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/1--peinit-boot-downgraded.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/1--peinit-boot-downgraded.md",
         "target": "~peios/events/field-index/fields-graph#graph.services",
         "label": "`graph.services`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/1--peinit-boot-downgraded.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/1--peinit-boot-downgraded.md",
         "target": "~peios/events/field-index/fields-object#object.service.name",
         "label": "`object.service.name`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/1--peinit-boot-downgraded.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/1--peinit-boot-downgraded.md",
         "target": "~peios/events/field-index/fields-object#object.service.conflict.name",
         "label": "`object.service.conflict.name`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/8--peinit-graph-operation-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/8--peinit-graph-operation-ended.md",
         "target": "~peios/events/field-index/fields-graph#graph.context",
         "label": "`graph.context`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/8--peinit-graph-operation-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/8--peinit-graph-operation-ended.md",
         "target": "~peios/events/field-index/fields-object#object.operation.guid",
         "label": "`object.operation.guid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/8--peinit-graph-operation-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/8--peinit-graph-operation-ended.md",
         "target": "~peios/events/field-index/fields-object#object.service.name",
         "label": "`object.service.name`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/8--peinit-graph-operation-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/8--peinit-graph-operation-ended.md",
         "target": "~peios/events/field-index/fields-outcome#outcome.success",
         "label": "`outcome.success`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
         "target": "~peios/events/field-index/fields-object#object.job.guid",
         "label": "`object.job.guid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
         "target": "~peios/events/field-index/fields-object#object.job.type",
         "label": "`object.job.type`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
         "target": "~peios/events/field-index/fields-object#object.job.state",
         "label": "`object.job.state`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
         "target": "~peios/events/field-index/fields-outcome#outcome.success",
         "label": "`outcome.success`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
         "target": "~peios/events/field-index/fields-outcome#outcome.detail",
         "label": "`outcome.detail`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
         "target": "~peios/events/field-index/fields-object#object.service.name",
         "label": "`object.service.name`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
         "target": "~peios/events/field-index/fields-object#object.job.activation-generation",
         "label": "`object.job.activation-generation`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
         "target": "~peios/events/field-index/fields-object#object.operation.guid",
         "label": "`object.operation.guid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
         "target": "~peios/events/field-index/fields-object#object.process.pid",
         "label": "`object.process.pid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
         "target": "~peios/events/field-index/fields-object#object.process.exit-code",
         "label": "`object.process.exit-code`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
         "target": "~peios/events/field-index/fields-object#object.process.exit-signal",
         "label": "`object.process.exit-signal`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
         "target": "~peios/events/field-index/fields-object#object.job.executable",
         "label": "`object.job.executable`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
         "target": "~peios/events/field-index/fields-object#object.job.arguments",
         "label": "`object.job.arguments`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
         "target": "~peios/events/field-index/fields-object#object.job.arguments-truncated",
         "label": "`object.job.arguments-truncated`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
         "target": "~peios/events/field-index/fields-object#object.job.arguments-count",
         "label": "`object.job.arguments-count`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
         "target": "~peios/events/field-index/fields-object#object.job.created-time",
         "label": "`object.job.created-time`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
         "target": "~peios/events/field-index/fields-object#object.job.started-time",
         "label": "`object.job.started-time`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
         "target": "~peios/events/field-index/fields-object#object.job.duration",
         "label": "`object.job.duration`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
         "target": "~peios/events/field-index/fields-object#object.cgroup.path",
         "label": "`object.cgroup.path`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
         "target": "~peios/events/field-index/fields-object#object.cgroup.generation",
         "label": "`object.cgroup.generation`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
         "target": "~peios/events/field-index/fields-object#object.job.token.sid",
         "label": "`object.job.token.sid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
         "target": "~peios/events/field-index/fields-object#object.job.token.groups",
         "label": "`object.job.token.groups`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
         "target": "~peios/events/field-index/fields-object#object.job.token.privileges",
         "label": "`object.job.token.privileges`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/13--peinit-job-ended.md",
         "target": "~peios/events/field-index/fields-object#object.job.token.privileges-enabled",
         "label": "`object.job.token.privileges-enabled`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/12--peinit-job-created.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/12--peinit-job-created.md",
         "target": "~peios/events/field-index/fields-object#object.job.guid",
         "label": "`object.job.guid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/12--peinit-job-created.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/12--peinit-job-created.md",
         "target": "~peios/events/field-index/fields-object#object.job.type",
         "label": "`object.job.type`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/12--peinit-job-created.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/12--peinit-job-created.md",
         "target": "~peios/events/field-index/fields-object#object.job.state",
         "label": "`object.job.state`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/12--peinit-job-created.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/12--peinit-job-created.md",
         "target": "~peios/events/field-index/fields-object#object.service.name",
         "label": "`object.service.name`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/12--peinit-job-created.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/12--peinit-job-created.md",
         "target": "~peios/events/field-index/fields-object#object.job.activation-generation",
         "label": "`object.job.activation-generation`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/12--peinit-job-created.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/12--peinit-job-created.md",
         "target": "~peios/events/field-index/fields-object#object.operation.guid",
         "label": "`object.operation.guid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/12--peinit-job-created.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/12--peinit-job-created.md",
         "target": "~peios/events/field-index/fields-object#object.job.executable",
         "label": "`object.job.executable`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/12--peinit-job-created.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/12--peinit-job-created.md",
         "target": "~peios/events/field-index/fields-object#object.job.token.sid",
         "label": "`object.job.token.sid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/12--peinit-job-created.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/12--peinit-job-created.md",
         "target": "~peios/events/field-index/fields-object#object.job.token.groups",
         "label": "`object.job.token.groups`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/12--peinit-job-created.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/12--peinit-job-created.md",
         "target": "~peios/events/field-index/fields-object#object.job.token.privileges",
         "label": "`object.job.token.privileges`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/12--peinit-job-created.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/12--peinit-job-created.md",
         "target": "~peios/events/field-index/fields-object#object.job.token.privileges-enabled",
         "label": "`object.job.token.privileges-enabled`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/21--peinit-notify-status-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/21--peinit-notify-status-reported.md",
         "target": "~peios/events/field-index/fields-subject#subject.service.name",
         "label": "`subject.service.name`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/21--peinit-notify-status-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/21--peinit-notify-status-reported.md",
         "target": "~peios/events/field-index/fields-subject#subject.job.guid",
         "label": "`subject.job.guid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/21--peinit-notify-status-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/21--peinit-notify-status-reported.md",
         "target": "~peios/events/field-index/fields-subject#subject.job.activation-generation",
         "label": "`subject.job.activation-generation`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/21--peinit-notify-status-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/21--peinit-notify-status-reported.md",
         "target": "~peios/events/field-index/fields-subject#subject.operation.guid",
         "label": "`subject.operation.guid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/21--peinit-notify-status-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/21--peinit-notify-status-reported.md",
         "target": "~peios/events/field-index/fields-notify#notify.status",
         "label": "`notify.status`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/3--peinit-config-reload-applied.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/3--peinit-config-reload-applied.md",
         "target": "~peios/events/field-index/fields-outcome#outcome.success",
         "label": "`outcome.success`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/3--peinit-config-reload-applied.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/3--peinit-config-reload-applied.md",
         "target": "~peios/events/field-index/fields-outcome#outcome.detail",
         "label": "`outcome.detail`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/3--peinit-config-reload-applied.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/3--peinit-config-reload-applied.md",
         "target": "~peios/events/field-index/fields-graph#graph.services",
         "label": "`graph.services`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/3--peinit-config-reload-applied.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/3--peinit-config-reload-applied.md",
         "target": "~peios/events/field-index/fields-graph#graph.counts.added",
         "label": "`graph.counts.added`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/3--peinit-config-reload-applied.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/3--peinit-config-reload-applied.md",
         "target": "~peios/events/field-index/fields-graph#graph.counts.updated",
         "label": "`graph.counts.updated`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/3--peinit-config-reload-applied.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/3--peinit-config-reload-applied.md",
         "target": "~peios/events/field-index/fields-graph#graph.counts.restored",
         "label": "`graph.counts.restored`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/3--peinit-config-reload-applied.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/3--peinit-config-reload-applied.md",
         "target": "~peios/events/field-index/fields-graph#graph.counts.marked-removed",
         "label": "`graph.counts.marked-removed`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/3--peinit-config-reload-applied.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/3--peinit-config-reload-applied.md",
         "target": "~peios/events/field-index/fields-graph#graph.counts.discarded",
         "label": "`graph.counts.discarded`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/3--peinit-config-reload-applied.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/3--peinit-config-reload-applied.md",
         "target": "~peios/events/field-index/fields-graph#graph.counts.undecodable",
         "label": "`graph.counts.undecodable`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/15--peinit-job-started.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/15--peinit-job-started.md",
         "target": "~peios/events/field-index/fields-object#object.job.guid",
         "label": "`object.job.guid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/15--peinit-job-started.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/15--peinit-job-started.md",
         "target": "~peios/events/field-index/fields-object#object.job.type",
         "label": "`object.job.type`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/15--peinit-job-started.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/15--peinit-job-started.md",
         "target": "~peios/events/field-index/fields-object#object.job.state",
         "label": "`object.job.state`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/15--peinit-job-started.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/15--peinit-job-started.md",
         "target": "~peios/events/field-index/fields-object#object.service.name",
         "label": "`object.service.name`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/15--peinit-job-started.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/15--peinit-job-started.md",
         "target": "~peios/events/field-index/fields-object#object.job.activation-generation",
         "label": "`object.job.activation-generation`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/15--peinit-job-started.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/15--peinit-job-started.md",
         "target": "~peios/events/field-index/fields-object#object.operation.guid",
         "label": "`object.operation.guid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/15--peinit-job-started.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/15--peinit-job-started.md",
         "target": "~peios/events/field-index/fields-object#object.process.pid",
         "label": "`object.process.pid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/15--peinit-job-started.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/15--peinit-job-started.md",
         "target": "~peios/events/field-index/fields-object#object.cgroup.path",
         "label": "`object.cgroup.path`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/15--peinit-job-started.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/15--peinit-job-started.md",
         "target": "~peios/events/field-index/fields-object#object.job.token.sid",
         "label": "`object.job.token.sid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/15--peinit-job-started.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/15--peinit-job-started.md",
         "target": "~peios/events/field-index/fields-object#object.job.token.groups",
         "label": "`object.job.token.groups`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/15--peinit-job-started.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/15--peinit-job-started.md",
         "target": "~peios/events/field-index/fields-object#object.job.token.privileges",
         "label": "`object.job.token.privileges`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/15--peinit-job-started.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/15--peinit-job-started.md",
         "target": "~peios/events/field-index/fields-object#object.job.token.privileges-enabled",
         "label": "`object.job.token.privileges-enabled`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/20--peinit-notify-rejected.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/20--peinit-notify-rejected.md",
         "target": "~peios/events/field-index/fields-outcome#outcome.reason",
         "label": "`outcome.reason`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/20--peinit-notify-rejected.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/20--peinit-notify-rejected.md",
         "target": "~peios/events/field-index/fields-subject#subject.process.pid",
         "label": "`subject.process.pid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/20--peinit-notify-rejected.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/20--peinit-notify-rejected.md",
         "target": "~peios/events/field-index/fields-subject#subject.service.name",
         "label": "`subject.service.name`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/20--peinit-notify-rejected.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/20--peinit-notify-rejected.md",
         "target": "~peios/events/field-index/fields-subject#subject.job.guid",
         "label": "`subject.job.guid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/20--peinit-notify-rejected.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/20--peinit-notify-rejected.md",
         "target": "~peios/events/field-index/fields-subject#subject.job.activation-generation",
         "label": "`subject.job.activation-generation`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/20--peinit-notify-rejected.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/20--peinit-notify-rejected.md",
         "target": "~peios/events/field-index/fields-subject#subject.operation.guid",
         "label": "`subject.operation.guid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/22--peinit-notify-stopping-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/22--peinit-notify-stopping-reported.md",
         "target": "~peios/events/field-index/fields-subject#subject.service.name",
         "label": "`subject.service.name`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/22--peinit-notify-stopping-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/22--peinit-notify-stopping-reported.md",
         "target": "~peios/events/field-index/fields-subject#subject.job.guid",
         "label": "`subject.job.guid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/22--peinit-notify-stopping-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/22--peinit-notify-stopping-reported.md",
         "target": "~peios/events/field-index/fields-subject#subject.job.activation-generation",
         "label": "`subject.job.activation-generation`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/22--peinit-notify-stopping-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/22--peinit-notify-stopping-reported.md",
         "target": "~peios/events/field-index/fields-subject#subject.operation.guid",
         "label": "`subject.operation.guid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/14--peinit-job-output-dropped.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/14--peinit-job-output-dropped.md",
         "target": "~peios/events/field-index/fields-object#object.job.guid",
         "label": "`object.job.guid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/18--peinit-notify-exit-status-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/18--peinit-notify-exit-status-reported.md",
         "target": "~peios/events/field-index/fields-subject#subject.service.name",
         "label": "`subject.service.name`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/18--peinit-notify-exit-status-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/18--peinit-notify-exit-status-reported.md",
         "target": "~peios/events/field-index/fields-subject#subject.job.guid",
         "label": "`subject.job.guid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/18--peinit-notify-exit-status-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/18--peinit-notify-exit-status-reported.md",
         "target": "~peios/events/field-index/fields-subject#subject.job.activation-generation",
         "label": "`subject.job.activation-generation`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/18--peinit-notify-exit-status-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/18--peinit-notify-exit-status-reported.md",
         "target": "~peios/events/field-index/fields-subject#subject.operation.guid",
         "label": "`subject.operation.guid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/18--peinit-notify-exit-status-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/18--peinit-notify-exit-status-reported.md",
         "target": "~peios/events/field-index/fields-notify#notify.exit-status",
         "label": "`notify.exit-status`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/27--peinit-operation-started.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/27--peinit-operation-started.md",
         "target": "~peios/events/field-index/fields-object#object.operation.guid",
         "label": "`object.operation.guid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/27--peinit-operation-started.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/27--peinit-operation-started.md",
         "target": "~peios/events/field-index/fields-object#object.operation.type",
         "label": "`object.operation.type`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/27--peinit-operation-started.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/27--peinit-operation-started.md",
         "target": "~peios/events/field-index/fields-object#object.operation.source",
         "label": "`object.operation.source`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/27--peinit-operation-started.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/27--peinit-operation-started.md",
         "target": "~peios/events/field-index/fields-object#object.operation.state",
         "label": "`object.operation.state`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/27--peinit-operation-started.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/27--peinit-operation-started.md",
         "target": "~peios/events/field-index/fields-object#object.service.name",
         "label": "`object.service.name`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/27--peinit-operation-started.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/27--peinit-operation-started.md",
         "target": "~peios/events/field-index/fields-subject#subject.token.sid",
         "label": "`subject.token.sid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/27--peinit-operation-started.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/27--peinit-operation-started.md",
         "target": "~peios/events/field-index/fields-subject#subject.token.groups",
         "label": "`subject.token.groups`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/27--peinit-operation-started.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/27--peinit-operation-started.md",
         "target": "~peios/events/field-index/fields-subject#subject.token.privileges",
         "label": "`subject.token.privileges`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/27--peinit-operation-started.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/27--peinit-operation-started.md",
         "target": "~peios/events/field-index/fields-subject#subject.token.privileges-enabled",
         "label": "`subject.token.privileges-enabled`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/2--peinit-cgroup-leaked.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/2--peinit-cgroup-leaked.md",
         "target": "~peios/events/field-index/fields-object#object.service.name",
         "label": "`object.service.name`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/2--peinit-cgroup-leaked.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/2--peinit-cgroup-leaked.md",
         "target": "~peios/events/field-index/fields-object#object.job.guid",
         "label": "`object.job.guid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/2--peinit-cgroup-leaked.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/2--peinit-cgroup-leaked.md",
         "target": "~peios/events/field-index/fields-object#object.cgroup.path",
         "label": "`object.cgroup.path`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/2--peinit-cgroup-leaked.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/2--peinit-cgroup-leaked.md",
         "target": "~peios/events/field-index/fields-object#object.cgroup.type",
         "label": "`object.cgroup.type`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/16--peinit-job-status-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/16--peinit-job-status-reported.md",
         "target": "~peios/events/field-index/fields-object#object.job.guid",
         "label": "`object.job.guid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/16--peinit-job-status-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/16--peinit-job-status-reported.md",
         "target": "~peios/events/field-index/fields-object#object.job.submitter.sid",
         "label": "`object.job.submitter.sid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/16--peinit-job-status-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/16--peinit-job-status-reported.md",
         "target": "~peios/events/field-index/fields-notify#notify.status",
         "label": "`notify.status`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/16--peinit-job-status-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/16--peinit-job-status-reported.md",
         "target": "~peios/events/field-index/fields-notify#notify.progress.current",
         "label": "`notify.progress.current`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/16--peinit-job-status-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/16--peinit-job-status-reported.md",
         "target": "~peios/events/field-index/fields-notify#notify.progress.total",
         "label": "`notify.progress.total`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/16--peinit-job-status-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/16--peinit-job-status-reported.md",
         "target": "~peios/events/field-index/fields-notify#notify.progress.bounded",
         "label": "`notify.progress.bounded`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/16--peinit-job-status-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/16--peinit-job-status-reported.md",
         "target": "~peios/events/field-index/fields-notify#notify.progress.unit",
         "label": "`notify.progress.unit`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/23--peinit-on-failure-suppressed.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/23--peinit-on-failure-suppressed.md",
         "target": "~peios/events/field-index/fields-object#object.service.name",
         "label": "`object.service.name`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/23--peinit-on-failure-suppressed.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/23--peinit-on-failure-suppressed.md",
         "target": "~peios/events/field-index/fields-object#object.service.on-failure.name",
         "label": "`object.service.on-failure.name`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/23--peinit-on-failure-suppressed.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/23--peinit-on-failure-suppressed.md",
         "target": "~peios/events/field-index/fields-object#object.service.on-failure-chain",
         "label": "`object.service.on-failure-chain`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/23--peinit-on-failure-suppressed.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/23--peinit-on-failure-suppressed.md",
         "target": "~peios/events/field-index/fields-outcome#outcome.reason",
         "label": "`outcome.reason`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/6--peinit-event-dropped.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/6--peinit-event-dropped.md",
         "target": "~peios/events/field-index/fields-emission#emission.type",
         "label": "`emission.type`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/6--peinit-event-dropped.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/6--peinit-event-dropped.md",
         "target": "~peios/events/field-index/fields-emission#emission.payload-length",
         "label": "`emission.payload-length`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/6--peinit-event-dropped.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/6--peinit-event-dropped.md",
         "target": "~peios/events/field-index/fields-object#object.service.name",
         "label": "`object.service.name`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/6--peinit-event-dropped.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/6--peinit-event-dropped.md",
         "target": "~peios/events/field-index/fields-object#object.job.guid",
         "label": "`object.job.guid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/6--peinit-event-dropped.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/6--peinit-event-dropped.md",
         "target": "~peios/events/field-index/fields-outcome#outcome.errno",
         "label": "`outcome.errno`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/28--peinit-recovery-entered.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/28--peinit-recovery-entered.md",
         "target": "~peios/events/field-index/fields-outcome#outcome.reason",
         "label": "`outcome.reason`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/28--peinit-recovery-entered.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/28--peinit-recovery-entered.md",
         "target": "~peios/events/field-index/fields-outcome#outcome.detail",
         "label": "`outcome.detail`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/25--peinit-operation-merged.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/25--peinit-operation-merged.md",
         "target": "~peios/events/field-index/fields-object#object.operation.guid",
         "label": "`object.operation.guid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/25--peinit-operation-merged.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/25--peinit-operation-merged.md",
         "target": "~peios/events/field-index/fields-object#object.operation.type",
         "label": "`object.operation.type`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/25--peinit-operation-merged.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/25--peinit-operation-merged.md",
         "target": "~peios/events/field-index/fields-object#object.operation.source",
         "label": "`object.operation.source`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/25--peinit-operation-merged.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/25--peinit-operation-merged.md",
         "target": "~peios/events/field-index/fields-object#object.operation.state",
         "label": "`object.operation.state`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/25--peinit-operation-merged.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/25--peinit-operation-merged.md",
         "target": "~peios/events/field-index/fields-object#object.operation.merged-into.guid",
         "label": "`object.operation.merged-into.guid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/25--peinit-operation-merged.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/25--peinit-operation-merged.md",
         "target": "~peios/events/field-index/fields-object#object.service.name",
         "label": "`object.service.name`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/25--peinit-operation-merged.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/25--peinit-operation-merged.md",
         "target": "~peios/events/field-index/fields-subject#subject.token.sid",
         "label": "`subject.token.sid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/25--peinit-operation-merged.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/25--peinit-operation-merged.md",
         "target": "~peios/events/field-index/fields-subject#subject.token.groups",
         "label": "`subject.token.groups`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/25--peinit-operation-merged.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/25--peinit-operation-merged.md",
         "target": "~peios/events/field-index/fields-subject#subject.token.privileges",
         "label": "`subject.token.privileges`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/25--peinit-operation-merged.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/25--peinit-operation-merged.md",
         "target": "~peios/events/field-index/fields-subject#subject.token.privileges-enabled",
         "label": "`subject.token.privileges-enabled`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/30--peinit-service-reload-timed-out.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/30--peinit-service-reload-timed-out.md",
         "target": "~peios/events/field-index/fields-object#object.service.name",
         "label": "`object.service.name`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/19--peinit-notify-progress-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/19--peinit-notify-progress-reported.md",
         "target": "~peios/events/field-index/fields-subject#subject.service.name",
         "label": "`subject.service.name`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/19--peinit-notify-progress-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/19--peinit-notify-progress-reported.md",
         "target": "~peios/events/field-index/fields-subject#subject.job.guid",
         "label": "`subject.job.guid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/19--peinit-notify-progress-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/19--peinit-notify-progress-reported.md",
         "target": "~peios/events/field-index/fields-subject#subject.job.activation-generation",
         "label": "`subject.job.activation-generation`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/19--peinit-notify-progress-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/19--peinit-notify-progress-reported.md",
         "target": "~peios/events/field-index/fields-subject#subject.operation.guid",
         "label": "`subject.operation.guid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/19--peinit-notify-progress-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/19--peinit-notify-progress-reported.md",
         "target": "~peios/events/field-index/fields-notify#notify.progress.current",
         "label": "`notify.progress.current`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/19--peinit-notify-progress-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/19--peinit-notify-progress-reported.md",
         "target": "~peios/events/field-index/fields-notify#notify.progress.total",
         "label": "`notify.progress.total`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/19--peinit-notify-progress-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/19--peinit-notify-progress-reported.md",
         "target": "~peios/events/field-index/fields-notify#notify.progress.bounded",
         "label": "`notify.progress.bounded`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/19--peinit-notify-progress-reported.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/19--peinit-notify-progress-reported.md",
         "target": "~peios/events/field-index/fields-notify#notify.progress.unit",
         "label": "`notify.progress.unit`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/24--peinit-operation-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/24--peinit-operation-ended.md",
         "target": "~peios/events/field-index/fields-object#object.operation.guid",
         "label": "`object.operation.guid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/24--peinit-operation-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/24--peinit-operation-ended.md",
         "target": "~peios/events/field-index/fields-object#object.operation.type",
         "label": "`object.operation.type`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/24--peinit-operation-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/24--peinit-operation-ended.md",
         "target": "~peios/events/field-index/fields-object#object.operation.source",
         "label": "`object.operation.source`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/24--peinit-operation-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/24--peinit-operation-ended.md",
         "target": "~peios/events/field-index/fields-object#object.operation.state",
         "label": "`object.operation.state`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/24--peinit-operation-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/24--peinit-operation-ended.md",
         "target": "~peios/events/field-index/fields-outcome#outcome.success",
         "label": "`outcome.success`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/24--peinit-operation-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/24--peinit-operation-ended.md",
         "target": "~peios/events/field-index/fields-outcome#outcome.detail",
         "label": "`outcome.detail`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/24--peinit-operation-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/24--peinit-operation-ended.md",
         "target": "~peios/events/field-index/fields-object#object.operation.duration",
         "label": "`object.operation.duration`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/24--peinit-operation-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/24--peinit-operation-ended.md",
         "target": "~peios/events/field-index/fields-object#object.service.name",
         "label": "`object.service.name`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/24--peinit-operation-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/24--peinit-operation-ended.md",
         "target": "~peios/events/field-index/fields-subject#subject.token.sid",
         "label": "`subject.token.sid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/24--peinit-operation-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/24--peinit-operation-ended.md",
         "target": "~peios/events/field-index/fields-subject#subject.token.groups",
         "label": "`subject.token.groups`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/24--peinit-operation-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/24--peinit-operation-ended.md",
         "target": "~peios/events/field-index/fields-subject#subject.token.privileges",
         "label": "`subject.token.privileges`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/24--peinit-operation-ended.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/24--peinit-operation-ended.md",
         "target": "~peios/events/field-index/fields-subject#subject.token.privileges-enabled",
         "label": "`subject.token.privileges-enabled`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/26--peinit-operation-requested.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/26--peinit-operation-requested.md",
         "target": "~peios/events/field-index/fields-object#object.operation.guid",
         "label": "`object.operation.guid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/26--peinit-operation-requested.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/26--peinit-operation-requested.md",
         "target": "~peios/events/field-index/fields-object#object.operation.type",
         "label": "`object.operation.type`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/26--peinit-operation-requested.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/26--peinit-operation-requested.md",
         "target": "~peios/events/field-index/fields-object#object.operation.source",
         "label": "`object.operation.source`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/26--peinit-operation-requested.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/26--peinit-operation-requested.md",
         "target": "~peios/events/field-index/fields-object#object.operation.state",
         "label": "`object.operation.state`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/26--peinit-operation-requested.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/26--peinit-operation-requested.md",
         "target": "~peios/events/field-index/fields-object#object.service.name",
         "label": "`object.service.name`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/26--peinit-operation-requested.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/26--peinit-operation-requested.md",
         "target": "~peios/events/field-index/fields-subject#subject.token.sid",
         "label": "`subject.token.sid`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/26--peinit-operation-requested.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/26--peinit-operation-requested.md",
         "target": "~peios/events/field-index/fields-subject#subject.token.groups",
         "label": "`subject.token.groups`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/26--peinit-operation-requested.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/26--peinit-operation-requested.md",
         "target": "~peios/events/field-index/fields-subject#subject.token.privileges",
         "label": "`subject.token.privileges`"
       },
       {
-        "page": "docs/learn/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/26--peinit-operation-requested.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/0--using-peios.antho/600--reference.shelf/100--events.book/8--peinit/26--peinit-operation-requested.md",
         "target": "~peios/events/field-index/fields-subject#subject.token.privileges-enabled",
         "label": "`subject.token.privileges-enabled`"
       },
       {
-        "page": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/11--output-handling/4--the-eventd-handoff.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/11--output-handling/4--the-eventd-handoff.md",
         "target": "~peios/advanced-peios/pspu/observability-interfaces/log-records",
         "label": "PSPU \u00a73.7"
       },
       {
-        "page": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/11--output-handling/4--the-eventd-handoff.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/11--output-handling/4--the-eventd-handoff.md",
         "target": "~peios/advanced-peios/pcds/guid/binary-format",
         "label": "PCDS GUID layout"
       },
       {
-        "page": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/11--output-handling/5--console-output.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/11--output-handling/5--console-output.md",
         "target": "~peios/developing-for-peios/writing-boot-hooks/writing-a-boot-hook",
         "label": "hook scripts"
       },
       {
-        "page": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/1--introduction/5--service-manager-boundaries.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/1--introduction/5--service-manager-boundaries.md",
         "target": "~peios/registry-concepts/watches",
         "label": "change   notifications"
       },
       {
-        "page": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/1--introduction/5--service-manager-boundaries.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/1--introduction/5--service-manager-boundaries.md",
         "target": "~peios/identity/well-known-principals",
         "label": "SYSTEM"
       },
       {
-        "page": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/1--introduction/5--service-manager-boundaries.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/1--introduction/5--service-manager-boundaries.md",
         "target": "~peios/identity/overview",
         "label": "lpsd"
       },
       {
-        "page": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/1--introduction/5--service-manager-boundaries.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/1--introduction/5--service-manager-boundaries.md",
         "target": "~peios/identity/well-known-principals",
         "label": "Well-known principals"
       },
       {
-        "page": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/1--introduction/5--service-manager-boundaries.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/1--introduction/5--service-manager-boundaries.md",
         "target": "~peios/threads-and-processes/process-lifecycle",
         "label": "cgroup"
       },
       {
-        "page": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/7--dependencies/5--readiness-levels.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/7--dependencies/5--readiness-levels.md",
         "target": "~peios/networking/overview",
         "label": "netd"
       },
       {
-        "page": "docs/learn/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/7--dependencies/5--readiness-levels.md",
+        "page": "docs/learn/1--peios.shelf/peios.product/3--advanced-peios.antho/300--trms.shelf/200--peinit.book/7--dependencies/5--readiness-levels.md",
         "target": "~peios/time/overview",
         "label": "timed"
       }
