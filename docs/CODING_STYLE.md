@@ -1,6 +1,6 @@
 # Peinit Coding Style
 
-Follow the [PSC coding rules](https://learn.peios.org/psc/coding-style/)
+Follow the [PSC coding rules](https://learn.peios.org/psc/common-coding-rules/scope-and-precedence/)
 and the Rust language profile. `tools/style-check.py` pins the mechanical
 checks; `tools/check` also runs Clippy, tests, ABI checks, and packaging.
 Use four spaces and a 100-column Rust formatter target. Import order is
