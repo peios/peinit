@@ -119,7 +119,7 @@ components:
 |---|---|
 | **KACS** | Service identity (installing tokens on children), control-interface authentication (peer token + AccessCheck), and per-service access control. See [Access decisions](~kernel/internals/kacs/access-check/the-dacl-walk). |
 | **LCS / the registry** | Service definitions, boot configuration, and its own parameters. See [The registry](~peios/sdk-registry/overview). |
-| **registryd** | The registry *source* daemon — the first service peinit starts. peinit treats it as an opaque dependency. (`registryd` is an interface; the default implementation is `loregd` — see [Boot and boot modes](~peios/services-and-jobs/boot-and-boot-modes).) |
+| **registryd** | The registry *source* daemon — the first service peinit starts. peinit treats it as an opaque dependency. (`registryd` is an interface; the default implementation is `loregd` — see [Boot and boot modes](~peios/boot/boot-and-boot-modes).) |
 | **authd** | Minting tokens for non-platform services. peinit requests; authd mints. |
 | **eventd** | Service logs (forwarded over a socket) and job/operation/audit events (emitted through KMES). |
 | **KACS, again** | Conveying a job identity: when a process submits a job over peinit's jobs socket and attaches a token, the kernel gates the attach — so peinit can run a program as a service's client without ever judging the identity itself. See [Jobs and operations](~peios/services-and-jobs/jobs-and-operations). |
@@ -127,7 +127,7 @@ components:
 The bootstrapping puzzle — authd needs the registry, the registry needs to be
 started by *something*, and that something is peinit running before any of
 them exist — is resolved by the boot model in [Boot and boot
-modes](~peios/services-and-jobs/boot-and-boot-modes).
+modes](~peios/boot/boot-and-boot-modes).
 
 ## How a token is materialised
 
@@ -152,7 +152,7 @@ that follows affects only this token, never peinit's.
 This path exists because of a bootstrapping problem: the platform services
 that *make* the normal token flow possible cannot use it, because they have to
 start *before* it exists. `registryd` and `authd` use this bootstrap path
-during [boot](~peios/services-and-jobs/boot-and-boot-modes). Standard eventd
+during [boot](~peios/boot/boot-and-boot-modes). Standard eventd
 and lpsd deployments now use `Identity=Service`, take the authd path, and
 start after authd (§4.2).
 
@@ -225,7 +225,7 @@ Every other descriptor peinit holds — the control socket, the notify socket,
 the event-loop fd, the registry, and authd and eventd connections — is opened
 close-on-exec, so it closes automatically at exec and can never leak into a
 service. peinit also resets the child's signal state to defaults (it runs with
-all signals blocked for its own [signalfd](~peios/services-and-jobs/shutdown);
+all signals blocked for its own [signalfd](~peios/boot/shutdown);
 a service must not inherit that). The guarantee is that a service starts from
 a clean slate, not from peinit's privileged one.
 

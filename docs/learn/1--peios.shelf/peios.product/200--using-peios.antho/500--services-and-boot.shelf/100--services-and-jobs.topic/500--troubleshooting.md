@@ -6,7 +6,7 @@ related:
   - peios/services-and-jobs/the-service-lifecycle
   - peios/services-and-jobs/supervision
   - peios/services-and-jobs/controlling-services
-  - peios/services-and-jobs/boot-and-boot-modes
+  - peios/boot/boot-and-boot-modes
 ---
 
 Collect the current state and cause before changing anything:
@@ -78,7 +78,7 @@ exhausting its restart budget**, its
 peinit sync and reboot. Repeating that failure can produce a reboot loop; the
 symptom alone does not establish this cause.
 
-The [boot-attempt counter](~peios/services-and-jobs/boot-and-boot-modes) can
+The [boot-attempt counter](~peios/boot/boot-and-boot-modes) can
 break a sequence of boots that reach peinit's counter increment but never
 become confirmed: after N attempts (default 3), peinit enters [Recovery
 mode](#recovery). If each boot reaches the success grace
@@ -232,7 +232,7 @@ up:
 
 ## Safe
 
-[Safe mode](~peios/services-and-jobs/boot-and-boot-modes) selects Critical and
+[Safe mode](~peios/boot/boot-and-boot-modes) selects Critical and
 `SafeMode=1` services within the boot-triggered set. Those flags do not give a
 demand-only service a boot trigger. You land here when graph validation finds
 a **cycle or unresolvable conflict involving a Critical service**, or when
@@ -246,7 +246,7 @@ boot returns. You can start any service by hand from Safe mode in the meantime
 
 ## Recovery
 
-[Recovery mode](~peios/services-and-jobs/boot-and-boot-modes) gives you a
+[Recovery mode](~peios/boot/boot-and-boot-modes) gives you a
 SYSTEM shell on the console and skips Phase 2 services. It starts registryd
 only if the boot has not already attempted that start. You reach it when the
 boot counter hits N, when `peios.recovery=1` is set, or when **registryd

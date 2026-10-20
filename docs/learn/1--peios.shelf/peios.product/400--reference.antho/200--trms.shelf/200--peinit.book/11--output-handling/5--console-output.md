@@ -214,4 +214,4 @@ than hanging the boot.
 > [!NOTE]
 > `peios.quiet` governs peinit only. What the **kernel** prints is
 > governed separately by `loglevel`, which shipped images set to `4`. See
-> [Boot and boot modes](~peios/services-and-jobs/boot-and-boot-modes).
+> [Boot and boot modes](~peios/boot/boot-and-boot-modes).

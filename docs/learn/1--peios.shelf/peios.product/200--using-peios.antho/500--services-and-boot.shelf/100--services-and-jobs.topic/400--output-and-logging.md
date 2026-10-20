@@ -7,12 +7,12 @@ related:
   - peios/services-and-jobs/jobs-and-operations
   - kernel/internals/kacs/auditing/overview
   - kernel/internals/kacs/auditing/event-families-and-delivery
-  - peios/services-and-jobs/boot-and-boot-modes
+  - peios/boot/boot-and-boot-modes
 ---
 
 In **Services Manager**, select the service and choose **Logs…**. It opens
 [Event
-Viewer](~peios/desktop-event-viewer/event-viewer) with
+Viewer](~peios/reading-records/event-viewer) with
 the service's lines and the output of its hooks and health checks, newest
 first and updating as they arrive.
 
@@ -117,7 +117,7 @@ terminal.
 
 `peios.quiet` can suppress peinit's console messages, and suppressed messages
 are dropped rather than saved for later. See [console noise
-settings](~peios/services-and-jobs/boot-and-boot-modes#console-noise-peios-quiet)
+settings](~peios/boot/boot-and-boot-modes#console-noise-peios-quiet)
 when investigating a boot problem.
 
 ## Where to start
@@ -127,5 +127,5 @@ For symptom-based next steps, use
 executions or actions, use [Jobs and
 operations](~peios/services-and-jobs/jobs-and-operations). For query tools,
 use [Event
-Viewer](~peios/desktop-event-viewer/event-viewer) or
+Viewer](~peios/reading-records/event-viewer) or
 [evctl](~peios/evctl/using-evctl).

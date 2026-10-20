@@ -168,11 +168,11 @@ Under `Machine\System\Boot\`:
 
 | Key | Type | Default | Purpose | See |
 |---|---|---|---|---|
-| `MaxParallelStarts` | dword (> 0) | 10 | Maximum services starting concurrently. Missing → default; zero/invalid → Recovery. | [Boot and boot modes](~peios/services-and-jobs/boot-and-boot-modes) |
-| `BootSuccessGrace` | dword | 30 | Seconds a Critical service must hold a satisfying state before boot is successful. | [Boot and boot modes](~peios/services-and-jobs/boot-and-boot-modes) |
-| `ShutdownTimeout` | dword | 90 | Maximum seconds for the whole graceful shutdown. | [Shutdown](~peios/services-and-jobs/shutdown) |
+| `MaxParallelStarts` | dword (> 0) | 10 | Maximum services starting concurrently. Missing → default; zero/invalid → Recovery. | [Boot and boot modes](~peios/boot/boot-and-boot-modes) |
+| `BootSuccessGrace` | dword | 30 | Seconds a Critical service must hold a satisfying state before boot is successful. | [Boot and boot modes](~peios/boot/boot-and-boot-modes) |
+| `ShutdownTimeout` | dword | 90 | Maximum seconds for the whole graceful shutdown. | [Shutdown](~peios/boot/shutdown) |
 | `SettleTimeout` | dword | 5 | Seconds to wait for the boot set to settle before starting [`boot:settled`](~peios/services-and-jobs/triggers-and-timers) services anyway. | [Triggers and timers](~peios/services-and-jobs/triggers-and-timers) |
-| `PostKillTimeout` | dword | 5 | Seconds peinit waits for a service cgroup to drain after SIGKILL before treating it as stuck. `ShutdownTimeout` bounds the shutdown as a whole; this bounds one service's last stage of it. | [Shutdown](~peios/services-and-jobs/shutdown) |
+| `PostKillTimeout` | dword | 5 | Seconds peinit waits for a service cgroup to drain after SIGKILL before treating it as stuck. `ShutdownTimeout` bounds the shutdown as a whole; this bounds one service's last stage of it. | [Shutdown](~peios/boot/shutdown) |
 
 ## Operational parameters
 
@@ -194,11 +194,11 @@ Under `Machine\System\Init\`:
 | `LogReadBytesPerEvent` | dword | 16384 | Bytes drained from a service's output pipe per readable event. Larger favors throughput on chatty services, smaller favors fairness between them. | [Service output and logging](~peios/services-and-jobs/output-and-logging) |
 | `PreEventdBuffer` | dword | 1048576 | Total bytes of service output held in memory before eventd is up to receive it. Overflow drops the oldest output; it never blocks a service. | [Service output and logging](~peios/services-and-jobs/output-and-logging) |
 | `EnvVars\` | (parent key) | empty | Default environment variables injected into Phase 2 services (value name = variable, `REG_SZ` data = value). The descriptor here is security-critical. | [The execution environment](~peios/services-and-jobs/execution-environment) |
-| `ProvisionedPaths\` | (parent key) | empty | Boot-time path provisioning: each child key names one directory or file that peinit creates and secures after registryd starts and before Phase 2 — the registry-backed equivalent of tmpfiles.d. | [Boot and boot modes](~peios/services-and-jobs/boot-and-boot-modes) |
-| `ProvisionedPaths\<name>\Kind` | string | *(required)* | `directory` or `file` — what to create at `Path`. | [Boot and boot modes](~peios/services-and-jobs/boot-and-boot-modes) |
-| `ProvisionedPaths\<name>\Path` | string | *(required)* | Absolute path to create or verify. | [Boot and boot modes](~peios/services-and-jobs/boot-and-boot-modes) |
-| `ProvisionedPaths\<name>\Security` | binary | SYSTEM + Administrators full, users read/traverse | Peios file security descriptor to apply to the object. | [Boot and boot modes](~peios/services-and-jobs/boot-and-boot-modes) |
-| `ProvisionedPaths\<name>\Required` | dword | 0 | If 1, a failure to provision this entry sends boot to [Recovery mode](~peios/services-and-jobs/boot-and-boot-modes) before Phase 2 starts. | [Boot and boot modes](~peios/services-and-jobs/boot-and-boot-modes) |
+| `ProvisionedPaths\` | (parent key) | empty | Boot-time path provisioning: each child key names one directory or file that peinit creates and secures after registryd starts and before Phase 2 — the registry-backed equivalent of tmpfiles.d. | [Boot and boot modes](~peios/boot/boot-and-boot-modes) |
+| `ProvisionedPaths\<name>\Kind` | string | *(required)* | `directory` or `file` — what to create at `Path`. | [Boot and boot modes](~peios/boot/boot-and-boot-modes) |
+| `ProvisionedPaths\<name>\Path` | string | *(required)* | Absolute path to create or verify. | [Boot and boot modes](~peios/boot/boot-and-boot-modes) |
+| `ProvisionedPaths\<name>\Security` | binary | SYSTEM + Administrators full, users read/traverse | Peios file security descriptor to apply to the object. | [Boot and boot modes](~peios/boot/boot-and-boot-modes) |
+| `ProvisionedPaths\<name>\Required` | dword | 0 | If 1, a failure to provision this entry sends boot to [Recovery mode](~peios/boot/boot-and-boot-modes) before Phase 2 starts. | [Boot and boot modes](~peios/boot/boot-and-boot-modes) |
 
 > [!NOTE]
 > A few `ProvisionedPaths` rules worth knowing before you rely on them:
@@ -207,7 +207,7 @@ Under `Machine\System\Init\`:
 > define each directory you need as its own entry, or depend on the package
 > that owns the parent. A malformed entry is logged and skipped rather than
 > blocking boot; only an entry you mark `Required=1` can send boot to
-> [Recovery mode](~peios/services-and-jobs/boot-and-boot-modes), and only when
+> [Recovery mode](~peios/boot/boot-and-boot-modes), and only when
 > it genuinely can't be created or secured.
 
 ## Keys peinit reads from other subsystems

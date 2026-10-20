@@ -6,7 +6,7 @@ related:
   - peios/services-and-jobs/defining-a-service
   - peios/services-and-jobs/the-service-lifecycle
   - peios/services-and-jobs/controlling-services
-  - peios/services-and-jobs/boot-and-boot-modes
+  - peios/boot/boot-and-boot-modes
   - peios/peinit/boot/phase-1
   - kernel/internals/kacs/tokens/the-token-model
   - peios/sdk-registry/overview
@@ -35,8 +35,8 @@ only services you have permission to query.
 | Find output from a failed run or hook | [Service output and logging](~peios/services-and-jobs/output-and-logging) |
 | Create a service or change its settings | [Defining a service](~peios/services-and-jobs/defining-a-service) |
 | Change automatic starts or a schedule | [Triggers and timers](~peios/services-and-jobs/triggers-and-timers) |
-| Diagnose a reduced boot or reboot loop | [Boot modes](~peios/services-and-jobs/boot-and-boot-modes) |
-| Shut down or reboot deliberately | [Shutdown](~peios/services-and-jobs/shutdown) |
+| Diagnose a reduced boot or reboot loop | [Boot modes](~peios/boot/boot-and-boot-modes) |
+| Shut down or reboot deliberately | [Shutdown](~peios/boot/shutdown) |
 
 For exact field types and defaults, use the [Registry key
 reference](~peios/services-and-jobs/registry-key-reference). For

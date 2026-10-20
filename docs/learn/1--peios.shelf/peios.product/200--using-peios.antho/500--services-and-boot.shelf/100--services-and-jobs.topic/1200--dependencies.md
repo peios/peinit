@@ -5,8 +5,8 @@ description: Choose startup dependencies and runtime coupling, check why a depen
 related:
   - peios/services-and-jobs/the-service-lifecycle
   - peios/services-and-jobs/supervision
-  - peios/services-and-jobs/boot-and-boot-modes
-  - peios/services-and-jobs/shutdown
+  - peios/boot/boot-and-boot-modes
+  - peios/boot/shutdown
   - peios/services-and-jobs/jobs-and-operations
 ---
 
@@ -100,7 +100,7 @@ If A `Conflicts` with B:
 - **Start.** Starting A while B is Active creates a stop operation for B
   (source `ConflictResolution`), evicting it (cause `ConflictEviction`)
   before A starts — and vice versa. If the loser will not stop within its
-  `StopTimeout`, [SIGKILL escalation](~peios/services-and-jobs/shutdown)
+  `StopTimeout`, [SIGKILL escalation](~peios/boot/shutdown)
   applies. The evicted loser does **not** land in Inactive: it comes to rest
   in **Failed** (carrying `ConflictEviction`), so it shows as Failed in
   `status` and needs a `reset` before it will start again. That is deliberate
@@ -187,7 +187,7 @@ a cycle. Every service in the cycle is marked Failed with `CycleDetected`,
 and peinit logs the full path (`dependency cycle: A → B → C → A`) so you can
 find and break it. A service can not depend on itself — a self-reference is
 rejected as a cycle. If any service in the cycle is `ErrorControl=Critical`,
-peinit downgrades to [Safe mode](~peios/services-and-jobs/boot-and-boot-modes)
+peinit downgrades to [Safe mode](~peios/boot/boot-and-boot-modes)
 rather than rebooting, because a reboot would hit the same cycle.
 
 **Missing targets.** What a missing target means depends on the relationship:
@@ -243,7 +243,7 @@ still honored exactly.
 ## Shutdown reverses the graph
 
 peinit does not need a separate stop-ordering configuration.
-[Shutdown](~peios/services-and-jobs/shutdown) **reverses** the
+[Shutdown](~peios/boot/shutdown) **reverses** the
 dependency graph: services with no dependents stop first, and services that
 others depend on stop last. A service is never stopped until everything that
 `Requires` or `BindsTo` it has already stopped.
@@ -251,7 +251,7 @@ others depend on stop last. A service is never stopped until everything that
 Shared platform services stop after their dependents, with `registryd` last.
 The exact order comes from the installed graph; do not rely on a fixed list of
 daemon names. The full shutdown sequence is in
-[Shutdown](~peios/services-and-jobs/shutdown).
+[Shutdown](~peios/boot/shutdown).
 
 ## Where to start
 

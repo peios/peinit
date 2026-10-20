@@ -6,7 +6,7 @@ related:
   - peios/services-and-jobs/dependencies
   - peios/services-and-jobs/supervision
   - peios/services-and-jobs/the-service-lifecycle
-  - peios/services-and-jobs/boot-and-boot-modes
+  - peios/boot/boot-and-boot-modes
 ---
 
 Use `svctl shutdown` when you intend to stop the machine. Choose one action:
@@ -66,7 +66,7 @@ budget](~peios/services-and-jobs/supervision), peinit **syncs and reboots
 immediately**. There is no service-stop ordering: the system is in an
 undefined state and the fastest route to a known one is a reboot. This is what
 feeds the [boot-attempt
-counter](~peios/services-and-jobs/boot-and-boot-modes), and a Critical service
+counter](~peios/boot/boot-and-boot-modes), and a Critical service
 that fails identically every boot becomes a reboot loop that the counter
 eventually breaks by escalating to Recovery.
 
@@ -201,4 +201,4 @@ To understand the Critical-failure path that bypasses graceful shutdown, read
 [Keeping services running](~peios/services-and-jobs/supervision).
 
 For the boot side of the lifecycle and the reboot/recovery escalation, read
-[Boot and boot modes](~peios/services-and-jobs/boot-and-boot-modes).
+[Boot and boot modes](~peios/boot/boot-and-boot-modes).

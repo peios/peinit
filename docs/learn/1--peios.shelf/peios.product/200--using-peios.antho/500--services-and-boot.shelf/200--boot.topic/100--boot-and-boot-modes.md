@@ -5,7 +5,7 @@ description: Check the current boot, understand Full, Safe and Recovery modes, a
 related:
   - peios/services-and-jobs/dependencies
   - peios/services-and-jobs/supervision
-  - peios/services-and-jobs/shutdown
+  - peios/boot/shutdown
   - peios/peinit/boot/phase-1
   - peios/peinit/boot/the-initramfs-contract
   - peios/sdk-registry/overview
@@ -212,7 +212,7 @@ for the exact increment boundary.
 |---|---|---|
 | `Machine\System\Boot\MaxParallelStarts` | 10 | Services starting concurrently (must be > 0; invalid → Recovery). |
 | `Machine\System\Boot\BootSuccessGrace` | 30 | Seconds a Critical service must hold a satisfying state before boot counts as successful. |
-| `Machine\System\Boot\ShutdownTimeout` | 90 | Maximum seconds for the whole [shutdown](~peios/services-and-jobs/shutdown) sequence. |
+| `Machine\System\Boot\ShutdownTimeout` | 90 | Maximum seconds for the whole [shutdown](~peios/boot/shutdown) sequence. |
 | `Machine\System\Boot\PostKillTimeout` | 5 | Seconds a service cgroup can take to drain after SIGKILL before it counts as stuck. |
 | `Machine\System\Boot\SettleTimeout` | 5 | Seconds peinit waits for the boot service set to settle before starting `boot:settled` services anyway. |
 

@@ -295,7 +295,7 @@ something is broken and a console prompt is what you need.
 
 A `boot:settled` service is deliberately **not** part of the boot plan. It
 does not consume the [parallel-start
-budget](~peios/services-and-jobs/boot-and-boot-modes), is not counted toward
+budget](~peios/boot/boot-and-boot-modes), is not counted toward
 boot success, and cannot block another service. Waiting for quiet is a
 preference; it must not change what the boot means.
 

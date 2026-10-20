@@ -6,7 +6,7 @@ related:
   - peios/services-and-jobs/the-service-lifecycle
   - peios/services-and-jobs/who-can-manage-a-service
   - peios/services-and-jobs/jobs-and-operations
-  - peios/services-and-jobs/shutdown
+  - peios/boot/shutdown
   - peios/services-and-jobs/troubleshooting
 ---
 
@@ -114,7 +114,7 @@ service](~peios/services-and-jobs/who-can-manage-a-service#changing-them-from-th
   pane or on a row's menu. The window shows the service's lines and those of
   its hooks and health checks, newest first and as they are written. See
   [Event
-  Viewer](~peios/desktop-event-viewer/event-viewer).
+  Viewer](~peios/reading-records/event-viewer).
 - **Timers show when they run.** The **Next run** column shows when each
   service's soonest [timer](~peios/services-and-jobs/triggers-and-timers)
   fires. The details pane lists each timer under its schedule, with its next
@@ -208,7 +208,7 @@ window, the reload resolves as `advisory` and the service stays Active.
 
 | Command | Does | Required right |
 |---|---|---|
-| `shutdown <type>` | Graceful [shutdown](~peios/services-and-jobs/shutdown). `type` is `poweroff`, `reboot`, or `halt`. | `SYSTEM_SHUTDOWN` |
+| `shutdown <type>` | Graceful [shutdown](~peios/boot/shutdown). `type` is `poweroff`, `reboot`, or `halt`. | `SYSTEM_SHUTDOWN` |
 | `boot` | Report this boot's mode, reason, and confirmation status. | `SYSTEM_QUERY_STATUS` |
 | `reload-config` | Re-read *all* definitions and rebuild the graph (atomic). | `SYSTEM_RELOAD_CONFIG` |
 | `operation-status <id>` | Report the state of an operation by GUID. | `SERVICE_QUERY_STATUS` on its target |

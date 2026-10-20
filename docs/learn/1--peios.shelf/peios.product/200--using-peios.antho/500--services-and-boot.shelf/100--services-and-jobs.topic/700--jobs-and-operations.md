@@ -356,7 +356,7 @@ answers `UNKNOWN_JOB`, and the durable record is in
 
 ### Shutdown
 
-At [shutdown](~peios/services-and-jobs/shutdown), every live submitted job is
+At [shutdown](~peios/boot/shutdown), every live submitted job is
 stopped **at once**, in no particular order — jobs have no dependencies, so
 there is nothing to order — and a job still queued to launch is canceled with
 cause `shutdown`. Shutdown does not complete while a live job remains,

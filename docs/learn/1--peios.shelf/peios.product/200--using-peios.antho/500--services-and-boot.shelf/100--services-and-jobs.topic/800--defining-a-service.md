@@ -261,7 +261,7 @@ timers](~peios/services-and-jobs/triggers-and-timers).
 |---|---|---|
 | `Triggers` | — | `boot`, `boot:settled`, `timer:<schedule>`, `tty:released`. Absent = demand-only. |
 | `Disabled` | 0 | If 1, triggers must not activate the service (manual start still allowed). |
-| `SafeMode` | 0 | Eligible within the boot-triggered set in [Safe mode](~peios/services-and-jobs/boot-and-boot-modes); does not add a boot trigger. |
+| `SafeMode` | 0 | Eligible within the boot-triggered set in [Safe mode](~peios/boot/boot-and-boot-modes); does not add a boot trigger. |
 | `Conditions`, `Asserts` | — | Start-time checks. A failed condition *skips*; a failed assert *fails*. |
 
 **Who it runs as** — identity and privileges. See [Service identity and

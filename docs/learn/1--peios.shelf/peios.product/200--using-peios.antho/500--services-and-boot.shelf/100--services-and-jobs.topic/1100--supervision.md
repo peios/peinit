@@ -6,7 +6,7 @@ related:
   - peios/services-and-jobs/the-service-lifecycle
   - peios/services-and-jobs/service-types
   - peios/services-and-jobs/dependencies
-  - peios/services-and-jobs/shutdown
+  - peios/boot/shutdown
   - peios/services-and-jobs/troubleshooting
 ---
 
@@ -212,7 +212,7 @@ The extension is capped to prevent a buggy service from extending forever:
 | Stopping | `StopTimeout` | `StopTimeout` × 4 |
 | Reloading | `StartTimeout` | `StartTimeout` × 4 |
 
-During [shutdown](~peios/services-and-jobs/shutdown) a second, global cap also
+During [shutdown](~peios/boot/shutdown) a second, global cap also
 applies — the deadline can never exceed the remaining time in the global
 shutdown timeout, and the stricter of the two caps wins. A message received
 outside a transition (the service is Active, Failed, …) is ignored — there is
@@ -261,20 +261,20 @@ A few consequences worth holding onto:
   its budget, peinit reboots; it does *not* start the `OnFailure` handler.
 - **`ErrorControl=Critical` implies `SafeMode`.** A Critical service is
   always eligible to start in [Safe
-  mode](~peios/services-and-jobs/boot-and-boot-modes).
+  mode](~peios/boot/boot-and-boot-modes).
 - **Critical services are OOM-protected.** peinit sets their `oom_score_adj`
   to `-1000`, so the kernel will not pick them as out-of-memory victims.
 - **A runtime Critical crash does not enter Safe mode** — it follows the
   reboot path. Safe mode is only for boot-time *configuration* errors (a cycle
   or conflict involving a Critical service). The escalation between reboots,
   the boot-attempt counter, and Recovery mode are covered in [Boot and boot
-  modes](~peios/services-and-jobs/boot-and-boot-modes).
+  modes](~peios/boot/boot-and-boot-modes).
 
 > [!WARNING]
 > A Critical service that exhausts its restart budget on every boot can cause
 > a **reboot loop**. The [boot-attempt
 >
-> counter](~peios/services-and-jobs/boot-and-boot-modes#the-boot-attempt-counter)
+> counter](~peios/boot/boot-and-boot-modes#the-boot-attempt-counter)
 > can escalate repeated unconfirmed boots to Recovery, provided peinit reaches
 > and persists its increment. A confirmed boot resets the counter, so repeated
 > failures after confirmation can never reach the Recovery threshold. See
