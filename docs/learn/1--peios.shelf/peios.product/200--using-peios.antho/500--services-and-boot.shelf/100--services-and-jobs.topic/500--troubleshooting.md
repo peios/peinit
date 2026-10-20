@@ -1,5 +1,5 @@
 ---
-title: Troubleshoot a Service
+title: Troubleshooting a Service
 type: how-to
 description: Start with status and logs, then diagnose start failures, retries, missing changes, access errors and boot recovery.
 related:

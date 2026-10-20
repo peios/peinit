@@ -1,5 +1,5 @@
 ---
-title: Find Service Logs
+title: Finding Service Logs
 type: how-to
 description: Open service logs, match output to one run, diagnose missing lines, and understand which records survive.
 related:

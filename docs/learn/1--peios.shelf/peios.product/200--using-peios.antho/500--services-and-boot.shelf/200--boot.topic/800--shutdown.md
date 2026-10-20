@@ -1,5 +1,5 @@
 ---
-title: Shutdown
+title: Shutting Down and Rebooting
 type: how-to
 description: Power off or reboot through peinit, understand graceful timeouts, and reserve forced shutdown for a stuck system.
 related:

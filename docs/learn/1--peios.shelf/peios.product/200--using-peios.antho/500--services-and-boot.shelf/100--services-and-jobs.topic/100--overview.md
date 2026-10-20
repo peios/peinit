@@ -1,5 +1,5 @@
 ---
-title: Manage Services and Jobs
+title: Services and Jobs
 type: concept
 description: Check a service, start or stop it, find its logs, and choose the next troubleshooting or configuration step.
 related:
@@ -12,10 +12,11 @@ related:
   - peios/sdk-registry/overview
 ---
 
-Use **Services Manager** on the desktop or **svctl** in a terminal to see what
-is running and control it. Both talk to **peinit**, the service manager that
-runs as PID 1. Start with a status check; change the definition only when the
-running service needs different configuration.
+Use [Services Manager](~peios/services-and-jobs/services-manager) on the
+desktop or `svctl` in a terminal to see what is running and control it. Both
+talk to **peinit**, the service manager that runs as PID 1. Start with a
+status check; change the definition only when the running service needs
+different configuration.
 
 ```sh
 svctl list
