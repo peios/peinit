@@ -16,7 +16,7 @@ LCS's request timeout: if registryd hangs mid-read, peinit receives
 Decoding is per key. A definition that fails to decode — an invalid
 service name, a malformed trigger, an unclosed quote in a command, a
 `registry:` check naming an uncacheable key, a duplicate known field, an
-unrecognised value for an enumerated dword — fails that service, which
+unrecognized value for an enumerated dword — fails that service, which
 is marked Failed with cause `ValidationError`.
 [*phase2.an-undecodable-definition-fails-only-that-service] The boot
 proceeds with every other definition, and anything that depended on the

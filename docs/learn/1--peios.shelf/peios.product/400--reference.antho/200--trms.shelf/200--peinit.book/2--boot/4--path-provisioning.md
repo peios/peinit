@@ -67,7 +67,7 @@ Entries with `Required=0` are fail-soft: peinit logs and continues.
 fail-closed: peinit logs and enters recovery before Phase 2 starts.
 [*provision.a-required-entry-that-fails-is-recovery]
 
-An entry that is malformed — a missing or unrecognised `Kind`, a missing
+An entry that is malformed — a missing or unrecognized `Kind`, a missing
 or relative `Path`, a value of the wrong type — is logged as a warning
 and skipped, regardless of `Required`.
 [*provision.a-malformed-entry-is-skipped-whatever-required-says]

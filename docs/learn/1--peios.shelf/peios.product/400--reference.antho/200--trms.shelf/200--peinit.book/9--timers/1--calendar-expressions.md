@@ -96,7 +96,7 @@ system-local time.
 [*cal.a-timezone-is-an-iana-name-and-its-absence-means-system-local]
 
 A name is validated when the expression is parsed and resolved again at
-evaluation. An unrecognised zone is a hard parse error, not a silent
+evaluation. An unrecognized zone is a hard parse error, not a silent
 fallback to UTC. [*cal.an-unrecognised-timezone-is-a-parse-error]
 
 ## Daylight saving

@@ -29,7 +29,7 @@ Conditions are evaluated first; asserts only if every condition passed.
 [*check.conditions-are-evaluated-before-asserts] Both are evaluated
 before dependency resolution and before any pre-exec hook,
 [*check.checks-precede-dependency-resolution-and-the-hooks] and an entry
-with an empty argument or an unrecognised type is a decode error.
+with an empty argument or an unrecognized type is a decode error.
 [*check.an-empty-argument-or-unknown-type-is-a-decode-error]
 
 ## Evaluation without blocking
