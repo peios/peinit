@@ -264,7 +264,7 @@ The sender is verified exactly once whichever way it was routed
 (§10.5).
 
 What the fields do to a submitted job:
-<!-- lint-disable-next-line words spelling -->
+<!-- lint-disable-next-line spelling -->
 [*submit.the-notification-fields-a-submitted-job-may-send]
 
 | Field | Effect |
@@ -325,7 +325,7 @@ the main process through its pidfd, on a running job only.
 [*submit.signal-acts-on-a-running-job-only] `SIGKILL`
 this way leaves whatever the job spawned and produces a failed job with
 `exit_signal` set and a null cause.
-<!-- lint-disable-next-line words spelling -->
+<!-- lint-disable-next-line spelling -->
 [*submit.a-signalled-kill-produces-a-failed-job-with-a-null-cause] A
 submitter that wants the job *ended* uses `stop`.
 

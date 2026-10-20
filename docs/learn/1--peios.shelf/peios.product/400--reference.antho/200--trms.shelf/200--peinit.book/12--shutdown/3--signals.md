@@ -55,14 +55,14 @@ signals, so no signal can kill it.
 
 peinit reaps with `waitpid(-1, ..., WNOHANG)` in a drain loop, and
 normalizes the wait status before any service or job policy sees it:
-<!-- lint-disable-next-line words spelling -->
+<!-- lint-disable-next-line spelling -->
 [*signal.the-wait-status-is-normalised-before-policy-sees-it]
 
 - An exited child carries its exact exit code, 0–255.
   [*signal.an-exited-child-carries-its-exact-exit-code]
 - A signaled child carries the terminating signal number and whether
   the core-dump bit was set.
-<!-- lint-disable-next-line words spelling -->
+<!-- lint-disable-next-line spelling -->
   [*signal.a-signalled-child-carries-the-signal-and-the-core-dump-bit]
 - A stopped or continued status is invalid on this path, because peinit
   never asks for them. Observing one **fails closed** rather than being

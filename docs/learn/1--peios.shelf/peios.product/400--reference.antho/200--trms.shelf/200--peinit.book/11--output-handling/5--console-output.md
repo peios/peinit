@@ -55,7 +55,7 @@ Normal service failing and a Critical service failing both render
 `[FAILED]` while carrying different severities — and collapsing them
 would quietly change what `peios.quiet=2` suppresses.
 
-<!-- lint-disable-next-line words spelling -->
+<!-- lint-disable-next-line spelling -->
 ### Color [*console.tags-are-coloured-with-sgr-escapes]
 
 Tags are colored with ANSI SGR escapes: green for `OK`, yellow for
@@ -64,7 +64,7 @@ Untagged progress is never colored.
 
 Color is decided once, from the kernel command line, following the same
 rule systemd uses: **on unless the command line says `TERM=dumb`.**
-<!-- lint-disable-next-line words spelling -->
+<!-- lint-disable-next-line spelling -->
 [*console.colour-is-on-unless-the-command-line-says-term-dumb] peinit
 is PID 1 and has no inherited `TERM` to consult, so the command line is
 the only place an operator can say a console cannot render escapes.
@@ -73,7 +73,7 @@ and `TERM=dumb` is a spelling people already know.
 
 Color changes the bytes and never the layout, so a serial log and a
 virtual terminal agree about where the message starts.
-<!-- lint-disable-next-line words spelling -->
+<!-- lint-disable-next-line spelling -->
 [*console.colour-never-changes-the-layout]
 
 ### The stage banner [*console.a-banner-precedes-phase-1]

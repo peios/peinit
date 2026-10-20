@@ -60,11 +60,14 @@ and so on. [*cal.a-tilde-counts-the-day-from-the-end-of-the-month]
 `*-*~01` is the last day of every month; `*-02~03` is the
 third-to-last day of February.
 
+<!-- "May" here is the month. -->
+<!-- lint-disable spelling -->
 Repetition combines with it, and steps in the day-of-month direction —
 which means it walks the offset *downwards*, toward the end of the
 month. [*cal.a-step-after-a-tilde-walks-the-offset-downwards]
 `Mon *-05~07/1` covers the last seven days of May, and combined
 with `Mon` resolves to exactly one day: the last Monday in May.
+<!-- lint-enable spelling -->
 
 Wildcards, ranges and lists are also accepted after `~`, so `~*` matches
 every day and `~03..07` the third- to seventh-to-last.

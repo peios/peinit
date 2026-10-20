@@ -109,7 +109,7 @@ is only checked where the identity
 predicts a SID — a principal name is authd's to resolve, and peinit has
 nothing to compare it against.
 
-<!-- lint-disable-next-line line-length words spelling -->
+<!-- lint-disable-next-line line-length spelling -->
 ## What can be attested [*token.the-platform-service-identities-may-be-attested]
 
 authd accepts the platform's own service identities — `SYSTEM`,

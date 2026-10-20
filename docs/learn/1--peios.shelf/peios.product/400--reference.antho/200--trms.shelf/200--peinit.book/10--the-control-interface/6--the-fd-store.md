@@ -38,7 +38,7 @@ a service whose descriptors are being silently dropped can find out why.
 Several descriptors can share a name. One `FDSTORE=1` carrying N
 descriptors creates N entries under the one name, each independently
 subject to the limit — so the first few fit and the overflow is
-<!-- lint-disable-next-line words spelling -->
+<!-- lint-disable-next-line spelling -->
 rejected and closed. [*fdstore.several-descriptors-may-share-a-name]
 
 peinit does not monitor stored descriptors. The `FDPOLL` flag is

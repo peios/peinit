@@ -27,7 +27,7 @@ never nil; SIDs are written in binary (`bin.sid`), job and operation
 identifiers as binary GUIDs (`bin.guid`) that read back as the text
 `svctl` shows, enumerated values in kebab-case (`service-main`,
 `explicit-start`), and times as nanoseconds since the Unix epoch.
-<!-- lint-disable-next-line words spelling -->
+<!-- lint-disable-next-line spelling -->
 [*emit.every-event-is-a-catalogue-type-with-a-nested-payload]
 peinit's fragment, `/usr/share/evman/peinit.evman`, describes every type
 and field, and the Events reference generates its pages from it.

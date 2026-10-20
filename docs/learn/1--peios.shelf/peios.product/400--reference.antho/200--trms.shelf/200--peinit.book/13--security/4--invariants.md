@@ -36,7 +36,7 @@ that fills a response's `granted` refuses nothing (§10.2).
 **5. The control descriptor, the ServiceSecurity descriptors, and the
 per-job descriptors are the only policy inputs for runtime access
 control.** [*invariant.the-descriptors-are-the-only-policy-inputs]
-peinit consults no configuration file, no environment variable and no
+peinit consults no configuration file, no environment variable, and no
 hardcoded principal list. The only inputs to AccessCheck are those
 descriptors — the first two sourced from the registry with a compiled-in
 default, the third fixed at submission from the submitter's SID or the

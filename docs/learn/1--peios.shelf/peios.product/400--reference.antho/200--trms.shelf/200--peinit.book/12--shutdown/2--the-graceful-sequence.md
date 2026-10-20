@@ -8,7 +8,7 @@ description: The ordered steps of a graceful shutdown, from entering the shutdow
 peinit sets an internal flag. While it is set, no new service starts.
 [*graceful.no-new-service-starts-once-the-flag-is-set] Control commands
 other than `status`, `list`, `operation-status`, `job-status`,
-`job-list` and `job-stop` are rejected as invalid for the current
+`job-list`, and `job-stop` are rejected as invalid for the current
 state.
 
 Every live submitted job (§8.5) is stopped at this point too: SIGTERM
@@ -17,7 +17,7 @@ to each — unless it has already sent `STOPPING=1` — with cause
 jobs or against the service waves, because a job has no dependencies
 to order by. [*graceful.every-live-submitted-job-is-stopped-at-once]
 A job still queued for launch is canceled with the same
-<!-- lint-disable-next-line words spelling -->
+<!-- lint-disable-next-line spelling -->
 cause. [*graceful.a-queued-job-is-cancelled-with-the-same-cause]
 `submit` is refused for the rest of the shutdown; `status`,
 `wait`, `stop` and `signal` keep answering, as do the control socket's

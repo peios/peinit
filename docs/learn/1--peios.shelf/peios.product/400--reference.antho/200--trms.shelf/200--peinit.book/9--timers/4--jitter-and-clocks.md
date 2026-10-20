@@ -37,7 +37,7 @@ descriptor's read return `ECANCELED` whenever the realtime clock is
 discontinuously changed — an NTP step, a manual set. peinit recomputes
 the next occurrence against the new wall clock and re-arms, which is
 what keeps `*-*-* 02:00:00` anchored to 02:00 across clock corrections.
-<!-- lint-disable-next-line words spelling line-length -->
+<!-- lint-disable-next-line spelling line-length -->
 [*jitter.calendar-timers-are-absolute-realtime-timers-cancelled-on-a-clock-set]
 
 **Interval timers are genuine relative durations** and use

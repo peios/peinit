@@ -95,7 +95,7 @@ a missing target.
 An entry in the four list fields can carry a readiness level, written
 after a colon (`netd:routed`). The name and the level are validated
 separately, so the colon is not one of the illegal characters there.
-<!-- lint-disable-next-line words spelling -->
+<!-- lint-disable-next-line spelling -->
 [*fmt.a-list-dependency-may-carry-a-level] `OnFailure` takes a bare
 service name and no level: it names a handler to run, not a state to
 wait for. [*fmt.onfailure-takes-no-level]

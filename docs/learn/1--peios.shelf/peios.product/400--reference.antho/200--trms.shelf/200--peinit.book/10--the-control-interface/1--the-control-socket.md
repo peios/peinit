@@ -118,7 +118,7 @@ costs the connection or the listener.
 peinit handles one frame per readiness turn, and processes no further
 frames from a connection while a wait is pending on it. Pipelined
 requests are therefore serialized behind a wait.
-<!-- lint-disable-next-line words spelling -->
+<!-- lint-disable-next-line spelling -->
 [*control.pipelined-requests-serialise-behind-a-wait]
 
 ## Timestamps [*control.timestamps-are-projected-from-the-monotonic-clock]

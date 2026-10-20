@@ -47,7 +47,7 @@ automatic restart already pending.
   honors the remaining delay. It does not short-circuit the backoff.
   If the automatic restart later becomes due, it merges into the
   administrator's operation, so the identifier the caller holds is the
-<!-- lint-disable-next-line words spelling -->
+<!-- lint-disable-next-line spelling -->
   one that executes. [*dispatch.backoff-start-honours-the-remaining-delay]
 - `stop` cancels both the pending restart and any deferred start, and
   the service goes Inactive. A subsequent automatic restart is refused,

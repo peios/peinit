@@ -109,7 +109,7 @@ While a service is in Backoff it is down and does not satisfy
 dependents. An explicit `start` creates or merges into a **deferred**
 start operation, which honors the remaining delay rather than
 short-circuiting it;
-<!-- lint-disable-next-line words spelling -->
+<!-- lint-disable-next-line spelling -->
 [*restart.an-explicit-start-during-backoff-honours-the-remaining-delay] a
 `stop` cancels the pending restart and takes the service to Inactive.
 [*restart.a-stop-during-backoff-cancels-the-pending-restart]

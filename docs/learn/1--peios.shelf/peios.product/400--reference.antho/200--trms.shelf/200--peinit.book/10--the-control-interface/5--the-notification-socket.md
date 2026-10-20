@@ -89,7 +89,7 @@ one leaves:
    PID equals the sender's. Only a main job is ever a candidate, which
    is what makes `NotifyAccess=Main` the only mode there is — a hook or
    a health check cannot notify on a service's behalf.
-<!-- lint-disable-next-line words spelling -->
+<!-- lint-disable-next-line spelling -->
    [*notify.only-a-services-main-job-may-notify] If no service's
    main job carries the PID, the live submitted jobs (§8.5) are
    scanned instead. The routing question is asked purely by PID, before

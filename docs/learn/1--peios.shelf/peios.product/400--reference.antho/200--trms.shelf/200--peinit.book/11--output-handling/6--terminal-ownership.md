@@ -10,7 +10,7 @@ On a console that produces a sign-in prompt with a progress line through
 the middle of it, and a password echoed into whatever redrew last. So
 peinit hands the device to one service and makes the others wait.
 
-<!-- lint-disable-next-line line-length words spelling -->
+<!-- lint-disable-next-line line-length spelling -->
 ## Who is holding it [*terminal.a-service-holds-its-terminal-while-it-may-have-a-process-on-it]
 
 A service holds its terminal in every state where it can still have a

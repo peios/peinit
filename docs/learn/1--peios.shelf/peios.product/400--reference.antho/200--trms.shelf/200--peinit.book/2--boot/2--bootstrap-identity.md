@@ -29,7 +29,7 @@ lpsd and eventd used it too, until each moved to an account of its own
 the authd path like any other service.
 
 Nothing restricts which services can declare `Identity=SYSTEM`.
-<!-- lint-disable-next-line words spelling -->
+<!-- lint-disable-next-line spelling -->
 [*bootstrap.no-allowlist-governs-who-may-be-system] There is
 no allowlist, because an allowlist would be enforcing a boundary that is
 already enforced somewhere better: the Security Descriptor on

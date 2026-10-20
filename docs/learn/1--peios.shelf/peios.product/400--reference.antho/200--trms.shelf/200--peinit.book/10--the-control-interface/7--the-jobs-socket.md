@@ -123,7 +123,7 @@ other error is answered and the connection kept.
 peinit handles one message per readiness turn on a connection, and
 reads nothing from a connection while a wait is pending on it, so
 pipelined messages serialize behind a wait.
-<!-- lint-disable-next-line words spelling -->
+<!-- lint-disable-next-line spelling -->
 [*jobs.pipelined-messages-serialise-behind-a-wait] A turn either answers
 at once, or records a pending wait on the connection state, or does both
 in the case of a refusal. Three waits exist:

@@ -123,10 +123,13 @@ Weekdays are English names, case-insensitive, abbreviated (`Mon`) or full
 
 ### Last day of the month
 
+<!-- "May" here is the month. -->
+<!-- lint-disable spelling -->
 A `~` in place of the `-` between Month and Day counts the day **from the
 end** of the month: `~01` is the last day, `~02` the second-to-last, and so
 on. So `*-*~01` is the last day of every month. Repetition combines with it —
 `Mon *-05~07/1` is "the last Monday in May."
+<!-- lint-enable spelling -->
 
 ### Named shortcuts
 
