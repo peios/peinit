@@ -74,7 +74,7 @@ Logged, and do not prevent boot:
   rather than failed, because a missing hard dependency rejects the whole
   reload transaction, and that would prevent reloading the very
   definition that installs the missing provider. See
-  [§7.6](~peios/advanced-peios/peinit/dependencies/derived-dependencies).
+  [§7.6](~peios/reference/peinit/dependencies/derived-dependencies).
 
 ## Multiple findings
 

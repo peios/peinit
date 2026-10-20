@@ -69,7 +69,7 @@ soonest firing. Jitter is already included in the actual firing time.
 operation ID expires after its terminal retention grace; a submitted job is
 retained for 60 seconds after it ends. For older results, look in
 [eventd](~peios/reading-records/stored-records). The [TRM client
-examples](~peios/advanced-peios/peinit/the-control-interface/operator-client-examples#reading-status)
+examples](~peios/reference/peinit/the-control-interface/operator-client-examples#reading-status)
 retain the full JSON views and field formats.
 
 ## Manager
@@ -114,7 +114,7 @@ service](~peios/services-and-jobs/who-can-manage-a-service#changing-them-from-th
   pane or on a row's menu. The window shows the service's lines and those of
   its hooks and health checks, newest first and as they are written. See
   [Event
-  Viewer](https://learn.peios.org/peios/desktop-event-viewer/event-viewer/).
+  Viewer](~peios/desktop-event-viewer/event-viewer).
 - **Timers show when they run.** The **Next run** column shows when each
   service's soonest [timer](~peios/services-and-jobs/triggers-and-timers)
   fires. The details pane lists each timer under its schedule, with its next
@@ -355,7 +355,7 @@ users; the target's permissions decide which commands they can run.
 Lifecycle commands create an operation ID you can follow. Concurrent identical
 requests can merge into one operation. For JSON framing and complete response
 examples, see the [control-client
-reference](~peios/advanced-peios/peinit/the-control-interface/operator-client-examples#how-the-control-interface-works).
+reference](~peios/reference/peinit/the-control-interface/operator-client-examples#how-the-control-interface-works).
 
 ## Connection limits
 

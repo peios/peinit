@@ -127,7 +127,7 @@ LocalService. With `Identity=Service`, it is also the token's user identity.
 
 Renaming a service changes its SID. Update grants that name the old SID as
 part of the same planned change. The [SID derivation
-reference](~peios/advanced-peios/peinit/introduction/service-manager-boundaries#the-per-service-sid)
+reference](~peios/reference/peinit/introduction/service-manager-boundaries#the-per-service-sid)
 gives the algorithm.
 
 ## How a token is materialised
@@ -151,10 +151,10 @@ service, issued identity and privileges, or a refusal reason. peinit derives
 an authority dependency for a non-SYSTEM service or hook identity.
 
 The [token-materialisation
-reference](~peios/advanced-peios/peinit/introduction/service-manager-boundaries#how-a-token-is-materialised)
+reference](~peios/reference/peinit/introduction/service-manager-boundaries#how-a-token-is-materialised)
 retains the minting and authority flow. The current authd request is specified
 in the [TRM authd
-path](~peios/advanced-peios/peinit/service-identity/the-authd-path).
+path](~peios/reference/peinit/service-identity/the-authd-path).
 
 ## Security invariants
 

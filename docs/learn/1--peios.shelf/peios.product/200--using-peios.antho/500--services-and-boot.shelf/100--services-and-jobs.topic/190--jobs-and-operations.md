@@ -263,7 +263,7 @@ through a connection already at that level; it cannot be raised later.
 
 The view records both the **submitter** and the **identity** the job runs as,
 plus its logon session. The [TRM identity-conveyance
-reference](~peios/advanced-peios/peinit/jobs-and-operations/submission-and-progress-examples#what-a-job-runs-as)
+reference](~peios/reference/peinit/jobs-and-operations/submission-and-progress-examples#what-a-job-runs-as)
 describes attached tokens.
 
 ### The definition
@@ -282,7 +282,7 @@ execute the image.
 See [svctl job
 options](~peios/services-and-jobs/controlling-services#job-commands) for the
 CLI and the [submission
-reference](~peios/advanced-peios/peinit/jobs-and-operations/submission-and-progress-examples#the-definition)
+reference](~peios/reference/peinit/jobs-and-operations/submission-and-progress-examples#the-definition)
 for complete fields and descriptor passing.
 
 ### Who can manage a job
@@ -316,7 +316,7 @@ status text and progress are reported by the program itself; an absent value
 does not establish that it is stuck.
 
 The [TRM job-view
-reference](~peios/advanced-peios/peinit/jobs-and-operations/submission-and-progress-examples#the-job-view)
+reference](~peios/reference/peinit/jobs-and-operations/submission-and-progress-examples#the-job-view)
 describes the progress message forms and update limits.
 
 ### Stopping, timeouts, and the end of a job

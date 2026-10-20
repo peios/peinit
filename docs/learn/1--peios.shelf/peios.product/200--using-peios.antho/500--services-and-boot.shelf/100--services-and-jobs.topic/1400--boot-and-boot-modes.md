@@ -203,7 +203,7 @@ late failures can therefore continue without reaching the Recovery threshold.
 Use `svctl boot` to distinguish these cases. The counter deliberately does
 *not* try to catch a peinit too broken to reach its own increment; that is a
 binary-integrity problem, not a boot-loop problem. See the [TRM counter
-cycle](~peios/advanced-peios/peinit/boot/the-boot-attempt-counter#the-cycle)
+cycle](~peios/reference/peinit/boot/the-boot-attempt-counter#the-cycle)
 for the exact increment boundary.
 
 ## Boot configuration
@@ -448,7 +448,7 @@ to an administrator to remember.
 
 Do not infer readiness or shutdown order from a fixed list of daemon names.
 Check the installed definitions and the service status. The [boot
-implementation](~peios/advanced-peios/peinit/boot/phase-2) describes graph
+implementation](~peios/reference/peinit/boot/phase-2) describes graph
 construction and validation.
 
 ## Where to start

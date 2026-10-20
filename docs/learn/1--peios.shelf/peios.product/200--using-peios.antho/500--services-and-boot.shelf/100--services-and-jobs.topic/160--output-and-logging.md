@@ -12,7 +12,7 @@ related:
 
 In **Services Manager**, select the service and choose **Logs…**. It opens
 [Event
-Viewer](https://learn.peios.org/peios/desktop-event-viewer/event-viewer/) with
+Viewer](~peios/desktop-event-viewer/event-viewer) with
 the service's lines and the output of its hooks and health checks, newest
 first and updating as they arrive.
 
@@ -49,7 +49,7 @@ opt out of forwarding; `--output` requests an additional live copy.
 > service's output arrangement if you need a log record.
 
 Pipe wiring and tagging are described in the [output-flow
-reference](~peios/advanced-peios/peinit/output-handling/service-output-flow#capturing-output).
+reference](~peios/reference/peinit/output-handling/service-output-flow#capturing-output).
 
 ## Logs and events have different limits
 
@@ -74,7 +74,7 @@ is replayed when eventd is ready, but it is not persistent storage and cannot
 guarantee a complete boot log.
 
 The [buffer
-reference](~peios/advanced-peios/peinit/output-handling/service-output-flow#the-pre-eventd-buffer)
+reference](~peios/reference/peinit/output-handling/service-output-flow#the-pre-eventd-buffer)
 explains the early-boot path.
 
 ## Flood protection
@@ -91,7 +91,7 @@ remains best-effort there too.
 See the [registry
 limits](~peios/services-and-jobs/registry-key-reference#operational-parameters)
 before changing buffer sizes and the [TRM flood-control
-detail](~peios/advanced-peios/peinit/output-handling/service-output-flow#flood-protection)
+detail](~peios/reference/peinit/output-handling/service-output-flow#flood-protection)
 for the implementation.
 
 ## The eventd handoff
@@ -105,7 +105,7 @@ nothing.
 Access policy can also hide records from a query. Check [who can read
 what](~peios/reading-records/stored-records) if the expected
 origin is absent. The [handoff
-reference](~peios/advanced-peios/peinit/output-handling/service-output-flow#the-eventd-handoff)
+reference](~peios/reference/peinit/output-handling/service-output-flow#the-eventd-handoff)
 describes transport behavior.
 
 ## Console output
@@ -127,5 +127,5 @@ For symptom-based next steps, use
 executions or actions, use [Jobs and
 operations](~peios/services-and-jobs/jobs-and-operations). For query tools,
 use [Event
-Viewer](https://learn.peios.org/peios/desktop-event-viewer/event-viewer/) or
+Viewer](~peios/desktop-event-viewer/event-viewer) or
 [evctl](~peios/evctl/using-evctl).

@@ -255,7 +255,7 @@ definition](~peios/services-and-jobs/defining-a-service) is finally discarded.
 A service receives its standard streams and explicitly supplied descriptors.
 It does not inherit peinit's privileged connections or signal handling. The
 [launch-isolation
-reference](~peios/advanced-peios/peinit/introduction/service-manager-boundaries#a-clean-context)
+reference](~peios/reference/peinit/introduction/service-manager-boundaries#a-clean-context)
 describes the descriptor and signal setup.
 
 ## The cgroup tree
@@ -269,7 +269,7 @@ stuck. A later start can use a fresh `<service>.gen<N>` tree; that does not
 repair or kill the stuck old process. Investigate the [Abandoned
 state](~peios/services-and-jobs/the-service-lifecycle#abandoned).
 The [cgroup
-reference](~peios/advanced-peios/peinit/introduction/service-manager-boundaries#the-cgroup-tree)
+reference](~peios/reference/peinit/introduction/service-manager-boundaries#the-cgroup-tree)
 retains the layout and rationale.
 
 ## Where to start

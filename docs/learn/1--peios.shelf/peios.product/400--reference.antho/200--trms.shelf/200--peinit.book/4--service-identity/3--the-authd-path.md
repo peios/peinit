@@ -83,7 +83,7 @@ peinit *orders* around that dependency rather than merely suffering it.
 The authority declares `Provides = ["authn"]`, and peinit derives a hard
 dependency on whoever fills that role for every service whose `Identity`
 — or whose `HookIdentity`, where it has hooks — is not `SYSTEM`
-([§7.6](~peios/advanced-peios/peinit/dependencies/derived-dependencies)).
+([§7.6](~peios/reference/peinit/dependencies/derived-dependencies)).
 Nothing is written on the consumer side: the edge comes from the same
 field that creates the requirement, so a new service cannot forget it.
 

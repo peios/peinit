@@ -8,9 +8,9 @@ Most dependencies are declared. One is not.
 A service whose `Identity` is anything but `SYSTEM` cannot start until the
 authority is *listening*, because peinit has to ask it for a token before
 there is a process at all
-([§4.3](~peios/advanced-peios/peinit/service-identity/the-authd-path)).
+([§4.3](~peios/reference/peinit/service-identity/the-authd-path)).
 That is a hard dependency in every sense
-[`Requires`](~peios/advanced-peios/peinit/dependencies/relationships)
+[`Requires`](~peios/reference/peinit/dependencies/relationships)
 means one.
 
 It used to be nobody's. peinit hardcodes the socket the authority listens
@@ -60,7 +60,7 @@ name is never mistaken for a role,
 [*derived.a-real-service-name-wins-over-a-role-of-the-same-name] a
 provider never gains a dependency on its own role, and a role no
 service fills is left as written for validation to report. See
-[§7.5](~peios/advanced-peios/peinit/dependencies/readiness-levels) for
+[§7.5](~peios/reference/peinit/dependencies/readiness-levels) for
 why the network is declared this way.
 
 ## What peinit derives
@@ -99,9 +99,9 @@ Three rules keep the derivation from doing damage:
 Because the result is an ordinary `Requires`, it needs no new kind of
 edge and behaves exactly like a declared one everywhere else — in
 [graph
-validation](~peios/advanced-peios/peinit/dependencies/graph-validation),
+validation](~peios/reference/peinit/dependencies/graph-validation),
 in [graph
-execution](~peios/advanced-peios/peinit/dependencies/graph-execution),
+execution](~peios/reference/peinit/dependencies/graph-execution),
 at shutdown, and in `svctl status`, where it appears as the dependency it
 is rather than as a hidden ordering.
 [*derived.the-derived-edge-behaves-exactly-like-a-declared-requires]
@@ -137,7 +137,7 @@ at the service that asked for a token and could not have one.
 
 ## A role is not an online target
 
-[§7.5](~peios/advanced-peios/peinit/dependencies/readiness-levels) opens
+[§7.5](~peios/reference/peinit/dependencies/readiness-levels) opens
 by rejecting `network-online.target`, and the objection there does not
 reach this mechanism. It is worth being explicit about why, because the
 two look alike from a distance.

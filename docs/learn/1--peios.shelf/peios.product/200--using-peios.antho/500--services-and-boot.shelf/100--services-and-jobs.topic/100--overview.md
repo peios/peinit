@@ -41,7 +41,7 @@ only services you have permission to query.
 For exact field types and defaults, use the [Registry key
 reference](~peios/services-and-jobs/registry-key-reference). For
 implementation and protocol details, use the [peinit Technical Reference
-Manual](~peios/advanced-peios/peinit).
+Manual](~peios/reference/peinit).
 
 ## Three kinds of object
 
@@ -72,7 +72,7 @@ that need to stay in the foreground.
 Logs and durable history belong to eventd. Open **Logs…** for a service in
 Services Manager, or follow [Service output and
 logging](~peios/services-and-jobs/output-and-logging). The [TRM compatibility
-notes](~peios/advanced-peios/peinit/introduction/service-manager-boundaries#what-peinit-is-not)
+notes](~peios/reference/peinit/introduction/service-manager-boundaries#what-peinit-is-not)
 describe the interface boundaries.
 
 ## The one operational invariant
@@ -82,7 +82,7 @@ next start or another relevant operation; it does not necessarily change a
 running process. Check [when configuration changes
 apply](~peios/services-and-jobs/defining-a-service#field-mutability-when-a-change-takes-effect).
 The [event-loop
-design](~peios/advanced-peios/peinit/introduction/service-manager-boundaries#the-one-operational-invariant)
+design](~peios/reference/peinit/introduction/service-manager-boundaries#the-one-operational-invariant)
 explains why.
 
 ## Where peinit sits in the system
@@ -93,5 +93,5 @@ its registry definition is separate again. See [Service
 identity](~peios/services-and-jobs/identity-and-privileges) and [Who can
 manage a service](~peios/services-and-jobs/who-can-manage-a-service). The [TRM
 system
-map](~peios/advanced-peios/peinit/introduction/service-manager-boundaries#where-peinit-sits-in-the-system)
+map](~peios/reference/peinit/introduction/service-manager-boundaries#where-peinit-sits-in-the-system)
 covers the components behind these checks.

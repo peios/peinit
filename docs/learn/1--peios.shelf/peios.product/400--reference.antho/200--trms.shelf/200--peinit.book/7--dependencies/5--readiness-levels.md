@@ -30,7 +30,7 @@ existing `Requires`, `Wants` and `BindsTo` fields rather than a field of
 its own, because a level dependency *is* a service dependency with a
 stricter predicate: `netd:routed` subsumes `netd`. Each relationship
 keeps exactly the semantics
-[it already has](~peios/advanced-peios/peinit/dependencies/relationships),
+[it already has](~peios/reference/peinit/dependencies/relationships),
 applied to
 the stricter test. [*ready.each-relationship-keeps-its-semantics-with-a-level]
 
@@ -55,7 +55,7 @@ Requires = ["network:routed"]
 `network` is filled by whichever service declares `Provides = ["network"]`
 — netd, on a shipped image — and peinit rewrites the entry to
 `netd:routed` before anything reads it, exactly as
-[§7.6](~peios/advanced-peios/peinit/dependencies/derived-dependencies)
+[§7.6](~peios/reference/peinit/dependencies/derived-dependencies)
 resolves a role. The level rides across unchanged.
 [*ready.a-role-carrying-a-level-is-rewritten-to-the-provider-with-that-level]
 Everything downstream
@@ -139,7 +139,7 @@ A level is settled at dispatch, not at planning. The plan decides *what*
 to start; whether a level is met is a live question — it can arrive after
 the target's own start completed (netd is active long before DHCP
 finishes) and be retracted while a dependent is still waiting — so the
-[execution graph](~peios/advanced-peios/peinit/dependencies/graph-execution)
+[execution graph](~peios/reference/peinit/dependencies/graph-execution)
 re-checks it against the service table every time it considers releasing
 the dependent, and holds the start until the answer is yes.
 <!-- lint-disable-next-line line-length -->
