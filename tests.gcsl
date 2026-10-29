@@ -1,0 +1,105 @@
+# peinit's tests: its portable unit tests, without the Peios features, as
+# `cargo test` builds them, the client library's exports and a C program
+# that calls it, its documentation tests, as `cargo test --doc` runs them,
+# and Clippy's checks with every feature, as `cargo clippy --all-targets
+# --all-features -- -Dwarnings` makes them.
+#
+# A test's own code runs in a hermetic step of its own, so what it plans,
+# builds or fetches is in its parameters' defaults.
+import fs
+import toolchain
+import unpack from archive
+import Toolchain from toolchain
+import BuildEnv from "github.com/gcslib/buildenv"
+import "github.com/gcslib/python"
+import "github.com/gcslib/rust"
+import "github.com/peios/peios-rs" as peios_rs
+
+# The IANA time zone database, compiled, as the `tzdata` Python package
+# ships it, pinned by its SHA-256.
+let TZDATA = "https://files.pythonhosted.org/packages/0a/66/9a06c2227fedfd4919f0eaaa8b94377d9730882a7e4f95823c9a331ab5e1/tzdata-2026.6-py2.py3-none-any.whl"
+
+# The time zone database's zoneinfo files, which the calendar timers' tests
+# read through jiff.
+def zoneinfo() -> Dir {
+    let wheel = fetch(TZDATA, sha256 = "0a10eec6e13ef16b627fabed9a5f2ba61a62b1c67f327305f4e7e412a70b4aec")
+    = unpack(wheel).dir("tzdata/zoneinfo")
+}
+
+# The portable unit tests and the programs', which need no Peios kernel.
+# Some run shell scripts, given busybox's `/bin/sh` and tools, and some
+# compute calendar times, given the time zone database.
+def test portable(
+    tests: List<rust.RustTest> = rust.tests(crates(), "peinit2"),
+    env: BuildEnv = toolchain.get(Toolchain::BuildEnv),
+    zones: Dir = zoneinfo(),
+) {
+    let given: List<{at: String, place: Dir | File}> = [{at = "/bin"; place = env.root.dir("bin")}, {at = "/usr/share/zoneinfo"; place = zones}]
+    let each = for test in tests {
+        = rust.run_test(test, given = given, env = [{key = "TZDIR"; value = "/usr/share/zoneinfo"}])
+    }
+}
+
+# The guest tests: the unit tests with the Peios features, which run in a
+# Peios guest, given to it by hand. They are built, not run.
+def build guest_tests() {
+    let tests = rust.tests(crates(), "peinit2", features = peios_features())
+    let found = for each in tests if each.name == "peinit" { = each.program }
+    = found[0]
+}
+
+# The documentation tests.
+def test doctests(ran: List<{}> = rust.doctests(crates(), "peinit2")) {}
+
+# Clippy's checks with every feature, every warning denied.
+def test clippy(checked: List<{}> = rust.clippy(crates(), "peinit2", features = peios_features(), flags = ["-Dwarnings"])) {}
+
+# The tool `name` of the C toolchain `c`, by its path in a sandbox that has
+# the toolchain at `/opt/cc`: `x86_64-linux-nm` beside `x86_64-linux-gcc`.
+fn tool(c: toolchain.CToolchain, name: String): String {
+    let cc = c.cc.path.strip_prefix(c.root.path).strip_prefix("/")
+    = "/opt/cc/{cc.strip_suffix("gcc")}{name}"
+}
+
+# The client library: it exports exactly the functions the ABI snapshot
+# declares, and a C program that includes its headers and links it calls
+# it without contacting PID 1, as `tools/check-library.py` checks it.
+def test library(
+    library: File = build libpeinit(),
+    libpeios: List<{at: String, place: Dir | File}> = peios_rs.runtime(),
+    sources: List<{at: String, place: Dir | File}> = [
+        {at = "/work/abi/peinit-abi.h"; place = file("abi/peinit-abi.h")},
+        {at = "/work/Cargo.toml"; place = file("Cargo.toml")},
+        {at = "/work/include"; place = dir("include")},
+        {at = "/work/tests/library.c"; place = file("tests/library.c")},
+        {at = "/work/tools/check-library.py"; place = file("tools/check-library.py")},
+    ],
+    c: toolchain.CToolchain = toolchain.get(Toolchain::C),
+    py: python.PythonToolchain = toolchain.get(Toolchain::Python),
+) {
+    let home = working_dir().path
+    let made = fs.mkdir("{home}/tmp")
+    let placed: List<{at: String, place: Dir | File | FileSet}> = [
+        {at = "/"; place = c.runtime},
+        {at = "/tmp"; place = dir("{home}/tmp")},
+        {at = "/opt/cc"; place = c.root},
+        {at = "/opt/python"; place = py.root},
+        {at = "/work/lib/libpeinit.so.0"; place = library},
+        ...(for each in libpeios { = {at = each.at; place = each.place} }),
+        ...(for each in sources { = {at = each.at; place = each.place} }),
+    ]
+    let box = fs.compose(placed).sandbox(
+        cwd = "/work",
+        env = {
+            CC = tool(c, "gcc")
+            NM = tool(c, "nm")
+            PATH = "/opt/cc/bin:/opt/python/bin"
+        },
+    )
+    let ran = box.exec(
+        "/opt/python/bin/python3",
+        "/work/tools/check-library.py",
+        "/work/lib/libpeinit.so.0",
+        "{libpeios[0].at}",
+    )
+}

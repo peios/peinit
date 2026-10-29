@@ -1,0 +1,39 @@
+# peinit's programs and its client library, each crate compiled on its own
+# (see the rust library's `workspace`), for glibc, with the features that
+# make them Peios's: the security boundary and the registry.
+import "github.com/gcslib/clang"
+import "github.com/gcslib/rust"
+import "github.com/peios/peios-rs" as peios_rs
+
+# The features peinit is built with for Peios.
+def peios_features() -> List<String> {
+    = ["peios-boundary", "peios-registry"]
+}
+
+# The peinit package, planned. `peios-sys` binds libpeios with bindgen and
+# links it, so it, and every crate that depends on it, is given what
+# peios-rs's library says it needs: libpeios and its headers, built from
+# the Peios SDK's own files.
+def crates() -> rust.RustWorkspace {
+    = rust.workspace(
+        dir("."),
+        rust.vendored(file("Cargo.lock")),
+        crates = peios_rs.crate_settings(),
+        libclang = [clang.libclang_18()],
+    )
+}
+
+# PID 1 and service control.
+def build peinit2() {
+    = rust.bin(crates(), "peinit2", features = peios_features())
+}
+
+# The service control command.
+def build svctl() {
+    = rust.bin(crates(), "peinit2", name = "svctl", features = peios_features())
+}
+
+# The public client library, `libpeinit.so.0` by its soname.
+def build libpeinit() {
+    = rust.library(crates(), "peinit2", features = peios_features())
+}

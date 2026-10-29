@@ -14,7 +14,9 @@ def main() -> None:
     library, sdk = (Path(arg).resolve() for arg in sys.argv[1:])
     header = Path("abi/peinit-abi.h").read_text()
     expected = set(re.findall(r"\b(peinit_[a-z_]+)\s*\(", header))
-    symbols = subprocess.check_output(["nm", "-D", "--defined-only", library], text=True)
+    symbols = subprocess.check_output(
+        [os.environ.get("NM", "nm"), "-D", "--defined-only", library], text=True
+    )
     observed = {line.split()[-1] for line in symbols.splitlines()}
     if observed != expected:
         raise SystemExit(
@@ -28,7 +30,7 @@ def main() -> None:
         program = work / "consumer"
         subprocess.run(
             [
-                "cc",
+                os.environ.get("CC", "cc"),
                 "-std=c11",
                 "-Wall",
                 "-Wextra",

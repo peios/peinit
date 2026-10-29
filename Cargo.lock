@@ -14,7 +14,7 @@ dependencies = [
 [[package]]
 name = "auth-core"
 version = "0.0.24"
-source = "git+https://github.com/peios/authd.git?rev=a014fa4c74f17ce4f67ba964eefce33a1a3dbdfa#a014fa4c74f17ce4f67ba964eefce33a1a3dbdfa"
+source = "git+https://github.com/peios/authd.git?rev=41a8bc921bfe9498e37c45ab17e5802534cb863f#41a8bc921bfe9498e37c45ab17e5802534cb863f"
 dependencies = [
  "libc",
 ]
@@ -295,7 +295,7 @@ dependencies = [
 [[package]]
 name = "peios"
 version = "0.4.0"
-source = "git+https://github.com/peios/peios-rs.git?rev=f8c84930f2b71763bcf0550df0b1420a0f63b21e#f8c84930f2b71763bcf0550df0b1420a0f63b21e"
+source = "git+https://github.com/peios/peios-rs.git?rev=b2282f654758831e4a2e34c7b35c26e61a6ebe1c#b2282f654758831e4a2e34c7b35c26e61a6ebe1c"
 dependencies = [
  "bitflags 2.13.1",
  "libc",
@@ -305,7 +305,7 @@ dependencies = [
 [[package]]
 name = "peios-sys"
 version = "0.3.0"
-source = "git+https://github.com/peios/peios-rs.git?rev=f8c84930f2b71763bcf0550df0b1420a0f63b21e#f8c84930f2b71763bcf0550df0b1420a0f63b21e"
+source = "git+https://github.com/peios/peios-rs.git?rev=b2282f654758831e4a2e34c7b35c26e61a6ebe1c#b2282f654758831e4a2e34c7b35c26e61a6ebe1c"
 dependencies = [
  "bindgen",
  "pkg-config",

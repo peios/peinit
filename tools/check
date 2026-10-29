@@ -1,0 +1,16 @@
+#!/bin/sh
+# The contributor check: owned source style, the public headers against the
+# Rust ABI (which needs cbindgen 0.29.2 and a C compiler on the host), then
+# pekit's tests, which run the portable tests and documentation tests, check
+# the client library, and check the package with Clippy.
+set -eu
+
+repo=$(CDPATH="" cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$repo"
+if [ -n "${PEIOS_STYLE_BIN:-}" ]; then
+    PATH="$PEIOS_STYLE_BIN:$PATH"
+    export PATH
+fi
+python3 tools/style-check.py
+tools/verify-abi.sh
+pekit test
