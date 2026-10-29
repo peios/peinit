@@ -1,6 +1,10 @@
 #!/bin/sh
-# Validate source style, portable behavior, the production graph and PPK payloads.
+# The contributor check: owned source style, the public headers against the
+# Rust ABI (which needs cbindgen 0.29.2 and a C compiler on the host), then
+# pekit's tests, which run the portable tests and documentation tests, check
+# the client library, and check the package with Clippy.
 set -eu
+
 repo=$(CDPATH="" cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$repo"
 if [ -n "${PEIOS_STYLE_BIN:-}" ]; then
@@ -8,14 +12,5 @@ if [ -n "${PEIOS_STYLE_BIN:-}" ]; then
     export PATH
 fi
 python3 tools/style-check.py
-./bazel test //...
-./bazel build //:artifacts //:guest-tests //:packages
-: "${PEIOS_SDK:?Set PEIOS_SDK to an explicit development SDK}"
-export PEIOS_LIB_DIR="$PEIOS_SDK/lib"
-export PEIOS_INCLUDE="$PEIOS_SDK/include"
-export PKM_UAPI="$PEIOS_SDK/include"
-export LD_LIBRARY_PATH="$PEIOS_LIB_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-gcc_include=$(gcc -print-file-name=include)
-export BINDGEN_EXTRA_CLANG_ARGS="-isystem $gcc_include${BINDGEN_EXTRA_CLANG_ARGS:+ $BINDGEN_EXTRA_CLANG_ARGS}"
-cargo +1.98.1 clippy --all-targets --all-features --no-deps --locked -- -D warnings
-cargo +1.98.1 test --doc --locked
+tools/verify-abi.sh
+pekit test

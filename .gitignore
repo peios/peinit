@@ -1,11 +1,12 @@
 # Rust / cargo build output
 /target
 
-# pekit build + package output (out_dir)
-/out
-
-/bazel-*
-/.ci-sdk/
 /docs/learn/dist/
 **/__pycache__/
 **/.ruff_cache/
+
+# pekit build output.
+/pekit-out/
+
+# Libraries pekit fetches for the pins in `pekit.lock`.
+/.gcsl/
