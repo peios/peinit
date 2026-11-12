@@ -125,6 +125,42 @@ not policy inputs, and peinit does not consult them for anything —
 identity on Peios is a token, and the token here is established by
 which job the sender *is*, not by what UID it claims.
 
+### A sender whose job has no PID yet
+
+A job records its PID only when its setup status is read and shows that
+exec succeeded (§5.3). Until then no job carries the PID, and step 1
+cannot find the sender. The setup status and the datagram reach peinit
+through different sources, and an event-loop turn handles them in
+whatever order the kernel reports them. A service that sends `READY=1`
+immediately after exec can have its datagram handled before its own
+setup status.
+
+So when a datagram's sender is a launched process whose setup status
+has not been processed, peinit reads that setup status before it
+authenticates the datagram.
+[*notify.a-senders-pending-setup-status-is-read-before-its-datagram]
+The status is always readable by then. The setup pipe closes at exec,
+before the program that sends the datagram starts running. Reading it
+first records the PID and pidfd on the job, or fails the launch.
+Authentication then runs as described above. A failed launch's sender
+is refused as `unauthenticated-sender`. Reading the setup status
+first changes the order, not the trust: a datagram is applied only if
+the job now carries the sender's PID and the job's pidfd confirms it.
+
+Without this step, the datagram would be refused as
+`unauthenticated-sender`, and that refusal would be final. A service
+sends `READY=1` once, so the service would wait for a readiness that
+had already been sent, and peinit would kill it at its start timeout.
+
+If the setup status still cannot be read, peinit holds the datagram
+rather than dropping it. It applies held datagrams in arrival order, and
+authenticates each in full when the setup is processed. It applies them
+before any later datagram from the same sender.
+[*notify.a-datagram-whose-setup-cannot-yet-be-read-is-held] peinit
+holds at most sixteen datagrams for one sender. It refuses any more as
+`setup-pending`. Holding is a fallback: in normal operation, the read
+described above has already found the status.
+
 ## Applying a datagram
 
 A datagram can carry several newline-separated lines, and peinit applies

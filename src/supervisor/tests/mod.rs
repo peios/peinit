@@ -37,8 +37,8 @@ use crate::boundary::{
     BoundaryError, CgroupRemoveOutcome, Clock, FilesystemCheckHelperLauncher,
     FilesystemCheckHelperReader, FilesystemCheckHelperRequest, FilesystemCheckReport,
     LaunchedFilesystemCheckHelper, LaunchedProcess, ProcessController, ProcessLaunchSpec,
-    ProcessLauncher, ProcessSignal, ProcessTarget, RealtimeClock, RegistryClient, TokenHandle,
-    TokenProvider,
+    ProcessLauncher, ProcessSetupStatus, ProcessSignal, ProcessTarget, RealtimeClock,
+    RegistryClient, TokenHandle, TokenProvider,
 };
 use crate::control::socket::ControlSocketLimits;
 use crate::control::system::ControlSecurityDescriptor;
@@ -240,6 +240,10 @@ struct TestProcessLauncher {
     observed_listen_fdnames: Vec<Option<String>>,
     observed_inherited_fd_names: Vec<Vec<String>>,
     observed_setup_timeouts: Vec<u64>,
+    /// Statuses each setup-status descriptor reads as, in order; a descriptor
+    /// with none scripted fails to read, as `read(2)` on a closed one would.
+    setup_statuses: BTreeMap<i32, VecDeque<ProcessSetupStatus>>,
+    read_setup_fds: Vec<i32>,
 }
 
 #[derive(Debug)]
@@ -372,6 +376,8 @@ impl TestProcessLauncher {
             observed_listen_fdnames: Vec::new(),
             observed_inherited_fd_names: Vec::new(),
             observed_setup_timeouts: Vec::new(),
+            setup_statuses: BTreeMap::new(),
+            read_setup_fds: Vec::new(),
         }
     }
 
@@ -390,11 +396,23 @@ impl TestProcessLauncher {
             observed_listen_fdnames: Vec::new(),
             observed_inherited_fd_names: Vec::new(),
             observed_setup_timeouts: Vec::new(),
+            setup_statuses: BTreeMap::new(),
+            read_setup_fds: Vec::new(),
         }
     }
 
     fn runtime_directory_results(mut self, results: Vec<Result<(), BoundaryError>>) -> Self {
         self.runtime_directory_results = results.into();
+        self
+    }
+
+    fn setup_statuses(
+        mut self,
+        fd: i32,
+        statuses: impl IntoIterator<Item = ProcessSetupStatus>,
+    ) -> Self {
+        self.setup_statuses
+            .insert(fd, statuses.into_iter().collect());
         self
     }
 }
@@ -450,6 +468,13 @@ impl ProcessLauncher for TestProcessLauncher {
             .pop_front()
             .ok_or_else(|| BoundaryError::Process("scripted launcher exhausted".to_string()))
             .and_then(|result| result)
+    }
+    fn read_process_setup_status(&mut self, fd: i32) -> Result<ProcessSetupStatus, BoundaryError> {
+        self.read_setup_fds.push(fd);
+        self.setup_statuses
+            .get_mut(&fd)
+            .and_then(VecDeque::pop_front)
+            .ok_or_else(|| BoundaryError::Process(format!("no setup status scripted for fd {fd}")))
     }
 }
 

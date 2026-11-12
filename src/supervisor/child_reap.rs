@@ -13,9 +13,7 @@ pub(in crate::supervisor) use signal::signal_failure_cause;
 impl Supervisor {
     /// Is a launched-but-not-yet-started process using this pid?
     fn has_pending_setup_for_pid(&self, pid: u32) -> bool {
-        self.pending_process_setups
-            .values()
-            .any(|setup| setup.process.pid == pid)
+        self.pending_process_setup_fd_for_pid(pid).is_some()
     }
 
     /// Exits held back by [`Self::apply_reaped_child`] whose job now exists.

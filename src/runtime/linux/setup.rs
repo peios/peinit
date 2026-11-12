@@ -13,7 +13,8 @@ use crate::registry::LcsRegistryClient;
 #[cfg(feature = "peios-registry")]
 use crate::registry::{LcsRegistryWatch, LcsRegistryWatches};
 use crate::runtime::{
-    RuntimeEventRegistrar, RuntimeEventSource, RuntimeJobsChannelTable, RuntimeServiceLogPipes,
+    RuntimeEventRegistrar, RuntimeEventSource, RuntimeJobsChannelTable, RuntimeNotifySocket,
+    RuntimeServiceLogPipes,
 };
 use crate::shutdown::LinuxShutdownFinalizer;
 
@@ -96,7 +97,7 @@ impl LinuxShutdownRuntime {
             epoll,
             signal,
             child_reaper: LinuxChildReaper::new(),
-            notify_socket,
+            notify_socket: RuntimeNotifySocket::new(notify_socket),
             control_listener,
             control_connections: ControlConnectionTable::<
                 ControlConnectionRecord<LinuxControlConnection>,

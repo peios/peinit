@@ -8,8 +8,8 @@ mod turn;
 pub use context::RuntimeShutdownEventContext;
 pub use error::RuntimeShutdownEventTurnError;
 pub use notify::{
-    RuntimeNotifyDatagram, RuntimeNotifyRead, RuntimeNotifyRejection, RuntimeNotifySource,
-    RuntimeNotifySupervisorTurn,
+    RuntimeHeldNotifyDatagrams, RuntimeNotifyDatagram, RuntimeNotifyRead, RuntimeNotifyRejection,
+    RuntimeNotifySocket, RuntimeNotifySource, RuntimeNotifySupervisorTurn,
 };
 pub use registration::{RuntimeEventRegistrar, RuntimeEventRegistrationError};
 pub use source::{
