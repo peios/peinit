@@ -280,6 +280,9 @@ fn collect_notify_supervisor_turn(
         RuntimeNotifySupervisorTurn::InternalError(dispatch) => {
             super::event::push_internal_error(out, dispatch)
         }
+        // Nothing happened yet: what the datagram does is recorded when it
+        // is applied or refused.
+        RuntimeNotifySupervisorTurn::HeldUntilSetup { .. } => Ok(()),
         RuntimeNotifySupervisorTurn::Rejected(rejection) => {
             let sender_pid = notify_sender_pid(read);
             let attribution = notify_rejection_attribution(rejection);
@@ -358,7 +361,9 @@ fn notify_rejection_attribution(
     match rejection {
         RuntimeNotifyRejection::Parse { attribution, .. }
         | RuntimeNotifyRejection::Apply { attribution, .. } => attribution.as_ref(),
-        RuntimeNotifyRejection::Shutdown(_) | RuntimeNotifyRejection::Truncated { .. } => None,
+        RuntimeNotifyRejection::Shutdown(_)
+        | RuntimeNotifyRejection::Truncated { .. }
+        | RuntimeNotifyRejection::SetupPending => None,
     }
 }
 
@@ -403,5 +408,6 @@ fn notify_rejection_reason(rejection: &RuntimeNotifyRejection) -> NotifyRejectio
         },
         RuntimeNotifyRejection::Shutdown(_) => NotifyRejectionReason::ShutdownRefused,
         RuntimeNotifyRejection::Truncated { .. } => NotifyRejectionReason::Truncated,
+        RuntimeNotifyRejection::SetupPending => NotifyRejectionReason::SetupPending,
     }
 }

@@ -14,8 +14,9 @@ use crate::runtime::{
     RuntimeLifecycleDeadlineTimer, RuntimeNotifySource, RuntimePid1SignalSource,
     RuntimeShutdownDeadlineTimer, RuntimeShutdownEventSources, RuntimeWorkPumpTurn,
     drain_runtime_work_queues, process_registry_watch_event,
-    process_runtime_control_connection_event, process_runtime_shutdown_event,
-    register_filesystem_check_helper_sources, register_process_setup_sources,
+    process_runtime_control_connection_event, process_runtime_notify_event,
+    process_runtime_shutdown_event, register_filesystem_check_helper_sources,
+    register_process_setup_sources, replay_runtime_held_notify_datagrams,
     run_deferred_registry_reload,
 };
 
@@ -105,7 +106,25 @@ where
 {
     let sources = prioritize_runtime_sources(sources);
     let mut turns = Vec::with_capacity(sources.len());
+    let mut setup_fds_read_ahead = Vec::new();
     for source in sources.iter().copied() {
+        if let RuntimeEventSource::ProcessSetup { fd } = source
+            && setup_fds_read_ahead.contains(&fd)
+        {
+            // Read ahead of a datagram from its own process earlier in this
+            // batch (PEI-1688), and closed if that ended it. Reading the
+            // number again could read whatever it has since been reused for;
+            // a setup still pending is reported again by the next wait.
+            continue;
+        }
+        if source == RuntimeEventSource::NotifySocket {
+            let notify =
+                process_runtime_notify_event(supervisor, event_sources, context.event_context())
+                    .map_err(|error| RuntimeShutdownLoopError::Event { source, error })?;
+            setup_fds_read_ahead.extend(notify.setup_status_fd);
+            turns.extend(notify.turns);
+            continue;
+        }
         let turn = match source {
             RuntimeEventSource::ControlConnection { fd } => {
                 process_runtime_control_connection_event(
@@ -134,6 +153,20 @@ where
         .map_err(|error| RuntimeShutdownLoopError::Event { source, error })?;
         turns.push(turn);
     }
+    // A datagram held because its sender's setup status could not be read
+    // is applied once a setup readiness in this batch has processed it.
+    turns.extend(
+        replay_runtime_held_notify_datagrams(
+            supervisor,
+            event_sources,
+            context.clock,
+            context.controller,
+        )
+        .map_err(|error| RuntimeShutdownLoopError::Event {
+            source: RuntimeEventSource::NotifySocket,
+            error,
+        })?,
+    );
     let post_work = drain_runtime_work_queues(supervisor, &mut context.work_pump_context())
         .map_err(RuntimeShutdownLoopError::Work)?;
     event_sources

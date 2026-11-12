@@ -18,7 +18,10 @@ use super::deadline::process_shutdown_deadline_timer_event;
 use super::event_sources::NoRuntimeRegistryClient;
 use super::jobs::{process_jobs_connection_event, process_jobs_listener_event};
 use super::lifecycle_deadline::process_lifecycle_deadline_timer_event;
-use super::notify::process_notify_event;
+use super::notify::{
+    RuntimeNotifyEventTurns, RuntimeNotifySetupReader, process_notify_event,
+    process_notify_event_setup_first, replay_held_notify_datagrams,
+};
 use super::power_button::process_power_button_event;
 use super::pre_start_check::{
     process_filesystem_check_helper_event, process_filesystem_check_helper_exit_event,
@@ -55,6 +58,77 @@ where
         registry,
         deadline_timer,
         context,
+    )
+}
+
+/// The notify socket's readiness, with the sender's setup status read first
+/// when its job does not carry its PID yet (PEI-1688). The batch loop takes
+/// this rather than [`process_runtime_shutdown_event`], which yields one turn
+/// for one source and so cannot carry the setup's.
+pub(crate) fn process_runtime_notify_event<I, L, S, H, N, D, T, C, P, F, A, R>(
+    supervisor: &mut Supervisor,
+    sources: &mut RuntimeShutdownEventSources<'_, I, L, S, H, N, D, T>,
+    context: RuntimeShutdownEventContext<'_, C, P, F, A, R>,
+) -> Result<RuntimeNotifyEventTurns, RuntimeShutdownEventTurnError>
+where
+    I: ControlConnectionIo,
+    L: ControlListener<Connection = I> + ?Sized,
+    S: RuntimePid1SignalSource + ?Sized,
+    H: ChildReaper + ?Sized,
+    N: RuntimeNotifySource + ?Sized,
+    D: RuntimeShutdownDeadlineTimer + ?Sized,
+    T: RuntimeLifecycleDeadlineTimer + ?Sized,
+    C: Clock + RealtimeClock + ?Sized,
+    P: ProcessController + ?Sized,
+    F: crate::boundary::ShutdownFinalizer,
+    A: SystemAccessChecker
+        + ServiceAccessChecker
+        + crate::submitted::JobAccessChecker
+        + crate::submitted::JobDescriptorFactory
+        + ?Sized,
+    R: RuntimeEventRegistrar + ?Sized,
+{
+    let setup_reader = context
+        .process_launcher
+        .map(|launcher| RuntimeNotifySetupReader {
+            launcher,
+            registrar: &mut *context.registrar,
+            log_pipes: &mut *sources.log_pipes,
+        });
+    process_notify_event_setup_first(
+        supervisor,
+        &mut *sources.notify_source,
+        &mut *sources.deadline_timer,
+        context.clock,
+        context.controller,
+        setup_reader,
+    )
+}
+
+/// Apply the datagrams held for senders whose setup has since been processed.
+pub(crate) fn replay_runtime_held_notify_datagrams<I, L, S, H, N, D, T, C, P>(
+    supervisor: &mut Supervisor,
+    sources: &mut RuntimeShutdownEventSources<'_, I, L, S, H, N, D, T>,
+    clock: &mut C,
+    controller: &mut P,
+) -> Result<Vec<RuntimeShutdownEventTurn>, RuntimeShutdownEventTurnError>
+where
+    I: ControlConnectionIo,
+    L: ControlListener<Connection = I> + ?Sized,
+    S: RuntimePid1SignalSource + ?Sized,
+    H: ChildReaper + ?Sized,
+    N: RuntimeNotifySource + ?Sized,
+    D: RuntimeShutdownDeadlineTimer + ?Sized,
+    T: RuntimeLifecycleDeadlineTimer + ?Sized,
+    C: Clock + ?Sized,
+    P: ProcessController + ?Sized,
+{
+    replay_held_notify_datagrams(
+        supervisor,
+        &mut *sources.notify_source,
+        &mut *sources.deadline_timer,
+        clock,
+        controller,
     )
 }
 

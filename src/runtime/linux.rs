@@ -18,10 +18,9 @@ use crate::control::connection::{ControlConnectionRecord, ControlConnectionTable
 use crate::control::socket::{LinuxControlConnection, LinuxControlSocket};
 use crate::control::system::PeiosSystemAccessChecker;
 use crate::jobs::socket::LinuxJobsSocket;
-use crate::notify::NotifySocket;
 #[cfg(feature = "peios-registry")]
 use crate::registry::{LcsRegistryClient, LcsRegistryWatches};
-use crate::runtime::{RuntimeJobsChannelTable, RuntimeServiceLogPipes};
+use crate::runtime::{RuntimeJobsChannelTable, RuntimeNotifySocket, RuntimeServiceLogPipes};
 use crate::shutdown::LinuxShutdownFinalizer;
 
 #[derive(Debug)]
@@ -29,7 +28,7 @@ pub struct LinuxShutdownRuntime {
     epoll: LinuxEpoll,
     signal: LinuxPid1SignalFd,
     child_reaper: LinuxChildReaper,
-    notify_socket: NotifySocket,
+    notify_socket: RuntimeNotifySocket,
     control_listener: LinuxControlSocket,
     control_connections: ControlConnectionTable<ControlConnectionRecord<LinuxControlConnection>>,
     deadline_timer: LinuxTimerFd,

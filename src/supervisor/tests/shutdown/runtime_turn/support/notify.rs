@@ -1,12 +1,13 @@
 use std::collections::VecDeque;
 
 use crate::notify::{NotifyDatagram, NotifySocketReadError};
-use crate::runtime::RuntimeNotifySource;
+use crate::runtime::{RuntimeHeldNotifyDatagrams, RuntimeNotifySource};
 
 #[derive(Debug, Default)]
 pub(crate) struct FakeNotifySource {
     results: VecDeque<Result<Option<NotifyDatagram>, NotifySocketReadError>>,
     pub(crate) calls: usize,
+    pub(crate) held: RuntimeHeldNotifyDatagrams,
 }
 
 impl FakeNotifySource {
@@ -16,6 +17,7 @@ impl FakeNotifySource {
         Self {
             results: results.into_iter().collect(),
             calls: 0,
+            held: RuntimeHeldNotifyDatagrams::default(),
         }
     }
 
@@ -28,5 +30,9 @@ impl RuntimeNotifySource for FakeNotifySource {
     fn read_notify_datagram(&mut self) -> Result<Option<NotifyDatagram>, NotifySocketReadError> {
         self.calls += 1;
         self.results.pop_front().unwrap_or(Ok(None))
+    }
+
+    fn held_notify_datagrams(&mut self) -> &mut RuntimeHeldNotifyDatagrams {
+        &mut self.held
     }
 }

@@ -109,6 +109,7 @@ pub enum NotifyRejectionReason {
     UnsupportedReloadOperation,
     UnsupportedReadyState,
     ShutdownRefused,
+    SetupPending,
     InternalError,
 }
 
@@ -130,6 +131,7 @@ impl NotifyRejectionReason {
             Self::UnsupportedReloadOperation => "unsupported-reload-operation",
             Self::UnsupportedReadyState => "unsupported-ready-state",
             Self::ShutdownRefused => "shutdown-refused",
+            Self::SetupPending => "setup-pending",
             Self::InternalError => "internal-error",
         }
     }

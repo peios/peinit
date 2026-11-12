@@ -86,6 +86,11 @@ make a job record trustworthy:
   Running for ever. A reaped PID that matches no job *and* no pending
   setup is genuinely not peinit's — PID 1 reaps orphans it never
   started — and is ignored.
+- **A notification sent during that window is not refused for it.**
+  A service can send `READY=1` before the turn that reads its setup
+  status. peinit reads the status first and authenticates the datagram
+  after. If the status cannot yet be read, peinit holds the datagram
+  until it can (§10.5).
 - A setup failure takes the job straight from Created to Failed.
   `ended_at_ns` records the **classification** time, `failure_cause`
   records what went wrong, and `pid`, `pidfd`, `started_at_ns`,

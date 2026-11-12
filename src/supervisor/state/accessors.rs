@@ -109,6 +109,18 @@ impl Supervisor {
         self.pending_process_setups.contains_key(&setup_status_fd)
     }
 
+    /// The setup-status descriptor of the launched process using `pid`, while
+    /// its setup status has not been processed.
+    ///
+    /// Such a process is not yet findable by pid: its job records the pid
+    /// only once the status is processed.
+    pub fn pending_process_setup_fd_for_pid(&self, pid: u32) -> Option<i32> {
+        self.pending_process_setups
+            .iter()
+            .find(|(_, setup)| setup.process.pid == pid)
+            .map(|(fd, _)| *fd)
+    }
+
     /// Queued launch ids dropped since the last call because their job record
     /// had gone. Reset on read; the work pump reports it for the turn.
     pub fn take_stale_launch_entries(&mut self) -> usize {

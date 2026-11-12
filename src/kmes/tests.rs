@@ -582,6 +582,7 @@ fn every_notify_rejection_reason_is_one_the_fragment_declares() {
         UnsupportedReloadOperation,
         UnsupportedReadyState,
         ShutdownRefused,
+        SetupPending,
         InternalError,
     ] {
         assert!(
