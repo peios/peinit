@@ -14,7 +14,7 @@ dependencies = [
 [[package]]
 name = "auth-core"
 version = "0.0.24"
-source = "git+https://github.com/peios/authd.git?rev=3f42589dcb738c4fe9d2cdd6b26df92f61c6a2c4#3f42589dcb738c4fe9d2cdd6b26df92f61c6a2c4"
+source = "git+https://github.com/peios/authd.git?rev=ea3c9f90c48052ff0c0757d88032c9c706964b9a#ea3c9f90c48052ff0c0757d88032c9c706964b9a"
 dependencies = [
  "libc",
 ]

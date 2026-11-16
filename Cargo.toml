@@ -15,7 +15,7 @@ crate-type = ["rlib", "cdylib"]
 jiff = "0.2.29"
 libc = "0.2"
 # Use authd's shared PGSS codec for service-token requests.
-auth-core = { git = "https://github.com/peios/authd.git", rev = "3f42589dcb738c4fe9d2cdd6b26df92f61c6a2c4", optional = true }
+auth-core = { git = "https://github.com/peios/authd.git", rev = "ea3c9f90c48052ff0c0757d88032c9c706964b9a", optional = true }
 peios = { git = "https://github.com/peios/peios-rs.git", rev = "4c9c0106550e3b7d8b4a98dfd0d7a5490fcf0116", optional = true }
 serde_json = "1"
 sha1 = "0.10"
