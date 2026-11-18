@@ -16,7 +16,7 @@ jiff = "0.2.29"
 libc = "0.2"
 # Use authd's shared PGSS codec for service-token requests.
 auth-core = { git = "https://github.com/peios/authd.git", rev = "b2b4d18ab639dac0e2990f3ccdd8e718d544b353", optional = true }
-peios = { git = "https://github.com/peios/peios-rs.git", rev = "3950d35950c46cb3538885b7cf05bde059393def", optional = true }
+peios = { git = "https://github.com/peios/peios-rs.git", rev = "7c05d93e82ddeae7c9c16c4bb21cfe5e5416ca7e", optional = true }
 serde_json = "1"
 sha1 = "0.10"
 
