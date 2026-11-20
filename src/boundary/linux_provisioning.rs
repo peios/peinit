@@ -15,26 +15,25 @@ use crate::service::ServiceDefinition;
 #[cfg(feature = "peios-boundary")]
 const DEFAULT_PROVISIONED_PATH_SDDL: &str = "O:SYG:SYD:(A;;GA;;;SY)(A;;GA;;;BA)(A;;FR;;;BU)";
 
-/// Every KACS-native open has to name a data right -- `READ_DATA`,
-/// `WRITE_DATA`, `APPEND_DATA` -- or `EXECUTE`, because that is what gives the
-/// returned descriptor a file mode; a mask of metadata and standard rights
-/// alone fails with `EINVAL`.
+/// Provisioning never reads or writes what it creates, so it asks for no data
+/// right: the handle is a KACS control handle, with no file mode, carrying
+/// only what it needs to `fstat` the result and, on the reopen, to stamp a
+/// descriptor. A data right would buy nothing and cost something -- a write
+/// mode takes write access, which fails with `ETXTBSY` on a running binary and
+/// breaks other holders' read leases.
 ///
-/// For a directory the only one available is `LIST_DIRECTORY`, which is
-/// `READ_DATA` under another name. Its write aliases `ADD_FILE` and
-/// `ADD_SUBDIRECTORY` are not cacheable directory handle rights and are
-/// rejected with `EOPNOTSUPP` -- they authorize namespace operations on the
-/// parent, evaluated live, rather than being carried by a handle.
+/// Directories and files take the same mask. A directory's write aliases
+/// `ADD_FILE` and `ADD_SUBDIRECTORY` would be refused with `EOPNOTSUPP`
+/// anyway -- they authorize namespace operations on the parent, evaluated
+/// live, rather than being carried by a handle.
 #[cfg(feature = "peios-boundary")]
-const DIRECTORY_CREATE_ACCESS: FileAccess = FileAccess::LIST_DIRECTORY
-    .union(FileAccess::READ_ATTRIBUTES)
-    .union(FileAccess::SYNCHRONIZE);
+const PROVISION_ACCESS: FileAccess = FileAccess::READ_ATTRIBUTES.union(FileAccess::SYNCHRONIZE);
 
+/// The reopen of something already there, to stamp its descriptor.
 #[cfg(feature = "peios-boundary")]
-const FILE_CREATE_ACCESS: FileAccess = FileAccess::READ_DATA
-    .union(FileAccess::WRITE_DATA)
-    .union(FileAccess::READ_ATTRIBUTES)
-    .union(FileAccess::SYNCHRONIZE);
+const RESTAMP_ACCESS: FileAccess = PROVISION_ACCESS
+    .union(FileAccess::WRITE_DAC)
+    .union(FileAccess::WRITE_OWNER);
 
 pub fn provision_linux_boot_paths(paths: &[ProvisionedPath]) -> ProvisionedPathApplyReport {
     let mut report = ProvisionedPathApplyReport::default();
@@ -217,10 +216,7 @@ fn ensure_file(path: &Path, sd: &ResolvedSecurity) -> io::Result<()> {
     let (file, created) =
         create_or_open_file(path, sd).map_err(|e| step_error("create file", path, e))?;
     if !fd_is_regular_file(file.as_raw_fd())? {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!("{} exists but is not a regular file", path.display()),
-        ));
+        return Err(not_a_regular_file(path));
     }
     if created {
         return Ok(());
@@ -272,7 +268,7 @@ fn create_or_open_directory(
 ) -> io::Result<(peios::file::File, bool)> {
     let ResolvedSecurity::Descriptor(sd) = sd;
     match OpenOptions::new()
-        .desired_access(DIRECTORY_CREATE_ACCESS)
+        .desired_access(PROVISION_ACCESS)
         .disposition(Disposition::Create)
         .options(CreateOptions::DIRECTORY)
         .flags(OpenFlags::SYMLINK_NOFOLLOW)
@@ -284,7 +280,7 @@ fn create_or_open_directory(
         Err(error) => return Err(io::Error::from(error)),
     }
     let (file, _) = OpenOptions::new()
-        .desired_access(DIRECTORY_CREATE_ACCESS | FileAccess::WRITE_DAC | FileAccess::WRITE_OWNER)
+        .desired_access(RESTAMP_ACCESS)
         .disposition(Disposition::Open)
         .options(CreateOptions::DIRECTORY)
         .flags(OpenFlags::SYMLINK_NOFOLLOW)
@@ -321,7 +317,7 @@ fn create_or_open_file(
 ) -> io::Result<(peios::file::File, bool)> {
     let ResolvedSecurity::Descriptor(sd) = sd;
     match OpenOptions::new()
-        .desired_access(FILE_CREATE_ACCESS)
+        .desired_access(PROVISION_ACCESS)
         .disposition(Disposition::Create)
         .flags(OpenFlags::SYMLINK_NOFOLLOW)
         .creator_sd(sd)
@@ -331,13 +327,25 @@ fn create_or_open_file(
         Err(error) if error.raw_os_error() == Some(libc::EEXIST) => {}
         Err(error) => return Err(io::Error::from(error)),
     }
+    // A FIFO, socket or device node refuses a handle with no data right, with
+    // `EINVAL`. Say what is actually wrong rather than passing that on.
     let (file, _) = OpenOptions::new()
-        .desired_access(FILE_CREATE_ACCESS | FileAccess::WRITE_DAC | FileAccess::WRITE_OWNER)
+        .desired_access(RESTAMP_ACCESS)
         .disposition(Disposition::Open)
         .flags(OpenFlags::SYMLINK_NOFOLLOW)
         .create(None, path)
-        .map_err(io::Error::from)?;
+        .map_err(|error| match path.symlink_metadata() {
+            Ok(metadata) if !metadata.is_file() => not_a_regular_file(path),
+            _ => io::Error::from(error),
+        })?;
     Ok((file, false))
+}
+
+fn not_a_regular_file(path: &Path) -> io::Error {
+    io::Error::new(
+        io::ErrorKind::InvalidInput,
+        format!("{} exists but is not a regular file", path.display()),
+    )
 }
 
 #[cfg(not(feature = "peios-boundary"))]
